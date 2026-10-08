@@ -1,0 +1,8 @@
+# node scripts/validate-contracts.mjs
+(exit 0; last lines)
+valid example ok: examples/valid/injection-document/full.json
+valid example ok: examples/valid/injection-document/minimal.json
+valid example ok: examples/valid/instance-template/shop-template-flag-delivery-env.json
+valid example ok: examples/valid/instance-template/shop-template.json
+checked 3 schemas, 5 valid and 129 invalid examples
+contracts: PASS

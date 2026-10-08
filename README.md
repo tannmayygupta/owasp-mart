@@ -30,7 +30,8 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 | `node scripts/dev.mjs hello` | Starts a hardened hello container, checks it, removes it |
 | `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (empty until later stories) |
 | `node scripts/dev.mjs down` | Stops and removes the project's containers |
-| `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed) |
-| `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests against the real Docker engine (about 1 minute) |
+| `pnpm run contracts:check` | Validates the instance contract (IF-6): schemas, examples, semantic rules (needs `pnpm install` once) |
+| `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed; needs `pnpm install` once) |
+| `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests: real Docker engine and contract copies (about 1 minute; the contract tests also install dependencies in a temporary copy) |
 
 Application code (platform, lab and target) is not written yet; it starts with the Sprint 1 tasks.

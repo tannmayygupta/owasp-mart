@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (instance contract v0, L-02, 2026-10-08, Tanmay)
+- Instance contract v0 (IF-6) in `contracts/instance/`: contract text, three JSON Schemas (injection document, flags file, instance template), 5 valid and 129 invalid examples, `contracts/CHANGELOG.md`. Checked by `scripts/validate-contracts.mjs` (`pnpm run contracts:check`) with tests. Ajv 8.20.0 and ajv-formats 3.0.1 added as pinned dev dependencies; CI `scripts` job now installs dependencies first. End-to-end tests in `scripts/e2e/contracts.e2e.test.mjs`. Awaiting Sahil's approval as consumer.
+
 ### Added
 - `initial.md` v0.2 as the source of truth (decisions D-01 to D-13). (2026-10-08, Tanmay)
 - Documentation system: `CLAUDE.md` rule, dev-log, ADRs, traceability table, commit gate (`scripts/check-docs.mjs`, Claude Code hook and git `commit-msg` backstop). (2026-10-08, Tanmay)

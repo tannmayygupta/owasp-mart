@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
+  "seed": "FAKE-SEED-NOT-REAL-0000000000000000",
+  "flags": [
+    {
+      "challenge_key": "C01",
+      "flag": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"
+    }
+  ],
+  "decoys": []
+}

@@ -1,0 +1,394 @@
+{
+  "schema_version": "0.1",
+  "template_id": "shop-v0",
+  "volumes": [
+    {
+      "name": "vm-run",
+      "memory_backed": true,
+      "size_mb": 16
+    },
+    {
+      "name": "vm-import",
+      "memory_backed": true,
+      "size_mb": 8
+    },
+    {
+      "name": "vm-placement-import",
+      "memory_backed": true,
+      "size_mb": 2
+    },
+    {
+      "name": "vm-placement-mock",
+      "memory_backed": true,
+      "size_mb": 2
+    },
+    {
+      "name": "vm-placement-other",
+      "memory_backed": true,
+      "size_mb": 2
+    }
+  ],
+  "components": [
+    {
+      "name": "shop",
+      "role": "shop",
+      "image": "{image:shop}",
+      "user": "65532:65532",
+      "read_only": true,
+      "no_new_privileges": true,
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "egress": false,
+      "network_mode": "instance",
+      "memory_mb": 512,
+      "cpu_limit": 1,
+      "pids_limit": 256,
+      "mounts": [
+        {
+          "type": "tmpfs",
+          "target": "/tmp",
+          "size_mb": 64
+        },
+        {
+          "type": "tmpfs",
+          "target": "/data",
+          "size_mb": 256
+        },
+        {
+          "type": "volume",
+          "target": "/run/vm",
+          "source": "vm-run",
+          "read_only": true
+        },
+        {
+          "type": "volume",
+          "target": "/run/import",
+          "source": "vm-import",
+          "read_only": false
+        }
+      ],
+      "env": {
+        "VM_INSTANCE_ID": "{instance_id}",
+        "VM_EPOCH": "{epoch}",
+        "VM_PUBLIC_HOST": "{host}",
+        "VM_SIDECAR_EVENTS_URL": "http://sidecar:9000",
+        "VM_MOCK_URL": "http://mock-services",
+        "VM_IMPORT_SOCKET": "/run/import/import.sock",
+        "VM_DB_PATH": "/data/shop.db",
+        "VM_CATALOG_DB_PATH": "/data/catalog.db",
+        "VM_SNAPSHOT_PATH": "/run/vm/snapshot.db",
+        "VM_FLAGS_PATH": "/run/vm/flags.json",
+        "PORT": "3000",
+        "TZ": "UTC",
+        "VM_LOG_LEVEL": "info"
+      },
+      "labels": {
+        "vm.schema": "0.1",
+        "vm.instance": "{instance_id}",
+        "vm.epoch": "{epoch}",
+        "vm.component": "shop",
+        "vm.template": "shop-v0",
+        "vm.expires": "{expires}",
+        "vm.host": "{host}",
+        "vm.kind": "inst",
+        "vm.owner": "{owner_hash}"
+      },
+      "healthcheck": {
+        "interval_s": 2,
+        "timeout_s": 2,
+        "retries": 15,
+        "kind": "http",
+        "port": 3000,
+        "path": "/readyz"
+      },
+      "ports": [
+        3000
+      ]
+    },
+    {
+      "name": "sidecar",
+      "role": "sidecar",
+      "image": "{image:sidecar}",
+      "user": "65532:65532",
+      "read_only": true,
+      "no_new_privileges": true,
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "egress": false,
+      "network_mode": "instance",
+      "memory_mb": 256,
+      "cpu_limit": 0.5,
+      "pids_limit": 128,
+      "mounts": [
+        {
+          "type": "tmpfs",
+          "target": "/tmp",
+          "size_mb": 16
+        }
+      ],
+      "env": {
+        "VM_INSTANCE_ID": "{instance_id}",
+        "VM_EPOCH": "{epoch}",
+        "TZ": "UTC",
+        "VM_LOG_LEVEL": "info"
+      },
+      "labels": {
+        "vm.schema": "0.1",
+        "vm.instance": "{instance_id}",
+        "vm.epoch": "{epoch}",
+        "vm.component": "sidecar",
+        "vm.template": "shop-v0",
+        "vm.expires": "{expires}",
+        "vm.host": "{host}",
+        "vm.kind": "inst",
+        "vm.owner": "{owner_hash}"
+      },
+      "healthcheck": {
+        "interval_s": 2,
+        "timeout_s": 2,
+        "retries": 15,
+        "kind": "tcp",
+        "port": 8080
+      },
+      "ports": [
+        8080,
+        9000
+      ]
+    },
+    {
+      "name": "injector",
+      "role": "injector",
+      "image": "{image:injector}",
+      "user": "65532:65532",
+      "read_only": true,
+      "no_new_privileges": true,
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "egress": false,
+      "network_mode": "none",
+      "memory_mb": 128,
+      "cpu_limit": 0.5,
+      "pids_limit": 64,
+      "mounts": [
+        {
+          "type": "tmpfs",
+          "target": "/tmp",
+          "size_mb": 16
+        },
+        {
+          "type": "tmpfs",
+          "target": "/data",
+          "size_mb": 64
+        },
+        {
+          "type": "volume",
+          "target": "/run/vm",
+          "source": "vm-run",
+          "read_only": false
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/import",
+          "source": "vm-placement-import",
+          "read_only": false
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/mock",
+          "source": "vm-placement-mock",
+          "read_only": false
+        }
+      ],
+      "env": {
+        "VM_SNAPSHOT_PATH": "/run/vm/snapshot.db",
+        "VM_FLAGS_PATH": "/run/vm/flags.json",
+        "TZ": "UTC"
+      },
+      "labels": {
+        "vm.schema": "0.1",
+        "vm.instance": "{instance_id}",
+        "vm.epoch": "{epoch}",
+        "vm.component": "injector",
+        "vm.template": "shop-v0",
+        "vm.expires": "{expires}",
+        "vm.host": "{host}",
+        "vm.kind": "inst",
+        "vm.owner": "{owner_hash}"
+      }
+    },
+    {
+      "name": "import-service",
+      "role": "import-service",
+      "image": "{image:import-service}",
+      "user": "65532:65532",
+      "read_only": true,
+      "no_new_privileges": true,
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "egress": false,
+      "network_mode": "none",
+      "memory_mb": 128,
+      "cpu_limit": 0.5,
+      "pids_limit": 64,
+      "mounts": [
+        {
+          "type": "tmpfs",
+          "target": "/tmp",
+          "size_mb": 16
+        },
+        {
+          "type": "volume",
+          "target": "/run/import",
+          "source": "vm-import",
+          "read_only": false
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/import",
+          "source": "vm-placement-other",
+          "read_only": true
+        }
+      ],
+      "env": {
+        "VM_IMPORT_SOCKET": "/run/import/import.sock",
+        "TZ": "UTC",
+        "VM_LOG_LEVEL": "info"
+      },
+      "labels": {
+        "vm.schema": "0.1",
+        "vm.instance": "{instance_id}",
+        "vm.epoch": "{epoch}",
+        "vm.component": "import-service",
+        "vm.template": "shop-v0",
+        "vm.expires": "{expires}",
+        "vm.host": "{host}",
+        "vm.kind": "inst",
+        "vm.owner": "{owner_hash}"
+      },
+      "healthcheck": {
+        "interval_s": 2,
+        "timeout_s": 2,
+        "retries": 15,
+        "kind": "socket",
+        "path": "/run/import/import.sock"
+      }
+    },
+    {
+      "name": "mock-services",
+      "role": "mock-services",
+      "image": "{image:mock-services}",
+      "user": "65532:65532",
+      "read_only": true,
+      "no_new_privileges": true,
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "egress": false,
+      "network_mode": "instance",
+      "memory_mb": 128,
+      "cpu_limit": 0.5,
+      "pids_limit": 64,
+      "mounts": [
+        {
+          "type": "tmpfs",
+          "target": "/tmp",
+          "size_mb": 16
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/mock",
+          "source": "vm-placement-mock",
+          "read_only": true
+        }
+      ],
+      "env": {
+        "TZ": "UTC",
+        "VM_LOG_LEVEL": "info"
+      },
+      "labels": {
+        "vm.schema": "0.1",
+        "vm.instance": "{instance_id}",
+        "vm.epoch": "{epoch}",
+        "vm.component": "mock-services",
+        "vm.template": "shop-v0",
+        "vm.expires": "{expires}",
+        "vm.host": "{host}",
+        "vm.kind": "inst",
+        "vm.owner": "{owner_hash}"
+      },
+      "healthcheck": {
+        "interval_s": 2,
+        "timeout_s": 2,
+        "retries": 15,
+        "kind": "tcp",
+        "port": 9101
+      },
+      "ports": [
+        9101,
+        9102,
+        9103,
+        9104
+      ]
+    },
+    {
+      "name": "bot-controller",
+      "role": "bot-controller",
+      "image": "{image:bot-controller}",
+      "user": "65532:65532",
+      "read_only": true,
+      "no_new_privileges": true,
+      "privileged": false,
+      "cap_drop": [
+        "ALL"
+      ],
+      "egress": false,
+      "network_mode": "instance",
+      "memory_mb": 512,
+      "cpu_limit": 1,
+      "pids_limit": 256,
+      "mounts": [
+        {
+          "type": "tmpfs",
+          "target": "/tmp",
+          "size_mb": 128
+        }
+      ],
+      "env": {
+        "VM_PUBLIC_HOST": "{host}",
+        "PORT": "9200",
+        "TZ": "UTC",
+        "VM_LOG_LEVEL": "info"
+      },
+      "labels": {
+        "vm.schema": "0.1",
+        "vm.instance": "{instance_id}",
+        "vm.epoch": "{epoch}",
+        "vm.component": "bot-controller",
+        "vm.template": "shop-v0",
+        "vm.expires": "{expires}",
+        "vm.host": "{host}",
+        "vm.kind": "inst",
+        "vm.owner": "{owner_hash}"
+      },
+      "healthcheck": {
+        "interval_s": 2,
+        "timeout_s": 2,
+        "retries": 15,
+        "kind": "tcp",
+        "port": 9200
+      },
+      "ports": [
+        9200
+      ]
+    }
+  ]
+}

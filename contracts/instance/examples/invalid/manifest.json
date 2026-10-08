@@ -1,0 +1,518 @@
+{
+  "injection-document/bad-flag-format.json": {
+    "path": "/flags/0/flag",
+    "rule": "flag is VM{ plus 24 Base32 characters }"
+  },
+  "injection-document/lowercase-flag.json": {
+    "path": "/flags/0/flag",
+    "rule": "Base32 uppercase only"
+  },
+  "injection-document/bad-decoy-format.json": {
+    "path": "/decoys/0/value",
+    "rule": "decoy has the flag format"
+  },
+  "injection-document/missing-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "injection-document/non-numeric-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch is an integer"
+  },
+  "injection-document/zero-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch starts at 1"
+  },
+  "injection-document/bad-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is 0.x"
+  },
+  "injection-document/bad-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance id shape"
+  },
+  "injection-document/short-seed.json": {
+    "path": "/seed",
+    "rule": "seed has at least 32 characters"
+  },
+  "injection-document/missing-seed.json": {
+    "path": "/seed",
+    "rule": "seed is required"
+  },
+  "injection-document/bad-issued-at.json": {
+    "path": "/issued_at",
+    "rule": "issued_at is a date-time"
+  },
+  "injection-document/bad-challenge-key.json": {
+    "path": "/flags/0/challenge_key",
+    "rule": "challenge key C01 to C11"
+  },
+  "injection-document/extra-property.json": {
+    "path": "/event_key",
+    "rule": "no unknown top-level fields (no key in the document)"
+  },
+  "injection-document/duplicate-challenge-key.json": {
+    "path": "/flags/1/challenge_key",
+    "rule": "one flag per challenge key (semantic)"
+  },
+  "injection-document/decoy-equals-flag.json": {
+    "path": "/decoys/0/value",
+    "rule": "a decoy never equals a real flag (semantic)"
+  },
+  "injection-document/duplicate-decoy-index.json": {
+    "path": "/decoys/1/index",
+    "rule": "one decoy per challenge key and index (semantic)"
+  },
+  "flags-file/bad-flag-format.json": {
+    "path": "/flags/0/flag",
+    "rule": "flag format"
+  },
+  "flags-file/missing-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "flags-file/bad-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance id shape"
+  },
+  "flags-file/bad-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is 0.x"
+  },
+  "flags-file/duplicate-challenge-key.json": {
+    "path": "/flags/1/challenge_key",
+    "rule": "one flag per challenge key (semantic)"
+  },
+  "instance-template/user-root.json": {
+    "path": "/components/0/user",
+    "rule": "no root user"
+  },
+  "instance-template/user-group-root.json": {
+    "path": "/components/0/user",
+    "rule": "no root group"
+  },
+  "instance-template/user-name.json": {
+    "path": "/components/0/user",
+    "rule": "numeric uid:gid only"
+  },
+  "instance-template/egress-true.json": {
+    "path": "/components/0/egress",
+    "rule": "no egress"
+  },
+  "instance-template/read-only-false.json": {
+    "path": "/components/0/read_only",
+    "rule": "read-only root filesystem"
+  },
+  "instance-template/no-new-privileges-false.json": {
+    "path": "/components/0/no_new_privileges",
+    "rule": "no new privileges"
+  },
+  "instance-template/privileged-true.json": {
+    "path": "/components/0/privileged",
+    "rule": "never privileged"
+  },
+  "instance-template/privileged-missing.json": {
+    "path": "/components/0/privileged",
+    "rule": "privileged must be stated"
+  },
+  "instance-template/cap-drop-empty.json": {
+    "path": "/components/0/cap_drop",
+    "rule": "cap_drop is ALL"
+  },
+  "instance-template/cap-drop-missing.json": {
+    "path": "/components/0/cap_drop",
+    "rule": "cap_drop is required"
+  },
+  "instance-template/cap-add.json": {
+    "path": "/components/0/cap_add",
+    "rule": "no added capabilities"
+  },
+  "instance-template/host-bind-mount.json": {
+    "path": "/components/0/mounts/0/type",
+    "rule": "no host mounts"
+  },
+  "instance-template/mount-traversal-target.json": {
+    "path": "/components/0/mounts/1/target",
+    "rule": "exact mount targets only"
+  },
+  "instance-template/mount-unlisted-target.json": {
+    "path": "/components/0/mounts/1/target",
+    "rule": "exact mount targets only"
+  },
+  "instance-template/anonymous-volume.json": {
+    "path": "/components/0/mounts/2/source",
+    "rule": "a volume mount names its volume"
+  },
+  "instance-template/volume-not-memory-backed.json": {
+    "path": "/volumes/0/memory_backed",
+    "rule": "every volume is memory-backed"
+  },
+  "instance-template/tmpfs-at-run-vm.json": {
+    "path": "/components/0/mounts/2/target",
+    "rule": "/run/vm is a shared volume, not a private tmpfs"
+  },
+  "instance-template/missing-shop-role.json": {
+    "path": "/components",
+    "rule": "the shop role is required"
+  },
+  "instance-template/missing-injector-role.json": {
+    "path": "/components",
+    "rule": "the injector role is required"
+  },
+  "instance-template/duplicate-role.json": {
+    "path": "/components",
+    "rule": "each role exactly once"
+  },
+  "instance-template/missing-network-mode.json": {
+    "path": "/components/0/network_mode",
+    "rule": "network_mode is required"
+  },
+  "instance-template/import-service-on-instance-network.json": {
+    "path": "/components/3/network_mode",
+    "rule": "import service has no network"
+  },
+  "instance-template/missing-healthcheck.json": {
+    "path": "/components/0/healthcheck",
+    "rule": "healthcheck required except for the injector"
+  },
+  "instance-template/healthcheck-http-without-path.json": {
+    "path": "/components/0/healthcheck/path",
+    "rule": "http healthcheck names its path"
+  },
+  "instance-template/missing-ports.json": {
+    "path": "/components/1/ports",
+    "rule": "ports required for shop, sidecar, mock-services, bot-controller"
+  },
+  "instance-template/missing-memory-limit.json": {
+    "path": "/components/0/memory_mb",
+    "rule": "memory limit declared"
+  },
+  "instance-template/missing-cpu-limit.json": {
+    "path": "/components/0/cpu_limit",
+    "rule": "cpu limit declared"
+  },
+  "instance-template/missing-pids-limit.json": {
+    "path": "/components/0/pids_limit",
+    "rule": "process limit declared"
+  },
+  "instance-template/env-unlisted-name.json": {
+    "path": "/components/0/env/DATABASE_URL",
+    "rule": "env names from the allowlist only"
+  },
+  "instance-template/env-flag-name.json": {
+    "path": "/components/0/env/VM_FLAG_C01",
+    "rule": "no flag in env"
+  },
+  "instance-template/env-key-suffix.json": {
+    "path": "/components/0/env/EVENT_KEY",
+    "rule": "no key in env (_KEY)"
+  },
+  "instance-template/env-secret-suffix.json": {
+    "path": "/components/0/env/DB_SECRET",
+    "rule": "no secret in env (_SECRET)"
+  },
+  "instance-template/env-token-suffix.json": {
+    "path": "/components/0/env/API_TOKEN",
+    "rule": "no token in env (_TOKEN)"
+  },
+  "instance-template/env-password-suffix.json": {
+    "path": "/components/0/env/ADMIN_PASSWORD",
+    "rule": "no password in env (_PASSWORD)"
+  },
+  "instance-template/env-flag-in-value.json": {
+    "path": "/components/0/env/VM_LOG_LEVEL",
+    "rule": "no flag in an env value"
+  },
+  "instance-template/env-value-too-long.json": {
+    "path": "/components/0/env/VM_LOG_LEVEL",
+    "rule": "env value at most 512 characters"
+  },
+  "instance-template/env-value-not-string.json": {
+    "path": "/components/0/env/PORT",
+    "rule": "env values are strings"
+  },
+  "instance-template/bad-owner-label.json": {
+    "path": "/components/0/labels/vm.owner",
+    "rule": "vm.owner is an opaque hash, never an email"
+  },
+  "instance-template/missing-owner-label.json": {
+    "path": "/components/0/labels/vm.owner",
+    "rule": "all nine labels required"
+  },
+  "instance-template/label-component-mismatch.json": {
+    "path": "/components/0/labels/vm.component",
+    "rule": "vm.component equals name (semantic)"
+  },
+  "instance-template/label-template-mismatch.json": {
+    "path": "/components/0/labels/vm.template",
+    "rule": "vm.template equals template_id (semantic)"
+  },
+  "instance-template/flag-delivery-env-name-mismatch.json": {
+    "path": "/components/0/flag_delivery_env/env_name",
+    "rule": "env_name is VM_FLAG_ plus challenge_key (semantic)"
+  },
+  "instance-template/flag-delivery-env-bad-name.json": {
+    "path": "/components/0/flag_delivery_env/env_name",
+    "rule": "env_name shape"
+  },
+  "instance-template/flag-delivery-env-short-reason.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason has at least 20 characters"
+  },
+  "instance-template/flag-delivery-env-blank-reason.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason is not blank"
+  },
+  "instance-template/flag-delivery-env-missing-reason.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason is required"
+  },
+  "instance-template/flag-delivery-env-on-sidecar.json": {
+    "path": "/components/1/flag_delivery_env",
+    "rule": "only the shop may receive a flag in env"
+  },
+  "instance-template/bad-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is 0.x"
+  },
+  "instance-template/bad-template-id.json": {
+    "path": "/template_id",
+    "rule": "template id shape"
+  },
+  "instance-template/duplicate-component-name.json": {
+    "path": "/components/1/name",
+    "rule": "component names are unique (semantic)"
+  },
+  "instance-template/duplicate-volume-name.json": {
+    "path": "/volumes/1/name",
+    "rule": "volume names are unique (semantic)"
+  },
+  "instance-template/unknown-volume-source.json": {
+    "path": "/components/0/mounts/2/source",
+    "rule": "a mounted volume exists in volumes (semantic)"
+  },
+  "instance-template/duplicate-mount-target.json": {
+    "path": "/components/0/mounts/1/target",
+    "rule": "mount targets are unique per component (semantic)"
+  },
+  "instance-template/run-vm-separate-volumes.json": {
+    "path": "/components/0/mounts/2/source",
+    "rule": "injector and shop share one /run/vm volume (semantic)"
+  },
+  "instance-template/run-vm-shop-writable.json": {
+    "path": "/components/0/mounts/2/read_only",
+    "rule": "shop mounts /run/vm read-only (semantic)"
+  },
+  "instance-template/run-vm-injector-read-only.json": {
+    "path": "/components/2/mounts/2/read_only",
+    "rule": "injector mounts /run/vm read-write (semantic)"
+  },
+  "instance-template/shop-missing-run-vm.json": {
+    "path": "/components/0/mounts",
+    "rule": "shop mounts /run/vm (semantic)"
+  },
+  "instance-template/shop-missing-data.json": {
+    "path": "/components/0/mounts",
+    "rule": "shop mounts /data (semantic)"
+  },
+  "instance-template/injector-missing-run-vm.json": {
+    "path": "/components/2/mounts",
+    "rule": "injector mounts /run/vm (semantic)"
+  },
+  "instance-template/import-service-missing-run-import.json": {
+    "path": "/components/3/mounts",
+    "rule": "import service mounts /run/import (semantic)"
+  },
+  "instance-template/run-import-separate-volumes.json": {
+    "path": "/components/3/mounts/1/source",
+    "rule": "shop and import service share one /run/import volume (semantic)"
+  },
+  "instance-template/sidecar-mounts-run-vm.json": {
+    "path": "/components/1/mounts/1/target",
+    "rule": "only the injector and the shop mount /run/vm (semantic)"
+  },
+  "instance-template/bot-controller-mounts-run-import.json": {
+    "path": "/components/5/mounts/1/target",
+    "rule": "only the shop and the import service mount /run/import (semantic)"
+  },
+  "instance-template/shop-missing-tmp.json": {
+    "path": "/components/0/mounts",
+    "rule": "shop mounts /tmp (semantic)"
+  },
+  "instance-template/injector-missing-tmp.json": {
+    "path": "/components/2/mounts",
+    "rule": "injector mounts /tmp (semantic)"
+  },
+  "instance-template/import-service-missing-tmp.json": {
+    "path": "/components/3/mounts",
+    "rule": "import service mounts /tmp (semantic)"
+  },
+  "instance-template/shop-missing-run-import.json": {
+    "path": "/components/0/mounts",
+    "rule": "shop mounts /run/import (semantic)"
+  },
+  "instance-template/unused-volume.json": {
+    "path": "/volumes/4",
+    "rule": "every declared volume is mounted (semantic)"
+  },
+  "instance-template/label-instance-differs.json": {
+    "path": "/components/1/labels/vm.instance",
+    "rule": "vm.instance identical across components (semantic)"
+  },
+  "instance-template/label-host-differs.json": {
+    "path": "/components/2/labels/vm.host",
+    "rule": "vm.host identical across components (semantic)"
+  },
+  "instance-template/label-kind-front.json": {
+    "path": "/components/0/labels/vm.kind",
+    "rule": "vm.kind is inst in templates"
+  },
+  "instance-template/label-expires-bad.json": {
+    "path": "/components/0/labels/vm.expires",
+    "rule": "vm.expires is a token or an ISO 8601 UTC time"
+  },
+  "instance-template/label-schema-other.json": {
+    "path": "/components/0/labels/vm.schema",
+    "rule": "vm.schema is 0.1"
+  },
+  "instance-template/memory-below-memory-backed-sizes.json": {
+    "path": "/components/0/memory_mb",
+    "rule": "tmpfs and volume sizes fit in memory_mb (semantic)"
+  },
+  "instance-template/memory-limit-below-16.json": {
+    "path": "/components/0/memory_mb",
+    "rule": "memory_mb at least 16"
+  },
+  "instance-template/cpu-limit-zero.json": {
+    "path": "/components/0/cpu_limit",
+    "rule": "cpu_limit above 0"
+  },
+  "instance-template/port-out-of-range.json": {
+    "path": "/components/0/ports/0",
+    "rule": "ports 1024 to 65535"
+  },
+  "instance-template/duplicate-port.json": {
+    "path": "/components/0/ports",
+    "rule": "ports are unique"
+  },
+  "instance-template/healthcheck-unknown-kind.json": {
+    "path": "/components/0/healthcheck/kind",
+    "rule": "healthcheck kind http, tcp or socket"
+  },
+  "instance-template/healthcheck-port-not-in-ports.json": {
+    "path": "/components/0/healthcheck/port",
+    "rule": "healthcheck port is one of the ports (semantic)"
+  },
+  "instance-template/healthcheck-timeout-over-interval.json": {
+    "path": "/components/0/healthcheck/timeout_s",
+    "rule": "timeout_s at most interval_s (semantic)"
+  },
+  "instance-template/healthcheck-path-traversal.json": {
+    "path": "/components/0/healthcheck/path",
+    "rule": "no .. in a healthcheck path"
+  },
+  "instance-template/shop-healthcheck-tcp.json": {
+    "path": "/components/0/healthcheck/kind",
+    "rule": "shop healthcheck is http"
+  },
+  "instance-template/import-service-healthcheck-http.json": {
+    "path": "/components/3/healthcheck/kind",
+    "rule": "import service healthcheck is socket"
+  },
+  "instance-template/tmpfs-with-read-only.json": {
+    "path": "/components/0/mounts/0/read_only",
+    "rule": "a tmpfs mount has no read_only field"
+  },
+  "instance-template/template-extra-property.json": {
+    "path": "/extra",
+    "rule": "no unknown top-level fields"
+  },
+  "injection-document/twelve-flags.json": {
+    "path": "/flags",
+    "rule": "at most 11 flags"
+  },
+  "injection-document/empty-flags.json": {
+    "path": "/flags",
+    "rule": "at least one flag"
+  },
+  "injection-document/seed-bad-characters.json": {
+    "path": "/seed",
+    "rule": "seed characters A-Z a-z 0-9 _ -"
+  },
+  "injection-document/negative-decoy-index.json": {
+    "path": "/decoys/0/index",
+    "rule": "decoy index at least 0"
+  },
+  "injection-document/flag-value-repeated.json": {
+    "path": "/flags/1/flag",
+    "rule": "a flag value is used once (semantic)"
+  },
+  "injection-document/decoy-value-repeated.json": {
+    "path": "/decoys/1/value",
+    "rule": "a decoy value is used once (semantic)"
+  },
+  "injection-document/decoy-challenge-not-in-flags.json": {
+    "path": "/decoys/2/challenge_key",
+    "rule": "a decoy belongs to a challenge that has a flag (semantic)"
+  },
+  "flags-file/extra-property.json": {
+    "path": "/event_key",
+    "rule": "no unknown top-level fields"
+  },
+  "instance-template/placement-import-mounted-by-shop.json": {
+    "path": "/components/0/mounts/4/target",
+    "rule": "the shop mounts neither placement volume (semantic)"
+  },
+  "instance-template/placement-mock-mounted-by-bot-controller.json": {
+    "path": "/components/5/mounts/1/target",
+    "rule": "the bot controller mounts neither placement volume (semantic)"
+  },
+  "instance-template/placement-mock-mounted-by-import-service.json": {
+    "path": "/components/3/mounts/3/target",
+    "rule": "only mock-services mounts the mock placement volume (semantic)"
+  },
+  "instance-template/placement-import-separate-volume.json": {
+    "path": "/components/3/mounts/2/source",
+    "rule": "placement volume is the injector volume (semantic)"
+  },
+  "instance-template/placement-mock-separate-volume.json": {
+    "path": "/components/4/mounts/1/source",
+    "rule": "placement volume is the injector volume (semantic)"
+  },
+  "instance-template/placement-import-writable.json": {
+    "path": "/components/3/mounts/2/read_only",
+    "rule": "import service mounts the placement volume read-only (semantic)"
+  },
+  "instance-template/import-service-missing-placement.json": {
+    "path": "/components/3/mounts",
+    "rule": "import service mounts /run/placement/import (semantic)"
+  },
+  "instance-template/mock-services-missing-placement.json": {
+    "path": "/components/4/mounts",
+    "rule": "mock-services mounts /run/placement/mock (semantic)"
+  },
+  "instance-template/injector-missing-placement-import.json": {
+    "path": "/components/2/mounts",
+    "rule": "injector mounts /run/placement/import (semantic)"
+  },
+  "instance-template/injector-missing-placement-mock.json": {
+    "path": "/components/2/mounts",
+    "rule": "injector mounts /run/placement/mock (semantic)"
+  },
+  "instance-template/injector-on-instance-network.json": {
+    "path": "/components/2/network_mode",
+    "rule": "the injector has no network"
+  },
+  "instance-template/placement-volumes-same-source.json": {
+    "path": "/components/2/mounts/4/source",
+    "rule": "the placement volumes are different volumes (semantic)"
+  },
+  "instance-template/volume-at-two-targets.json": {
+    "path": "/volumes/2",
+    "rule": "a volume has exactly one target path (semantic)"
+  },
+  "instance-template/placement-reader-other-user.json": {
+    "path": "/components/3/user",
+    "rule": "readers run as the injector user (semantic)"
+  }
+}

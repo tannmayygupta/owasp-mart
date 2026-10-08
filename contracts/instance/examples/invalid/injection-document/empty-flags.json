@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
+  "issued_at": "2026-01-01T00:00:00Z",
+  "seed": "FAKE-SEED-NOT-REAL-0000000000000000",
+  "flags": [],
+  "decoys": []
+}
