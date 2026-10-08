@@ -24,6 +24,8 @@ The report needs real, detailed material about what was built, why, and how it w
 - `.claude/settings.json`: runs the script as a Claude Code PreToolUse hook on Bash commands.
 - `.githooks/commit-msg`: the same check as a git hook, for commits made outside Claude Code.
 - `.gitignore`: secrets, dependencies, build output, crash dumps.
+- `.gitattributes`: keeps LF line endings for hooks and scripts on every machine.
+- Remote: `origin` = `git@github-personal:tannmayygupta/owasp-mart.git` (SSH alias for the personal key, verified as `tannmayygupta`). Repo was created empty by the user.
 
 ## How it works
 Claude Code calls the script before every Bash command. The script only acts when the command is a `git commit`. It lists the files that commit would include (staged files, files added by a chained `git add`, and tracked changes if `-a` is used). If any are code and the dev-log or changelog is missing, it returns a deny decision with a message telling Claude what to write. Any internal error lets the commit through, so it cannot trap a developer.
@@ -48,6 +50,7 @@ Test output was shown in the Claude Code session on 2026-10-08. No screenshots s
 2. **Chained commands.** `git add -A && git commit` was allowed because the hook runs before the whole command, when nothing is staged yet. Fixed by reading the `git add` part of the command and including those files.
 3. `major-project` was inside the home-folder git repo, whose remote is an unrelated project. Fixed with a dedicated `git init` here.
 4. A stray `bash.exe.stackdump` (Git Bash crash dump) appeared in the folder. Not deleted; ignored through `.gitignore`.
+5. **Line endings on other machines.** Git warned it would convert files to Windows line endings. The repo itself stores LF (`git ls-files --eol` shows `i/lf`), but a Windows clone with `core.autocrlf=true` would turn `.githooks/commit-msg` into CRLF and the backstop would silently stop working. Fixed with a `.gitattributes` that pins LF for hooks and scripts. Not yet tested on a fresh Windows clone.
 
 ## Security notes
 No vulnerable code yet. The hook script runs with the developer's credentials, so every developer should read `scripts/check-docs.mjs` and `.claude/settings.json` once. The gate checks that docs exist, not that they are good.

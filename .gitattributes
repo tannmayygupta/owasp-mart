@@ -1,0 +1,7 @@
+# Normalize text files in the repo.
+* text=auto
+
+# Hooks and scripts must keep LF on every machine (a CRLF shell script breaks).
+.githooks/* text eol=lf
+*.mjs text eol=lf
+*.sh text eol=lf

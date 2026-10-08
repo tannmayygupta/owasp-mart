@@ -26,6 +26,10 @@ Truthfulness rules:
 - If you do not know a detail (why, who decided, a result), **ask the developer**. Do not invent it.
 - Never write real flag values, secrets, keys, or personal data in docs. Describe where a flag lives, not what it is.
 
+## Git
+- The remote is `origin` on the personal GitHub account `tannmayygupta`, repo `owasp-mart` (private). Use **SSH only**, no HTTPS or tokens. On Tanmay's PC the SSH alias is `github-personal`; never use the work alias for this project.
+- Push only when the developer asks. Never change the remote or force-push without asking.
+
 ## How the rule is enforced
 - `.claude/settings.json` runs `scripts/check-docs.mjs` before any `git commit` Claude makes. It blocks the commit when code changed without a dev-log entry and a `CHANGELOG.md` update.
 - Backstop for commits made outside Claude: run **once per clone** `git config core.hooksPath .githooks`.

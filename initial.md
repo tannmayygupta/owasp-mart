@@ -229,7 +229,7 @@ Each challenge will also carry **CWE** and **MITRE ATT&CK** IDs (D-07), values O
 - **Architecture rule:** run within free-tier limits now; moving to a paid server later must need **no architecture change**.
 - **Demo:** one presenter (the user) in front of examiners. **Design goal:** many concurrent users and heavy load.
 - **Build method:** the whole team builds end to end with Claude Code.
-- **Repository (checked 2026-10-08):** `major-project` used to sit inside the home-folder git repo (`C:/Users/tanma`), whose remote is an unrelated project (`rbufullstack-1`). It now has its **own repo** (`main`), **local only, no GitHub remote yet** (name pending, Q-27, Q-23). See D-14.
+- **Repository (checked 2026-10-08):** `major-project` used to sit inside the home-folder git repo (`C:/Users/tanma`), whose remote is an unrelated project (`rbufullstack-1`). It now has its **own repo** (`main`), remote = **`git@github-personal:tannmayygupta/owasp-mart.git`** (private, personal GitHub account, SSH). See D-14.
 - **College report template:** exists; **the user will share it later** (Q-26). Until then `docs/report/README.md` holds a provisional mapping.
 
 **Demo machine (checked 2026-10-08):** the user's own PC, which is also the dev machine here.
@@ -265,11 +265,11 @@ Each challenge will also carry **CWE** and **MITRE ATT&CK** IDs (D-07), values O
 | Q-19 | Default **retention period** for candidate data before auto-delete, and how it fits the one-year processing-log rule in India's DPDP Rules. | Needed to build auto-delete. Research item. |
 | Q-21 | **Who writes the report**, and what do the 2 non-developing authors do (docs, testing, pilot users)? | Decides report ownership and pilot participants. |
 | Q-22 | **Pilot and mock hiring round:** who are the participants (the synopsis says "where feasible")? | Phase 4 and 5 depend on people. |
-| Q-23 | Is **"VulnMart"** the final product name? (The pitch used "OWASP Vulnerable Practice-and-Hiring Platform".) | Naming across code, docs, report. |
+| Q-23 | Is **"VulnMart"** the final product name? (The pitch used "OWASP Vulnerable Practice-and-Hiring Platform"; the GitHub repo is named `owasp-mart`.) | Naming across code, docs, report. |
 | Q-24 | What are the **other two developers' PC specs** and are Docker/WSL set up on them? | Dev environment must work for all three. |
 | Q-25 | **When** will the guide be informed of the scope changes? | The synopsis was approved as written. |
 | Q-26 | The **college report template**: the user will share it. Then map `docs/report/README.md` to its chapters. | The documentation structure should match the report. |
-| Q-27 | **GitHub repo name**, and approval to create the private repo and push the first commit. | Repo creation and pushing publish content to an external service, so it needs an explicit go-ahead and a name. |
+| ~~Q-27~~ | ~~GitHub repo name and approval to create and push.~~ **ANSWERED (user, 2026-10-08):** the user created the private repo **`tannmayygupta/owasp-mart`** on the **personal** GitHub account and asked for **SSH** (personal key, not the work one). First commit pushed. See D-14. | Repo creation and pushing publish content to an external service. |
 | Q-28 | Verify the commit hook **live** inside Claude Code (restart in the project folder, trust prompt, `/hooks`, try a code commit without docs). | The gate was only tested with simulated input. |
 
 ### 14.2 Gaps and tensions (NOTE — my analysis)
@@ -385,7 +385,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 **Submission:** first week of November 2026 (exact date not given; no interim review dates mentioned). **Scope:** the user said there is no need to take pressure on implementation and that the team will implement it **end to end using Claude Code**. So the full scope in this file stays; no minimum-version cutting or feature ranking is required at this stage. **Decided by user 2026-10-08.** Recommendations are not limited by time or team size. *Not research-backed: this is the user's own stance. The risk of about 4 weeks for a large scope is kept visible in gap 10.*
 
 ### D-14 — Repository and documentation rule
-- **Repo:** a **dedicated private GitHub repo** for VulnMart (make it public at submission only if examiners need it). `major-project` sat inside the home-folder git repo whose remote is unrelated, so a separate local repo (`main`) was created. No GitHub remote yet (Q-27). Private during development keeps challenge solutions and flag logic hidden, which matters for the hiring use.
+- **Repo:** a **dedicated private GitHub repo** for VulnMart (make it public at submission only if examiners need it). `major-project` sat inside the home-folder git repo whose remote is unrelated, so a separate local repo (`main`) was created. The user created **`tannmayygupta/owasp-mart`** (private, personal account) and chose **SSH with the personal key** (alias `github-personal` on Tanmay's PC, verified as `tannmayygupta`; the `github-work` alias is not used for this project). Private during development keeps challenge solutions and flag logic hidden, which matters for the hiring use.
 - **Rule:** after every task, Claude Code writes a **dev-log entry**, a **decision record** when a decision was made, a **changelog** line, **traceability** updates and **evidence**; real results only; asks when unsure; never real flags, secrets or personal data. Written in `CLAUDE.md` (shared through git, so all three developers' Claude Code follow it).
 - **Enforcement:** a Claude Code **PreToolUse hook** (`scripts/check-docs.mjs`) blocks a `git commit` when code changed without a dev-log entry and a `CHANGELOG.md` update; a **git commit-msg backstop** (`git config core.hooksPath .githooks`, once per clone) covers commits outside Claude; `[no-doc]` skips it for non-functional commits; needs Node.js; fails open on internal errors.
 - **Doc set (full):** `docs/dev-log/`, `docs/adr/` (ADR 0001 added), `CHANGELOG.md`, `docs/traceability.md` (F1-F11, C01-C11), `docs/report/` (template pending), `docs/assets/`.
