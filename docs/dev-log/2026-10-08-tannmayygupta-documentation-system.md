@@ -42,6 +42,9 @@ Run in throwaway git repos outside the project, with simulated Claude Code hook 
 - Second run: 8 passed, 2 failed. One failure was a mistake in the test (nothing was staged, so allowing was correct). The other was a real gap (see below).
 - Final run: **13 of 13 scenarios passed**, including chained `git add -A && git commit`, `git add .`, `git add <paths>`, `git -C <path> commit`, `[no-doc]`, docs-only changes and non-commit commands. Earlier-run scenarios for `git commit -a` and `-am`, a dev-log without a changelog, and the commit-msg backstop also passed on the previous build.
 
+- **Live check after restart (same day):** a code-only commit was attempted from a real session. It was **blocked by the git commit-msg backstop, not by the Claude Code hook** (the test file had been created and staged, so the hook never ran). Root cause below (problem 6).
+- Test run after the fix: 6 of 6 simulated scenarios passed with tool names `PowerShell`, `Bash` and `Read`, including the exact PowerShell command shape from the live check.
+
 ## Evidence
 Test output was shown in the Claude Code session on 2026-10-08. No screenshots saved.
 
@@ -51,12 +54,13 @@ Test output was shown in the Claude Code session on 2026-10-08. No screenshots s
 3. `major-project` was inside the home-folder git repo, whose remote is an unrelated project. Fixed with a dedicated `git init` here.
 4. A stray `bash.exe.stackdump` (Git Bash crash dump) appeared in the folder. Not deleted; ignored through `.gitignore`.
 5. **Line endings on other machines.** Git warned it would convert files to Windows line endings. The repo itself stores LF (`git ls-files --eol` shows `i/lf`), but a Windows clone with `core.autocrlf=true` would turn `.githooks/commit-msg` into CRLF and the backstop would silently stop working. Fixed with a `.gitattributes` that pins LF for hooks and scripts. Not yet tested on a fresh Windows clone.
+6. **The Claude Code hook did not fire on Windows.** The hook matcher was `Bash`, but this Windows session runs commands through a **PowerShell** tool. Matchers are exact tool names (`Bash` matches only Bash), so the hook never ran; the git backstop caught the commit instead. Found by the live check. Fixed with matcher `Bash|PowerShell` and by accepting `PowerShell` as a tool name in `scripts/check-docs.mjs`. Lesson: the two layers are independent, and the backstop protected us while the first layer was broken.
 
 ## Security notes
 No vulnerable code yet. The hook script runs with the developer's credentials, so every developer should read `scripts/check-docs.mjs` and `.claude/settings.json` once. The gate checks that docs exist, not that they are good.
 
 ## Limitations and follow-ups
-- **Not yet seen running inside a live Claude Code session.** The script was tested with simulated input. First live check: restart Claude Code in this folder, accept the trust prompt if shown, confirm the hook with `/hooks`, and try a code commit without docs.
+- **Claude Code hook still needs a live re-check after the matcher fix.** Restart Claude Code in this folder, confirm the hook with `/hooks`, then try a code commit without docs. Expected: the whole command is denied before it runs (no file created, nothing staged), unlike the backstop, which only stops the commit.
 - `git commit-tree` could be matched like `git commit` (harmless, rare).
 - GitHub remote not created yet; waiting for the repo name.
 - The other two developers must run `git config core.hooksPath .githooks` once per clone and have Node.js installed.

@@ -31,7 +31,7 @@ Truthfulness rules:
 - Push only when the developer asks. Never change the remote or force-push without asking.
 
 ## How the rule is enforced
-- `.claude/settings.json` runs `scripts/check-docs.mjs` before any `git commit` Claude makes. It blocks the commit when code changed without a dev-log entry and a `CHANGELOG.md` update.
+- `.claude/settings.json` runs `scripts/check-docs.mjs` before any `git commit` Claude makes, from either the Bash or the PowerShell tool. It blocks the commit when code changed without a dev-log entry and a `CHANGELOG.md` update.
 - Backstop for commits made outside Claude: run **once per clone** `git config core.hooksPath .githooks`.
 - Non-functional commits (formatting, typos): add `[no-doc]` to the commit message. Features and fixes always need docs.
 - Needs Node.js on the machine. The script fails open on unexpected errors, so it never traps a developer.

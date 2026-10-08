@@ -67,7 +67,7 @@ try {
     const input = JSON.parse(readFileSync(0, 'utf8').replace(/^﻿/, '') || '{}');
     const command = input?.tool_input?.command ?? '';
     const m = command.match(/\bgit\s+((?:-C\s+(?:"[^"]+"|'[^']+'|\S+)\s+)?)commit\b/);
-    if (input?.tool_name !== 'Bash' || !m) process.exit(0);
+    if (!['Bash', 'PowerShell'].includes(input?.tool_name) || !m) process.exit(0);
     let cwd = input.cwd || process.cwd();
     const c = m[1].match(/-C\s+(?:"([^"]+)"|'([^']+)'|(\S+))/);
     if (c) cwd = c[1] || c[2] || c[3];
