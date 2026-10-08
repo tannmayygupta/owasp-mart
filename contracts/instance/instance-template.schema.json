@@ -46,7 +46,7 @@
       "required": ["type", "target"],
       "properties": {
         "type": { "enum": ["tmpfs", "volume"] },
-        "target": { "enum": ["/tmp", "/data", "/run/vm", "/run/import"] },
+        "target": { "enum": ["/tmp", "/data", "/run/vm", "/run/import", "/run/placement/import", "/run/placement/mock"] },
         "source": { "$ref": "#/$defs/short_name" },
         "read_only": { "type": "boolean" },
         "size_mb": { "type": "integer", "minimum": 1 }
@@ -70,7 +70,7 @@
             "type": "object",
             "required": ["source", "read_only"],
             "properties": {
-              "target": { "enum": ["/run/vm", "/run/import"] },
+              "target": { "enum": ["/run/vm", "/run/import", "/run/placement/import", "/run/placement/mock"] },
               "size_mb": false
             }
           }
@@ -176,6 +176,10 @@
               "healthcheck": { "type": "object", "properties": { "kind": { "const": "socket" } } }
             }
           }
+        },
+        {
+          "if": { "type": "object", "properties": { "role": { "const": "injector" } }, "required": ["role"] },
+          "then": { "type": "object", "properties": { "network_mode": { "const": "none" } } }
         },
         {
           "if": { "type": "object", "properties": { "role": { "const": "shop" } }, "required": ["role"] },

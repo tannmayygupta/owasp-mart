@@ -352,7 +352,7 @@
     "rule": "shop mounts /run/import (semantic)"
   },
   "instance-template/unused-volume.json": {
-    "path": "/volumes/2",
+    "path": "/volumes/4",
     "rule": "every declared volume is mounted (semantic)"
   },
   "instance-template/label-instance-differs.json": {
@@ -458,5 +458,61 @@
   "flags-file/extra-property.json": {
     "path": "/event_key",
     "rule": "no unknown top-level fields"
+  },
+  "instance-template/placement-import-mounted-by-shop.json": {
+    "path": "/components/0/mounts/4/target",
+    "rule": "the shop mounts neither placement volume (semantic)"
+  },
+  "instance-template/placement-mock-mounted-by-bot-controller.json": {
+    "path": "/components/5/mounts/1/target",
+    "rule": "the bot controller mounts neither placement volume (semantic)"
+  },
+  "instance-template/placement-mock-mounted-by-import-service.json": {
+    "path": "/components/3/mounts/3/target",
+    "rule": "only mock-services mounts the mock placement volume (semantic)"
+  },
+  "instance-template/placement-import-separate-volume.json": {
+    "path": "/components/3/mounts/2/source",
+    "rule": "placement volume is the injector volume (semantic)"
+  },
+  "instance-template/placement-mock-separate-volume.json": {
+    "path": "/components/4/mounts/1/source",
+    "rule": "placement volume is the injector volume (semantic)"
+  },
+  "instance-template/placement-import-writable.json": {
+    "path": "/components/3/mounts/2/read_only",
+    "rule": "import service mounts the placement volume read-only (semantic)"
+  },
+  "instance-template/import-service-missing-placement.json": {
+    "path": "/components/3/mounts",
+    "rule": "import service mounts /run/placement/import (semantic)"
+  },
+  "instance-template/mock-services-missing-placement.json": {
+    "path": "/components/4/mounts",
+    "rule": "mock-services mounts /run/placement/mock (semantic)"
+  },
+  "instance-template/injector-missing-placement-import.json": {
+    "path": "/components/2/mounts",
+    "rule": "injector mounts /run/placement/import (semantic)"
+  },
+  "instance-template/injector-missing-placement-mock.json": {
+    "path": "/components/2/mounts",
+    "rule": "injector mounts /run/placement/mock (semantic)"
+  },
+  "instance-template/injector-on-instance-network.json": {
+    "path": "/components/2/network_mode",
+    "rule": "the injector has no network"
+  },
+  "instance-template/placement-volumes-same-source.json": {
+    "path": "/components/2/mounts/4/source",
+    "rule": "the placement volumes are different volumes (semantic)"
+  },
+  "instance-template/volume-at-two-targets.json": {
+    "path": "/volumes/2",
+    "rule": "a volume has exactly one target path (semantic)"
+  },
+  "instance-template/placement-reader-other-user.json": {
+    "path": "/components/3/user",
+    "rule": "readers run as the injector user (semantic)"
   }
 }

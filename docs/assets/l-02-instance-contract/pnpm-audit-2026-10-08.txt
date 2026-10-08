@@ -1,3 +1,2 @@
 # pnpm audit
-(exit 0)
 No known vulnerabilities found

@@ -1,15 +1,8 @@
 # node scripts/validate-contracts.mjs
-(exit 0)
-invalid example rejected at /volumes/2: examples/invalid/instance-template/unused-volume.json
-invalid example rejected at /components/0/user: examples/invalid/instance-template/user-group-root.json
-invalid example rejected at /components/0/user: examples/invalid/instance-template/user-name.json
-invalid example rejected at /components/0/user: examples/invalid/instance-template/user-root.json
-invalid example rejected at /volumes/0/memory_backed: examples/invalid/instance-template/volume-not-memory-backed.json
-valid example ok: examples/valid/flags-file/full.json
+(exit 0; last lines)
 valid example ok: examples/valid/injection-document/full.json
 valid example ok: examples/valid/injection-document/minimal.json
 valid example ok: examples/valid/instance-template/shop-template-flag-delivery-env.json
 valid example ok: examples/valid/instance-template/shop-template.json
-checked 3 schemas, 5 valid and 115 invalid examples
+checked 3 schemas, 5 valid and 129 invalid examples
 contracts: PASS
-... (one line per example above; full run lists all 120 examples)

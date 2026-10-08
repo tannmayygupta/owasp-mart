@@ -14,6 +14,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ### 0.1.0 (2026-10-08, Tanmay, story L-02)
 - First draft: `instance-contract.md` (the 11 topics of architecture 07 section 3.2, injector exit codes with placeholder `INST-*` names, versioning rule, table of open points to confirm).
 - JSON Schemas 2020-12: `injection-document.schema.json`, `flags-file.schema.json`, `instance-template.schema.json`.
-- Examples: 5 valid and 115 invalid, each invalid one with its expected error path in `examples/invalid/manifest.json`.
+- Examples: 5 valid and 129 invalid, each invalid one with its expected error path in `examples/invalid/manifest.json`.
+- Two more memory-backed volumes, `vm-placement-import` at `/run/placement/import` and `vm-placement-mock` at `/run/placement/mock`, carry the flag files for the import service and mock-services (injector read-write, one consumer each read-only). The injector has `network_mode: none`.
 - Checked by `scripts/validate-contracts.mjs` (`pnpm run contracts:check`).
 - Status: awaiting approval by Sahil (consumer) before merge.

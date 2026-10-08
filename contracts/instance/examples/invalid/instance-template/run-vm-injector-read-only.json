@@ -11,6 +11,16 @@
       "name": "vm-import",
       "memory_backed": true,
       "size_mb": 8
+    },
+    {
+      "name": "vm-placement-import",
+      "memory_backed": true,
+      "size_mb": 2
+    },
+    {
+      "name": "vm-placement-mock",
+      "memory_backed": true,
+      "size_mb": 2
     }
   ],
   "components": [
@@ -156,7 +166,7 @@
         "ALL"
       ],
       "egress": false,
-      "network_mode": "instance",
+      "network_mode": "none",
       "memory_mb": 128,
       "cpu_limit": 0.5,
       "pids_limit": 64,
@@ -176,6 +186,18 @@
           "target": "/run/vm",
           "source": "vm-run",
           "read_only": true
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/import",
+          "source": "vm-placement-import",
+          "read_only": false
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/mock",
+          "source": "vm-placement-mock",
+          "read_only": false
         }
       ],
       "env": {
@@ -222,6 +244,12 @@
           "target": "/run/import",
           "source": "vm-import",
           "read_only": false
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/import",
+          "source": "vm-placement-import",
+          "read_only": true
         }
       ],
       "env": {
@@ -269,6 +297,12 @@
           "type": "tmpfs",
           "target": "/tmp",
           "size_mb": 16
+        },
+        {
+          "type": "volume",
+          "target": "/run/placement/mock",
+          "source": "vm-placement-mock",
+          "read_only": true
         }
       ],
       "env": {

@@ -91,7 +91,6 @@ export function semanticTemplate(d) {
     }
   });
 
-  // /run/vm: one memory-backed volume, injector read-write, every other mounter read-only.
   const injector = byRole.injector;
   const shop = byRole.shop;
   const importer = byRole['import-service'];
@@ -101,34 +100,67 @@ export function semanticTemplate(d) {
     if (!found) add(`/components/${comp.i}/mounts`, `${what} must mount ${target}`);
     return found;
   };
-  const injRun = need(injector, '/run/vm', 'the injector');
+  // Volumes the injector writes: /run/vm (read by the shop), /run/placement/import (import service),
+  // /run/placement/mock (mock-services). Consumers mount the injector's volume read-only and must mount it.
+  const WRITTEN = [
+    { target: '/run/vm', readers: ['shop'] },
+    { target: '/run/placement/import', readers: ['import-service'] },
+    { target: '/run/placement/mock', readers: ['mock-services'] },
+  ];
   need(injector, '/tmp', 'the injector');
-  need(shop, '/run/vm', 'the shop');
   need(shop, '/tmp', 'the shop');
   need(shop, '/data', 'the shop');
+  need(importer, '/tmp', 'the import service');
   const shopImp = need(shop, '/run/import', 'the shop');
   const impImp = need(importer, '/run/import', 'the import service');
-  need(importer, '/tmp', 'the import service');
-
-  if (injRun && injRun.m.type === 'volume' && injRun.m.read_only !== false) {
-    add(`/components/${injector.i}/mounts/${injRun.j}/read_only`, 'the injector must mount /run/vm read-write');
+  const srcRefs = [];
+  for (const w of WRITTEN) {
+    const inj = need(injector, w.target, 'the injector');
+    if (inj) srcRefs.push({ comp: injector, ...inj });
+    for (const role of w.readers) need(byRole[role], w.target, `the ${role}`);
+    if (inj && inj.m.type === 'volume' && inj.m.read_only !== false) {
+      add(`/components/${injector.i}/mounts/${inj.j}/read_only`, `the injector must mount ${w.target} read-write`);
+    }
+    d.components.forEach((c, i) => {
+      const r = mountOf({ c, i }, w.target);
+      if (!r || c.role === 'injector') return;
+      if (!w.readers.includes(c.role)) { add(`/components/${i}/mounts/${r.j}/target`, `only the injector and the ${w.readers.join(', ')} mount ${w.target}`); return; }
+      if (r.m.type !== 'volume') return;
+      if (r.m.read_only !== true) add(`/components/${i}/mounts/${r.j}/read_only`, `only the injector may write ${w.target}; others mount it read-only`);
+      if (inj && inj.m.source !== r.m.source) add(`/components/${i}/mounts/${r.j}/source`, `must be the same volume the injector mounts at ${w.target}`);
+    });
   }
-  d.components.forEach((c, i) => {
-    const r = mountOf({ c, i }, '/run/vm');
-    if (!r || r.m.type !== 'volume' || c.role === 'injector') return;
-    if (r.m.read_only !== true) add(`/components/${i}/mounts/${r.j}/read_only`, 'only the injector may write /run/vm; others mount it read-only');
-    if (injRun && injRun.m.source !== r.m.source) add(`/components/${i}/mounts/${r.j}/source`, 'must be the same volume the injector mounts at /run/vm');
-  });
   if (shopImp && impImp && shopImp.m.source !== impImp.m.source) {
     add(`/components/${importer.i}/mounts/${impImp.j}/source`, 'the shop and the import service must share one /run/import volume');
   }
 
-  // Who may mount the shared volumes.
+  // The three injector volumes and the socket volume are four different volumes.
+  if (shopImp) srcRefs.push({ comp: shop, ...shopImp });
+  const seenSrc = new Set();
+  for (const r of srcRefs) {
+    if (seenSrc.has(r.m.source)) add(`/components/${r.comp.i}/mounts/${r.j}/source`, `volume ${r.m.source} is already used for another of /run/vm, /run/placement/import, /run/placement/mock, /run/import`);
+    seenSrc.add(r.m.source);
+  }
+
+  // Every volume is mounted at exactly one target path across the template.
+  d.volumes.forEach((v, i) => {
+    const targets = new Set(d.components.flatMap((c) => c.mounts.filter((m) => m.type === 'volume' && m.source === v.name).map((m) => m.target)));
+    if (targets.size > 1) add(`/volumes/${i}`, `volume ${v.name} is mounted at several targets (${[...targets].join(', ')})`);
+  });
+
+  // Readers of the injector's 0400 files run as the injector's user.
+  if (injector) {
+    d.components.forEach((c, i) => {
+      if (['shop', 'import-service', 'mock-services'].includes(c.role) && c.user !== injector.c.user) {
+        add(`/components/${i}/user`, 'must equal the injector user (placement files are mode 0400)');
+      }
+    });
+  }
+
+  // Who may mount the socket volume.
   d.components.forEach((c, i) => {
     c.mounts.forEach((m, j) => {
-      const at = `/components/${i}/mounts/${j}/target`;
-      if (m.target === '/run/vm' && !['injector', 'shop'].includes(c.role)) add(at, 'only the injector and the shop mount /run/vm');
-      if (m.target === '/run/import' && !['shop', 'import-service'].includes(c.role)) add(at, 'only the shop and the import service mount /run/import');
+      if (m.target === '/run/import' && !['shop', 'import-service'].includes(c.role)) add(`/components/${i}/mounts/${j}/target`, 'only the shop and the import service mount /run/import');
     });
   });
 

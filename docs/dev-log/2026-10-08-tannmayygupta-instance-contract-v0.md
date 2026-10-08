@@ -18,8 +18,8 @@ There is now one written, versioned description of what an instance looks like: 
 The shop (Sahil), the stub shop and the orchestrator (Tanmay) each needed the same description instead of inventing their own (story L-02).
 
 ## What was built
-- `contracts/instance/instance-contract.md`: 11 sections, injector exit codes with placeholder `INST-*` names, versioning rule, flag-in-env exception mechanism, and an "Open points (to confirm)" table with 33 rows.
-- Three schemas (JSON Schema 2020-12). 5 valid examples, 115 invalid examples (one per rule, each with its exact expected error path in `examples/invalid/manifest.json`).
+- `contracts/instance/instance-contract.md`: 11 sections, injector exit codes with placeholder `INST-*` names, versioning rule, flag-in-env exception mechanism, and an "Open points (to confirm)" table with 34 rows.
+- Three schemas (JSON Schema 2020-12). 5 valid examples, 129 invalid examples (one per rule, each with its exact expected error path in `examples/invalid/manifest.json`).
 - `scripts/validate-contracts.mjs` and `scripts/validate-contracts.test.mjs`; `contracts/CHANGELOG.md`.
 - Ajv 8.20.0 and ajv-formats 3.0.1 as exact dev dependencies; script `contracts:check`; CI `scripts` job installs dependencies first.
 
@@ -36,7 +36,7 @@ The validator compiles each schema, checks that every example file maps to a sch
 Ajv 8.20.0 and ajv-formats 3.0.1 confirmed by Tanmay on 2026-10-08; noted in ADR 0012 (no new ADR). Placeholders used for the unmerged error registry and catalogue (story note). Ajv `strictRequired` is switched off in the validator because `required` inside `if/then/else` refers to properties of the parent schema; all other strict checks stay on.
 
 ## Tests
-- `node scripts/validate-contracts.mjs`: exit 0, "checked 3 schemas, 5 valid and 115 invalid examples", "contracts: PASS".
+- `node scripts/validate-contracts.mjs`: exit 0, "checked 3 schemas, 5 valid and 129 invalid examples", "contracts: PASS".
 - `pnpm run contracts:check`: same result.
 - `node --test "scripts/*.test.mjs"`: 40 tests, 40 pass, 0 fail (the existing `dev` tests plus 21 new ones, 21 of 21 pass in `validate-contracts.test.mjs`: the real contract, CLI exit codes, removing `epoch` from the schema, a template without the shop role, non-shared `/run/vm` volume, non-memory-backed volume, wrong expected path, orphan and missing-manifest examples, malformed JSON, non-compiling schema, missing files, missing sections, real-looking flag and private key, byte-order mark).
 - `pnpm install --frozen-lockfile`: exit 0. `pnpm audit`: "No known vulnerabilities found".
@@ -60,7 +60,10 @@ No vulnerable code. The contract only fixes the safe runtime profile. All exampl
 ## Review round 1 (coordinator)
 After review the validator gained: role-based mount rules (only injector and shop mount /run/vm, only shop and import service mount /run/import), required-mount examples, unmounted volumes, label consistency, memory-backed sizes within memory_mb, healthcheck port, timeout, path and kind rules, repeated flag and decoy values, decoy without a flag, scanning of schemas and manifest, ignoring .DS_Store, Thumbs.db and .gitkeep. Schemas now use const 0.1 for schema_version and vm.schema. The example injector is now on the instance network (matches architecture 02; none is proposed in open point 29) and its /data tmpfs is 64 MB so it fits its 128 MB limit. Re-run results: validator PASS (3 schemas, 5 valid, 115 invalid); script tests 40 of 40 pass (validate-contracts tests 21 of 21).
 
+## Decisions of 2026-10-08 (Tanmay, after review)
+Open point 16: placement files now travel on two extra memory-backed volumes (`/run/placement/import`, `/run/placement/mock`), one consumer each, read-only, from the injector's read-write volume. Open point 29: the injector has `network_mode: none` (deviates from the architecture 02 drawing). Both are enforced by the schema or validator and covered by 14 new invalid examples. Real output after the change: `node scripts/validate-contracts.mjs` PASS, 3 schemas, 5 valid and 129 invalid examples; `node --test scripts/validate-contracts.test.mjs` 21 of 21 pass.
+
 ## Limitations and follow-ups
-- Open: how the placement files for the import service and mock-services reach those containers (only the shop and injector share `/run/vm` in v0), and how the patched snapshot gets from `/run/vm` into the shop's `/data` (proposal: the shop copies it). Listed in the open-points table, rows 15 and 16.
+- Open: how the patched snapshot gets from `/run/vm` into the shop's `/data` (proposal: the shop copies it), row 15; Sahil must confirm that the consumers read the two placement paths, row 16.
 - Sahil must approve before merge; Akshay should check the instance id and owner-hash shapes.
 - Markdown and schemas are tied only by section-heading checks; a deeper check is for L-07. Stub-shop conformance is L-06. Real limits come from spikes S-4 and S-5.

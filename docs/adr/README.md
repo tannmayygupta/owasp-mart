@@ -17,5 +17,6 @@
 | 0013 | [Three work-stream split](0013-three-work-stream-split.md) | Accepted (D-33): P, L, T; Tanmay L, Akshay P, Sahil T |
 | 0014 | [Organization scoping: application filter plus RLS](0014-organization-scoping-app-filter-and-rls.md) | Proposed |
 | 0015 | [Laptop fallback and developer engine](0015-laptop-fallback-engine.md) | Proposed |
+| 0016 | [Per-consumer flag file delivery and injector network](0016-per-consumer-flag-file-delivery-and-injector-network.md) | Accepted (D-36) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

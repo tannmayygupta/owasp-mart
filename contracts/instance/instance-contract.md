@@ -19,7 +19,7 @@ Six roles, each exactly once per instance, with a unique `name` (the name is als
 |---|---|---|---|---|
 | `shop` | The marketplace (T) | `instance` | 3000 (architecture) | yes, `/readyz` |
 | `sidecar` | Sidecar proxy (L) | `instance` | 8080 player traffic from the edge, 9000 app events from the shop, instance network only (both architecture) | yes |
-| `injector` | One-shot: the shop image's `inject` entrypoint (T) | `instance` (`none` proposed, open point 29) | none | no (it exits) |
+| `injector` | One-shot: the shop image's `inject` entrypoint (T) | `none` (decision, open point 29) | none | no (it exits) |
 | `import-service` | Runs import jobs (T) | `none` (always) | none, uses a unix socket | yes, socket |
 | `mock-services` | Payment, KYC, metadata, collector (T) | `instance` | 9101 payment, 9102 KYC, 9103 metadata, 9104 collector | yes |
 | `bot-controller` | Launches the browser per visit (T) | `instance` | 9200 | yes |
@@ -88,7 +88,7 @@ Every container and network carries nine labels. A template holds placeholders; 
 
 ## 5. Flag injection
 
-The injector is the shop image's `inject` entrypoint run as a one-shot container on the `instance` network (the schema allows `instance` or `none`; `none` is proposed, see open point 29). The orchestrator writes one JSON document on its standard input and closes it. The document follows [injection-document.schema.json](injection-document.schema.json): `schema_version`, `instance_id`, `epoch`, optional `issued_at`, `seed`, `flags` (one per challenge, `VM{` plus 24 Base32 characters `}`) and `decoys`. The digests of the flags go to the sidecar, not to the injector (architecture 04 section 11.3).
+The injector is the shop image's `inject` entrypoint run as a one-shot container with `network_mode: none` (the schema enforces this, open point 29). It has no network: it reads its document on standard input and writes only to volumes. The orchestrator writes one JSON document on its standard input and closes it. The document follows [injection-document.schema.json](injection-document.schema.json): `schema_version`, `instance_id`, `epoch`, optional `issued_at`, `seed`, `flags` (one per challenge, `VM{` plus 24 Base32 characters `}`) and `decoys`. The digests of the flags go to the sidecar, not to the injector (architecture 04 section 11.3).
 
 What the injector does, in order:
 
@@ -97,6 +97,10 @@ What the injector does, in order:
 3. Writes `/run/vm/flags.json` ([flags-file.schema.json](flags-file.schema.json), mode 0400) for sentinel logic. It carries the epoch so a file from before a reset can be recognised.
 4. Writes the marker file `/run/vm/injected` (to confirm: empty file, mode 0444), last, and exits.
 5. The orchestrator removes the injector container at once.
+
+**Placement files.** For each `flag_placement` of kind "file in import service" the injector writes the file under `/run/placement/import`; for kind "file in mock-services" under `/run/placement/mock`. Each file has mode 0400 and owner 65532 (the run user). Each of these two paths is a separate memory-backed volume (`vm-placement-import`, `vm-placement-mock`) that the injector mounts read-write; only the import service may mount the first and only mock-services the second, each read-only and each from the injector's volume. The consumer must mount its volume. The shop, sidecar and bot controller mount neither. The four volumes (`/run/vm`, the two placement volumes and `/run/import`) are four different volumes, each mounted at exactly one target path, and the injector, shop, import service and mock-services run as the same user so they can read the 0400 files.
+
+Order and lifetime: the shop, import service and mock-services start only after the injector has exited 0 (the orchestrator waits; start order is L-13), so a placement file is never read half-written. The orchestrator creates fresh `/run/vm` and placement volumes for every epoch, so files of an old epoch never survive a reset. The orchestrator must create the memory-backed volumes writable for uid 65532 (volume options uid and gid; to confirm in L-13). A placement file larger than the volume size makes the injector exit 12.
 
 **Shared volume.** `/run/vm` is one memory-backed named volume, mounted read-write by the injector and read-only by the shop (and by no other container in v0). Without a shared volume the shop could never see the injector's files or marker; the validator rejects a template where the two do not share one. The same pattern holds for `/run/import`: one memory-backed volume shared by the shop and the import service for the unix socket.
 
@@ -129,19 +133,19 @@ Every component, without exception (the schema rejects anything else):
 
 - Non-root numeric `user` as `uid:gid`, both above 0. Proposal for all components: `65532:65532` (to confirm). Files the injector writes with mode 0400 are readable by the shop because both run as the same user.
 - `read_only: true` root filesystem; `no_new_privileges: true`; `privileged: false`; `cap_drop: ["ALL"]` and no added capabilities; `egress: false`.
-- Writable places are only memory-backed: `tmpfs` mounts at `/tmp` and `/data` (one per component, not shared) and the two shared named volumes at `/run/vm` and `/run/import`. Mount targets are exactly these four and unique per component. No bind mounts, no host paths, no anonymous volumes.
+- Writable places are only memory-backed: `tmpfs` mounts at `/tmp` and `/data` (one per component, not shared) and the four shared named volumes at `/run/vm`, `/run/import`, `/run/placement/import` and `/run/placement/mock`. Mount targets are exactly these six and unique per component. No bind mounts, no host paths, no anonymous volumes.
 - Every volume in the template is `memory_backed` and has a `size_mb`; every mounted volume must be declared.
 - `memory_mb`, `cpu_limit` (CPUs, for example 0.5) and `pids_limit` are required. The example numbers are placeholders until spikes S-4 and S-5 (to confirm).
-- The validator also rejects any other role mounting `/run/vm` (only the injector and the shop do, the shop read-only from the injector's volume) or `/run/import` (only the shop and the import service); the sidecar, mock-services and bot controller never mount `/run/vm`.
-- Required mounts (validator): shop `/tmp`, `/data`, `/run/vm` read-only, `/run/import`; injector `/tmp` and `/run/vm` read-write; import service `/tmp` and `/run/import`.
-- Hand-over of data (to confirm with T): the injector writes the patched snapshot to `/run/vm`; the shop copies it into its own `/data` before it reports ready. How the files for the import service and mock-services (placement kinds "file in import service" and "file in mock-services") reach those containers is **not settled in v0**, because only the shop and the injector share `/run/vm`.
+- The validator also rejects any other role mounting `/run/vm` (only the injector and the shop do, the shop read-only from the injector's volume), `/run/import` (only the shop and the import service), `/run/placement/import` (only the injector and the import service, read-only from the injector's volume) or `/run/placement/mock` (only the injector and mock-services, same rule); the sidecar, mock-services and bot controller never mount `/run/vm`.
+- Required mounts (validator): shop `/tmp`, `/data`, `/run/vm` read-only, `/run/import`; injector `/tmp`, `/run/vm`, `/run/placement/import` and `/run/placement/mock` read-write; import service `/tmp`, `/run/import` and `/run/placement/import` read-only; mock-services `/run/placement/mock` read-only.
+- Hand-over of data (to confirm with T): the injector writes the patched snapshot to `/run/vm`; the shop copies it into its own `/data` before it reports ready. The files for the import service and mock-services (placement kinds "file in import service" and "file in mock-services") reach those containers through the two placement volumes described in section 5.
 
 - Restart and data loss: the shop's `/data` is memory-backed, so a restart loses it (see OI-23 for candidate behaviour). There is no restart policy in v0; a dead shop means the orchestrator resets the instance.
 - Labels on networks are applied by the orchestrator at create time and are not checked by this schema (the schema covers container labels in the template only).
 
 ## 8. Import service
 
-Proposal for T to confirm: the container has `network_mode: none` (the schema enforces this) and talks to the shop through a unix socket on the shared `/run/import` volume, with a fresh process per job. This is how "no network, no database access" (FR-CHL-07, FR-INS-02) holds while the shop still sends jobs. Its healthcheck is of kind `socket`.
+Proposal for T to confirm: the container has `network_mode: none` (the schema enforces this) and talks to the shop through a unix socket on the shared `/run/import` volume, with a fresh process per job. It also mounts `/run/placement/import` read-only to read its flag file. This is how "no network, no database access" (FR-CHL-07, FR-INS-02) holds while the shop still sends jobs. Its healthcheck is of kind `socket`.
 
 ## 9. Bot controller
 
@@ -175,26 +179,27 @@ Every value below was chosen by this draft because the architecture does not fix
 | 8 | Run user | `65532:65532` for every component | Sahil |
 | 9 | Ports | shop 3000, sidecar 8080 and 9000 (architecture); mock-services 9101 payment, 9102 KYC, 9103 metadata, 9104 collector; bot controller 9200 | Sahil |
 | 10 | Memory, CPU and process limits | shop 512 MB, 1 CPU, 256 pids; sidecar 256 MB, 0.5, 128; bot controller 512 MB, 1, 256; injector, import service, mock-services 128 MB, 0.5, 64; the memory-backed sizes of a component (its tmpfs mounts plus the volumes it mounts) must not exceed its `memory_mb` (validator) | Tanmay after spikes S-4, S-5 |
-| 11 | Memory-backed sizes | `/tmp` 16 MB (shop 64, bot 128), `/data` 256 MB (injector 64), volumes `/run/vm` 16 MB and `/run/import` 8 MB | Sahil, Tanmay |
-| 12 | Volume names | `vm-run` and `vm-import` (the orchestrator adds the instance id when it creates them) | Tanmay |
+| 11 | Memory-backed sizes | `/tmp` 16 MB (shop 64, bot 128), `/data` 256 MB (injector 64), volumes `/run/vm` 16 MB, `/run/import` 8 MB, `/run/placement/import` and `/run/placement/mock` 2 MB each | Sahil, Tanmay |
+| 12 | Volume names | `vm-run`, `vm-import`, `vm-placement-import` and `vm-placement-mock` (the orchestrator adds the instance id when it creates them) | Tanmay |
 | 13 | Paths | shop DB `/data/shop.db`, catalogue DB `/data/catalog.db`, snapshot `/run/vm/snapshot.db`, import socket `/run/import/import.sock` | Sahil |
-| 14 | Mount targets | exactly `/tmp`, `/data`, `/run/vm`, `/run/import` | Sahil |
+| 14 | Mount targets | exactly `/tmp`, `/data`, `/run/vm`, `/run/import`, `/run/placement/import`, `/run/placement/mock` | Sahil |
 | 15 | Snapshot hand-over | The injector writes the patched snapshot to `/run/vm`; the shop copies it to `/data` before ready | Sahil |
-| 16 | Delivery of placement files to the import service and mock-services | Not settled in v0 (only the shop and injector share `/run/vm`); needs a decision | Sahil, Tanmay |
+| 16 | Delivery of placement files to the import service and mock-services | Decision by Tanmay (2026-10-08): two extra memory-backed volumes, `vm-placement-import` at `/run/placement/import` (injector read-write, import service read-only) and `vm-placement-mock` at `/run/placement/mock` (injector read-write, mock-services read-only), files mode 0400, owner 65532. To confirm with Sahil that the consumers read these paths | Sahil |
 | 17 | Healthcheck numbers and kinds | interval 2 s, timeout 2 s, 15 retries; kinds `http`, `tcp`, `socket`; shop checks `/readyz` | Tanmay (spike S-4) |
 | 18 | Import service transport | unix socket, no network, fresh process per job, healthcheck by socket | Sahil |
 | 19 | Decoy placement field | `decoy_placement` (optional string, content defined by T) | Sahil |
-| 20 | Network mode names | `instance` and `none`; every role except the import service may use either (the import service is always `none`) | Tanmay |
+| 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | Tanmay |
 | 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | Tanmay |
 | 22 | Event endpoint base URL | `http://sidecar:9000` (path left to IF-4); mock base `http://mock-services` | Tanmay, Sahil |
 | 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex; `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
 | 24 | Env value limit and reason length | value at most 512 characters; flag-in-env reason 20 to 300 characters, not blank; only the shop may use the exception | Sahil |
 | 25 | Env allowlist | the 13 names in section 2 | Sahil |
 | 26 | `issued_at` handling | optional, advisory and not enforced in v0, no age check | Tanmay |
-| 27 | Sentinel and file paths of the placement kinds | defined by the catalogue (IF-7), not by this contract | Sahil (T-02) |
+| 27 | Sentinel and file paths of the placement kinds | file names are defined by the catalogue (IF-7); the directories `/run/placement/import` and `/run/placement/mock` are fixed here (row 16) | Sahil (T-02) |
 | 28 | Shop restart and data loss | `/data` is memory-backed and lost on restart; no restart policy in v0; a dead shop means the orchestrator resets the instance (refers to OI-23) | Tanmay, Sahil |
-| 29 | Injector network mode | Propose `none` for the injector; the example template uses `instance` to match the architecture | Tanmay |
+| 29 | Injector network mode | Decision by Tanmay (2026-10-08): `network_mode: none` for the injector, enforced by the schema. This deviates from the architecture 02 drawing, which shows the injector on the instance network | Tanmay |
 | 30 | Network labels | Applied by the orchestrator at create time, not checked by this schema | Tanmay |
 | 31 | Start order and injector entrypoint | Prose only in v0; implemented by the orchestrator (L-13) | Tanmay |
 | 32 | Injection document size limit and UTF-8 handling on standard input | Left to the injector | Sahil |
-| 33 | Who mounts the shared volumes | Only the injector and the shop mount `/run/vm` (the shop read-only); only the shop and the import service mount `/run/import`; the sidecar, mock-services and bot controller never mount `/run/vm` | Sahil |
+| 33 | Who mounts the shared volumes | Only the injector and the shop mount `/run/vm` (the shop read-only); only the shop and the import service mount `/run/import`; only the injector and the import service mount `/run/placement/import`; only the injector and mock-services mount `/run/placement/mock`; the sidecar, mock-services and bot controller never mount `/run/vm` | Sahil |
+| 34 | Volume owner and mode options | The orchestrator creates the memory-backed volumes with uid and gid 65532 and a writable mode for that user (volume options to be confirmed in L-13) | Tanmay |

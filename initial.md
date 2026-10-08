@@ -546,6 +546,10 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 - **Decision (user, 2026-10-08: "accept all four"):** (1) **one encryption key per candidate attempt**, not per assessment, so one candidate can be deleted and shredded while others in the assessment stay (amends the wording of D-25 and FR-PRV-12; PRD issue P-9; ADR 0009). (2) **ASVS level 3 also for the key service and the audit-log subsystem**, in addition to the orchestrator and admin (extends D-21). (3) **"Never plain HTTP" (D-16) applies to public addresses only**: the laptop fallback and developer machines may use loopback names such as `*.localhost` over HTTP (ADR 0003; browser behavior to confirm in spike S-20). (4) **The C03 read-only catalogue is a second SQLite file opened read-only**, not a separate container, to save memory; sprint zero must confirm that SQL injection cannot reach other data (SQLite `ATTACH` and `load_extension` unavailable, one statement per call) (PRD issue P-18; changes the wording "own container" in `docs/design/challenge-specs.md`).
 - **Evidence:** ADR 0003, 0008, 0009 and `docs/architecture/06-security.md`. **Caveats:** ASVS 5.0 level definitions were not read in a primary source (EF-29); the SQLite ATTACH and load_extension behavior is a spike.
 
+### D-36 — Per-consumer flag files and an injector with no network
+- **Decision (Tanmay, 2026-10-08, from IF-6 open points 16 and 29):** (1) the flag files that must exist only in the import service (C06) and in mock-services (C10) are delivered through two small **memory-backed volumes, one per consumer** (`/run/placement/import`, `/run/placement/mock`), written only by the injector and mounted read-only only by that consumer (chosen after research; delegated to the coordinator by the developer). (2) The **injector has `network_mode: none`**, which deviates from the architecture 02 drawing. Sahil confirms the consumer paths in the pull request review.
+- **Evidence:** ADR 0016 (OWASP Secrets Management Cheat Sheet, CNCF whitepaper via a secondary source, Docker secrets guides; not all read in primary sources).
+
 ---
 
 ## 16. Next steps

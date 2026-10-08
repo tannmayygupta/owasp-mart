@@ -1,13 +1,13 @@
 # node --test "scripts/e2e/contracts.e2e.test.mjs"
-(node:11016) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(node:23652) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-✔ fresh checkout parity: install with a frozen lockfile, then the CI scripts job command passes (7067.2731ms)
-✔ pnpm run contracts:check passes in the real repository and prints the counts (489.0785ms)
-✔ breaking a rule exits 1: removing epoch from the injection schema (495.7882ms)
-✔ breaking a rule exits 1: the injector and the shop use different /run/vm volumes (424.4962ms)
-✔ breaking a rule exits 1: a real-looking flag in an example (446.2482ms)
-✔ usage: --help exits 0, an unknown argument exits 2, a missing folder fails with exit 1 (610.4965ms)
-✔ the contract document has sections 1 to 11 in order and an open-points table (1.4335ms)
+✔ fresh checkout parity: install with a frozen lockfile, then the CI scripts job command passes (7140.945ms)
+✔ pnpm run contracts:check passes in the real repository and prints the counts (449.3037ms)
+✔ breaking a rule exits 1: removing epoch from the injection schema (432.2937ms)
+✔ breaking a rule exits 1: the injector and the shop use different /run/vm volumes (424.8816ms)
+✔ breaking a rule exits 1: a real-looking flag in an example (426.4223ms)
+✔ usage: --help exits 0, an unknown argument exits 2, a missing folder fails with exit 1 (665.7746ms)
+✔ the contract document has sections 1 to 11 in order and an open-points table (1.6237ms)
 ℹ tests 7
 ℹ suites 0
 ℹ pass 7
@@ -15,4 +15,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 10021.3277
+ℹ duration_ms 10003.3813
