@@ -1,0 +1,2 @@
+# docker inspect vulnmart-hello (while running)
+User=65532:65532 ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges:true] Binds=[] Ports={"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"18080"}]} Memory=67108864 PidsLimit=64 Health=healthy Privileged=false

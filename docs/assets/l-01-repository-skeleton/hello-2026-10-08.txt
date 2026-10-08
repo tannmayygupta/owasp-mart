@@ -1,0 +1,4 @@
+# node scripts/dev.mjs hello
+hello
+exit: 0
+# project containers left after the run (docker ps -a --filter name=vulnmart): 0

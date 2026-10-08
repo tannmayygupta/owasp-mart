@@ -26,6 +26,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 ### Added (challenge design, 2026-10-08, Tanmay)
 - `docs/design/challenge-specs.md`: detailed design of the 11 challenges with milestones, tests and event catalogue; decisions D-32 (DC-1 to DC-15) accepted; PRD open items OI-16 to OI-20 resolved.
 
+### Added (L-01 repository skeleton, 2026-10-08, Tanmay)
+- Monorepo skeleton (architecture 07 section 1), pinned tools (Node 24.21.0, pnpm 12.10.1, Python 3.14.8, uv 0.12.23) with empty pnpm and uv workspaces and lockfiles, Compose project `vulnmart` with a hardened `hello` service, `scripts/dev.mjs` (`hello`, `up`, `down`, `doctor`) with tests, `.github/CODEOWNERS`, and CI `.github/workflows/ci.yml`. Docker on Tanmay's PC was repaired (WSL updated to 2.7.13, 8 GB cap in `.wslconfig`, Docker data moved to D:); `hello`, `doctor` and the container hardening pass on real Docker (19 unit and 10 end-to-end tests). CI green on a pull request is not yet confirmed.
+
 ### Added (architecture, 2026-10-08, Tanmay)
 - Architecture documents `docs/architecture/` (index, evidence register, 7 design documents) and decision records `docs/adr/0002` to `0015`. Decisions D-33 (three work-streams P, L, T; Tanmay L, Akshay P, Sahil T), D-34 (two Oracle VMs, amends D-15) and D-35 (per-attempt keys, ASVS level 3 for key and audit, loopback HTTP for development, catalogue as a read-only SQLite file).
 

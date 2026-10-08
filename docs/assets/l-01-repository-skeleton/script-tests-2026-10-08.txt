@@ -1,0 +1,13 @@
+# node --test "scripts/*.test.mjs"
+✔ doctor: all pass gives 0, a missing tool gives 1 (1.5014ms)
+✔ doctor: a different Node major fails and names the pin (0.4437ms)
+✔ doctor: a different pnpm version fails and names the pin (0.3577ms)
+✔ portFree: false when something listens (48.1054ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 388.8226

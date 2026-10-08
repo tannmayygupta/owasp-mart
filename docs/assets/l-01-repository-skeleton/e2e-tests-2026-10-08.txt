@@ -1,0 +1,19 @@
+# node --test "scripts/e2e/*.test.mjs"  (real Docker 29.6.2)
+✔ help: prints the commands and exits 0 (424.9559ms)
+✔ unknown command: exits 1 with a message on stderr (384.8051ms)
+✔ doctor: every check passes against the real tools (1705.11ms)
+✔ hello: starts a real container, answers hello, exits 0 and leaves nothing behind (11192.7032ms)
+✔ hello: removes a stale container from an earlier run first (11786.0257ms)
+✔ hello: a busy port exits 1, names the port and starts no container (1180.5153ms)
+✔ up: a profile with no services yet exits 1 and starts nothing (1384.5918ms)
+✔ up: an unknown profile is refused before Docker is used (398.5264ms)
+✔ down: stops and removes a running hello container (18946.1973ms)
+✔ hello container hardening: non-root, read-only, no capabilities, loopback port, limits, no mounts (7417.0072ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55790.3304
