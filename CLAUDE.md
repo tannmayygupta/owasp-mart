@@ -32,11 +32,19 @@ Truthfulness rules:
 - A story is not done until its tests ran and passed (real output recorded), the dev-log entry, changelog line and traceability rows exist (documentation rule above), and the tracker shows the new state.
 - **Never update the skills automatically.** No `npx skills update`, no skill installs, no `bmad setup` that changes versions, without the team agreeing. After any `git pull` run `node scripts/verify-skills.mjs`; if it fails, stop and tell the developer.
 - BMAD scripts need `uv` on the machine (see `docs/bmad/INSTALL.md`).
+- **Task cycle (mandatory, one task at a time).** Each developer's task list is `docs/dev/dev<N>-<name>.md`; the guide is `docs/dev/START-HERE.md`. When a developer asks to work on a task:
+  1. Work on one task only; do not start another until the current one is closed. Never code outside a BMAD story.
+  2. Find or create its story with `bmad-ticket` (if the epic has no stories yet, incept the epic using that epic's tasks from the developer's task file as the breakdown, and show the result for approval). Never edit another developer's tracker folder.
+  3. Build with `bmad-build` (full route), then review with `bmad-code-review`, then test (the story's tests and `bmad-qa-generate-e2e-tests` for visible or API behaviour). Record real commands and real output only.
+  4. Close: apply the documentation rule, tick the task in the developer's task file, mark the story done with `bmad-ticket` only after the developer confirms, and remind them to set Done = Yes in their Excel sheet.
+  5. Stop and ask the developer before the next task. If a requirement, decision or open question (OI-xx) is unclear, stop and ask; do not decide it.
 - **Tracker automation (D-30).** Whoever finishes a story updates its state in the tracker in the same commit: the story's plan file under `docs/bmad/initiative-<slug>/` (via `bmad-ticket`), never another developer's folder. Initiatives: Akshay = `initiative-platform`, Tanmay = `initiative-lab`, Sahil = `initiative-target`. The commit gate blocks a code commit that has no tracker update once an initiative folder exists. Also tick the task in your `docs/dev/dev<N>-<name>.md` file. The Excel workbook `docs/bmad/VulnMart-Tracker.xlsx` is updated **by hand** (never regenerated over edits) and is not checked by the gate.
 
 ## Git
 - The remote is `origin` on the personal GitHub account `tannmayygupta`, repo `owasp-mart` (private). Use **SSH only**, no HTTPS or tokens. On Tanmay's PC the SSH alias is `github-personal`; never use the work alias for this project.
 - Push only when the developer asks. Never change the remote or force-push without asking.
+- Branches: never commit to `main`. One branch per developer per sprint, `sprint-<n>-<name>` (for example `sprint-1-akshay`), one pull request per sprint of 8 tasks. A task marked EARLY PR in the task file goes on its own branch `shared-<task-id>` from fresh `main` with its own small pull request. One other developer reviews each pull request; the owner of any contract or other-stream path touched must approve.
+- Other developers use their own SSH key with `git@github.com:tannmayygupta/owasp-mart.git`; the alias `github-personal` is only for Tanmay's PC.
 
 ## How the rule is enforced
 - `.claude/settings.json` runs `scripts/check-docs.mjs` before any `git commit` Claude makes, from either the Bash or the PowerShell tool. It blocks the commit when code changed without a dev-log entry and a `CHANGELOG.md` update.

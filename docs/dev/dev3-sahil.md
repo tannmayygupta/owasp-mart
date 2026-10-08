@@ -7,12 +7,14 @@ Sahil owns the vulnerable marketplace and its 11 challenges: the shop, its servi
 | Ticket tree | `docs/bmad/initiative-target/` |
 | Excel tracker | `docs/bmad/VulnMart-Tracker.xlsx`, sheet "3 Sahil (Target)" (updated by hand) |
 | Tasks | 32 tasks in 4 weekly sprints |
+| Read first | [START-HERE.md](START-HERE.md): how to run every task with BMAD and Claude Code |
+| Branches | one branch per sprint: `sprint-<n>-sahil`, one pull request per sprint; tasks marked EARLY PR get their own small pull request `shared-<task-id>` |
 | Status | Draft plan written 2026-10-08 by Claude Code; not yet approved by the team |
 
 ## How to work from this file
 
-1. Take the next unticked task whose "Waits on" items are done. If a wait is on another developer, use the mock or fake named in the task and carry on; do not stop.
-2. Create the story with `bmad-ticket`, build it with `bmad-build`, review it, test it. A task that is too big may become more than one story.
+1. Take the next unticked task whose "Waits on" items are done. If a wait is on another developer, use the mock or fake named in the task and carry on; do not stop. One task at a time.
+2. Create the story with `bmad-ticket`, build it with `bmad-build`, review it, test it. The line "BMAD story" under each task says whether the story already exists. A task that is too big may become more than one story.
 3. When the tests have really passed: tick the box below, update the story state in `docs/bmad/initiative-target/`, write the dev-log entry, changelog line and traceability rows, then commit.
 4. Update the Excel sheet by hand (Done = Yes).
 
@@ -33,6 +35,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-01. Shop skeleton runs in a container (tracer bullet)**
   - Epic: `epic-target-baseline`
+  - BMAD story: already planned, ref `1.1` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Set up your Windows environment and run an Express app on Node 24 in a hardened container that answers /healthz, /readyz and /version.
   - Covers: TB-3, TB-5
   - Waits on: L-01 (repository skeleton).
@@ -40,6 +43,8 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-02. Challenge catalogue schema and 11 stub entries (IF-7)**
   - Epic: `epic-target-baseline`
+  - BMAD story: already planned, ref `1.2` in `epic-target-baseline` (find it with `bmad-ticket`)
+  - EARLY PR: yes. P-04 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
   - Build: Define the catalogue schema and commit 11 stub entries with tags, tier, placeholder milestones and hint slots.
   - Covers: TB-1
   - Waits on: L-01.
@@ -47,6 +52,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-03. Review the instance contract and event schema as consumer**
   - Epic: `epic-target-baseline`
+  - BMAD story: already planned, ref `1.3` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Review IF-6 and IF-4 against what the shop needs and file change requests through the contract rules.
   - Covers: TB-2
   - Waits on: Tanmay's drafts L-02 and L-03 (open pull requests).
@@ -54,6 +60,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-04. Shop skeleton meets the instance contract in the lab harness**
   - Epic: `epic-target-baseline`
+  - BMAD story: already planned, ref `1.4` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Make the skeleton ready only after the injector marker, serve a planted flag and emit one app event inside the lab harness.
   - Covers: TB-3
   - Waits on: T-01, T-03 and Tanmay's harness (L-06).
@@ -61,6 +68,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-05. Exploit test runner skeleton**
   - Epic: `epic-target-baseline`
+  - BMAD story: already planned, ref `1.5` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: A runner that executes a test against any instance URL, with its own tiny vulnerable and fixed stubs.
   - Covers: TB-4
   - Waits on: T-01.
@@ -68,6 +76,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-06. Shop data model and seven state machines**
   - Epic: `epic-shop-core-and-roles`
+  - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: About 20 tables with migrations and the seven state machines.
   - Covers: FR-SHP-02, 04
   - Waits on: T-01.
@@ -75,6 +84,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-07. Shop identity, six roles, permissions and strong hashing**
   - Epic: `epic-shop-core-and-roles`
+  - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Neutral marketplace look, accounts, six roles with the permission matrix, strong password hashing.
   - Covers: FR-SHP-01, 03, 09
   - Waits on: T-06.
@@ -82,6 +92,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 - [ ] **T-08. Snapshot seeding mechanism**
   - Epic: `epic-shop-instance-integration`
+  - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Build a seeded snapshot in CI and a per-epic seed-data mechanism so later work adds seed data without editing shared files.
   - Covers: FR-SHP-12
   - Waits on: T-06.
@@ -93,6 +104,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-09. Health, readiness after the injector marker and runtime profile**
   - Epic: `epic-shop-instance-integration`
+  - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Health endpoints, ready only after the injector writes the marker, running non-root with a read-only filesystem and no egress.
   - Covers: FR-SHP-15
   - Waits on: T-04, T-08 and Tanmay's L-13.
@@ -100,6 +112,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-10. Shop boundaries and signed app events**
   - Epic: `epic-shop-instance-integration`
+  - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The shop has no route to the platform database, Valkey, the orchestrator or other instances, and sends signed app events through the sidecar.
   - Covers: FR-SHP-14
   - Waits on: T-09, Tanmay's event schema (L-03).
@@ -107,6 +120,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-11. Mock services container**
   - Epic: `epic-shop-instance-integration`
+  - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Combined mock services: payment, KYC, metadata and the XSS collector, reachable only inside the instance network.
   - Covers: FR-SHP-13
   - Waits on: T-09.
@@ -114,6 +128,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-12. Isolated import service**
   - Epic: `epic-shop-instance-integration`
+  - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: An import service that runs a fresh process per job with no network and no database access.
   - Covers: FR-SHP-13
   - Waits on: T-09.
@@ -121,6 +136,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-13. Support-agent bot**
   - Epic: `epic-shop-instance-integration`
+  - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The bot controller that opens only pages of its own instance for a fixed time.
   - Covers: FR-SHP-11; spike S-5
   - Waits on: T-11.
@@ -128,6 +144,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-14. Customer flows**
   - Epic: `epic-shop-core-and-roles`
+  - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Browse, search, cart, checkout with the simulated payment, orders, reviews and support tickets.
   - Covers: FR-SHP-05
   - Waits on: T-07, T-08.
@@ -135,6 +152,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-15. Support, finance and admin flows**
   - Epic: `epic-shop-core-and-roles`
+  - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Support, finance and admin screens following the permission matrix.
   - Covers: FR-SHP-07
   - Waits on: T-07.
@@ -142,6 +160,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 - [ ] **T-16. Seeded accounts for the challenges**
   - Epic: `epic-shop-core-and-roles`
+  - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Seeded accounts for every challenge.
   - Covers: FR-SHP-08
   - Waits on: T-07, T-08.
@@ -153,6 +172,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-17. Seller flows**
   - Epic: `epic-shop-seller-and-money`
+  - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: Seller store registration and approval, products, fulfilment and staff.
   - Covers: FR-SHP-06
   - Waits on: T-14. Open in part: OI-20.
@@ -160,6 +180,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-18. Refunds, disputes, commissions and payouts**
   - Epic: `epic-shop-seller-and-money`
+  - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: The correct marketplace money model with refunds, disputes, proportional commission reversal, append-only ledger.
   - Covers: FR-SHP-10
   - Waits on: T-17. Open in part: OI-19.
@@ -167,6 +188,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-19. C01 Broken Access Control (cross-store order read)**
   - Epic: `epic-challenges-c01-c04`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C01 as designed with its flag, milestones, hints, write-up and exploit test.
   - Covers: FR-CHL-02
   - Waits on: T-14, T-17.
@@ -174,6 +196,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-20. C02 Cryptographic Failures (gift-card codes from a weak hash)**
   - Epic: `epic-challenges-c01-c04`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C02 as designed with its flag, milestones, hints, write-up and exploit test.
   - Covers: FR-CHL-03
   - Waits on: T-14.
@@ -181,6 +204,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-21. C03 Injection (SQL injection and stored XSS)**
   - Epic: `epic-challenges-c01-c04`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C03 parts A and B: SQL injection against a read-only catalogue file and stored XSS visited by the bot.
   - Covers: FR-CHL-04
   - Waits on: T-11, T-13, T-14; check SQLite ATTACH and load_extension.
@@ -188,6 +212,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-22. C04 Insecure Design (refund total beyond the amount paid)**
   - Epic: `epic-challenges-c01-c04`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C04 as a separate quick-refund path on top of the correct model.
   - Covers: FR-CHL-05
   - Waits on: T-18.
@@ -195,6 +220,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-23. C05 Security Misconfiguration (unauthenticated diagnostics page)**
   - Epic: `epic-challenges-c05-c08`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C05 with a diagnostics page that shows only a synthetic object.
   - Covers: FR-CHL-06
   - Waits on: T-15.
@@ -202,6 +228,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 - [ ] **T-24. C06 Vulnerable Components (prototype pollution in the import service)**
   - Epic: `epic-challenges-c05-c08`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C06 with the old lodash in the isolated import service; confirm the pollution input works on Node 24.
   - Covers: FR-CHL-07; spike S-9
   - Waits on: T-12.
@@ -213,6 +240,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-25. C07 Authentication Failures (weak password-reset code)**
   - Epic: `epic-challenges-c05-c08`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C07 on the finance account; the reset mailbox is unreadable by the player.
   - Covers: FR-CHL-08
   - Waits on: T-15.
@@ -220,6 +248,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-26. C08 Software or Data Integrity Failures (unsigned payment webhook)**
   - Epic: `epic-challenges-c05-c08`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C08 with an unsigned payment webhook that releases a sentinel flag only on an unsigned sandbox event.
   - Covers: FR-CHL-09
   - Waits on: T-11.
@@ -227,6 +256,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
   - Epic: `epic-challenges-c09-c11`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C09 so that the attack leaves zero events in the shop's own events.
   - Covers: FR-CHL-10
   - Waits on: T-10, Tanmay's negative-observation rule (L-21).
@@ -234,6 +264,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-28. C10 Server-Side Request Forgery (seller image import)**
   - Epic: `epic-challenges-c09-c11`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C10 with a seller image import that can reach only the fake metadata service.
   - Covers: FR-CHL-11
   - Waits on: T-11, T-17.
@@ -241,6 +272,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-29. C11 Mishandling of Exceptional Conditions (KYC check fails open)**
   - Epic: `epic-challenges-c09-c11`
+  - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C11 with a seller KYC check that fails open and a sentinel flag.
   - Covers: FR-CHL-12
   - Waits on: T-11, T-17.
@@ -248,6 +280,8 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
   - Epic: `epic-catalogue-hints-and-verification`
+  - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
+  - EARLY PR: yes. P-26 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
   - Build: Fill the catalogue for all 11 challenges: both OWASP tags, CWE and ATT&CK ids re-checked on the official sites, tier, player brief, three hint levels, write-up hidden until solved, and the decoy flag locations.
   - Covers: FR-CHL-01, 14, 15, 17
   - Waits on: T-19 to T-29. Open in part: OI-14.
@@ -255,6 +289,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-31. Cross-challenge tests and exploit tests as a CI release gate**
   - Epic: `epic-catalogue-hints-and-verification`
+  - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
   - Build: Prove that solving one challenge captures no other flag, and run the 11 exploit tests in CI as a release gate.
   - Covers: FR-CHL-13, 16
   - Waits on: T-30.
@@ -262,6 +297,8 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
 
 - [ ] **T-32. Deployed verification on the instance VM**
   - Epic: `All target epics`
+  - BMAD story: not planned yet; created when you incept `All target epics` (see START-HERE.md, section "First task of an epic")
+  - EARLY PR: yes. L-30 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
   - Build: Run all exploit tests and the shop checks against an instance on VM-I.
   - Covers: Done-when of every target epic
   - Waits on: Tanmay's deployment (L-12, L-15, L-17) and all earlier target tasks.
