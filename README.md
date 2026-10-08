@@ -20,4 +20,17 @@ Built by three developers with Claude Code. Final submission: first week of Nove
 - `.claude/` and `_bmad/`: the BMAD workflow skills and runtime that Claude Code uses. Do not edit or update them without the team agreeing; `node scripts/verify-skills.mjs` checks they are unchanged.
 - `scripts/`: the documentation commit gate and the skills verifier. `.githooks/`: the git backstop for the gate (enable once per clone with `git config core.hooksPath .githooks`).
 
+## Developer commands
+
+Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `package.json` and CI), and Docker Desktop running.
+
+| Command | What it does |
+|---|---|
+| `node scripts/dev.mjs doctor` | Prints tool versions with PASS or FAIL |
+| `node scripts/dev.mjs hello` | Starts a hardened hello container, checks it, removes it |
+| `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (empty until later stories) |
+| `node scripts/dev.mjs down` | Stops and removes the project's containers |
+| `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed) |
+| `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests against the real Docker engine (about 1 minute) |
+
 Application code (platform, lab and target) is not written yet; it starts with the Sprint 1 tasks.

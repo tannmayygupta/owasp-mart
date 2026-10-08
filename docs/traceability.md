@@ -34,3 +34,10 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | C09 | Logging (and Alerting) Failures | A09 / A09 | Not started | | | | |
 | C10 | Server-Side Request Forgery | A10 / A01 | Not started | | | | |
 | C11 | Mishandling of Exceptional Conditions | none / A10 | Not started | | | | |
+
+## Build baseline (L-01)
+
+| ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |
+|---|---|---|---|---|---|---|
+| LB-1 | Repository skeleton, pinned tools, CI, CODEOWNERS, Compose, dev.mjs | Done (CI on a pull request not yet seen) | `scripts/dev.mjs`, `infra/compose/compose.yaml`, `.github/` | `scripts/dev.test.mjs`, `scripts/e2e/dev.e2e.test.mjs` | 19 unit and 10 end-to-end tests pass on real Docker; lockfile and compose checks pass | [2026-10-08-tannmayygupta-repository-skeleton](dev-log/2026-10-08-tannmayygupta-repository-skeleton.md) |
+| LB-2 | Docker works on Tanmay's PC (WSL and data on D:, memory cap) | Done except data location | `docs/assets/l-01-repository-skeleton/` | `node scripts/dev.mjs doctor` and `hello` | WSL repaired, doctor 6 of 6 PASS, hello exit 0, 8 GB cap set; Docker data still on C: | [2026-10-08-tannmayygupta-repository-skeleton](dev-log/2026-10-08-tannmayygupta-repository-skeleton.md) |

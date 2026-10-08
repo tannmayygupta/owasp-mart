@@ -1,0 +1,8 @@
+# node scripts/dev.mjs doctor
+PASS  Node           v24.11.0 (pinned major 24, .node-version 24.21.0)
+PASS  pnpm           12.10.1 (pinned 12.10.1)
+PASS  uv             uv 0.12.23 (46b84fd0b 2026-10-03 x86_64-pc-windows-msvc)
+PASS  Docker         Docker version 29.6.2, build dfc4efb
+PASS  Compose        5.3.1
+PASS  Docker engine  running
+exit: 0

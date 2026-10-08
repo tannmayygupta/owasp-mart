@@ -1,0 +1,5 @@
+# pnpm workspace (JavaScript side). Empty until stream P and T add packages.
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "services/*"

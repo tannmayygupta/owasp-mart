@@ -1,0 +1,43 @@
+# Architecture 07, section 2. The last matching pattern wins.
+# Stream L = @tannmayygupta, stream P = @akshaay29, stream T = @sahillroy.
+
+# default: any one listed owner satisfies a rule (approval from one is enough)
+*                                   @akshaay29 @tannmayygupta @sahillroy
+
+/contracts/api/platform/            @akshaay29
+/contracts/api/lab/                 @tannmayygupta
+/contracts/events/                  @tannmayygupta
+/contracts/orchestrator/            @tannmayygupta
+/contracts/instance/                @tannmayygupta @sahillroy
+/contracts/catalog/                 @sahillroy
+/contracts/errors/                  @akshaay29
+/contracts/db/                      @akshaay29
+/contracts/mocks/                   @tannmayygupta
+/apps/api/src/vulnmart/kernel/      @akshaay29
+/apps/api/src/vulnmart/ports/       @akshaay29 @tannmayygupta
+/apps/api/src/vulnmart/accounts/    @akshaay29
+/apps/api/src/vulnmart/orgs/        @akshaay29
+/apps/api/src/vulnmart/assessments/ @akshaay29
+/apps/api/src/vulnmart/privacy/     @akshaay29
+/apps/api/src/vulnmart/admin/       @akshaay29
+/apps/api/src/vulnmart/notifications/ @akshaay29
+/apps/api/src/vulnmart/live/        @akshaay29
+/apps/api/src/vulnmart/attempts/    @tannmayygupta
+/apps/api/src/vulnmart/instances/   @tannmayygupta
+/apps/api/src/vulnmart/scoring/     @tannmayygupta
+/apps/api/src/vulnmart/ingest/      @tannmayygupta
+/apps/api/src/vulnmart/flags/       @tannmayygupta
+/apps/api/migrations/               @akshaay29 @tannmayygupta
+/apps/web/                          @akshaay29
+/apps/orchestrator/                 @tannmayygupta
+/apps/shop/                         @sahillroy
+/services/sidecar/                  @tannmayygupta
+/services/gate/                     @tannmayygupta
+/services/edge/                     @tannmayygupta
+/services/mock-services/            @sahillroy
+/services/import-service/          @sahillroy
+/services/bot/                      @sahillroy
+/challenges/                        @sahillroy
+/infra/                             @tannmayygupta
+/.github/                           @tannmayygupta @akshaay29 @sahillroy
+/docs/                              @akshaay29 @tannmayygupta @sahillroy

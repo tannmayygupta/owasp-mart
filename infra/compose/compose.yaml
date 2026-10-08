@@ -1,0 +1,40 @@
+# VulnMart Compose project (architecture 07, section 6).
+# Start services with: node scripts/dev.mjs up <profile...>   (never call this file by hand in docs)
+#
+# Profiles that later stories fill (they have no services yet):
+#   platform  Postgres, Valkey, Mailpit, API, ingest, live, worker, scheduler, Caddy   (stream P, with L)
+#   web       Next.js dev server                                                       (stream P)
+#   lab       orchestrator, socket proxy, edge, gate, instance images                  (stream L)
+#   mocks     Prism, fake orchestrator, fake ingest, stub shop                         (streams L and P)
+# Profile `hello` below is the tracer bullet used by `node scripts/dev.mjs hello`.
+name: vulnmart
+
+services:
+  hello:
+    profiles: ["hello"]
+    # busybox 1.37.0 (musl); tag plus multi-arch index digest, checked on 2026-10-08.
+    image: busybox:1.37.0-musl@sha256:5cec3fc171c87218698e85a52af7087de727372aae264a787b8112901a5b0092
+    container_name: vulnmart-hello
+    user: "65532:65532"
+    read_only: true
+    mem_limit: 64m
+    pids_limit: 64
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:18080:8080"
+    command:
+      - sh
+      - -c
+      - echo hello > /tmp/index.html && exec httpd -f -p 8080 -h /tmp
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 1s
+    restart: "no"

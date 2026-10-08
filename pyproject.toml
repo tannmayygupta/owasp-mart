@@ -1,0 +1,13 @@
+# uv workspace root (Python side). No members yet; stream L and P add them (apps/api, packages/py-models).
+[project]
+name = "vulnmart"
+version = "0.0.0"
+description = "VulnMart monorepo root (no application code yet)"
+requires-python = "==3.14.*"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = []
