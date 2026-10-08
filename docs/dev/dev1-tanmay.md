@@ -33,7 +33,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other two streams can build against stable contracts and fakes.
 
-- [ ] **L-01. Repository skeleton and tooling run end to end (tracer bullet)**
+- [x] **L-01. Repository skeleton and tooling run end to end (tracer bullet)**
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. P-01, T-01, T-02 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
