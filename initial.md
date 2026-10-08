@@ -266,7 +266,7 @@ Each challenge will also carry **CWE** and **MITRE ATT&CK** IDs (D-07), values O
 | Q-21 | **Who writes the report**, and what do the 2 non-developing authors do (docs, testing, pilot users)? | Decides report ownership and pilot participants. |
 | Q-22 | **Pilot and mock hiring round:** who are the participants (the synopsis says "where feasible")? | Phase 4 and 5 depend on people. |
 | Q-23 | Is **"VulnMart"** the final product name? (The pitch used "OWASP Vulnerable Practice-and-Hiring Platform"; the GitHub repo is named `owasp-mart`.) | Naming across code, docs, report. |
-| Q-24 | What are the **other two developers' PC specs** and are Docker/WSL set up on them? | Dev environment must work for all three. |
+| Q-24 | **PARTLY ANSWERED (user, 2026-10-08):** Tanmay = Windows 11; **Sahil = Windows**; **Akshay = macOS**. **Still open:** Akshay's Mac chip (Apple Silicon or Intel), RAM, and whether Docker is set up on Akshay's and Sahil's machines. | Dev environment must work for all three. Mixed OS means scripts must be cross-platform, and container images should be built for both amd64 and arm64 (an Apple Silicon Mac and Oracle's free Ampere VM are both arm64). |
 | Q-25 | **When** will the guide be informed of the scope changes? | The synopsis was approved as written. |
 | Q-26 | The **college report template**: the user will share it. Then map `docs/report/README.md` to its chapters. | The documentation structure should match the report. |
 | ~~Q-27~~ | ~~GitHub repo name and approval to create and push.~~ **ANSWERED (user, 2026-10-08):** the user created the private repo **`tannmayygupta/owasp-mart`** on the **personal** GitHub account and asked for **SSH** (personal key, not the work one). First commit pushed. See D-14. | Repo creation and pushing publish content to an external service. |
@@ -398,7 +398,8 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.
-2. **Research and lock** each unlocked item, one at a time, using proven industry solutions, and record it in Section 15:
+   **Pipeline (agreed with the user, 2026-10-08):** research -> user confirms in short pick-one batches -> lock in Section 15 -> PRD -> architecture -> three independent work-streams with fixed interface contracts -> developers start. **Status:** research launched as 8 parallel streams (RS-A to RS-H, see `docs/research/README.md`). Items R-01 to R-14 below map to those streams (R-13, the dev environment setup, is handled separately).
+2. **Research and lock** each unlocked item using proven industry solutions, and record it in Section 15:
    - **R-01 Roles and permissions** (user request): full feature list and permission matrix for the platform roles (Section 5) and the six shop roles (Section 6).
    - **R-02 Hosting:** what can run on free tiers (Vercel, Railway, others) given per-user containers; what must stay on our own machine.
    - **R-03 Isolation and safety** of intentionally vulnerable containers (network egress, SSRF, container escape).

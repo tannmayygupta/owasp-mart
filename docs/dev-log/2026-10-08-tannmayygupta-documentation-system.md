@@ -56,6 +56,8 @@ Test output was shown in the Claude Code session on 2026-10-08. No screenshots s
 5. **Line endings on other machines.** Git warned it would convert files to Windows line endings. The repo itself stores LF (`git ls-files --eol` shows `i/lf`), but a Windows clone with `core.autocrlf=true` would turn `.githooks/commit-msg` into CRLF and the backstop would silently stop working. Fixed with a `.gitattributes` that pins LF for hooks and scripts. Not yet tested on a fresh Windows clone.
 6. **The Claude Code hook did not fire on Windows.** The hook matcher was `Bash`, but this Windows session runs commands through a **PowerShell** tool. Matchers are exact tool names (`Bash` matches only Bash), so the hook never ran; the git backstop caught the commit instead. Found by the live check. Fixed with matcher `Bash|PowerShell` and by accepting `PowerShell` as a tool name in `scripts/check-docs.mjs`. Lesson: the two layers are independent, and the backstop protected us while the first layer was broken.
 
+7. **Hook not executable for macOS/Linux.** Git ignores a hook file that is not executable. `.githooks/commit-msg` was committed from Windows as mode 100644, so the backstop would silently not run on Akshay's Mac. Fixed with `git update-index --chmod=+x .githooks/commit-msg` (mode now 100755). Not yet tested on a Mac.
+
 ## Security notes
 No vulnerable code yet. The hook script runs with the developer's credentials, so every developer should read `scripts/check-docs.mjs` and `.claude/settings.json` once. The gate checks that docs exist, not that they are good.
 
