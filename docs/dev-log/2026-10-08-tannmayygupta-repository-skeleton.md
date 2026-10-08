@@ -5,7 +5,7 @@
 | Date | 2026-10-08 |
 | Developer | tannmayygupta |
 | Branch / commit | shared-L-01 / local commit, not pushed (early pull request branch) |
-| Status | Done, except two open items: CI not yet seen on a real pull request, and Docker data is still on C: (not moved to D:) |
+| Status | Done, except one open item: CI not yet seen green on a real pull request (branch pushed, pull request not yet opened) |
 | Report tag | tooling, tracer bullet, BMAD cycle |
 
 ## Requirements covered
@@ -56,8 +56,8 @@ All on Tanmay's PC, Docker 29.6.2, outputs in `docs/assets/l-01-repository-skele
 None; no vulnerable code. No secrets in any file.
 
 ## Limitations and follow-ups
-- Open a pull request (branch `shared-L-01`) and confirm CI is green; the `compose` job runs `hello` on the GitHub runner and has not been seen yet.
-- Docker's data (4.7 GB) is still on C:. Move it to D: with Docker Desktop, Settings, Resources, Disk image location, because it also holds an unrelated n8n image and volume.
+- Branch `shared-L-01` is pushed. Open the pull request and confirm CI is green; the `compose` job runs `hello` on the GitHub runner and has not been seen yet.
+- Docker's data (4.8 GB) was moved to `D:\docker-data\wsl` and `%LOCALAPPDATA%\Docker\wsl` is now a junction to it (copy verified byte for byte, then Docker restarted: the n8n image and its volume are still there and `hello` passes). The old copy is kept as `%LOCALAPPDATA%\Docker\wsl.old-backup` (5 GB on C:) until Tanmay confirms it can be deleted.
 - Story risk check: after the merge, Akshay (Mac) and Sahil (Windows) run `node scripts/dev.mjs hello` on their machines and report.
 - Deferred (see deferred-work.md): a Windows CI job, pnpm supply-chain settings, CI green and the other machines.
 - `image.png` (the Docker error screenshot) is untracked and not committed.

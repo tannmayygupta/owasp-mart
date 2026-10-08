@@ -28,5 +28,5 @@ Verify: `node scripts/dev.mjs hello` starts a hello container on Tanmay's PC and
 
 - Decision: story approved by Tanmay on 2026-10-08 as the first task of the project; it is an early pull request (branch `shared-L-01`) because Akshay (P-01) and Sahil (T-01, T-02) wait on it.
 - Risk check outside the criteria (high risk): after the merge, Akshay on his Mac and Sahil on his Windows PC each clone `main` and run `node scripts/dev.mjs hello` on their own machine; each reports the result to Tanmay.
-- Open question: GitHub handles of Akshay and Sahil for CODEOWNERS; answering it is part of this story.
-- Open question: whether Docker runs on Windows 11 Home with WSL2 on this PC (EF-26 conflicting); this story settles it.
+- Decision (2026-10-08): CODEOWNERS handles are `@tannmayygupta` (L), `@akshaay29` (P) and `@sahillroy` (T), given by Tanmay.
+- Decision (2026-10-08, settled by this story): Docker Desktop runs on Windows 11 Home with WSL2 on Tanmay's PC once WSL is updated to 2.7.13; `doctor` and `hello` pass. Docker data now lives on D: (`D:\docker-data\wsl`, reached through a junction from `%LOCALAPPDATA%\Docker\wsl`); memory is capped at 8 GB in `.wslconfig`.
