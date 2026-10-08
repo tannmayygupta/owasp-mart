@@ -43,7 +43,7 @@ Truthfulness rules:
 ## Git
 - The remote is `origin` on the personal GitHub account `tannmayygupta`, repo `owasp-mart` (private). Use **SSH only**, no HTTPS or tokens. On Tanmay's PC the SSH alias is `github-personal`; never use the work alias for this project.
 - Push only when the developer asks. Never change the remote or force-push without asking.
-- Branches: never commit to `main`. One branch per developer per sprint, `sprint-<n>-<name>` (for example `sprint-1-akshay`), one pull request per sprint of 8 tasks. A task marked EARLY PR in the task file goes on its own branch `shared-<task-id>` from fresh `main` with its own small pull request. One other developer reviews each pull request; the owner of any contract or other-stream path touched must approve.
+- Branches: never commit to `main`. One branch per developer per sprint, `sprint-<n>-<name>` (for example `sprint-1-akshay`), one pull request per sprint of 8 tasks. A task marked EARLY PR in the task file goes on its own branch `shared-<task-id>` from fresh `main` with its own small pull request. Pull request review is optional during initial development (D-37, 2026-10-08): the author may merge once CI is green. When a contract or another stream's path changes, tell its owner in the team chat.
 - Other developers use their own SSH key with `git@github.com:tannmayygupta/owasp-mart.git`; the alias `github-personal` is only for Tanmay's PC.
 
 ## How the rule is enforced

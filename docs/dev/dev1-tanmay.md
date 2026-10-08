@@ -42,7 +42,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Waits on: Nothing. This is the first task of the whole project.
   - Done when: `node scripts/dev.mjs hello` starts a hello container on your PC and the CI skeleton runs green on a pull request.
 
-- [ ] **L-02. Instance contract v0 (IF-6)**
+- [x] **L-02. Instance contract v0 (IF-6)**
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. T-03 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.

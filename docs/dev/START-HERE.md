@@ -105,7 +105,7 @@ Check that every requirement id in the task's "Covers" is in the story, and appr
 - **Exception, EARLY PR.** Tasks that another developer waits on in the same sprint (for example L-01 and the contract tasks) are marked EARLY PR in the task files. Do such a task on its own branch from fresh `main`: `git switch main`, `git pull`, `git switch -c shared-<task-id>`. When done, open a small pull request right away, get it reviewed and merged, then bring it into your sprint branch with `git switch sprint-<n>-<name>` and `git merge main`.
 - **Pushing:** only when you ask Claude to. Say `Push my branch`. It uses SSH. Never push to `main`.
 - **Pull request text:** ask Claude to write it (what changed, which task IDs, real test results). Use `bmad-walkthrough` to help the reviewer.
-- **Review:** one other developer reviews each pull request. If you touched a contract or another stream's folder, that owner must approve (CODEOWNERS and the contract rules in `docs/architecture/07-repo-and-workstreams.md`). First reply within one working day.
+- **Review:** optional during initial development (decision D-37, 2026-10-08): you may merge your own pull request once CI is green. If you touched a contract or another stream's folder, tell that owner in the team chat so they can look at it afterwards (CODEOWNERS and the contract rules in `docs/architecture/07-repo-and-workstreams.md` still name the owners).
 - **After the merge:** `git switch main`, `git pull`, `node scripts/verify-skills.mjs`, then create the next sprint branch.
 
 ## 7. When something goes wrong

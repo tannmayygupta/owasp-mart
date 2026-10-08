@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-08 |
 | Developer | tannmayygupta |
-| Branch / commit | shared-L-02 (early pull request, base 48f5da2; pull request not yet opened) |
-| Status | Built, reviewed (two thorough rounds) and tested; waiting for Sahil's approval as consumer and for CI on the pull request before it is done |
+| Branch / commit | shared-L-02, pull request #2 merged into main as 16ae8aa (early pull request) |
+| Status | Done. Pull request #2 merged with all 4 CI checks green (reported by Tanmay); Sahil's consumer approval waived by D-37, his "to confirm" rows are still open |
 | Report tag | contracts, IF-6, sprint zero |
 
 ## Requirements covered
@@ -65,5 +65,5 @@ Open point 16: placement files now travel on two extra memory-backed volumes (`/
 
 ## Limitations and follow-ups
 - Open: how the patched snapshot gets from `/run/vm` into the shop's `/data` (proposal: the shop copies it), row 15; Sahil must confirm that the consumers read the two placement paths, row 16.
-- Sahil must approve before merge; Akshay should check the instance id and owner-hash shapes.
+- Sahil's approval was waived (D-37); Sahil should still confirm the "to confirm" rows (paths, snapshot hand-over, placement files, injector network) and Akshay the instance id and owner-hash shapes, in the team chat.
 - Markdown and schemas are tied only by section-heading checks; a deeper check is for L-07. Stub-shop conformance is L-06. Real limits come from spikes S-4 and S-5.

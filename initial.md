@@ -550,6 +550,10 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 - **Decision (Tanmay, 2026-10-08, from IF-6 open points 16 and 29):** (1) the flag files that must exist only in the import service (C06) and in mock-services (C10) are delivered through two small **memory-backed volumes, one per consumer** (`/run/placement/import`, `/run/placement/mock`), written only by the injector and mounted read-only only by that consumer (chosen after research; delegated to the coordinator by the developer). (2) The **injector has `network_mode: none`**, which deviates from the architecture 02 drawing. Sahil confirms the consumer paths in the pull request review.
 - **Evidence:** ADR 0016 (OWASP Secrets Management Cheat Sheet, CNCF whitepaper via a secondary source, Docker secrets guides; not all read in primary sources).
 
+### D-37 — Pull request review is optional during initial development
+- **Decision (Tanmay, 2026-10-08):** while the team is still building the first version, a pull request does not need a review; the author may merge once CI is green. Owners of a contract or another stream's folder are told in the team chat after a change. Applies to all three developers until the team decides otherwise. First use: pull request #2 (L-02) merged without Sahil's consumer approval; the contract's "to confirm" rows are still to be confirmed by Sahil and Akshay.
+- **Amends:** the review rule in `CLAUDE.md`, `docs/dev/START-HERE.md` and the L-02 story ("stream T has approved"); the CODEOWNERS file is unchanged.
+
 ---
 
 ## 16. Next steps

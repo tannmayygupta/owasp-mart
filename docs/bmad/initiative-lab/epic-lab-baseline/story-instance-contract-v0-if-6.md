@@ -26,4 +26,4 @@ Verify: The contract validates and stream T has approved it as consumer; conform
 ## Notes
 
 - Decision (2026-10-08, Tanmay): the error registry (P-02) and the catalogue stubs (T-02) are not merged yet, so this contract uses the error-code family names (INST-*, ORCH-*, EVT-*) and the catalogue field names from the architecture, marked "to confirm"; a small follow-up pull request aligns them after P-02 and T-02 merge.
-- Co-owned with stream T (Sahil), who approves it as consumer: request his review on the pull request before merging (CODEOWNERS `/contracts/instance/`). Early pull request, branch `shared-L-02`, because Sahil's T-03 waits on it.
+- Decision (2026-10-08, D-37): Sahil's consumer approval was waived; pull request #2 was merged by Tanmay after CI was green. Sahil confirms the "to confirm" rows of the contract in the team chat. Early pull request, branch `shared-L-02`, because Sahil's T-03 waits on it.
