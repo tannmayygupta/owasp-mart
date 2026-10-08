@@ -17,6 +17,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 ### Added (BMAD trackers, 2026-10-08, Tanmay)
 - Draft BMAD ticket trees for the three streams under `docs/bmad/initiative-*` (all 170 FR owned once), a manually maintained Excel workbook `docs/bmad/VulnMart-Tracker.xlsx`, and a tracker-update rule in the commit gate and `CLAUDE.md`.
 
+### Added (developer task lists, 2026-10-08, Tanmay)
+- `docs/dev/dev1-tanmay.md`, `dev2-akshay.md`, `dev3-sahil.md`: all tasks by weekly sprint (4 sprints, 7 to 8 tasks each); the Excel tracker is now one simple sheet per developer (Done Yes/No). `docs/README.md` index refreshed.
+
 ### Added (challenge design, 2026-10-08, Tanmay)
 - `docs/design/challenge-specs.md`: detailed design of the 11 challenges with milestones, tests and event catalogue; decisions D-32 (DC-1 to DC-15) accepted; PRD open items OI-16 to OI-20 resolved.
 
