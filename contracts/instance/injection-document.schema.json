@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/instance/injection-document.schema.json",
+  "title": "Injection document (instance contract v0, IF-6)",
+  "description": "The one JSON document the orchestrator writes on the standard input of the one-shot injector. Contains secrets (flags, seed): never put it in an environment variable, a log, a label or a file outside the memory-backed volumes. Rules a schema cannot express (duplicate challenge keys, decoy equal to a flag, duplicate decoy index) are checked by scripts/validate-contracts.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "instance_id", "epoch", "seed", "flags", "decoys"],
+  "properties": {
+    "schema_version": {
+      "description": "Contract version this document follows, 0.x until v1.0.0.",
+      "const": "0.1"
+    },
+    "instance_id": {
+      "description": "Proposal: i- plus 16 Base32 characters (to confirm).",
+      "type": "string",
+      "pattern": "^i-[A-Z2-7]{16}$"
+    },
+    "epoch": {
+      "description": "Flag epoch of this instance, starts at 1 and grows by one on every reset.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "issued_at": {
+      "description": "Optional. When the orchestrator wrote the document (UTC). Information only in v0: the injector does not reject old documents; a stale document is detected by its epoch.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "seed": {
+      "description": "Random per-instance seed for seeded accounts and data. A secret like the flags.",
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "flags": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["challenge_key", "flag"],
+        "properties": {
+          "challenge_key": { "$ref": "#/$defs/challenge_key" },
+          "flag": { "$ref": "#/$defs/flag" }
+        }
+      }
+    },
+    "decoys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["challenge_key", "index", "value"],
+        "properties": {
+          "challenge_key": { "$ref": "#/$defs/challenge_key" },
+          "index": { "type": "integer", "minimum": 0 },
+          "value": { "$ref": "#/$defs/flag" },
+          "decoy_placement": {
+            "description": "Optional. Where the decoy goes. Field name proposed, content to be defined by the target stream (T).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "challenge_key": {
+      "type": "string",
+      "pattern": "^C(0[1-9]|10|11)$"
+    },
+    "flag": {
+      "description": "VM{ plus 24 Base32 characters }. Format from architecture 04 section 11.1.",
+      "type": "string",
+      "pattern": "^VM\\{[A-Z2-7]{24}\\}$"
+    }
+  }
+}

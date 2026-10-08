@@ -1,0 +1,13 @@
+# node --test "scripts/*.test.mjs"
+✔ a byte-order mark is rejected (153.6419ms)
+✔ no file of the contract or its tooling starts with a byte-order mark (15.2264ms)
+✔ OS metadata files and .gitkeep in examples are not orphans; a secret in a schema is found (300.2801ms)
+✔ errorPath builds JSON Pointers for required, additional and property-name errors (0.2415ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4501.7769

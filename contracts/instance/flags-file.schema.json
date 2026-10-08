@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/instance/flags-file.schema.json",
+  "title": "Flags file /run/vm/flags.json (instance contract v0, IF-6)",
+  "description": "Written by the injector with mode 0400 on the memory-backed /run/vm volume, read by the shop for sentinel logic (a flag released only on the intended vulnerable path). The epoch lets a consumer recognise a file from before a reset. Duplicate challenge keys are checked by scripts/validate-contracts.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "instance_id", "epoch", "flags"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "instance_id": { "type": "string", "pattern": "^i-[A-Z2-7]{16}$" },
+    "epoch": { "type": "integer", "minimum": 1 },
+    "flags": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["challenge_key", "flag"],
+        "properties": {
+          "challenge_key": { "type": "string", "pattern": "^C(0[1-9]|10|11)$" },
+          "flag": { "type": "string", "pattern": "^VM\\{[A-Z2-7]{24}\\}$" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
+  "issued_at": "2026-01-01T00:00:00Z",
+  "flags": [
+    {
+      "challenge_key": "C01",
+      "flag": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"
+    },
+    {
+      "challenge_key": "C02",
+      "flag": "VM{BBBBBBBBBBBBBBBBBBBBBBBB}"
+    },
+    {
+      "challenge_key": "C03",
+      "flag": "VM{CCCCCCCCCCCCCCCCCCCCCCCC}"
+    },
+    {
+      "challenge_key": "C04",
+      "flag": "VM{DDDDDDDDDDDDDDDDDDDDDDDD}"
+    },
+    {
+      "challenge_key": "C05",
+      "flag": "VM{EEEEEEEEEEEEEEEEEEEEEEEE}"
+    },
+    {
+      "challenge_key": "C06",
+      "flag": "VM{FFFFFFFFFFFFFFFFFFFFFFFF}"
+    },
+    {
+      "challenge_key": "C07",
+      "flag": "VM{GGGGGGGGGGGGGGGGGGGGGGGG}"
+    },
+    {
+      "challenge_key": "C08",
+      "flag": "VM{HHHHHHHHHHHHHHHHHHHHHHHH}"
+    },
+    {
+      "challenge_key": "C09",
+      "flag": "VM{IIIIIIIIIIIIIIIIIIIIIIII}"
+    },
+    {
+      "challenge_key": "C10",
+      "flag": "VM{JJJJJJJJJJJJJJJJJJJJJJJJ}"
+    },
+    {
+      "challenge_key": "C11",
+      "flag": "VM{KKKKKKKKKKKKKKKKKKKKKKKK}"
+    }
+  ],
+  "decoys": [
+    {
+      "challenge_key": "C01",
+      "index": 0,
+      "value": "VM{XXXXXXXXXXXXXXXXXXXXXXXX}",
+      "decoy_placement": "to be defined by the target stream"
+    },
+    {
+      "challenge_key": "C01",
+      "index": 1,
+      "value": "VM{YYYYYYYYYYYYYYYYYYYYYYYY}"
+    },
+    {
+      "challenge_key": "C02",
+      "index": 0,
+      "value": "VM{ZZZZZZZZZZZZZZZZZZZZZZZZ}"
+    }
+  ]
+}

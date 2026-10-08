@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/instance/instance-template.schema.json",
+  "title": "Instance template (instance contract v0, IF-6)",
+  "description": "What the orchestrator may start for one instance: six components, the memory-backed volumes they share, and the runtime profile of each. Image names are placeholders like {image:shop}; the orchestrator resolves them from its allowlist. Rules that compare two fields (volume sharing, label cross-checks, unique names, flag_delivery_env name) are checked by scripts/validate-contracts.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "template_id", "volumes", "components"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "template_id": { "$ref": "#/$defs/template_id" },
+    "volumes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "memory_backed", "size_mb"],
+        "properties": {
+          "name": { "$ref": "#/$defs/short_name" },
+          "memory_backed": { "const": true },
+          "size_mb": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 6,
+      "items": { "$ref": "#/$defs/component" },
+      "allOf": [
+        { "contains": { "type": "object", "properties": { "role": { "const": "shop" } }, "required": ["role"] }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "properties": { "role": { "const": "sidecar" } }, "required": ["role"] }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "properties": { "role": { "const": "injector" } }, "required": ["role"] }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "properties": { "role": { "const": "import-service" } }, "required": ["role"] }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "properties": { "role": { "const": "mock-services" } }, "required": ["role"] }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "properties": { "role": { "const": "bot-controller" } }, "required": ["role"] }, "minContains": 1, "maxContains": 1 }
+      ]
+    }
+  },
+  "$defs": {
+    "short_name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "template_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,31}$" },
+    "mount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "target"],
+      "properties": {
+        "type": { "enum": ["tmpfs", "volume"] },
+        "target": { "enum": ["/tmp", "/data", "/run/vm", "/run/import"] },
+        "source": { "$ref": "#/$defs/short_name" },
+        "read_only": { "type": "boolean" },
+        "size_mb": { "type": "integer", "minimum": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "type": { "const": "tmpfs" } }, "required": ["type"] },
+          "then": {
+            "type": "object",
+            "required": ["size_mb"],
+            "properties": {
+              "target": { "enum": ["/tmp", "/data"] },
+              "source": false,
+              "read_only": false
+            }
+          }
+        },
+        {
+          "if": { "type": "object", "properties": { "type": { "const": "volume" } }, "required": ["type"] },
+          "then": {
+            "type": "object",
+            "required": ["source", "read_only"],
+            "properties": {
+              "target": { "enum": ["/run/vm", "/run/import"] },
+              "size_mb": false
+            }
+          }
+        }
+      ]
+    },
+    "healthcheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "interval_s", "timeout_s", "retries"],
+      "properties": {
+        "kind": { "enum": ["http", "tcp", "socket"] },
+        "port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "path": { "type": "string", "pattern": "^/[a-zA-Z0-9/._-]*$", "not": { "pattern": "\\.\\." } },
+        "interval_s": { "type": "integer", "minimum": 1, "maximum": 120 },
+        "timeout_s": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "retries": { "type": "integer", "minimum": 1, "maximum": 60 }
+      },
+      "allOf": [
+        { "if": { "type": "object", "properties": { "kind": { "const": "http" } }, "required": ["kind"] }, "then": { "type": "object", "required": ["port", "path"] } },
+        { "if": { "type": "object", "properties": { "kind": { "const": "tcp" } }, "required": ["kind"] }, "then": { "type": "object", "required": ["port"] } },
+        { "if": { "type": "object", "properties": { "kind": { "const": "socket" } }, "required": ["kind"] }, "then": { "type": "object", "required": ["path"] } }
+      ]
+    },
+    "labels": {
+      "description": "Labels of every container. Template values are placeholders ({instance_id}, {epoch}, {expires}, {host}, {owner_hash}) that the orchestrator replaces. vm.owner is an opaque hash, never an email.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vm.schema", "vm.instance", "vm.epoch", "vm.component", "vm.template", "vm.expires", "vm.host", "vm.kind", "vm.owner"],
+      "properties": {
+        "vm.schema": { "const": "0.1" },
+        "vm.instance": { "type": "string", "pattern": "^(\\{instance_id\\}|i-[A-Z2-7]{16})$" },
+        "vm.epoch": { "type": "string", "pattern": "^(\\{epoch\\}|[1-9][0-9]*)$" },
+        "vm.component": { "$ref": "#/$defs/short_name" },
+        "vm.template": { "$ref": "#/$defs/template_id" },
+        "vm.expires": { "type": "string", "pattern": "^(\\{expires\\}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z)$" },
+        "vm.host": { "type": "string", "pattern": "^(\\{host\\}|[a-z0-9][a-z0-9.-]{0,252})$" },
+        "vm.kind": { "const": "inst" },
+        "vm.owner": { "type": "string", "pattern": "^(\\{owner_hash\\}|[0-9a-f]{64})$" }
+      }
+    },
+    "flag_delivery_env": {
+      "description": "Exception for a challenge whose catalogue entry says flag_delivery: env (FR-FLG-03). The orchestrator sets the value from the injection document when it creates the container. The value is then visible to docker inspect: accepted and written down in reason.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["challenge_key", "env_name", "reason"],
+      "properties": {
+        "challenge_key": { "type": "string", "pattern": "^C(0[1-9]|10|11)$" },
+        "env_name": { "type": "string", "pattern": "^VM_FLAG_C(0[1-9]|10|11)$" },
+        "reason": { "type": "string", "minLength": 20, "maxLength": 300, "pattern": "^\\S.*\\S$" }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "image", "user", "read_only", "no_new_privileges", "privileged", "cap_drop", "egress", "network_mode", "memory_mb", "cpu_limit", "pids_limit", "mounts", "env", "labels"],
+      "properties": {
+        "name": { "$ref": "#/$defs/short_name" },
+        "role": { "enum": ["shop", "sidecar", "injector", "import-service", "mock-services", "bot-controller"] },
+        "image": { "type": "string", "pattern": "^\\{image:[a-z][a-z0-9-]*\\}$" },
+        "user": { "type": "string", "pattern": "^[1-9][0-9]*:[1-9][0-9]*$" },
+        "read_only": { "const": true },
+        "no_new_privileges": { "const": true },
+        "privileged": { "const": false },
+        "cap_drop": { "const": ["ALL"] },
+        "egress": { "const": false },
+        "network_mode": { "enum": ["instance", "none"] },
+        "memory_mb": { "type": "integer", "minimum": 16 },
+        "cpu_limit": { "type": "number", "exclusiveMinimum": 0 },
+        "pids_limit": { "type": "integer", "minimum": 1 },
+        "mounts": { "type": "array", "items": { "$ref": "#/$defs/mount" } },
+        "env": {
+          "type": "object",
+          "propertyNames": {
+            "allOf": [
+              { "enum": ["VM_INSTANCE_ID", "VM_EPOCH", "VM_PUBLIC_HOST", "VM_SIDECAR_EVENTS_URL", "VM_MOCK_URL", "VM_IMPORT_SOCKET", "VM_DB_PATH", "VM_CATALOG_DB_PATH", "VM_SNAPSHOT_PATH", "VM_FLAGS_PATH", "PORT", "TZ", "VM_LOG_LEVEL"] },
+              { "not": { "pattern": "(^VM_FLAG_|_KEY$|_SECRET$|_TOKEN$|_PASSWORD$)" } }
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 512,
+            "not": { "pattern": "VM\\{" }
+          }
+        },
+        "healthcheck": { "$ref": "#/$defs/healthcheck" },
+        "ports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1024, "maximum": 65535 }
+        },
+        "labels": { "$ref": "#/$defs/labels" },
+        "flag_delivery_env": { "$ref": "#/$defs/flag_delivery_env" }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "role": { "const": "import-service" } }, "required": ["role"] },
+          "then": {
+            "type": "object",
+            "properties": {
+              "network_mode": { "const": "none" },
+              "healthcheck": { "type": "object", "properties": { "kind": { "const": "socket" } } }
+            }
+          }
+        },
+        {
+          "if": { "type": "object", "properties": { "role": { "const": "shop" } }, "required": ["role"] },
+          "then": {
+            "type": "object",
+            "properties": { "healthcheck": { "type": "object", "properties": { "kind": { "const": "http" } } } }
+          }
+        },
+        {
+          "if": { "type": "object", "properties": { "role": { "const": "injector" } }, "required": ["role"] },
+          "else": { "type": "object", "required": ["healthcheck"] }
+        },
+        {
+          "if": { "type": "object", "properties": { "role": { "enum": ["shop", "sidecar", "mock-services", "bot-controller"] } }, "required": ["role"] },
+          "then": { "type": "object", "required": ["ports"] }
+        },
+        {
+          "if": { "type": "object", "properties": { "role": { "const": "shop" } }, "required": ["role"] },
+          "else": { "type": "object", "properties": { "flag_delivery_env": false } }
+        }
+      ]
+    }
+  }
+}
