@@ -1,0 +1,6 @@
+# Team overrides for BMad (committed; shared by all three developers).
+# Personal settings (for example each developer's active initiative) go in config.user.toml, which is gitignored.
+
+[core]
+project_name = "owasp-mart"
+output_folder = "{project-root}/docs/bmad"

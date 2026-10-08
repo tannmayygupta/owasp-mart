@@ -26,6 +26,13 @@ Truthfulness rules:
 - If you do not know a detail (why, who decided, a result), **ask the developer**. Do not invent it.
 - Never write real flag values, secrets, keys, or personal data in docs. Describe where a flag lives, not what it is.
 
+## Development workflow: BMAD (D-29 to D-31)
+- Work is done with the **BMAD skills installed in `.claude/skills/`** (record: `docs/bmad/INSTALL.md`). One developer, one tracker, **one story at a time**: create the story (`bmad-ticket`), implement it (`bmad-build`), review it (`bmad-code-review` or `bmad-review`), test it (`bmad-qa-generate-e2e-tests` and the story's tests), then close it and start the next.
+- Trackers are files under `docs/bmad/` (one `initiative-<slug>` folder per developer). Set your own with `active_initiative` in `_bmad/custom/config.user.toml` (gitignored). Do not edit another developer's tracker folder.
+- A story is not done until its tests ran and passed (real output recorded), the dev-log entry, changelog line and traceability rows exist (documentation rule above), and the tracker shows the new state.
+- **Never update the skills automatically.** No `npx skills update`, no skill installs, no `bmad setup` that changes versions, without the team agreeing. After any `git pull` run `node scripts/verify-skills.mjs`; if it fails, stop and tell the developer.
+- BMAD scripts need `uv` on the machine (see `docs/bmad/INSTALL.md`).
+
 ## Git
 - The remote is `origin` on the personal GitHub account `tannmayygupta`, repo `owasp-mart` (private). Use **SSH only**, no HTTPS or tokens. On Tanmay's PC the SSH alias is `github-personal`; never use the work alias for this project.
 - Push only when the developer asks. Never change the remote or force-push without asking.

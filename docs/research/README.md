@@ -15,6 +15,7 @@ Shared rules and output format: [_BRIEF.md](_BRIEF.md).
 | RS-F | Challenges C07-C11 | RS-F-challenges-07-11.md | Done, under review |
 | RS-G | Shop domain, shop roles, refunds, bots, seeding | RS-G-shop-domain.md | Done, under review |
 | RS-H | Privacy and data lifecycle | RS-H-privacy-lifecycle.md | Done, under review |
+| RS-I | Four design traps and the development lifecycle (lead session) | RS-I-design-traps-and-lifecycle.md | Done; traps accepted as D-28, lifecycle as D-29 to D-31 |
 
 ## Review log (2026-10-08)
 

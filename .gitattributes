@@ -5,3 +5,8 @@
 .githooks/* text eol=lf
 *.mjs text eol=lf
 *.sh text eol=lf
+
+# BMAD skills and runtime: same bytes on every machine, so the hash manifest check works everywhere.
+.claude/skills/** text eol=lf
+_bmad/** text eol=lf
+docs/bmad/skills.sha256 text eol=lf
