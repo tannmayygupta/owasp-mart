@@ -10,3 +10,4 @@
 .claude/skills/** text eol=lf
 _bmad/** text eol=lf
 docs/bmad/skills.sha256 text eol=lf
+*.xlsx binary

@@ -32,6 +32,7 @@ Truthfulness rules:
 - A story is not done until its tests ran and passed (real output recorded), the dev-log entry, changelog line and traceability rows exist (documentation rule above), and the tracker shows the new state.
 - **Never update the skills automatically.** No `npx skills update`, no skill installs, no `bmad setup` that changes versions, without the team agreeing. After any `git pull` run `node scripts/verify-skills.mjs`; if it fails, stop and tell the developer.
 - BMAD scripts need `uv` on the machine (see `docs/bmad/INSTALL.md`).
+- **Tracker automation (D-30).** Whoever finishes a story updates its state in the tracker in the same commit: the story's plan file under `docs/bmad/initiative-<slug>/` (via `bmad-ticket`), never another developer's folder. Initiatives: Akshay = `initiative-platform`, Tanmay = `initiative-lab`, Sahil = `initiative-target`. The commit gate blocks a code commit that has no tracker update once an initiative folder exists. The Excel workbook `docs/bmad/VulnMart-Tracker.xlsx` is updated **by hand** (never regenerated over edits) and is not checked by the gate.
 
 ## Git
 - The remote is `origin` on the personal GitHub account `tannmayygupta`, repo `owasp-mart` (private). Use **SSH only**, no HTTPS or tokens. On Tanmay's PC the SSH alias is `github-personal`; never use the work alias for this project.

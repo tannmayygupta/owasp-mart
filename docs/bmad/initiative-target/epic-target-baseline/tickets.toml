@@ -1,0 +1,71 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Shop skeleton runs in a container (tracer bullet)"
+description = "Sets up Sahil's Windows environment and runs an Express app on Node 24 in a hardened container that answers /healthz, /readyz and /version."
+verify = "`docker run` of the shop image answers its health endpoints on Sahil's PC; Docker, Node 24, uv and `node scripts/verify-skills.mjs` succeed."
+covers = ["TB-3", "TB-5"]
+after = []
+hitl = true
+risk = "low"
+unknown = "Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton, tooling and CI) being merged so the shop folder has a home; remove when merged."
+
+[[entry]]
+id = 2
+type = "story"
+title = "Challenge catalogue schema and 11 stub entries (IF-7)"
+description = "Defines the catalogue schema and commits 11 stub entries with tags, tier, placeholder milestones and hint slots."
+verify = "All 11 stubs validate against the schema in CI."
+covers = ["TB-1"]
+after = []
+hitl = false
+risk = "low"
+unknown = "Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton) being merged; remove when merged."
+
+[[entry]]
+id = 3
+type = "story"
+title = "Review the instance contract and event schema as consumer"
+description = "Reviews IF-6 and IF-4 against what the shop needs and files change requests through the contract rules."
+verify = "Review comments are merged or answered and stream T has signed the versions it builds against."
+covers = ["TB-2"]
+after = []
+hitl = true
+risk = "low"
+unknown = "Waits on draft pull requests of initiative-lab epic-lab-baseline entries 2 and 3 (instance contract v0, instance event schema); remove when they are open for review."
+
+[[entry]]
+id = 4
+type = "story"
+title = "Shop skeleton meets the instance contract in the lab harness"
+description = "Makes the shop skeleton report ready only after the injector marker, serve a planted flag and emit one app event inside the lab harness."
+verify = "In the lab harness the instance becomes ready after the marker, the planted flag is served and the fake ingest accepts the app event."
+covers = ["TB-3"]
+after = [1, 3]
+hitl = false
+risk = "medium"
+unknown = "Waits on initiative-lab epic-lab-baseline entry 5 (stub shop, fake ingest and lab harness) being merged; remove when merged."
+
+[[entry]]
+id = 5
+type = "story"
+title = "Exploit test runner skeleton"
+description = "Builds the runner that executes a test against any instance URL, with its own tiny vulnerable and fixed stubs, and reports pass on the vulnerable one and fail on the fixed one."
+verify = "A trivial test passes against the runner's own vulnerable stub and fails against its fixed stub in CI."
+covers = ["TB-4"]
+after = [1]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what the epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3, 4, 5]
+hitl = false
+risk = "low"

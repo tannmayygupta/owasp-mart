@@ -1,0 +1,103 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Repository skeleton and tooling run end to end (tracer bullet)"
+description = "Creates the monorepo layout with uv and pnpm workspaces and pinned tools, the CI skeleton, CODEOWNERS and the Compose profiles with `scripts/dev.mjs`, and verifies Docker on Tanmay's PC."
+verify = "`node scripts/dev.mjs hello` starts a hello container on Tanmay's PC and the CI skeleton runs green on a pull request."
+covers = ["LB-1", "LB-2"]
+after = []
+hitl = true
+risk = "high"
+references = ["docs/architecture/07-repo-and-workstreams.md#1-monorepo-layout"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Instance contract v0 (IF-6)"
+description = "Writes the contract the shop and every in-instance service obey: containers, env, health, labels, injection protocol and runtime profile."
+verify = "The contract validates and stream T has approved it as consumer; conformance of the stub shop is checked in the harness entry."
+covers = ["LB-3"]
+after = [1]
+hitl = false
+risk = "medium"
+unknown = "Co-owned with stream T (Sahil) who approves it as consumer; book the review before merging. Also waits on the error registry and catalogue stubs from initiative-platform epic-platform-baseline entry 2 and initiative-target epic-target-baseline entry 2; use placeholders and revisit."
+
+[[entry]]
+id = 3
+type = "story"
+title = "Instance event schema (IF-4) and app-event names"
+description = "Defines the signed events sidecars and the shop send to ingest and the app-event name list, with a fake ingest that validates them."
+verify = "Every example event validates, the fake ingest rejects a malformed or oversize one, and stream T has approved the names it emits."
+covers = ["LB-4"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Orchestrator API (IF-5) and fake orchestrator"
+description = "Authors the orchestrator HTTP contract, the `InstanceHost` Protocol the orchestrator drives, and a fake orchestrator with a `FakeInstanceHost` that obey it."
+verify = "A client built from the contract creates, resets and destroys instances against the fake, and the fake host passes the same Protocol tests the real one must pass later."
+covers = ["LB-5"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Lab fragment of the platform API (IF-2)"
+description = "Authors the endpoints stream L provides to stream P (attempts, instances, reports) as an API fragment with a mock, so the dashboards are built against it."
+verify = "The fragment validates, a mock built from it answers every endpoint, and stream P has reviewed it as consumer."
+covers = ["LB-9"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Stub shop, fake ingest and lab harness"
+description = "Builds a tiny stub shop satisfying the instance contract, and a Compose harness that starts one full instance with pass-through sidecar, edge and gate stubs and an injection step."
+verify = "One command starts a full stub instance on a laptop that answers health, becomes ready only after the injection marker, serves a planted flag and emits one app event the fake ingest validates; the stub shop passes the instance-contract conformance check."
+covers = ["LB-6"]
+after = [2, 3, 4]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Contract checks live in CI"
+description = "Adds the contract checks to CI (schema validity, breaking-change, bundle current, mock validity, provider conformance, migrations, table ownership, compatibility file) and owns the CI ownership and single-Alembic-head checks the other streams rely on."
+verify = "A deliberately breaking contract change fails CI and a valid one passes."
+covers = ["LB-7"]
+after = [2, 3, 4]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Tag contracts v1.0.0 and start the change rules"
+description = "Gets every contract owner's approval, writes COMPAT.md, tags `contracts-v1.0.0` and turns the change rules on."
+verify = "The tag exists, COMPAT.md lists the versions every stream targets and the approvals check is active."
+covers = ["LB-8"]
+after = [5, 6, 9]
+hitl = true
+risk = "medium"
+unknown = "Waits on sign-offs from initiative-platform epic-platform-baseline entries 2 to 5, initiative-target epic-target-baseline entries 2 and 3 and platform entry 8; also unverified: branch protection with required code-owner review on a private personal repository (EF-30), so settle it in repository settings or use the CI approvals check."
+
+[[entry]]
+id = 8
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what the epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3, 4, 5, 6, 7, 9]
+hitl = false
+risk = "low"

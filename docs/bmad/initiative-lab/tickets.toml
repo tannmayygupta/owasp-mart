@@ -1,0 +1,56 @@
+# tickets.toml: the epics of this initiative in build order. tickets.py reads it.
+
+[[epic]]
+id = 1
+slug = "epic-lab-baseline"
+title = "Lab baseline and sprint-zero contracts"
+covers = []
+
+[[epic]]
+id = 2
+slug = "epic-environments-and-deployment"
+title = "Two Oracle VMs, certificates and deployment pipelines"
+covers = []
+after = [{ epic = 1, needs = "the repository skeleton, Compose profiles and CI skeleton" }]
+
+[[epic]]
+id = 3
+slug = "epic-orchestrator-and-instance-lifecycle"
+title = "Instances start, run, reset and clean up reliably"
+covers = ["FR-INS-01", "FR-INS-02", "FR-INS-03", "FR-INS-04", "FR-INS-05", "FR-INS-06", "FR-INS-07", "FR-INS-08", "FR-INS-09", "FR-INS-11"]
+after = [{ epic = 1, needs = "the instance contract v0 and the orchestrator API" }, { epic = 2, needs = "VM-I with Docker" }]
+
+[[epic]]
+id = 4
+slug = "epic-isolation-and-hardening"
+title = "Instances are isolated and the host is protected"
+covers = []
+after = [{ epic = 3, needs = "the orchestrator creating instances and networks" }]
+
+[[epic]]
+id = 5
+slug = "epic-edge-gate-and-event-path"
+title = "Only the owner reaches an instance, and events reach the platform"
+covers = ["FR-INS-10", "FR-SES-11"]
+after = [{ epic = 3, needs = "instances and networks to attach to" }, { epic = 4, needs = "per-instance networks and the host rule" }]
+
+[[epic]]
+id = 6
+slug = "epic-flags-detection-and-sidecar"
+title = "Flags are unique and every exploit is detected"
+covers = ["FR-FLG-01", "FR-FLG-02", "FR-FLG-03", "FR-FLG-04", "FR-FLG-05", "FR-FLG-06", "FR-FLG-07", "FR-FLG-08", "FR-FLG-09", "FR-DET-01", "FR-DET-02", "FR-DET-03", "FR-DET-04", "FR-DET-05", "FR-DET-06", "FR-DET-07", "FR-DET-08", "FR-DET-09"]
+after = [{ epic = 5, needs = "the edge relay and ingest path" }, { epic = 3, needs = "the injection protocol and instance start" }]
+
+[[epic]]
+id = 7
+slug = "epic-attempts-scoring-and-integrity"
+title = "Attempts, scores, time and integrity are fair and explainable"
+covers = ["FR-SES-01", "FR-SES-02", "FR-SES-03", "FR-SES-04", "FR-SES-05", "FR-SES-06", "FR-SES-07", "FR-SES-08", "FR-SES-09", "FR-SES-10", "FR-SCR-01", "FR-SCR-02", "FR-SCR-03", "FR-SCR-04", "FR-SCR-05", "FR-SCR-06", "FR-SCR-07", "FR-SCR-08", "FR-SCR-09", "FR-SCR-10", "FR-TIM-01", "FR-TIM-02", "FR-TIM-03", "FR-TIM-04", "FR-TIM-05", "FR-ACH-01", "FR-ACH-02", "FR-ACH-03", "FR-ACH-04", "FR-ACH-05", "FR-ACH-06", "FR-ACH-07"]
+after = [{ epic = 6, needs = "events, flags and milestones" }]
+
+[[epic]]
+id = 8
+slug = "epic-integration-and-demo-readiness"
+title = "End-to-end suite and demo readiness"
+covers = []
+after = [{ epic = 7, needs = "every lab epic done and the other streams' epics merged" }]

@@ -1,0 +1,56 @@
+# tickets.toml: the epics of this initiative in build order. tickets.py reads it.
+
+[[epic]]
+id = 1
+slug = "epic-target-baseline"
+title = "Target baseline and sprint-zero contracts"
+covers = []
+
+[[epic]]
+id = 2
+slug = "epic-shop-instance-integration"
+title = "The shop runs inside an instance: seeding, injection, events, services"
+covers = ["FR-SHP-11", "FR-SHP-12", "FR-SHP-13", "FR-SHP-14", "FR-SHP-15"]
+after = [{ epic = 1, needs = "the shop skeleton and catalogue schema" }]
+
+[[epic]]
+id = 3
+slug = "epic-shop-core-and-roles"
+title = "A believable marketplace with six roles"
+covers = ["FR-SHP-01", "FR-SHP-02", "FR-SHP-03", "FR-SHP-04", "FR-SHP-05", "FR-SHP-07", "FR-SHP-08", "FR-SHP-09"]
+after = [{ epic = 2, needs = "seeding, injection and runtime profile" }]
+
+[[epic]]
+id = 4
+slug = "epic-shop-seller-and-money"
+title = "Sellers, refunds, disputes and payouts work correctly"
+covers = ["FR-SHP-06", "FR-SHP-10"]
+after = [{ epic = 3, needs = "users, stores, products and orders" }]
+
+[[epic]]
+id = 5
+slug = "epic-challenges-c01-c04"
+title = "Challenges C01 to C04: access control, crypto, injection, insecure design"
+covers = ["FR-CHL-02", "FR-CHL-03", "FR-CHL-04", "FR-CHL-05"]
+after = [{ epic = 3, needs = "the marketplace features that host the weaknesses" }, { epic = 4, needs = "the refund model for C04" }, { epic = 2, needs = "the bot and collector for C03 part B" }]
+
+[[epic]]
+id = 6
+slug = "epic-challenges-c05-c08"
+title = "Challenges C05 to C08: misconfiguration, components, authentication, integrity"
+covers = ["FR-CHL-06", "FR-CHL-07", "FR-CHL-08", "FR-CHL-09"]
+after = [{ epic = 3, needs = "the marketplace features that host the weaknesses" }, { epic = 2, needs = "the import service and mock services" }]
+
+[[epic]]
+id = 7
+slug = "epic-challenges-c09-c11"
+title = "Challenges C09 to C11: logging, SSRF, exceptional conditions"
+covers = ["FR-CHL-10", "FR-CHL-11", "FR-CHL-12"]
+after = [{ epic = 4, needs = "seller flows for C10 and C11" }, { epic = 2, needs = "the metadata and KYC mocks" }]
+
+[[epic]]
+id = 8
+slug = "epic-catalogue-hints-and-verification"
+title = "Catalogue, hints, write-ups and exploit verification for all 11 challenges"
+covers = ["FR-CHL-01", "FR-CHL-13", "FR-CHL-14", "FR-CHL-15", "FR-CHL-16", "FR-CHL-17"]
+after = [{ epic = 5, needs = "C01 to C04" }, { epic = 6, needs = "C05 to C08" }, { epic = 7, needs = "C09 to C11" }]

@@ -8,11 +8,13 @@
 // Rule: if any non-exempt file changes, the same commit must also add/modify
 //   - a dev-log entry:  docs/dev-log/<anything>.md  (not README / _TEMPLATE)
 //   - CHANGELOG.md
+//   - a tracker update: a file under docs/bmad/initiative-<slug>/ (only once an initiative folder exists)
 // Bypass for non-functional commits (formatting, typos): put [no-doc] in the commit message.
 // If anything unexpected goes wrong, the script lets the commit through (fails open) so it never traps a developer.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const EXEMPT = [
   /^docs\//,
@@ -44,7 +46,19 @@ function gitStatus(cwd, paths = []) {
     .map((p) => p.replace(/^"|"$/g, ''));
 }
 
-function evaluate(files, message) {
+const isTracker = (f) => /^docs\/bmad\/initiative-[^/]+\//.test(f);
+
+// The tracker rule applies once at least one initiative folder exists under docs/bmad.
+function trackerActive(cwd) {
+  try {
+    const top = git(['rev-parse', '--show-toplevel'], cwd)[0];
+    return readdirSync(join(top, 'docs', 'bmad'), { withFileTypes: true }).some((d) => d.isDirectory() && d.name.startsWith('initiative-'));
+  } catch {
+    return false;
+  }
+}
+
+function evaluate(files, message, trackerOn = false) {
   if (/\[no-doc\]/i.test(message)) return null;
   if (/^(Merge|Revert) /.test(message.trim())) return null;
   const code = files.filter((f) => !EXEMPT.some((re) => re.test(f)));
@@ -52,6 +66,9 @@ function evaluate(files, message) {
   const missing = [];
   if (!files.some(isDevLog)) missing.push('a dev-log entry (docs/dev-log/YYYY-MM-DD-<dev>-<task-slug>.md from docs/dev-log/_TEMPLATE.md)');
   if (!files.includes('CHANGELOG.md')) missing.push('a CHANGELOG.md line under [Unreleased]');
+  if (trackerOn && !files.some(isTracker)) {
+    missing.push("a tracker update under docs/bmad/initiative-<slug>/ (the story's plan file with its new state; then also update the Excel tracker by hand, which is not checked)");
+  }
   if (missing.length === 0) return null;
   const shown = code.slice(0, 5).join(', ') + (code.length > 5 ? `, +${code.length - 5} more` : '');
   return (
@@ -86,7 +103,7 @@ try {
       const added = everything ? gitStatus(cwd) : tracked ? git(['diff', '--name-only'], cwd) : paths.length ? gitStatus(cwd, paths) : [];
       added.forEach((f) => files.add(f));
     }
-    const reason = evaluate([...files], command);
+    const reason = evaluate([...files], command, trackerActive(cwd));
     if (reason) {
       process.stdout.write(
         JSON.stringify({
@@ -100,7 +117,7 @@ try {
     const msgFile = process.argv[process.argv.indexOf('--git') + 1];
     const message = msgFile ? readFileSync(msgFile, 'utf8') : '';
     const files = git(['diff', '--cached', '--name-only'], process.cwd());
-    const reason = evaluate(files, message);
+    const reason = evaluate(files, message, trackerActive(process.cwd()));
     if (reason) {
       console.error(`\n${reason}\n`);
       process.exit(1);

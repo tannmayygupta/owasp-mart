@@ -1,0 +1,102 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Platform stack runs end to end locally (tracer bullet)"
+description = "Sets up the Mac environment and runs the platform Compose profile (API, Postgres 18, Valkey, Mailpit) with a Next.js page that fetches the API health through a same-origin proxy."
+verify = "One command starts the stack on Akshay's Mac and the page shows the API health; Docker, uv, Node 24 and `node scripts/verify-skills.mjs` all succeed."
+covers = ["PB-7", "PB-8"]
+after = []
+hitl = true
+risk = "medium"
+unknown = "Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton, Compose profile layout, scripts/dev.mjs) being merged; remove when merged."
+
+[[entry]]
+id = 2
+type = "story"
+title = "Error registry and problem-details format (IF-8)"
+description = "Creates the single error-code registry and the problem-details body, with generated constants for Python and TypeScript."
+verify = "CI validates the registry and a sample API error validates against the problem schema."
+covers = ["PB-1"]
+after = [1]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Domain event schema (IF-3) with fixtures and replay script"
+description = "Defines the events the live stream carries as JSON Schema, with fixtures and a script that replays them."
+verify = "Every fixture validates, the replay script emits them in order to a local consumer, and the validation runs in CI."
+covers = ["PB-2"]
+after = [2]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Platform and lab API fragments, bundle, mock and generated clients (IF-1, IF-2)"
+description = "Authors the browser-facing API fragments with examples, bundles them, serves a Prism mock and generates the typed client and models."
+verify = "The bundle validates, the mock serves every example and the generated TypeScript client compiles against it."
+covers = ["PB-3"]
+after = [2, 3]
+hitl = false
+risk = "medium"
+unknown = "Needs the lab API fragment (initiative-lab epic-lab-baseline entry 9) and the catalogue stubs (initiative-target epic-target-baseline entry 2) merged; agree the fragment layout with Tanmay."
+
+[[entry]]
+id = 5
+type = "story"
+title = "Ports, in-memory fakes and table ownership (IF-9, IF-10)"
+description = "Defines the ports stream P provides (AuditPort, OutboxPort, KeyPort, ScopePort, SettingsPort, QuotaPort) as Python Protocols with in-memory fakes, fakes of the lab ports, and the table-owners file."
+verify = "Tests run against the fakes and the table-owners file validates; the CI ownership check itself is built by initiative-lab epic-lab-baseline entry 6."
+covers = ["PB-4"]
+after = [2, 3]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "API skeleton: kernel and single-head migrations"
+description = "Builds the API skeleton with settings, session and organization scope, audit and outbox stubs, key service stubs and one Alembic history."
+verify = "The API starts against Postgres, `alembic heads` shows one head, request IDs and the health, readiness and version endpoints respond, and a scope test refuses a query without an organization filter."
+covers = ["PB-5"]
+after = [1, 3, 5]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Dashboards skeleton with the same-origin proxy (local)"
+description = "Builds the Next.js skeleton with the `/api/*` proxy, origin secret header, no-store headers and security headers, run locally; the Vercel deployment is LE-3."
+verify = "Locally a page reaches the API health through `/api/*` with the origin secret header added, and two different users never receive each other's response in a caching test."
+covers = ["PB-6"]
+after = [1, 4]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Sign off contracts v1.0.0 as provider and consumer"
+description = "Reviews and signs the contracts stream P provides and consumes, and records the versions it builds against."
+verify = "Approvals are recorded on the contracts pull request and COMPAT.md lists the versions stream P targets; the tag itself is created by initiative-lab epic-lab-baseline entry 7."
+covers = ["PB-9"]
+after = [3, 4, 5]
+hitl = true
+risk = "low"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what the epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3, 4, 5, 6, 7, 8]
+hitl = false
+risk = "low"

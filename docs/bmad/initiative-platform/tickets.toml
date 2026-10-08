@@ -1,0 +1,63 @@
+# tickets.toml: the epics of this initiative in build order. tickets.py reads it.
+
+[[epic]]
+id = 1
+slug = "epic-platform-baseline"
+title = "Platform baseline and sprint-zero contracts"
+covers = []
+
+[[epic]]
+id = 2
+slug = "epic-notifications-and-email"
+title = "Email works and never loses a message"
+covers = ["FR-NTF-01", "FR-NTF-02", "FR-NTF-03", "FR-NTF-04"]
+after = [{ epic = 1, needs = "the API skeleton, outbox and Valkey from the baseline" }]
+
+[[epic]]
+id = 3
+slug = "epic-accounts-and-sessions"
+title = "People can register, log in and stay secure"
+covers = ["FR-ACC-01", "FR-ACC-02", "FR-ACC-03", "FR-ACC-04", "FR-ACC-05", "FR-ACC-06", "FR-ACC-07", "FR-ACC-08", "FR-ACC-09", "FR-ACC-10", "FR-ACC-11"]
+after = [{ epic = 2, needs = "email delivery for verification and reset links" }]
+
+[[epic]]
+id = 4
+slug = "epic-privacy-audit-and-keys"
+title = "Privacy, consent, audit and deletion work as promised"
+covers = ["FR-PRV-01", "FR-PRV-02", "FR-PRV-03", "FR-PRV-04", "FR-PRV-05", "FR-PRV-06", "FR-PRV-07", "FR-PRV-08", "FR-PRV-09", "FR-PRV-10", "FR-PRV-11", "FR-PRV-12", "FR-PRV-13", "FR-PRV-14", "FR-PRV-15", "FR-PRV-16", "FR-PRV-17", "FR-PRV-18", "FR-PRV-19", "FR-PRV-20"]
+after = [{ epic = 3, needs = "accounts, sessions and roles" }]
+
+[[epic]]
+id = 5
+slug = "epic-companies-and-approval"
+title = "Recruiters join approved companies"
+covers = ["FR-ORG-01", "FR-ORG-02", "FR-ORG-03", "FR-ORG-04", "FR-ORG-05", "FR-ORG-06", "FR-ORG-07", "FR-ORG-08"]
+after = [{ epic = 3, needs = "accounts, MFA and roles" }, { epic = 4, needs = "the audit log and consent terms record" }]
+
+[[epic]]
+id = 6
+slug = "epic-assessments-and-invites"
+title = "Recruiters create assessments and invite candidates"
+covers = ["FR-ASM-01", "FR-ASM-02", "FR-ASM-03", "FR-ASM-04", "FR-ASM-05", "FR-ASM-06"]
+after = [{ epic = 5, needs = "approved companies and members" }, { epic = 4, needs = "consent records" }, { epic = 2, needs = "invite email queue" }]
+
+[[epic]]
+id = 7
+slug = "epic-live-updates"
+title = "Everything on the dashboards is live"
+covers = ["FR-LIV-01", "FR-LIV-02", "FR-LIV-03", "FR-LIV-04", "FR-LIV-05", "FR-LIV-06"]
+after = [{ epic = 3, needs = "sessions and stream authorisation" }, { epic = 5, needs = "company membership for recruiter stream authorisation" }]
+
+[[epic]]
+id = 8
+slug = "epic-dashboards-and-exports"
+title = "Four role dashboards and data export"
+covers = ["FR-DSH-01", "FR-DSH-02", "FR-DSH-03", "FR-DSH-04", "FR-DSH-05", "FR-DSH-06", "FR-HNT-01", "FR-HNT-02", "FR-HNT-03", "FR-EXP-01", "FR-EXP-02", "FR-EXP-03", "FR-EXP-04"]
+after = [{ epic = 6, needs = "assessments and attempts to show" }, { epic = 7, needs = "live updates" }]
+
+[[epic]]
+id = 9
+slug = "epic-admin-and-operations"
+title = "Admins approve, operate and audit safely"
+covers = ["FR-ADM-01", "FR-ADM-02", "FR-ADM-03", "FR-ADM-04", "FR-ADM-05", "FR-ADM-06", "FR-ADM-07", "FR-ADM-08"]
+after = [{ epic = 5, needs = "companies to approve" }, { epic = 4, needs = "audit log and key service for break-glass" }]
