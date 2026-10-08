@@ -572,14 +572,14 @@ The system shall provide C02 so that a customer who works out the gift-card code
 - AC: a platform throttle (placeholder 60 redeem calls per minute) protects the instance without blocking the intended path.
 - Source: D-26; RS-E C02.
 
-**FR-CHL-04 · C03 Injection (SQL injection and stored XSS)** — Must · OPEN in part (see OI-18)
+**FR-CHL-04 · C03 Injection (SQL injection and stored XSS)** — Must · Locked (OI-18 resolved by D-32; design in `docs/design/challenge-specs.md` Section 3; rated 3)
 The system shall provide C03 with two independently credited parts: UNION-based SQL injection in product search, and stored XSS executed in the support-agent bot's session.
 - AC (SQL part): the search connects to a separate read-only catalog store with no users, tokens, orders or other flags; one statement per call; a statement timeout of about 2 seconds (detail from RS-E).
 - AC (XSS part): a payload stored by the player is viewed by the support-agent bot, runs in the bot's session, and sends a per-instance token to the in-instance collector, which the monitor credits.
 - AC: the XSS part's host feature (which user-written field the bot views), milestones and CWE tag have no research card yet and are decided in OI-18.
 - Source: D-18, D-26, D-27; RS-E C03; RS-G 1.4.
 
-**FR-CHL-05 · C04 Insecure Design** — Must · OPEN in part (see OI-19)
+**FR-CHL-05 · C04 Insecure Design** — Must · Locked (OI-19 resolved by D-32: separate "quick refund" path; spec Section 4)
 The system shall provide C04 so that two auto-approved partial refunds can exceed the amount paid and release the flag.
 - AC: refunds up to the auto-approve limit need no review; the auto-approve check has no cumulative cap on that path; limits 1,500 and 2,500 are placeholders (detail from RS-E).
 - AC: refund money goes to a non-spendable refund ledger.
@@ -620,7 +620,7 @@ The system shall provide C09 so that a player can brute-force a dormant support-
 - AC: the admin Security Alerts page encodes all output so it is not an extra XSS target for the bot.
 - Source: D-26, D-27 (support agent is the target); RS-F C09.
 
-**FR-CHL-11 · C10 Server-Side Request Forgery** — Must · OPEN in part (see OI-20)
+**FR-CHL-11 · C10 Server-Side Request Forgery** — Must · Locked (OI-20 resolved by D-32: the player starts as a seeded approved seller owner; spec Section 5)
 The system shall provide C10 so that a seller can make the shop fetch an internal fake metadata service through the image importer and read the sentinel flag.
 - AC: the fetcher supports only http and https, has a timeout, a 1 MB size cap and a concurrency limit; no real egress exists.
 - AC: the fake metadata service is reachable only from the shop container, has no published port and is not reachable through `host.docker.internal` or the host gateway (NFR-ISO-02).
@@ -659,7 +659,7 @@ The system shall include, for each challenge, an automated test that succeeds on
 - AC: a challenge whose test fails blocks release.
 - Source: F2; RS-E and RS-F "Automated verification test" sections; SM-4.
 
-**FR-CHL-17 · Difficulty tiers** — Must · OPEN (see OI-16)
+**FR-CHL-17 · Difficulty tiers** — Must · Locked (OI-16 resolved by D-32: 1-2 Easy, 3 Medium, 4-5 Hard)
 The system shall assign each challenge to one of three scoring tiers (Easy, Medium, Hard).
 - AC: the mapping from the difficulty ratings (1 to 5) to the tiers is decided in OI-16.
 - Source: D-22, D-26.
@@ -751,7 +751,7 @@ The system shall let the sidecar and the shop send events to the platform signed
 - AC: event types include request summary, rule match, flag seen and state change.
 - Source: D-23; RS-B 6, RS-D 3.3.5.
 
-**FR-DET-05 · Milestones** — Must · OPEN in part (see OI-17)
+**FR-DET-05 · Milestones** — Must · Locked (OI-17 resolved by D-32: M1 and M2 events defined per challenge in `docs/design/challenge-specs.md`, refined in each story)
 The system shall detect three milestones per challenge automatically, never self-declared: M1 "found the weakness" (20 percent), M2 "working exploit evidence" (40 percent), M3 "flag captured" (100 percent).
 - AC: milestones are defined by outcome (for example "read another store's order"), not by technique, so any valid path counts.
 - AC: the concrete M1 and M2 events for each challenge are decided in OI-17.
@@ -1686,6 +1686,8 @@ Spikes are experiments to run later. They turn estimates into measurements.
 # 11. Open items register
 
 ## 11.1 Open items
+
+> **Update 2026-10-08:** OI-16, OI-17, OI-18, OI-19 and OI-20 are resolved by decision D-32 (design in `docs/design/challenge-specs.md`). Their rows below are kept as written for the record.
 
 | ID | Question for the user | Why it matters | Options if known | Depends |
 |---|---|---|---|---|
