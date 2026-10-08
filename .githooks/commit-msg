@@ -1,0 +1,4 @@
+#!/bin/sh
+# Backstop for the documentation rule (also catches commits made outside Claude Code).
+# One-time setup per clone:  git config core.hooksPath .githooks
+exec node scripts/check-docs.mjs --git "$1"

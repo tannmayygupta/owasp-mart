@@ -1,0 +1,25 @@
+# secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.claude/settings.local.json
+
+# dependencies and build output
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+.next/
+
+# crash dumps
+*.stackdump
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
