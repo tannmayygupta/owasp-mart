@@ -17,6 +17,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 ### Added (challenge design, 2026-10-08, Tanmay)
 - `docs/design/challenge-specs.md`: detailed design of the 11 challenges with milestones, tests and event catalogue; decisions D-32 (DC-1 to DC-15) accepted; PRD open items OI-16 to OI-20 resolved.
 
+### Added (architecture, 2026-10-08, Tanmay)
+- Architecture documents `docs/architecture/` (index, evidence register, 7 design documents) and decision records `docs/adr/0002` to `0015`. Decisions D-33 (three work-streams P, L, T; Tanmay L, Akshay P, Sahil T), D-34 (two Oracle VMs, amends D-15) and D-35 (per-attempt keys, ASVS level 3 for key and audit, loopback HTTP for development, catalogue as a read-only SQLite file).
+
 ### Changed
 - `.gitattributes` pins LF line endings for skills and `_bmad` so hashes match on every machine.
 - Research phase complete: eight research notes (`docs/research/`) and decisions D-15 to D-27 locked in `initial.md` (hosting, web address, live updates, roles, stack, scoring, isolation, shop, privacy, challenge catalogue). (2026-10-08, Tanmay)

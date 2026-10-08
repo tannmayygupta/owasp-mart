@@ -20,6 +20,7 @@
 - **Sources.** D-nn = decision in `initial.md` Section 15. F1 to F11 and O1 to O6 = synopsis requirements and objectives as listed in `initial.md`. RS-x = research note.
 - **Secrets.** No real flag values, keys or personal data appear in this document.
 - **Not legal advice.** Privacy requirements follow the research notes and are not a legal opinion (see OI-33).
+- **Amendments after v0.1 (2026-10-08, decisions in `initial.md`):** D-34 replaces "an Oracle VM" in K-2, D-15 and NFR-ISO-06 with **two VMs** (VM-P platform and personal data, VM-I hostile instances). D-35 reads FR-PRV-12's "per-assessment key" as a **per-attempt key**, extends NFR-SEC-02 (ASVS level 3) to the **key service and the audit-log subsystem**, limits "never plain HTTP" (NFR-SEC-06, D-16) to **public addresses**, and makes the C03 catalogue a **second read-only SQLite file** (FR-INS-02, K-17). D-33 fixes the three work-streams (see `docs/architecture/07-repo-and-workstreams.md`). Where a requirement text above disagrees, the decision wins.
 
 ---
 
