@@ -21,3 +21,7 @@ Sprint zero produces contracts, stubs and a lab harness first. CODEOWNERS accept
 
 ## Evidence
 https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners (VERIFIED rules; plan availability UNVERIFIED); tools UNVERIFIED. See docs/architecture/07-repo-and-workstreams.md.
+
+## Update 2026-10-08 (story L-02)
+Ajv 8.20.0 and ajv-formats 3.0.1 (exact pins, repository dev dependencies) confirmed by Tanmay on 2026-10-08 as the JSON Schema validator for the contracts. Other tools in this record remain proposals.
+Alternatives considered (versions checked on the npm and PyPI registries on 2026-10-08): Python jsonschema 4.26.0 and @hyperjump/json-schema 1.18.0. Ajv 8.20.0 was chosen because it is the most used validator, supports JSON Schema 2020-12, has four small dependencies, and is Node like the rest of the repository scripts.

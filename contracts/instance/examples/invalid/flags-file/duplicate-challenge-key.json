@@ -1,0 +1,19 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
+  "flags": [
+    {
+      "challenge_key": "C01",
+      "flag": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"
+    },
+    {
+      "challenge_key": "C01",
+      "flag": "VM{BBBBBBBBBBBBBBBBBBBBBBBB}"
+    },
+    {
+      "challenge_key": "C03",
+      "flag": "VM{CCCCCCCCCCCCCCCCCCCCCCCC}"
+    }
+  ]
+}
