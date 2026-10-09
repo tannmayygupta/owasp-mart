@@ -75,7 +75,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Covers: PB-4
   - Waits on: P-02, P-03.
   - Done when: Tests run against the fakes and the table-owners file validates (the CI ownership check is Tanmay's L-07).
-  - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21, H-83 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-06. API skeleton: kernel and single-head migrations**
   - Epic: `epic-platform-baseline`
@@ -101,7 +101,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Covers: PB-9
   - Waits on: P-03, P-04, P-05.
   - Done when: Your approvals are on the contracts pull request and COMPAT.md lists the versions you target (the tag itself is Tanmay's L-09).
-  - Handoffs: H-10, H-11 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-10, H-11, H-83 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 2 (15 Oct to 21 Oct 2026)
 

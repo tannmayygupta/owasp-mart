@@ -1,0 +1,54 @@
+﻿== pytest
+........................................................................ [ 28%]
+........................................................................ [ 56%]
+........................................................................ [ 84%]
+.......................................                                  [100%]
+255 passed in 179.08s (0:02:59)
+== node e2e
+✔ reset: a ready instance gets epoch + 1 and goes through resetting and provisioning back to ready; a wrong epoch is 409 (1087.5675ms)
+✔ destroy: 202 then 200 on a repeat, and a destroyed id cannot be created again (409) (62.0325ms)
+✔ list: label filters, cursor paging, an unknown label is 422; host answers capacity (395.6881ms)
+✔ a host with little capacity answers 429 ORCH-BUSY with Retry-After and creates nothing (245.562ms)
+✔ with --tls flags the fake serves HTTPS and refuses a call without a client certificate (1852.8198ms)
+✔ the Python suite (protocol on both hosts, HTTP service, contract) still passes (145200.1568ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 149841.2816
+== unit
+✔ fake ingest server: option values are validated (0.6945ms)
+✔ command line: exit 0 on the real contract, 1 on a failure, 2 on a usage error (3304.5746ms)
+ℹ tests 82
+ℹ suites 0
+ℹ pass 82
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47361.2903
+== contracts:check
+valid example ok: examples/valid/instance-events/webhook.received.json
+valid posted body ok: examples/valid/posted/bot.visit.json
+valid posted body ok: examples/valid/posted/collector.hit.json
+valid posted body ok: examples/valid/posted/evidence.capture.json
+valid posted body ok: examples/valid/posted/import.job.json
+valid posted body ok: examples/valid/posted/shop.cross_store_order_read.json
+valid posted body ok: examples/valid/posted/shop.refund_decision.json
+fake ingest: 34 of 34 matrix checks as expected
+checked 1 schema, 29 event types, 29 valid events, 3 signed envelopes, 6 valid posted bodies and 61 invalid examples
+events: PASS
+orchestrator contract: checked 8 operations, 15 valid and 44 invalid examples
+orchestrator contract: PASS
+== cert files tracked / present
+
+
+After review patches (2026-10-09, same PC):
+uv run --locked --package vulnmart-api pytest -q -> 255 passed
+node --test scripts/e2e/orchestrator.e2e.test.mjs -> tests 13, pass 13, fail 0
+node --test scripts/*.test.mjs -> tests 82, pass 82, fail 0
+pnpm run contracts:check -> contracts, events, orchestrator contract PASS
+git ls-files | Select-String key/pem/crt files -> no output

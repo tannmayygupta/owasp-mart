@@ -13,8 +13,13 @@
 //
 // Usage: node server.mjs [--port 0] [--host 127.0.0.1] [--key <platform signing key>] [--capacity-mb 8192]
 //        [--step-delay-ms 0] [--host-id fake-host-1] [--report-url <platform base url>] [--report-key <orchestrator key>]
+//        [--tls-cert <server cert PEM> --tls-key <server key PEM> --tls-ca <client CA PEM>]
 // The key can also come from VM_FAKE_PLATFORM_KEY and VM_FAKE_ORCH_KEY. Prints {"listening":true,"port":N} when ready.
+// The three --tls-* flags go together (all or none). With them the fake speaks HTTPS and requires a client certificate signed
+// by the given CA (mutual TLS, a deployment matter that is not part of the OpenAPI file); without them it speaks plain HTTP.
 import http from 'node:http';
+import https from 'node:https';
+import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -463,12 +468,20 @@ export function createFakeOrchestrator(options = {}) {
     return problem(res, 404, 'ORCH-ROUTE-UNKNOWN', 'no such call (fake orchestrator)');
   }
 
-  const server = http.createServer((req, res) => {
+  const onRequest = (req, res) => {
     handle(req, res).catch((err) => {
       process.stderr.write(`fake orchestrator error: ${err.stack}\n`);
       if (!res.headersSent) problem(res, 500, 'ORCH-INTERNAL', 'internal error');
     });
-  });
+  };
+  const tlsGiven = [cfg.tlsCert, cfg.tlsKey, cfg.tlsCa].filter((v) => v !== undefined).length;
+  if (tlsGiven !== 0 && tlsGiven !== 3) throw new Error('--tls-cert, --tls-key and --tls-ca must be given together');
+  const server = tlsGiven
+    ? https.createServer({
+      cert: readFileSync(cfg.tlsCert), key: readFileSync(cfg.tlsKey), ca: readFileSync(cfg.tlsCa),
+      requestCert: true, rejectUnauthorized: true, minVersion: 'TLSv1.2',
+    }, onRequest)
+    : http.createServer(onRequest);
 
   return {
     server,
@@ -486,7 +499,7 @@ export function createFakeOrchestrator(options = {}) {
 
 // ---- command line ----
 function parseArgs(argv) {
-  const map = { '--port': 'port', '--host': 'host', '--key': 'platformKey', '--capacity-mb': 'capacityMb', '--step-delay-ms': 'stepDelayMs', '--host-id': 'hostId', '--report-url': 'reportUrl', '--report-key': 'orchestratorKey', '--report-timeout-ms': 'reportTimeoutMs' };
+  const map = { '--port': 'port', '--host': 'host', '--key': 'platformKey', '--capacity-mb': 'capacityMb', '--step-delay-ms': 'stepDelayMs', '--host-id': 'hostId', '--report-url': 'reportUrl', '--report-key': 'orchestratorKey', '--report-timeout-ms': 'reportTimeoutMs', '--tls-cert': 'tlsCert', '--tls-key': 'tlsKey', '--tls-ca': 'tlsCa' };
   const numeric = ['port', 'capacityMb', 'stepDelayMs', 'reportTimeoutMs'];
   const out = {};
   for (let i = 0; i < argv.length; i += 2) {
@@ -504,7 +517,8 @@ function parseArgs(argv) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let opts;
   try { opts = parseArgs(process.argv.slice(2)); } catch (err) { process.stderr.write(err.message + '\n'); process.exit(2); }
-  const svc = createFakeOrchestrator(opts);
+  let svc;
+  try { svc = createFakeOrchestrator(opts); } catch (err) { process.stderr.write(err.message + '\n'); process.exit(2); }
   const port = await svc.listen();
   process.stdout.write(JSON.stringify({ listening: true, port }) + '\n');
   const stop = () => svc.close().then(() => process.exit(0));

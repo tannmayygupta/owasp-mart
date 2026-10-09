@@ -5,6 +5,10 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (L-04 limits: mTLS test, Akshay handoff, 2026-10-09, Tanmay)
+- Fake orchestrator: optional --tls-cert, --tls-key, --tls-ca (all three or none, else exit 2); with them it serves HTTPS and requires a client certificate. Plain HTTP stays the default. 11 new Python tests (apps/api/tests/test_mtls.py, certificates made at test time with openssl in a temporary folder) and one Node end-to-end test; no certificate or key is committed; no contract or client change.
+- Handoff H-83 and a ready chat message for Akshay (docs/dev/messages/), note on H-68.
+
 ### Added (handoff register, 2026-10-09, Tanmay)
 - `docs/dev/HANDOFFS.md`: 82 hand-offs (Akshay 23, Sahil 33, Tanmay 26) from the three contracts, linked from the task files, with a rule in `CLAUDE.md` and a step in `docs/dev/START-HERE.md` so each developer's Claude reads them when planning a task. LF line endings pinned for contracts, apps, JSON, YAML, TOML, Python and lockfiles.
 

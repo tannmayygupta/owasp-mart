@@ -14,3 +14,7 @@
 - `test_an_oversize_body_is_refused` retries on any `OSError`; narrow to reset and broken-pipe errors.
 - The GET leak test uses substring checks; parse the JSON keys and values instead.
 - Storing `owner_hash` as the label and passing `first_seq` to the sidecar is contract text only; verified in L-06 and L-13.
+## From story 1.10 review (2026-10-09)
+- Run the Node end-to-end tests in CI (they are not part of any CI job); plan with the contract CI story (1.6).
+- Check the Linux CI result of the mTLS tests (TLS 1.3 refusal mapping, host name check); settled by the first pull request run.
+- Add tests: missing `openssl` on CI really fails, `CI=false` handling, expired and wrong-usage certificates, TLS 1.1 refused; share the certificate helper between the Python and Node tests; look at the 38 s runtime.

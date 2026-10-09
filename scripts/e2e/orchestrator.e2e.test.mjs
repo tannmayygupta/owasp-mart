@@ -8,7 +8,9 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import https from 'node:https';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -306,6 +308,54 @@ test('a host with little capacity answers 429 ORCH-BUSY with Retry-After and cre
   assertProblem(busy, 429, 'ORCH-BUSY');
   assert.ok(busy.headers.get('retry-after'), 'Retry-After is present');
   assertProblem(await call(small, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+});
+
+// Mutual TLS (deployment matter, outside the OpenAPI file): the fake with --tls-* flags serves HTTPS and refuses a caller without a
+// client certificate. Certificates are throwaway, made with the openssl command in a temporary folder that is removed afterwards.
+test('with --tls flags the fake serves HTTPS and refuses a call without a client certificate', async (t) => {
+  const probe = spawnSync('openssl', ['version'], { encoding: 'utf8' });
+  if (probe.error || probe.status !== 0) {
+    if (process.env.CI) assert.fail('openssl is not installed, the mTLS test cannot make certificates');
+    t.skip('openssl is not installed');
+    return;
+  }
+  const dir = mkdtempSync(path.join(tmpdir(), 'vm-e2e-mtls-'));
+  try {
+    const conf = path.join(dir, 'openssl.cnf');
+    writeFileSync(conf, '[req]\ndistinguished_name = dn\n[dn]\n');
+    const env = { ...cleanEnv, OPENSSL_CONF: conf };
+    const ossl = (...args) => {
+      const r = spawnSync('openssl', args, { cwd: dir, env, encoding: 'utf8' });
+      assert.equal(r.status, 0, `openssl ${args[0]} failed: ${r.stderr}`);
+    };
+    const ec = ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes'];
+    ossl('req', '-x509', ...ec, '-keyout', 'ca.key', '-out', 'ca.pem', '-days', '1', '-subj', '/CN=E2E CA', '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'keyUsage=critical,keyCertSign,cRLSign');
+    const leaf = (name, usage, san) => {
+      ossl('req', '-new', ...ec, '-keyout', `${name}.key`, '-out', `${name}.csr`, '-subj', `/CN=${name}`);
+      writeFileSync(path.join(dir, `${name}.ext`), `basicConstraints=CA:FALSE\nkeyUsage=digitalSignature\nextendedKeyUsage=${usage}\n${san}\n`);
+      ossl('x509', '-req', '-in', `${name}.csr`, '-CA', 'ca.pem', '-CAkey', 'ca.key', '-CAcreateserial', '-out', `${name}.pem`, '-days', '1', '-extfile', `${name}.ext`);
+    };
+    leaf('server', 'serverAuth', 'subjectAltName=DNS:localhost');
+    leaf('client', 'clientAuth', '');
+    const p = (f) => path.join(dir, f);
+    const httpsBase = (await startServer('--tls-cert', p('server.pem'), '--tls-key', p('server.key'), '--tls-ca', p('ca.pem'))).replace('http://127.0.0.1', 'https://localhost');
+    const ca = readFileSync(p('ca.pem'));
+    const get = (extra) => new Promise((resolve, reject) => {
+      const target = '/v1/host';
+      const ts = nowTs();
+      const nonce = newNonce();
+      const req = https.request(httpsBase + target, {
+        method: 'GET', ca, ...extra,
+        headers: { 'x-vm-timestamp': ts, 'x-vm-nonce': nonce, 'x-vm-signature': sign(KEY, 'GET', target, ts, nonce, '') },
+      }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.equal(await get({ cert: readFileSync(p('client.pem')), key: readFileSync(p('client.key')) }), 200, 'with a client certificate the call works');
+    await assert.rejects(get({}), (e) => /ECONNRESET|socket hang up|alert|certificate|handshake/i.test(`${e.code} ${e.message}`), 'without a client certificate the handshake is refused (not a refused connection or a timeout)');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('the Python suite (protocol on both hosts, HTTP service, contract) still passes', { timeout: 600000 }, () => {

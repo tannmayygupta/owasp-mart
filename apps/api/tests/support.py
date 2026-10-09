@@ -5,8 +5,10 @@ import base64
 import hashlib
 import itertools
 import json
+import os
 import queue
 import shutil
+import ssl
 import subprocess
 import tempfile
 import threading
@@ -76,11 +78,95 @@ def reset_request(epoch: int = 2, tag: str = "D", first_seq: int = 41) -> ResetR
     return ResetRequest(epoch=epoch, material=material(tag), first_seq=first_seq)
 
 
+def openssl_path() -> str | None:
+    """The `openssl` command, or None when it is not installed."""
+    return shutil.which("openssl")
+
+
+class Pki:
+    """Throwaway certificates for mutual TLS tests, made with the `openssl` command in a temporary folder.
+
+    One CA signs the server certificate (name `localhost` only) and a client certificate (`clientAuth`); a second CA
+    signs a client certificate that the server must refuse. Everything is deleted by `close()`; nothing is committed.
+    """
+
+    def __init__(self) -> None:
+        exe = openssl_path()
+        if exe is None:
+            raise RuntimeError("openssl is not installed")
+        self._exe = exe
+        self.dir = Path(tempfile.mkdtemp(prefix="vm-mtls-"))
+        try:
+            self.ca_cert, ca_key = self._ca("ca", "Test CA one")
+            self.other_ca_cert, other_key = self._ca("other-ca", "Test CA two")
+            self.server_cert, self.server_key = self._leaf("server", "localhost", self.ca_cert, ca_key,
+                                                           "serverAuth", "subjectAltName=DNS:localhost")
+            self.client_cert, self.client_key = self._leaf("client", "test-client", self.ca_cert, ca_key,
+                                                           "clientAuth", None)
+            self.other_client_cert, self.other_client_key = self._leaf("other-client", "other-client",
+                                                                      self.other_ca_cert, other_key, "clientAuth", None)
+        except BaseException:
+            self.close()
+            raise
+
+    def _run(self, *args: str) -> None:
+        # a minimal config keeps the Windows build of openssl from looking for a config file of its own
+        env = {**os.environ, "OPENSSL_CONF": str(self._conf())}
+        res = subprocess.run([self._exe, *args], cwd=self.dir, env=env, capture_output=True, text=True, timeout=60)
+        if res.returncode != 0:
+            raise RuntimeError(f"openssl {args[0]} failed: {res.stderr.strip()}")
+
+    def _conf(self) -> Path:
+        conf = self.dir / "openssl.cnf"
+        if not conf.exists():
+            conf.write_text("[req]\ndistinguished_name = dn\n[dn]\n", encoding="utf-8")
+        return conf
+
+    def _ca(self, name: str, cn: str) -> tuple[Path, Path]:
+        key, cert = self.dir / f"{name}.key", self.dir / f"{name}.pem"
+        self._run("req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
+                  "-keyout", key.name, "-out", cert.name, "-days", "1", "-subj", f"/CN={cn}",
+                  "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign")
+        return cert, key
+
+    def _leaf(self, name: str, cn: str, ca_cert: Path, ca_key: Path, usage: str, san: str | None) -> tuple[Path, Path]:
+        key, csr, cert, ext = (self.dir / f"{name}.key", self.dir / f"{name}.csr", self.dir / f"{name}.pem",
+                               self.dir / f"{name}.ext")
+        self._run("req", "-new", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
+                  "-keyout", key.name, "-out", csr.name, "-subj", f"/CN={cn}")
+        lines = ["basicConstraints=CA:FALSE", "keyUsage=digitalSignature", f"extendedKeyUsage={usage}"]
+        if san:
+            lines.append(san)
+        ext.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        self._run("x509", "-req", "-in", csr.name, "-CA", ca_cert.name, "-CAkey", ca_key.name, "-CAcreateserial",
+                  "-out", cert.name, "-days", "1", "-extfile", ext.name)
+        return cert, key
+
+    def client_context(self, *, trust: Path | None = None, cert: tuple[Path, Path] | None = ...,
+                       check_hostname: bool = True) -> ssl.SSLContext:
+        """A client TLS context. By default it trusts the test CA and presents the good client certificate;
+        pass `cert=None` to present none, or `trust` to trust another CA file."""
+        ctx = ssl.create_default_context(cafile=str(trust or self.ca_cert))
+        ctx.check_hostname = check_hostname
+        if cert is ...:
+            cert = (self.client_cert, self.client_key)
+        if cert is not None:
+            ctx.load_cert_chain(str(cert[0]), str(cert[1]))
+        return ctx
+
+    def untrusting_context(self) -> ssl.SSLContext:
+        """Presents the good client certificate but trusts only the other CA, so the server certificate is refused."""
+        return self.client_context(trust=self.other_ca_cert)
+
+    def close(self) -> None:
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+
 class ServiceProcess:
     """The fake orchestrator as a separate Node process."""
 
     def __init__(self, *, capacity_mb: int = 8192, step_delay_ms: int = 0, report_url: str | None = None,
-                 extra_args: tuple[str, ...] = ()) -> None:
+                 extra_args: tuple[str, ...] = (), tls: "Pki | None" = None) -> None:
         node = shutil.which("node")
         if node is None:
             raise RuntimeError("node is required for the fake orchestrator tests")
@@ -88,6 +174,8 @@ class ServiceProcess:
                 "--key", PLATFORM_KEY.decode(), "--report-key", ORCH_KEY.decode()]
         if report_url:
             args += ["--report-url", report_url]
+        if tls is not None:
+            args += ["--tls-cert", str(tls.server_cert), "--tls-key", str(tls.server_key), "--tls-ca", str(tls.ca_cert)]
         if extra_args:
             args += list(extra_args)
         # stderr goes to a file, never to an undrained pipe (a full pipe would stall the service)
@@ -104,7 +192,8 @@ class ServiceProcess:
             self.stop()
             raise RuntimeError("the fake orchestrator did not start: " + self.stderr_text())
         self.port = json.loads(line)["port"]
-        self.url = f"http://127.0.0.1:{self.port}"
+        # with TLS the server certificate names only "localhost", so the URL uses that name
+        self.url = f"https://localhost:{self.port}" if tls is not None else f"http://127.0.0.1:{self.port}"
 
     def stderr_text(self) -> str:
         self._stderr.flush()
