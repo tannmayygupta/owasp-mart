@@ -33,7 +33,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and the shop data model is in place.
 
-- [ ] **T-01. Shop skeleton runs in a container (tracer bullet)**
+- [x] **T-01. Shop skeleton runs in a container (tracer bullet)**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Set up your Windows environment and run an Express app on Node 24 in a hardened container that answers /healthz, /readyz and /version.
