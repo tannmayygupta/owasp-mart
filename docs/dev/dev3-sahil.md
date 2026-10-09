@@ -66,7 +66,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: T-01, T-03 and Tanmay's harness (L-06).
   - Done when: In the harness the instance becomes ready after the marker, the planted flag is served and the fake ingest accepts the event.
 
-- [ ] **T-05. Exploit test runner skeleton**
+- [x] **T-05. Exploit test runner skeleton**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: A runner that executes a test against any instance URL, with its own tiny vulnerable and fixed stubs.

@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-05 exploit test runner skeleton, 2026-10-09, Sahil)
+- `challenges/tests/runner/` exploit test runner: runs an exploit test against any instance URL and reports passed (vulnerable) / failed (fixed) / errored (could not run), as a library and a CLI (exit 0/1/3, 2 on usage). Ships a tiny vulnerable/fixed stub and a demo exploit under `challenges/tests/_example/`, a self-test (6 cases) proving pass-on-vulnerable and fail-on-fixed, and a CI `exploit runner` job that fails if no exploit tests are found. Node built-ins only. Covers TB-4.
+
 ### Added (T-03 IF-6/IF-4 consumer review, 2026-10-09, Sahil)
 - Target-stream consumer review and sign-off of the instance contract (IF-6 v0.1.0) and the instance event contract (IF-4 v0.1.0): `docs/reviews/2026-10-09-target-if6-if4-consumer-review.md`. Confirms every IF-6 open point owned by Sahil, checks IF-4 carries every shop-produced event the 11 challenges need, and raises one change request (CR-1: the `/version` env names vs the env allowlist). Covers TB-2.
 
