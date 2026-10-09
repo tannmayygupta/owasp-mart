@@ -61,7 +61,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Done when: Every example event validates and the fake ingest rejects a malformed or oversize one.
   - Handoffs: H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **L-04. Orchestrator API (IF-5), InstanceHost protocol and fake orchestrator**
+- [x] **L-04. Orchestrator API (IF-5), InstanceHost protocol and fake orchestrator**
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.4` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - Build: Write the orchestrator HTTP contract, the InstanceHost protocol the orchestrator drives, and a fake orchestrator with a FakeInstanceHost.

@@ -3,7 +3,7 @@ title: 'Orchestrator API (IF-5) and fake orchestrator'
 type: 'feature'
 ticket: '4'
 created: '2026-10-09'
-status: 'built'
+status: done
 baseline_revision: '38a980fd315371cd0599b899b1fe0b07f2f28281'
 route: 'full'
 route_source: 'pinned'
@@ -18,6 +18,7 @@ context:
   - '{project-root}/docs/architecture/06-security.md'
   - '{project-root}/docs/architecture/04-data-and-state.md'
   - '{project-root}/contracts/instance/instance-contract.md'
+assignee: "tannmayygupta"
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
