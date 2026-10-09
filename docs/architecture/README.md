@@ -18,6 +18,10 @@ Browsers talk only to the dashboards on Vercel. Vercel forwards `/api/*` to the 
 | [06-security.md](06-security.md) | Trust boundaries, STRIDE, secret inventory, orchestrator privileges, ASVS scope, compromised-instance assumptions |
 | [07-repo-and-workstreams.md](07-repo-and-workstreams.md) | Monorepo, CODEOWNERS, contracts, mocks, CI checks, Compose dev, work-stream split, sprint zero, deadlock rules |
 
+## Update note (2026-10-09)
+
+The instance event description (architecture 07 section 3.2 item 6, the events table in 04, and the envelope in docs/design/challenge-specs.md section 10) is superseded by the IF-4 contract contracts/events/app-events.md (ADR 0017, D-38). The challenge specs file itself was not edited.
+
 ## Evidence register
 
 Status words: VERIFIED (read in a primary source this session), UNVERIFIED, CONFLICTING. Numbers EF-27 and EF-28 are not cited and are unused.

@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 26,
+  "type": "kyc.result",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:25Z",
+  "data": {
+    "store_id": "s-03",
+    "outcome": "pass"
+  }
+}

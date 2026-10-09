@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 6,
+  "type": "shop.giftcard_attempt",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:05Z",
+  "data": {
+    "user_id": "u-1001",
+    "result": "ok",
+    "card_class": "own"
+  }
+}

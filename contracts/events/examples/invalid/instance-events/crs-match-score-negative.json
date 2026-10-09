@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 2,
+  "type": "proxy.crs_match",
+  "source": "sidecar",
+  "session_kind": "player",
+  "user_id": null,
+  "ts": "2026-01-01T00:00:01Z",
+  "data": {
+    "rule_ids": [
+      "942100"
+    ],
+    "tags": [
+      "attack_sqli"
+    ],
+    "anomaly_score": -1,
+    "route_template": "/api/products/search"
+  }
+}

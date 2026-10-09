@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 5,
+  "type": "shop.cross_store_order_read",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:04Z",
+  "data": {
+    "order_id": "VM-100201",
+    "caller_user_id": "u-1001",
+    "caller_store_id": "s-01",
+    "order_store_id": "s-02"
+  }
+}

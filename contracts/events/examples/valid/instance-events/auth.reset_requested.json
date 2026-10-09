@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 16,
+  "type": "auth.reset_requested",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:15Z",
+  "data": {
+    "account_id": "a-01",
+    "account_role": "customer",
+    "account_found": true
+  }
+}

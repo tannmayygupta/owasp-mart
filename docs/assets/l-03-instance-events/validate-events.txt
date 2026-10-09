@@ -1,0 +1,7 @@
+# node scripts/validate-events.mjs
+(exit 0; last lines)
+valid posted body ok: examples/valid/posted/shop.cross_store_order_read.json
+valid posted body ok: examples/valid/posted/shop.refund_decision.json
+fake ingest: 34 of 34 matrix checks as expected
+checked 1 schema, 29 event types, 29 valid events, 3 signed envelopes, 6 valid posted bodies and 61 invalid examples
+events: PASS

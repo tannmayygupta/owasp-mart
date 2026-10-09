@@ -553,6 +553,9 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 ### D-37 — Pull request review is optional during initial development
 - **Decision (Tanmay, 2026-10-08):** while the team is still building the first version, a pull request does not need a review; the author may merge once CI is green. Owners of a contract or another stream's folder are told in the team chat after a change. Applies to all three developers until the team decides otherwise. First use: pull request #2 (L-02) merged without Sahil's consumer approval; the contract's "to confirm" rows are still to be confirmed by Sahil and Akshay.
 - **Amends:** the review rule in `CLAUDE.md`, `docs/dev/START-HERE.md` and the L-02 story ("stream T has approved"); the CODEOWNERS file is unchanged.
+### D-38 — Instance event contract IF-4
+- **Decision (Tanmay, 2026-10-08/09, three questions answered during story L-03):** (1) an event is identified by **`(instance_id, seq)` only** (the catalogue's `event_id` is dropped); (2) **`proxy.flag_seen`** carries `kind` (real, decoy or foreign), the `challenge_key` when it is this instance's, and the candidate's SHA-256; (3) **`source`** is fine-grained: sidecar, shop, import, mock, bot, orchestrator, platform. The signing form (HMAC-SHA256 over instance id, `seq` and body digest), the answers (202, 200, 409, 401, 413, 422) and all caps are proposals in `contracts/events/app-events.md`, to be confirmed by Akshay and Sahil in the team chat.
+- **Supersedes:** the event descriptions in architecture 07 section 3.2 item 6, architecture 04 (events table `source`), and challenge specs section 10 (envelope). **Evidence:** ADR 0017. (D-37 is recorded on the `sprint-1-tanmay` branch.)
 
 ---
 

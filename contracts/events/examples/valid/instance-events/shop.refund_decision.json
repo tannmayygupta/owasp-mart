@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 11,
+  "type": "shop.refund_decision",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:10Z",
+  "data": {
+    "order_id": "VM-100202",
+    "refund_id": "r-01",
+    "path": "quick",
+    "amount": 1500,
+    "decision": "approved",
+    "cumulative_after": 1500
+  }
+}

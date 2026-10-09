@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 23,
+  "type": "gateway.ledger_entry",
+  "source": "mock",
+  "session_kind": "anon",
+  "user_id": null,
+  "ts": "2026-01-01T00:00:22Z",
+  "data": {
+    "order_id": "VM-100203",
+    "amount": 2500
+  }
+}

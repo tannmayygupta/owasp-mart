@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 8,
+  "type": "shop.ticket_markup_stored",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:07Z",
+  "data": {
+    "ticket_id": "t-01",
+    "message_id": "m-01",
+    "user_id": "u-1001"
+  }
+}

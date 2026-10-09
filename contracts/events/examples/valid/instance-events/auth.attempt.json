@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 19,
+  "type": "auth.attempt",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:18Z",
+  "data": {
+    "route": "web",
+    "account_id": "a-01",
+    "result": "failed"
+  }
+}

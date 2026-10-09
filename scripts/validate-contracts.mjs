@@ -219,7 +219,7 @@ function walkFiles(dir) {
   return out;
 }
 
-function scanSecrets(text, rel, errors) {
+export function scanSecrets(text, rel, errors) {
   for (const m of text.match(FLAG_LIKE) || []) {
     if (!FAKE_FLAG.test(m)) errors.push(`${rel}: flag-like value ${m} is not an obviously fake flag (one repeated letter)`);
   }

@@ -26,3 +26,6 @@ Thumbs.db
 
 # BMAD generated render output (rebuilt on every skill run)
 _bmad/render/
+
+# Office lock files (a workbook open in Excel)
+~$*

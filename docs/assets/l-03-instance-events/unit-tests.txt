@@ -1,0 +1,13 @@
+# node --test "scripts/*.test.mjs"
+✔ fake ingest server: a body far over 16 KiB is answered 413 and not stored; the server keeps working (58.8582ms)
+✔ fake ingest server: a client that aborts mid-body does not break the server (232.6794ms)
+✔ fake ingest server: option values are validated (0.3628ms)
+✔ command line: exit 0 on the real contract, 1 on a failure, 2 on a usage error (1839.6175ms)
+ℹ tests 82
+ℹ suites 0
+ℹ pass 82
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21803.1277

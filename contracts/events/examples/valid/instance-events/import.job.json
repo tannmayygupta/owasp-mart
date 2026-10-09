@@ -1,0 +1,19 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 15,
+  "type": "import.job",
+  "source": "import",
+  "session_kind": "player",
+  "user_id": null,
+  "ts": "2026-01-01T00:00:14Z",
+  "data": {
+    "job_id": "j-01",
+    "store_id": "s-01",
+    "flagged_keys": [
+      "polluted_key"
+    ],
+    "polluted": true,
+    "audit_token_issued": false
+  }
+}
