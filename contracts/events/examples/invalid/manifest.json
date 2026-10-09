@@ -1,0 +1,246 @@
+{
+  "instance-events/missing-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance_id is required"
+  },
+  "instance-events/bad-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance id is i- plus 16 Base32 characters"
+  },
+  "instance-events/seq-zero.json": {
+    "path": "/seq",
+    "rule": "seq is at least 1"
+  },
+  "instance-events/seq-string.json": {
+    "path": "/seq",
+    "rule": "seq is an integer"
+  },
+  "instance-events/seq-missing.json": {
+    "path": "/seq",
+    "rule": "seq is required"
+  },
+  "instance-events/unknown-type.json": {
+    "path": "/type",
+    "rule": "type must be in the catalogue"
+  },
+  "instance-events/unknown-source.json": {
+    "path": "/source",
+    "rule": "source is one of the seven values"
+  },
+  "instance-events/source-not-allowed-for-type.json": {
+    "path": "/source",
+    "rule": "each type has its own allowed source"
+  },
+  "instance-events/unknown-session-kind.json": {
+    "path": "/session_kind",
+    "rule": "session_kind is one of four values"
+  },
+  "instance-events/ts-not-utc.json": {
+    "path": "/ts",
+    "rule": "ts is UTC with Z"
+  },
+  "instance-events/ts-not-a-date.json": {
+    "path": "/ts",
+    "rule": "ts is RFC 3339"
+  },
+  "instance-events/bad-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is 0.1"
+  },
+  "instance-events/extra-envelope-field-event-id.json": {
+    "path": "/event_id",
+    "rule": "the catalogue event_id is dropped (decision 1); no extra fields"
+  },
+  "instance-events/extra-envelope-field-actor-role.json": {
+    "path": "/actor_role",
+    "rule": "actor_role is not part of the wire event"
+  },
+  "instance-events/missing-data.json": {
+    "path": "/data",
+    "rule": "data is required"
+  },
+  "instance-events/data-not-object.json": {
+    "path": "/data",
+    "rule": "data is an object"
+  },
+  "instance-events/bad-challenge-key.json": {
+    "path": "/challenge_key",
+    "rule": "challenge_key is C01 to C11"
+  },
+  "instance-events/missing-user-id.json": {
+    "path": "/user_id",
+    "rule": "user_id is required, null when none"
+  },
+  "instance-events/user-id-number.json": {
+    "path": "/user_id",
+    "rule": "user_id is a string or null"
+  },
+  "instance-events/extra-data-field.json": {
+    "path": "/data/note",
+    "rule": "data has no extra fields"
+  },
+  "instance-events/missing-data-field.json": {
+    "path": "/data/status",
+    "rule": "every required data field is present"
+  },
+  "instance-events/wrong-data-type.json": {
+    "path": "/data/status",
+    "rule": "status is an integer"
+  },
+  "instance-events/status-out-of-range.json": {
+    "path": "/data/status",
+    "rule": "status is 100 to 599"
+  },
+  "instance-events/flag-value-in-route.json": {
+    "path": "/data/route_template",
+    "rule": "a string holding VM{ is rejected in every data field"
+  },
+  "instance-events/flag-value-in-evidence-body.json": {
+    "path": "/data/body",
+    "rule": "a flag-shaped value never travels, not even in evidence"
+  },
+  "instance-events/flag-value-in-header.json": {
+    "path": "/data/headers_redacted/cookie",
+    "rule": "header values are checked too"
+  },
+  "instance-events/evidence-body-too-long.json": {
+    "path": "/data/body",
+    "rule": "evidence body is at most 8192 characters"
+  },
+  "instance-events/evidence-missing-challenge-key.json": {
+    "path": "/challenge_key",
+    "rule": "evidence.capture needs the challenge key in the envelope"
+  },
+  "instance-events/flag-seen-bad-kind.json": {
+    "path": "/data/kind",
+    "rule": "kind is real, decoy or foreign"
+  },
+  "instance-events/flag-seen-uppercase-hash.json": {
+    "path": "/data/candidate_sha256",
+    "rule": "the digest is 64 lowercase hex characters"
+  },
+  "instance-events/flag-seen-real-without-challenge-key.json": {
+    "path": "/data/challenge_key",
+    "rule": "kind real needs challenge_key"
+  },
+  "instance-events/flag-seen-foreign-with-challenge-key.json": {
+    "path": "/data/challenge_key",
+    "rule": "kind foreign must not name a challenge"
+  },
+  "instance-events/flag-seen-raw-candidate.json": {
+    "path": "/data/candidate",
+    "rule": "the candidate value is never a field, only its hash"
+  },
+  "instance-events/crs-match-score-negative.json": {
+    "path": "/data/anomaly_score",
+    "rule": "score is not negative"
+  },
+  "instance-events/giftcard-bad-result.json": {
+    "path": "/data/result",
+    "rule": "result is one of three values"
+  },
+  "instance-events/refund-negative-amount.json": {
+    "path": "/data/amount",
+    "rule": "amount is not negative"
+  },
+  "instance-events/auth-attempt-bad-route.json": {
+    "path": "/data/route",
+    "rule": "route is web, legacy or reset_confirm"
+  },
+  "instance-events/importer-bad-url-class.json": {
+    "path": "/data/url_class",
+    "rule": "url_class is one of six values"
+  },
+  "instance-events/kyc-bad-outcome.json": {
+    "path": "/data/outcome",
+    "rule": "outcome is one of three values"
+  },
+  "instance-events/bot-source-with-player-session.json": {
+    "path": "/session_kind",
+    "rule": "source bot needs session_kind bot (FR-DET-09)"
+  },
+  "instance-events/bot-visit-from-shop.json": {
+    "path": "/source",
+    "rule": "bot.visit comes from the bot"
+  },
+  "instance-events/flags-injected-from-shop.json": {
+    "path": "/source",
+    "rule": "only the orchestrator side writes it"
+  },
+  "instance-events/flags-injected-player-session.json": {
+    "path": "/session_kind",
+    "rule": "orchestrator events are internal"
+  },
+  "instance-events/flags-injected-duplicate-keys.json": {
+    "path": "/data/challenge_ids",
+    "rule": "challenge ids are unique"
+  },
+  "instance-events/flags-injected-empty.json": {
+    "path": "/data/challenge_ids",
+    "rule": "at least one challenge id"
+  },
+  "instance-events/fault-bad-detail-code.json": {
+    "path": "/data/detail_code",
+    "rule": "detail_code looks like an error code"
+  },
+  "instance-events/flag-value-lowercase.json": {
+    "path": "/data/route_template",
+    "rule": "the flag-shaped check ignores letter case (best effort, FR-FLG-02 owns the real rule)"
+  },
+  "instance-events/flag-value-url-encoded.json": {
+    "path": "/data/route_template",
+    "rule": "an encoded brace after VM is rejected too"
+  },
+  "instance-events/session-kind-internal-from-shop.json": {
+    "path": "/session_kind",
+    "rule": "internal is only for the sources import, orchestrator and platform"
+  },
+  "instance-events/session-kind-internal-from-sidecar.json": {
+    "path": "/session_kind",
+    "rule": "internal is only for the sources import, orchestrator and platform"
+  },
+  "instance-events/flag-seen-challenge-key-mismatch.json": {
+    "path": "/challenge_key",
+    "rule": "envelope and data challenge_key must not differ (checked in code, not by the schema)"
+  },
+  "posted/source-sidecar-refused.json": {
+    "path": "/source",
+    "rule": "the sidecar refuses source sidecar from the shop path"
+  },
+  "posted/source-orchestrator-refused.json": {
+    "path": "/source",
+    "rule": "orchestrator events are not posted by the shop"
+  },
+  "posted/shop-posts-proxy-request.json": {
+    "path": "/source",
+    "rule": "proxy.request is the sidecar's own type"
+  },
+  "posted/shop-posts-bot-visit.json": {
+    "path": "/source",
+    "rule": "bot.visit comes from the bot"
+  },
+  "posted/missing-type.json": {
+    "path": "/type",
+    "rule": "type is required"
+  },
+  "posted/unknown-type.json": {
+    "path": "/type",
+    "rule": "type must be in the catalogue"
+  },
+  "posted/includes-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "the sidecar adds instance_id; the poster must not send it"
+  },
+  "posted/includes-seq.json": {
+    "path": "/seq",
+    "rule": "the sidecar adds seq; the poster must not send it"
+  },
+  "posted/evidence-body-over-2-kib.json": {
+    "path": "/data/body",
+    "rule": "a posted evidence body is at most 2 KiB"
+  },
+  "posted/flag-value-in-data.json": {
+    "path": "/data/user_id",
+    "rule": "no flag-shaped value in posted data"
+  }
+}

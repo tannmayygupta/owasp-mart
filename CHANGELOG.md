@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (instance event contract IF-4, L-03, 2026-10-08, Tanmay)
+- Instance event contract v0 (IF-4) in `contracts/events/`: contract text with the 29-type event catalogue, JSON Schema, a derived posted-body schema, 29 valid events, 3 signed requests, 6 valid posted bodies and 61 invalid examples. Fake ingest in `contracts/mocks/fake-ingest/` (answers 202, 200, 401, 413, 422). Checked by `scripts/validate-events.mjs` (`pnpm run events:check`; `pnpm run contracts:check` now runs both checks) with unit and end-to-end tests. No new dependency.
+
 ### Added (instance contract v0, L-02, 2026-10-08, Tanmay)
 - Instance contract v0 (IF-6) in `contracts/instance/`: contract text, three JSON Schemas (injection document, flags file, instance template), 5 valid and 129 invalid examples, `contracts/CHANGELOG.md`. Checked by `scripts/validate-contracts.mjs` (`pnpm run contracts:check`) with tests. Ajv 8.20.0 and ajv-formats 3.0.1 added as pinned dev dependencies; CI `scripts` job now installs dependencies first. End-to-end tests in `scripts/e2e/contracts.e2e.test.mjs`. Awaiting Sahil's approval as consumer.
 

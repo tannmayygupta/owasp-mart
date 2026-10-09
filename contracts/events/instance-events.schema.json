@@ -1,0 +1,1623 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/events/instance-events.schema.json",
+  "title": "Signed instance event on the wire (IF-4, contract 0.1)",
+  "description": "One event as the ingest receives it: sidecar to edge relay to ingest, one event per request. The event identity is (instance_id, seq). The signature travels in the X-VM-Signature header, not in the body (see app-events.md). Each event type has its own data rule in $defs and its allowed source; data holds ids, classes, counts and hashes only (evidence.capture is the one exception) and never a flag-shaped value. The flag-shaped check is best effort and not a guarantee: the text definitions reject any string holding \"VM{\" in any letter case, \"VM%7B\" or a full-width brace, and the real flag format belongs to FR-FLG-02. The sidecar replaces flag-like strings in evidence.capture with the marker [FLAG-REDACTED] before sending. Rules that depend on two fields: source bot needs session_kind bot; session_kind internal is only for the sources import, orchestrator and platform; proxy.flag_seen needs data.challenge_key for kind real and decoy and forbids it for foreign. The envelope challenge_key and data.challenge_key of proxy.flag_seen must not differ; JSON Schema cannot compare two values, so scripts/validate-events.mjs and the fake ingest check that.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "instance_id",
+    "seq",
+    "type",
+    "source",
+    "session_kind",
+    "user_id",
+    "ts",
+    "data"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "pattern": "^i-[A-Z2-7]{16}$"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "proxy.request",
+        "proxy.crs_match",
+        "proxy.flag_seen",
+        "evidence.capture",
+        "shop.cross_store_order_read",
+        "shop.giftcard_attempt",
+        "shop.catalog_query_error",
+        "shop.ticket_markup_stored",
+        "bot.visit",
+        "collector.hit",
+        "shop.refund_decision",
+        "shop.refund_invariant_broken",
+        "shop.verbose_error",
+        "ops.page_served",
+        "import.job",
+        "auth.reset_requested",
+        "auth.reset_confirm_batch",
+        "auth.password_reset_completed",
+        "auth.attempt",
+        "shop.security_event_written",
+        "webhook.received",
+        "order.paid",
+        "gateway.ledger_entry",
+        "importer.fetch_attempt",
+        "meta.request_served",
+        "kyc.result",
+        "store.approved",
+        "instance.flags_injected",
+        "infrastructure_fault"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "sidecar",
+        "shop",
+        "import",
+        "mock",
+        "bot",
+        "orchestrator",
+        "platform"
+      ]
+    },
+    "session_kind": {
+      "type": "string",
+      "enum": [
+        "player",
+        "bot",
+        "anon",
+        "internal"
+      ]
+    },
+    "user_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/id"
+        }
+      ]
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$"
+    },
+    "challenge_key": {
+      "$ref": "#/$defs/challenge_key"
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "proxy.request"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "sidecar"
+          },
+          "data": {
+            "$ref": "#/$defs/data_proxy_request"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "proxy.crs_match"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "sidecar"
+          },
+          "data": {
+            "$ref": "#/$defs/data_proxy_crs_match"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "proxy.flag_seen"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "sidecar"
+          },
+          "data": {
+            "$ref": "#/$defs/data_proxy_flag_seen"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "evidence.capture"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "enum": [
+              "sidecar",
+              "mock"
+            ]
+          },
+          "data": {
+            "$ref": "#/$defs/data_evidence_capture"
+          }
+        },
+        "required": [
+          "challenge_key"
+        ]
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.cross_store_order_read"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_cross_store_order_read"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.giftcard_attempt"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_giftcard_attempt"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.catalog_query_error"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_catalog_query_error"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.ticket_markup_stored"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_ticket_markup_stored"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "bot.visit"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "bot"
+          },
+          "data": {
+            "$ref": "#/$defs/data_bot_visit"
+          },
+          "session_kind": {
+            "const": "bot"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "collector.hit"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "mock"
+          },
+          "data": {
+            "$ref": "#/$defs/data_collector_hit"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.refund_decision"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_refund_decision"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.refund_invariant_broken"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_refund_invariant_broken"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.verbose_error"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_verbose_error"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "ops.page_served"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_ops_page_served"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "import.job"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "import"
+          },
+          "data": {
+            "$ref": "#/$defs/data_import_job"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "auth.reset_requested"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_auth_reset_requested"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "auth.reset_confirm_batch"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_auth_reset_confirm_batch"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "auth.password_reset_completed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_auth_password_reset_completed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "auth.attempt"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_auth_attempt"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "shop.security_event_written"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_shop_security_event_written"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "webhook.received"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_webhook_received"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "order.paid"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_order_paid"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "gateway.ledger_entry"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "mock"
+          },
+          "data": {
+            "$ref": "#/$defs/data_gateway_ledger_entry"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "importer.fetch_attempt"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_importer_fetch_attempt"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "meta.request_served"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "mock"
+          },
+          "data": {
+            "$ref": "#/$defs/data_meta_request_served"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "kyc.result"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_kyc_result"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "store.approved"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "shop"
+          },
+          "data": {
+            "$ref": "#/$defs/data_store_approved"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "instance.flags_injected"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "orchestrator"
+          },
+          "data": {
+            "$ref": "#/$defs/data_instance_flags_injected"
+          },
+          "session_kind": {
+            "const": "internal"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "infrastructure_fault"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "enum": [
+              "orchestrator",
+              "platform"
+            ]
+          },
+          "data": {
+            "$ref": "#/$defs/data_infrastructure_fault"
+          },
+          "session_kind": {
+            "const": "internal"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "const": "bot"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "session_kind": {
+            "const": "bot"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "enum": [
+              "sidecar",
+              "shop",
+              "mock",
+              "bot"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "session_kind": {
+            "enum": [
+              "player",
+              "bot",
+              "anon"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+    },
+    "class": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,32}$"
+    },
+    "challenge_key": {
+      "type": "string",
+      "pattern": "^C(0[1-9]|1[01])$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "text200": {
+      "type": "string",
+      "maxLength": 200,
+      "pattern": "^(?![\\s\\S]*[Vv][Mm](?:\\{|%7[Bb]|\\uFF5B))[\\s\\S]*$"
+    },
+    "text512": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^(?![\\s\\S]*[Vv][Mm](?:\\{|%7[Bb]|\\uFF5B))[\\s\\S]*$"
+    },
+    "data_proxy_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "route_template",
+        "status",
+        "resp_len",
+        "client_class"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS",
+            "other"
+          ]
+        },
+        "route_template": {
+          "$ref": "#/$defs/text200"
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "resp_len": {
+          "$ref": "#/$defs/count"
+        },
+        "client_class": {
+          "$ref": "#/$defs/class"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        }
+      }
+    },
+    "data_proxy_crs_match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_ids",
+        "tags",
+        "anomaly_score",
+        "route_template"
+      ],
+      "properties": {
+        "rule_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]{3,9}$"
+          },
+          "maxItems": 50
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/class"
+          },
+          "maxItems": 20
+        },
+        "anomaly_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "route_template": {
+          "$ref": "#/$defs/text200"
+        }
+      }
+    },
+    "data_proxy_flag_seen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "candidate_sha256"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "real",
+            "decoy",
+            "foreign"
+          ]
+        },
+        "challenge_key": {
+          "$ref": "#/$defs/challenge_key"
+        },
+        "candidate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "route_template": {
+          "$ref": "#/$defs/text200"
+        },
+        "request_ref": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "real",
+                  "decoy"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "challenge_key"
+            ]
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "foreign"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "challenge_key": false
+            }
+          }
+        }
+      ]
+    },
+    "data_evidence_capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_ref",
+        "body",
+        "headers_redacted"
+      ],
+      "properties": {
+        "request_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^(?![\\s\\S]*[Vv][Mm](?:\\{|%7[Bb]|\\uFF5B))[\\s\\S]*$"
+        },
+        "headers_redacted": {
+          "type": "object",
+          "maxProperties": 50,
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9-]{1,64}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/text512"
+          }
+        }
+      }
+    },
+    "data_shop_cross_store_order_read": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "caller_user_id",
+        "caller_store_id",
+        "order_store_id"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "#/$defs/id"
+        },
+        "caller_user_id": {
+          "$ref": "#/$defs/id"
+        },
+        "caller_store_id": {
+          "$ref": "#/$defs/id"
+        },
+        "order_store_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "data_shop_giftcard_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user_id",
+        "result",
+        "card_class"
+      ],
+      "properties": {
+        "user_id": {
+          "$ref": "#/$defs/id"
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "malformed",
+            "unknown_wellformed",
+            "redeemed"
+          ]
+        },
+        "card_class": {
+          "type": "string",
+          "enum": [
+            "own",
+            "unsold_test",
+            "flag_card",
+            "none"
+          ]
+        }
+      }
+    },
+    "data_shop_catalog_query_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route",
+        "error_class"
+      ],
+      "properties": {
+        "route": {
+          "$ref": "#/$defs/text200"
+        },
+        "error_class": {
+          "$ref": "#/$defs/class"
+        }
+      }
+    },
+    "data_shop_ticket_markup_stored": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ticket_id",
+        "message_id",
+        "user_id"
+      ],
+      "properties": {
+        "ticket_id": {
+          "$ref": "#/$defs/id"
+        },
+        "message_id": {
+          "$ref": "#/$defs/id"
+        },
+        "user_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "data_bot_visit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visit_id",
+        "ticket_id",
+        "phase"
+      ],
+      "properties": {
+        "visit_id": {
+          "$ref": "#/$defs/id"
+        },
+        "ticket_id": {
+          "$ref": "#/$defs/id"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "start",
+            "end"
+          ]
+        },
+        "duration_ms": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "data_collector_hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collector_id_ok",
+        "bot_tagged",
+        "size"
+      ],
+      "properties": {
+        "collector_id_ok": {
+          "type": "boolean"
+        },
+        "bot_tagged": {
+          "type": "boolean"
+        },
+        "candidate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "data_shop_refund_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "refund_id",
+        "path",
+        "amount",
+        "decision",
+        "cumulative_after"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "#/$defs/id"
+        },
+        "refund_id": {
+          "$ref": "#/$defs/id"
+        },
+        "path": {
+          "type": "string",
+          "enum": [
+            "quick",
+            "item"
+          ]
+        },
+        "amount": {
+          "$ref": "#/$defs/count"
+        },
+        "decision": {
+          "$ref": "#/$defs/class"
+        },
+        "cumulative_after": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "data_shop_refund_invariant_broken": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "paid",
+        "refunded_total"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "#/$defs/id"
+        },
+        "paid": {
+          "$ref": "#/$defs/count"
+        },
+        "refunded_total": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "data_shop_verbose_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route",
+        "handler"
+      ],
+      "properties": {
+        "route": {
+          "$ref": "#/$defs/text200"
+        },
+        "handler": {
+          "type": "string",
+          "enum": [
+            "c05_api",
+            "c10_import",
+            "c11_kyc"
+          ]
+        }
+      }
+    },
+    "data_ops_page_served": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "client_class"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/text200"
+        },
+        "client_class": {
+          "$ref": "#/$defs/class"
+        }
+      }
+    },
+    "data_import_job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "store_id",
+        "flagged_keys",
+        "polluted",
+        "audit_token_issued"
+      ],
+      "properties": {
+        "job_id": {
+          "$ref": "#/$defs/id"
+        },
+        "store_id": {
+          "$ref": "#/$defs/id"
+        },
+        "flagged_keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/class"
+          },
+          "maxItems": 50
+        },
+        "polluted": {
+          "type": "boolean"
+        },
+        "audit_token_issued": {
+          "type": "boolean"
+        }
+      }
+    },
+    "data_auth_reset_requested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "account_role",
+        "account_found"
+      ],
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/id"
+        },
+        "account_role": {
+          "$ref": "#/$defs/class"
+        },
+        "account_found": {
+          "type": "boolean"
+        }
+      }
+    },
+    "data_auth_reset_confirm_batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "fail_count",
+        "ok_count",
+        "window_s"
+      ],
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/id"
+        },
+        "fail_count": {
+          "$ref": "#/$defs/count"
+        },
+        "ok_count": {
+          "$ref": "#/$defs/count"
+        },
+        "window_s": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        }
+      }
+    },
+    "data_auth_password_reset_completed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "account_role"
+      ],
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/id"
+        },
+        "account_role": {
+          "$ref": "#/$defs/class"
+        }
+      }
+    },
+    "data_auth_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route",
+        "account_id",
+        "result"
+      ],
+      "properties": {
+        "route": {
+          "type": "string",
+          "enum": [
+            "web",
+            "legacy",
+            "reset_confirm"
+          ]
+        },
+        "account_id": {
+          "$ref": "#/$defs/id"
+        },
+        "result": {
+          "$ref": "#/$defs/class"
+        }
+      }
+    },
+    "data_shop_security_event_written": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "kind"
+      ],
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "$ref": "#/$defs/class"
+        }
+      }
+    },
+    "data_webhook_received": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "source",
+        "verified",
+        "sandbox_header",
+        "accepted"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "gateway",
+            "non_gateway"
+          ]
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "sandbox_header": {
+          "type": "boolean"
+        },
+        "accepted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "data_order_paid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "verified",
+        "via"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "#/$defs/id"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "via": {
+          "$ref": "#/$defs/class"
+        }
+      }
+    },
+    "data_gateway_ledger_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "amount"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "#/$defs/id"
+        },
+        "amount": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "data_importer_fetch_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "url_class",
+        "blocked",
+        "status"
+      ],
+      "properties": {
+        "job_id": {
+          "$ref": "#/$defs/id"
+        },
+        "url_class": {
+          "type": "string",
+          "enum": [
+            "external",
+            "loopback",
+            "private",
+            "link_local",
+            "internal_name",
+            "other"
+          ]
+        },
+        "blocked": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 599
+        }
+      }
+    },
+    "data_meta_request_served": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "ua_class"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/text200"
+        },
+        "ua_class": {
+          "type": "string",
+          "enum": [
+            "importer",
+            "rates",
+            "health"
+          ]
+        }
+      }
+    },
+    "data_kyc_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "store_id",
+        "outcome"
+      ],
+      "properties": {
+        "store_id": {
+          "$ref": "#/$defs/id"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "valid",
+            "invalid_verbose",
+            "provider_error_fallback"
+          ]
+        }
+      }
+    },
+    "data_store_approved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "store_id",
+        "approved_by"
+      ],
+      "properties": {
+        "store_id": {
+          "$ref": "#/$defs/id"
+        },
+        "approved_by": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "data_instance_flags_injected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge_ids"
+      ],
+      "properties": {
+        "challenge_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/challenge_key"
+          },
+          "maxItems": 11,
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "data_infrastructure_fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fault_class"
+      ],
+      "properties": {
+        "fault_class": {
+          "$ref": "#/$defs/class"
+        },
+        "detail_code": {
+          "type": "string",
+          "pattern": "^[A-Z]+(-[A-Z0-9]+)+$",
+          "maxLength": 64
+        }
+      }
+    }
+  }
+}

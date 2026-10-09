@@ -550,6 +550,10 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 - **Decision (Tanmay, 2026-10-08, from IF-6 open points 16 and 29):** (1) the flag files that must exist only in the import service (C06) and in mock-services (C10) are delivered through two small **memory-backed volumes, one per consumer** (`/run/placement/import`, `/run/placement/mock`), written only by the injector and mounted read-only only by that consumer (chosen after research; delegated to the coordinator by the developer). (2) The **injector has `network_mode: none`**, which deviates from the architecture 02 drawing. Sahil confirms the consumer paths in the pull request review.
 - **Evidence:** ADR 0016 (OWASP Secrets Management Cheat Sheet, CNCF whitepaper via a secondary source, Docker secrets guides; not all read in primary sources).
 
+### D-38 — Instance event contract IF-4
+- **Decision (Tanmay, 2026-10-08/09, three questions answered during story L-03):** (1) an event is identified by **`(instance_id, seq)` only** (the catalogue's `event_id` is dropped); (2) **`proxy.flag_seen`** carries `kind` (real, decoy or foreign), the `challenge_key` when it is this instance's, and the candidate's SHA-256; (3) **`source`** is fine-grained: sidecar, shop, import, mock, bot, orchestrator, platform. The signing form (HMAC-SHA256 over instance id, `seq` and body digest), the answers (202, 200, 409, 401, 413, 422) and all caps are proposals in `contracts/events/app-events.md`, to be confirmed by Akshay and Sahil in the team chat.
+- **Supersedes:** the event descriptions in architecture 07 section 3.2 item 6, architecture 04 (events table `source`), and challenge specs section 10 (envelope). **Evidence:** ADR 0017. (D-37 is recorded on the `sprint-1-tanmay` branch.)
+
 ---
 
 ## 16. Next steps

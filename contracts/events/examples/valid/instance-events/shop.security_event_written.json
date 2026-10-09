@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 20,
+  "type": "shop.security_event_written",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:19Z",
+  "data": {
+    "account_id": "a-01",
+    "kind": "login_failed"
+  }
+}

@@ -57,13 +57,70 @@ test('fresh checkout parity: install with a frozen lockfile, then the CI scripts
   assert.equal(check.status, 0, check.stdout + check.stderr);
   assert.match(check.stdout, /checked 3 schemas, \d+ valid and \d+ invalid examples/);
   assert.match(check.stdout, /contracts: PASS/);
+  // the same command also checks the event contract (IF-4)
+  assert.match(check.stdout, /checked 1 schema, 29 event types, 29 valid events, \d+ signed envelopes, \d+ valid posted bodies and \d+ invalid examples/);
+  assert.match(check.stdout, /events: PASS/);
 });
 
-test('pnpm run contracts:check passes in the real repository and prints the counts', () => {
+test('pnpm run contracts:check passes in the real repository and prints the counts of both contracts', () => {
   const r = run('pnpm', ['run', 'contracts:check'], { cwd: ROOT });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /checked 3 schemas, \d+ valid and \d+ invalid examples/);
   assert.match(r.stdout, /contracts: PASS/);
+  assert.match(r.stdout, /checked 1 schema, 29 event types, 29 valid events, \d+ signed envelopes, \d+ valid posted bodies and \d+ invalid examples/);
+  assert.match(r.stdout, /events: PASS/);
+});
+
+test('pnpm run events:check passes alone, and validate-events exits 1 on a broken copy of the event contract', () => {
+  const ok = run('pnpm', ['run', 'events:check'], { cwd: ROOT });
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /events: PASS/);
+  // break a copy of the event contract: drop a type from the schema but keep it in the catalogue
+  const dir = path.join(tmp('events'), 'events');
+  cpSync(path.join(ROOT, 'contracts', 'events'), dir, { recursive: true });
+  const file = path.join(dir, 'instance-events.schema.json');
+  const s = readJson(file);
+  s.properties.type.enum = s.properties.type.enum.filter((t) => t !== 'order.paid');
+  writeJson(file, s);
+  const r = run(process.execPath, [path.join(ROOT, 'scripts', 'validate-events.mjs'), '--dir', dir]);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stderr, /order\.paid/);
+  assert.match(r.stdout, /events: FAIL/);
+});
+
+test('the fake ingest runs as a command and answers a signed event over HTTP', async () => {
+  const { spawn } = await import('node:child_process');
+  const { signEvent, TEST_KEY } = await import('../../contracts/mocks/fake-ingest/sign.mjs');
+  const server = path.join(ROOT, 'contracts', 'mocks', 'fake-ingest', 'server.mjs');
+  const child = spawn(process.execPath, [server, '--key', TEST_KEY, '--port', '0', '--host', '127.0.0.1'], { env: cleanEnv });
+  try {
+    const port = await new Promise((resolve, reject) => {
+      let out = '';
+      const t = setTimeout(() => reject(new Error('fake ingest did not start: ' + out)), 15000);
+      child.stdout.on('data', (d) => {
+        out += d;
+        const m = out.match(/127\.0\.0\.1:(\d+)\//);
+        if (m) { clearTimeout(t); resolve(Number(m[1])); }
+      });
+      child.on('exit', (c) => reject(new Error(`fake ingest exited with ${c}: ${out}`)));
+    });
+    const ev = readJson(path.join(ROOT, 'contracts', 'events', 'examples', 'valid', 'instance-events', 'proxy.request.json'));
+    const s = signEvent(TEST_KEY, ev);
+    const url = `http://127.0.0.1:${port}/internal/v1/events`;
+    assert.equal((await fetch(url, { method: 'POST', headers: s.headers, body: s.body })).status, 202);
+    assert.equal((await fetch(url, { method: 'POST', headers: s.headers, body: s.body })).status, 200);
+    const altered = JSON.stringify({ ...JSON.parse(s.body), ts: '2026-05-05T05:05:05Z' });
+    assert.notEqual(altered, s.body, 'the tampered body must differ');
+    assert.equal((await fetch(url, { method: 'POST', headers: s.headers, body: altered })).status, 401);
+  } finally {
+    child.removeAllListeners('exit');
+    const exited = new Promise((resolve) => child.once('exit', resolve));
+    child.kill();
+    await exited;
+  }
+  const bad = run(process.execPath, [server]);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /--key is required/);
 });
 
 test('breaking a rule exits 1: removing epoch from the injection schema', () => {

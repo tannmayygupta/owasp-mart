@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 12,
+  "type": "shop.refund_invariant_broken",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:11Z",
+  "data": {
+    "order_id": "VM-100202",
+    "paid": 3000,
+    "refunded_total": 4500
+  }
+}

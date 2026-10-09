@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.1",
+  "type": "shop.nothing",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:05Z",
+  "data": {
+    "user_id": "u-1001",
+    "result": "redeemed",
+    "card_class": "own"
+  }
+}

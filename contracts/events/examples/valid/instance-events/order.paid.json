@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 22,
+  "type": "order.paid",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:21Z",
+  "data": {
+    "order_id": "VM-100203",
+    "verified": false,
+    "via": "webhook"
+  }
+}

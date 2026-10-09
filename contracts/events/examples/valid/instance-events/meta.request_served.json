@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 25,
+  "type": "meta.request_served",
+  "source": "mock",
+  "session_kind": "anon",
+  "user_id": null,
+  "ts": "2026-01-01T00:00:24Z",
+  "data": {
+    "path": "/latest/meta",
+    "ua_class": "importer"
+  }
+}

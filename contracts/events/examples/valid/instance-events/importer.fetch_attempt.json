@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 24,
+  "type": "importer.fetch_attempt",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:23Z",
+  "data": {
+    "job_id": "j-02",
+    "url_class": "link_local",
+    "blocked": false,
+    "status": 200
+  }
+}

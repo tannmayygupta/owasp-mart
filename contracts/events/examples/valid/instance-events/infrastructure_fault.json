@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 29,
+  "type": "infrastructure_fault",
+  "source": "orchestrator",
+  "session_kind": "internal",
+  "user_id": null,
+  "ts": "2026-01-01T00:00:28Z",
+  "data": {
+    "fault_class": "instance_lost",
+    "detail_code": "INST-LOST"
+  }
+}

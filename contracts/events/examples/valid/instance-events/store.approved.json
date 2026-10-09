@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 27,
+  "type": "store.approved",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:26Z",
+  "data": {
+    "store_id": "s-03",
+    "approved_by": "system"
+  }
+}

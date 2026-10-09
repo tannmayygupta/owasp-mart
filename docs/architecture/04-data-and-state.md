@@ -70,7 +70,7 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `events` | `id`, `instance_id`, `attempt_id`, `seq`, `source` (`sidecar`, `app`, `orchestrator`, `platform`), `type`, `ts_instance`, `ts_received`, `payload jsonb` (metadata only) | Unique `(instance_id, seq)` makes ingestion idempotent (FR-DET-04). Request summaries are aggregated by the sidecar, not one row per request |
+| `events` | `id`, `instance_id`, `attempt_id`, `seq`, `source` (`sidecar`, `app`, `orchestrator`, `platform`; **superseded by IF-4 on 2026-10-09: `sidecar`, `shop`, `import`, `mock`, `bot`, `orchestrator`, `platform`, see `contracts/events/app-events.md` and ADR 0017**), `type`, `ts_instance`, `ts_received`, `payload jsonb` (metadata only) | Unique `(instance_id, seq)` makes ingestion idempotent (FR-DET-04). Request summaries are aggregated by the sidecar, not one row per request |
 | `milestones` | `attempt_id`, `challenge_key`, `level`, `reached_at`, `event_id`, `status` (`credited`, `held`, `rejected`), `decided_by`, `decision_note` | Best level per challenge counts once (FR-SCR-02) |
 | `flag_submissions` | `attempt_id`, `challenge_key`, `result` (`correct`, `wrong`, `decoy`, `other_instance`, `stale_epoch`), `at` | **No submitted value is stored** (FR-FLG-05) |
 | `hint_unlocks` | `attempt_id`, `challenge_key`, `level`, `cost_pct`, `at` | |

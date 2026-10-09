@@ -1,0 +1,19 @@
+# node --test "scripts/e2e/contracts.e2e.test.mjs"
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ fresh checkout parity: install with a frozen lockfile, then the CI scripts job command passes (26126.341ms)
+✔ pnpm run contracts:check passes in the real repository and prints the counts of both contracts (1686.1664ms)
+✔ pnpm run events:check passes alone, and validate-events exits 1 on a broken copy of the event contract (2578.7512ms)
+✔ the fake ingest runs as a command and answers a signed event over HTTP (642.9532ms)
+✔ breaking a rule exits 1: removing epoch from the injection schema (447.0116ms)
+✔ breaking a rule exits 1: the injector and the shop use different /run/vm volumes (449.1251ms)
+✔ breaking a rule exits 1: a real-looking flag in an example (448.8015ms)
+✔ usage: --help exits 0, an unknown argument exits 2, a missing folder fails with exit 1 (594.7139ms)
+✔ the contract document has sections 1 to 11 in order and an open-points table (1.3601ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33466.803

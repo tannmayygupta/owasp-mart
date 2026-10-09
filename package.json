@@ -8,7 +8,8 @@
     "test": "node --test \"scripts/*.test.mjs\"",
     "test:e2e": "node --test \"scripts/e2e/*.test.mjs\"",
     "dev": "node scripts/dev.mjs",
-    "contracts:check": "node scripts/validate-contracts.mjs"
+    "contracts:check": "node scripts/validate-contracts.mjs && node scripts/validate-events.mjs",
+    "events:check": "node scripts/validate-events.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0",

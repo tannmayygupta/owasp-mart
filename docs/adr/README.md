@@ -18,5 +18,6 @@
 | 0014 | [Organization scoping: application filter plus RLS](0014-organization-scoping-app-filter-and-rls.md) | Proposed |
 | 0015 | [Laptop fallback and developer engine](0015-laptop-fallback-engine.md) | Proposed |
 | 0016 | [Per-consumer flag file delivery and injector network](0016-per-consumer-flag-file-delivery-and-injector-network.md) | Accepted (D-36) |
+| 0017 | [Instance event contract: identity, signing, sources](0017-instance-event-contract-identity-signing-source.md) | Accepted (D-38) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

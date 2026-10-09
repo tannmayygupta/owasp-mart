@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 1,
+  "type": "proxy.request",
+  "source": "sidecar",
+  "session_kind": "player",
+  "user_id": null,
+  "ts": "yesterday",
+  "data": {
+    "method": "GET",
+    "route_template": "/api/products/search",
+    "status": 200,
+    "resp_len": 512,
+    "client_class": "browser"
+  }
+}

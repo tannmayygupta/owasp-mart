@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 14,
+  "type": "ops.page_served",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:13Z",
+  "data": {
+    "path": "/_ops/diagnostics",
+    "client_class": "browser"
+  }
+}

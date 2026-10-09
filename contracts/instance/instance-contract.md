@@ -7,7 +7,7 @@
 
 Plain terms: an **instance** is one private copy of the shop with its helper containers. This document says what every container in an instance must look like, so the orchestrator (L) and the shop and services (T) can be built separately. Words in **bold "to confirm"** are values the architecture does not fix; every one is listed in the table at the end ("Open points (to confirm)") for Sahil and Akshay.
 
-What this contract does not cover: the body and names of events (IF-4, story L-03), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are placeholders until the registry is merged.
+What this contract does not cover: the body and names of events (IF-4, `contracts/events/app-events.md`), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are placeholders until the registry is merged.
 
 Machine-checkable parts: [injection-document.schema.json](injection-document.schema.json), [flags-file.schema.json](flags-file.schema.json), [instance-template.schema.json](instance-template.schema.json) (JSON Schema 2020-12), with valid and invalid examples in `examples/`. Rules that compare two fields (for example "the injector and the shop share one `/run/vm` volume") are checked by `scripts/validate-contracts.mjs`.
 
@@ -125,7 +125,7 @@ The size limit and the UTF-8 handling of the document on standard input are for 
 
 ## 6. Event emission
 
-Out of scope in v0 (IF-4, story L-03). The contract only fixes the path: the shop sends events to the sidecar's event endpoint on the instance network, port 9000, base URL in `VM_SIDECAR_EVENTS_URL`. Body, event names, signing and size caps are defined in `contracts/events/` by L-03. Events carry no secrets.
+Defined by IF-4 in [../events/app-events.md](../events/app-events.md) (story L-03). The path stays as fixed here: the shop sends events to the sidecar's event endpoint on the instance network, port 9000, base URL in `VM_SIDECAR_EVENTS_URL`; IF-4 adds the path `/v1/events` (POST only), the body, the event names, the signing and the size caps. Events carry no secrets.
 
 ## 7. Runtime profile
 
@@ -190,7 +190,7 @@ Every value below was chosen by this draft because the architecture does not fix
 | 19 | Decoy placement field | `decoy_placement` (optional string, content defined by T) | Sahil |
 | 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | Tanmay |
 | 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | Tanmay |
-| 22 | Event endpoint base URL | `http://sidecar:9000` (path left to IF-4); mock base `http://mock-services` | Tanmay, Sahil |
+| 22 | Event endpoint base URL | `http://sidecar:9000` (path `/v1/events`, defined by IF-4); mock base `http://mock-services` | Tanmay, Sahil |
 | 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex; `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
 | 24 | Env value limit and reason length | value at most 512 characters; flag-in-env reason 20 to 300 characters, not blank; only the shop may use the exception | Sahil |
 | 25 | Env allowlist | the 13 names in section 2 | Sahil |

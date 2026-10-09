@@ -30,7 +30,9 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 | `node scripts/dev.mjs hello` | Starts a hardened hello container, checks it, removes it |
 | `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (empty until later stories) |
 | `node scripts/dev.mjs down` | Stops and removes the project's containers |
-| `pnpm run contracts:check` | Validates the instance contract (IF-6): schemas, examples, semantic rules (needs `pnpm install` once) |
+| `pnpm run contracts:check` | Validates both contracts: the instance contract (IF-6) and the instance event contract (IF-4): schemas, examples, semantic rules, fake ingest answers (needs `pnpm install` once) |
+| `pnpm run events:check` | Validates only the instance event contract (IF-4, `contracts/events/`) |
+| `node contracts/mocks/fake-ingest/server.mjs --key <test key> --port <n>` | Starts the fake ingest (stand-in for the real one; answers 202, 200, 401, 413, 422; use a throwaway key, never a real one) |
 | `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed; needs `pnpm install` once) |
 | `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests: real Docker engine and contract copies (about 1 minute; the contract tests also install dependencies in a temporary copy) |
 

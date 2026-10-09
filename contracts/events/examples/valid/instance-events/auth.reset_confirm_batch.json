@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "seq": 17,
+  "type": "auth.reset_confirm_batch",
+  "source": "shop",
+  "session_kind": "player",
+  "user_id": "u-1001",
+  "ts": "2026-01-01T00:00:16Z",
+  "data": {
+    "account_id": "a-01",
+    "fail_count": 40,
+    "ok_count": 0,
+    "window_s": 10
+  }
+}
