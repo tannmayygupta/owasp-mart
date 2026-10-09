@@ -66,6 +66,8 @@ Do these steps in order. The prompts are suggestions you can paste into Claude C
 
 The line "BMAD story" under the task tells you if the story already exists. If it says "not planned yet", follow section 5 first. If `bmad-ticket` lists the story as blocked only because of an **unknown** (a note about something it waits on), settle that with Claude first (section 5, second bullet).
 
+**Step 2a. Read the handoffs.** Open `docs/dev/HANDOFFS.md` and read the rows addressed to your task id. Include them in the plan, ask the developer to confirm or change each one, and record the answers in the Status and Answer columns (if an answer changes a contract, tell Tanmay in the team chat).
+
 **Step 3. Build.**
 > Use bmad-build with the full route on story <ref>. Ask me before anything unclear.
 

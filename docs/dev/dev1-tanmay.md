@@ -59,6 +59,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-4
   - Waits on: L-02.
   - Done when: Every example event validates and the fake ingest rejects a malformed or oversize one.
+  - Handoffs: H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-04. Orchestrator API (IF-5), InstanceHost protocol and fake orchestrator**
   - Epic: `epic-lab-baseline`
@@ -67,6 +68,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-5
   - Waits on: L-01.
   - Done when: A client built from the contract creates, resets and destroys instances against the fake, and the fake host passes the protocol tests the real one must pass later.
+  - Handoffs: H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-05. Lab fragment of the platform API (IF-2) with a mock**
   - Epic: `epic-lab-baseline`
@@ -76,6 +78,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-9
   - Waits on: L-01.
   - Done when: The fragment validates, the mock answers every endpoint and Akshay has reviewed it as consumer.
+  - Handoffs: H-78 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-06. Stub shop, fake ingest and lab harness**
   - Epic: `epic-lab-baseline`
@@ -85,6 +88,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-6
   - Waits on: L-02, L-03, L-04.
   - Done when: One command starts a full stub instance on a laptop: it answers health, becomes ready only after the injection marker, serves a planted flag, emits one app event the fake ingest validates, and passes the contract conformance check.
+  - Handoffs: H-74 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-07. Contract checks live in CI**
   - Epic: `epic-lab-baseline`
@@ -93,6 +97,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-7
   - Waits on: L-02, L-03, L-04.
   - Done when: A deliberately breaking contract change fails CI and a valid one passes.
+  - Handoffs: H-73 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-08. Oracle account, two VMs, private link and firewall**
   - Epic: `epic-environments-and-deployment`
@@ -101,6 +106,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LE-1, LE-6; spikes S-11, S-17
   - Waits on: Decision on who owns the Oracle account (Q-32).
   - Done when: Both VMs are reachable by key-only SSH, only 80, 443 and SSH are open, the private link works, and the account owner, budget alert and keep-alive routine are written down.
+  - Handoffs: H-68 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 2 (15 Oct to 21 Oct 2026)
 
@@ -113,6 +119,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Covers: LB-8
   - Waits on: L-05, L-06, L-07 and the sign-offs of Akshay (P-08) and Sahil (T-03).
   - Done when: The tag exists, COMPAT.md lists the versions every stream targets and the approvals check is active.
+  - Handoffs: H-58, H-80, H-81, H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-10. DuckDNS names and certificates**
   - Epic: `epic-environments-and-deployment`
@@ -146,6 +153,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Covers: FR-INS-01, 02, 07, 11; spike S-4
   - Waits on: L-04, L-08.
   - Done when: An instance is never shown ready before flag injection finished and the cold-start time is measured and recorded (S-4).
+  - Handoffs: H-57, H-58, H-59, H-60, H-61, H-64, H-66, H-67, H-68, H-69, H-70, H-71, H-72, H-79 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-14. Reset, teardown, timing defaults and reconciler**
   - Epic: `epic-orchestrator-and-instance-lifecycle`
@@ -154,6 +162,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Covers: FR-INS-03, 04, 05; spike S-13
   - Waits on: L-13.
   - Done when: Learner instances stop after 60 minutes idle or 4 hours total; killing the orchestrator mid-provision leaves no orphans after the reconciler runs.
+  - Handoffs: H-59, H-61, H-65, H-67 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-15. Instance isolation and hardening**
   - Epic: `epic-isolation-and-hardening`
@@ -162,6 +171,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Covers: NFR-ISO-01 to 04, NFR-SEC-02, 04; spikes S-3, S-15
   - Waits on: L-13.
   - Done when: From inside an instance the internet, LAN, cloud metadata, other instances, the platform, the gateway IP and host services are unreachable, tested on VM-I.
+  - Handoffs: H-62, H-71 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-16. Concurrency, quotas, start failures and warm-pool decision**
   - Epic: `epic-orchestrator-and-instance-lifecycle`
@@ -170,6 +180,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Covers: FR-INS-06, 08, 09
   - Waits on: L-13, L-14.
   - Done when: The measured number of concurrent instances and memory per instance are recorded, quotas are enforced against the fake port and failed starts are handled.
+  - Handoffs: H-66, H-79 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 3 (22 Oct to 28 Oct 2026)
 
@@ -190,6 +201,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Covers: FR-SES-11
   - Waits on: L-03, L-17.
   - Done when: A signed event reaches ingest, a forged or replayed one is rejected, and a second browser session for the same candidate is handled as FR-SES-11 requires.
+  - Handoffs: H-64, H-75 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-19. Flag derivation, injection and secrecy**
   - Epic: `epic-flags-detection-and-sidecar`
@@ -198,6 +210,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Covers: FR-FLG-01, 02, 03, 07, 08
   - Waits on: L-13. Use a fake KeyPort until Akshay delivers the real one.
   - Done when: Two instances of the same challenge hold different flags, a reset invalidates old ones, and a CI scan finds no flag pattern in any image layer or log.
+  - Handoffs: H-63 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-20. Coraza sidecar, automatic capture and paste**
   - Epic: `epic-flags-detection-and-sidecar`
@@ -206,6 +219,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Covers: FR-FLG-04, 05, 06, FR-DET-01, 02, 04; spikes S-6, S-7, S-9
   - Waits on: L-18, L-19.
   - Done when: A valid flag in a response to the owning player is credited automatically, a decoy is not, the sidecar never blocks, and classifier accuracy is measured (S-6).
+  - Handoffs: H-76 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-21. Milestone engine, evidence capture and sharing signal**
   - Epic: `epic-flags-detection-and-sidecar`
@@ -214,6 +228,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Covers: FR-DET-03, 05, 06, 07, 08, 09, FR-FLG-09
   - Waits on: L-20 and the catalogue (Sahil, T-02).
   - Done when: Milestones fire from the events in the challenge specs for every challenge, including the C09 negative-observation rule, and evidence is stored through KeyPort.
+  - Handoffs: H-77 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-22. Attempt state machine and server clock**
   - Epic: `epic-attempts-scoring-and-integrity`

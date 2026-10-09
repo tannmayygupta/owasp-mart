@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (handoff register, 2026-10-09, Tanmay)
+- `docs/dev/HANDOFFS.md`: 82 hand-offs (Akshay 23, Sahil 33, Tanmay 26) from the three contracts, linked from the task files, with a rule in `CLAUDE.md` and a step in `docs/dev/START-HERE.md` so each developer's Claude reads them when planning a task. LF line endings pinned for contracts, apps, JSON, YAML, TOML, Python and lockfiles.
+
 ### Added (orchestrator API v0, L-04, 2026-10-09, Tanmay)
 - Orchestrator API contract v0 (IF-5) in `contracts/orchestrator/`: OpenAPI 3.1 file for the seven calls and the signed state report, contract text with state machine, signing, idempotence, errors and 30 open points (proposals for Akshay), 15 valid and 33 invalid examples, a signing vector. Checked by `scripts/check_orchestrator_contract.py`, now the second half of `pnpm run contracts:check`.
 - Python package `vulnmart-api` (`apps/api`, only the ports): `InstanceHost` protocol, `FakeInstanceHost`, `HttpInstanceHost` (standard library only). Fake orchestrator service in `contracts/mocks/fake-orchestrator/server.mjs` (Node, no dependencies). 204 Python tests; the protocol suite runs against the fake host and against the client plus the fake service. After review: the fake host mirrors the service validation, the client refuses unsafe setups and treats any odd answer as `OrchestratorUnavailable`, the fake service hardens body, query and method handling (405), the contract check no longer fails with a traceback.

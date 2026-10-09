@@ -40,6 +40,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Covers: TB-3, TB-5
   - Waits on: L-01 (repository skeleton).
   - Done when: `docker run` of the shop image answers its health endpoints and Docker, Node 24, uv and `node scripts/verify-skills.mjs` succeed on your PC.
+  - Handoffs: H-30 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-02. Challenge catalogue schema and 11 stub entries (IF-7)**
   - Epic: `epic-target-baseline`
@@ -49,6 +50,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Covers: TB-1
   - Waits on: L-01.
   - Done when: All 11 stubs validate against the schema in CI.
+  - Handoffs: H-25, H-32, H-41, H-43 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-03. Review the instance contract and event schema as consumer**
   - Epic: `epic-target-baseline`
@@ -57,6 +59,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Covers: TB-2
   - Waits on: Tanmay's drafts L-02 and L-03 (open pull requests).
   - Done when: Review comments are merged or answered and you have signed the versions you build against.
+  - Handoffs: H-24 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-04. Shop skeleton meets the instance contract in the lab harness**
   - Epic: `epic-target-baseline`
@@ -65,6 +68,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Covers: TB-3
   - Waits on: T-01, T-03 and Tanmay's harness (L-06).
   - Done when: In the harness the instance becomes ready after the marker, the planted flag is served and the fake ingest accepts the event.
+  - Handoffs: H-26, H-30, H-34, H-35, H-56 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-05. Exploit test runner skeleton**
   - Epic: `epic-target-baseline`
@@ -97,6 +101,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Covers: FR-SHP-12
   - Waits on: T-06.
   - Done when: A fresh instance starts from the snapshot with seed data and the start time is measured.
+  - Handoffs: H-25, H-26, H-27 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 2 (15 Oct to 21 Oct 2026)
 
@@ -109,6 +114,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Covers: FR-SHP-15
   - Waits on: T-04, T-08 and Tanmay's L-13.
   - Done when: The shop is never ready before the marker and runs under the runtime profile in the harness.
+  - Handoffs: H-24, H-26, H-27, H-30, H-31, H-32, H-33, H-34 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-10. Shop boundaries and signed app events**
   - Epic: `epic-shop-instance-integration`
@@ -117,6 +123,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Covers: FR-SHP-14
   - Waits on: T-09, Tanmay's event schema (L-03).
   - Done when: Boundary tests pass and the fake ingest accepts the shop's events.
+  - Handoffs: H-35, H-36, H-37, H-38, H-39, H-40 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-11. Mock services container**
   - Epic: `epic-shop-instance-integration`
@@ -125,6 +132,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Covers: FR-SHP-13
   - Waits on: T-09.
   - Done when: Each mock answers inside the instance and is unreachable from outside.
+  - Handoffs: H-28, H-31, H-36, H-37, H-38, H-40, H-47, H-52, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-12. Isolated import service**
   - Epic: `epic-shop-instance-integration`
@@ -133,6 +141,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Covers: FR-SHP-13
   - Waits on: T-09.
   - Done when: A job runs in a fresh process and cannot reach the network or the database.
+  - Handoffs: H-28, H-29, H-31, H-36, H-38 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-13. Support-agent bot**
   - Epic: `epic-shop-instance-integration`
@@ -141,6 +150,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Covers: FR-SHP-11; spike S-5
   - Waits on: T-11.
   - Done when: The bot visits an allowed page, refuses others and its memory per instance is measured (S-5).
+  - Handoffs: H-31, H-36, H-38, H-44 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-14. Customer flows**
   - Epic: `epic-shop-core-and-roles`
@@ -165,6 +175,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Covers: FR-SHP-08
   - Waits on: T-07, T-08.
   - Done when: The seeded accounts work in a fresh instance and no seeded password repeats across challenges.
+  - Handoffs: H-25 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 3 (22 Oct to 28 Oct 2026)
 
@@ -193,6 +204,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Covers: FR-CHL-02
   - Waits on: T-14, T-17.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one, and the flag appears only on the intended path.
+  - Handoffs: H-45 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-20. C02 Cryptographic Failures (gift-card codes from a weak hash)**
   - Epic: `epic-challenges-c01-c04`
@@ -201,6 +213,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Covers: FR-CHL-03
   - Waits on: T-14.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one.
+  - Handoffs: H-46 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-21. C03 Injection (SQL injection and stored XSS)**
   - Epic: `epic-challenges-c01-c04`
@@ -209,6 +222,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Covers: FR-CHL-04
   - Waits on: T-11, T-13, T-14; check SQLite ATTACH and load_extension.
   - Done when: The exploit tests pass and fail as required, and SQL injection cannot reach other data.
+  - Handoffs: H-47 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-22. C04 Insecure Design (refund total beyond the amount paid)**
   - Epic: `epic-challenges-c01-c04`
@@ -217,6 +231,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Covers: FR-CHL-05
   - Waits on: T-18.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one.
+  - Handoffs: H-48 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-23. C05 Security Misconfiguration (unauthenticated diagnostics page)**
   - Epic: `epic-challenges-c05-c08`
@@ -225,6 +240,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Covers: FR-CHL-06
   - Waits on: T-15.
   - Done when: The exploit test passes and fails as required and no real data is exposed.
+  - Handoffs: H-49 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-24. C06 Vulnerable Components (prototype pollution in the import service)**
   - Epic: `epic-challenges-c05-c08`
@@ -233,6 +249,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Covers: FR-CHL-07; spike S-9
   - Waits on: T-12.
   - Done when: The exploit test passes and fails as required, the import service has no network or database, and no code execution is possible.
+  - Handoffs: H-28, H-29, H-50 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 4 (29 Oct to 4 Nov 2026)
 
@@ -245,6 +262,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Covers: FR-CHL-08
   - Waits on: T-15.
   - Done when: The exploit test passes and fails as required.
+  - Handoffs: H-51 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-26. C08 Software or Data Integrity Failures (unsigned payment webhook)**
   - Epic: `epic-challenges-c05-c08`
@@ -253,6 +271,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Covers: FR-CHL-09
   - Waits on: T-11.
   - Done when: The exploit test passes and fails as required.
+  - Handoffs: H-52 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
   - Epic: `epic-challenges-c09-c11`
@@ -261,6 +280,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Covers: FR-CHL-10
   - Waits on: T-10, Tanmay's negative-observation rule (L-21).
   - Done when: The proof of "attack happened, zero events recorded" comes from the shop's own events and the exploit test passes and fails as required.
+  - Handoffs: H-53 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-28. C10 Server-Side Request Forgery (seller image import)**
   - Epic: `epic-challenges-c09-c11`
@@ -269,6 +289,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Covers: FR-CHL-11
   - Waits on: T-11, T-17.
   - Done when: The fetcher cannot reach the host gateway or `host.docker.internal` and the exploit test passes and fails as required.
+  - Handoffs: H-28, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-29. C11 Mishandling of Exceptional Conditions (KYC check fails open)**
   - Epic: `epic-challenges-c09-c11`
@@ -277,6 +298,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Covers: FR-CHL-12
   - Waits on: T-11, T-17.
   - Done when: The flag shows only when the store was approved by the fail-open path and the exploit test passes and fails as required.
+  - Handoffs: H-55 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
   - Epic: `epic-catalogue-hints-and-verification`
@@ -286,6 +308,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Covers: FR-CHL-01, 14, 15, 17
   - Waits on: T-19 to T-29. Open in part: OI-14.
   - Done when: Every challenge page shows its tags and tier and a brief that never contains a flag.
+  - Handoffs: H-42, H-43 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **T-31. Cross-challenge tests and exploit tests as a CI release gate**
   - Epic: `epic-catalogue-hints-and-verification`
