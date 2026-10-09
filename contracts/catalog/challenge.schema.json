@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/catalog/challenge.schema.json",
+  "title": "Challenge catalogue entry (IF-7, v0.1)",
+  "description": "One VulnMart challenge in the catalogue. Data lives in challenges/catalog/cNN.yaml. Consumed by the platform (dashboards, API) and the lab (scoring, injector). v0.1 stubs carry tags, tier, placeholder milestones and hint slots; full briefs, write-ups and decoy locations are added in T-30. Rules a schema cannot express (tier must match difficulty, key must match the filename, exactly 11 entries, no real flag value) are checked by scripts/validate-catalog.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "key",
+    "title",
+    "status",
+    "owasp",
+    "cwe",
+    "attack",
+    "difficulty",
+    "tier",
+    "flag",
+    "start_state",
+    "milestones",
+    "hints",
+    "exploit_test",
+    "fixed_build"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Catalogue contract version this entry follows, 0.x until v1.0.0.",
+      "const": "0.1"
+    },
+    "key": {
+      "description": "Stable challenge key c01..c11. Must match the filename.",
+      "type": "string",
+      "pattern": "^c(0[1-9]|1[01])$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "description": "stub = tags/tier/placeholders only (sprint zero); complete = full content (T-30 onward).",
+      "enum": ["stub", "complete"]
+    },
+    "owasp": {
+      "description": "OWASP Top 10 edition tags. 2021 may be null (C11 has no 2021 category).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["2021", "2025"],
+      "properties": {
+        "2021": { "type": ["string", "null"], "pattern": "^A(0[1-9]|10)$" },
+        "2025": { "type": "string", "pattern": "^A(0[1-9]|10)$" }
+      }
+    },
+    "cwe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "related"],
+      "properties": {
+        "primary": { "type": "string", "pattern": "^CWE-[0-9]+$" },
+        "related": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^CWE-[0-9]+$" }
+        }
+      }
+    },
+    "attack": {
+      "description": "MITRE ATT&CK technique or sub-technique ids. At least one per challenge.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$" }
+    },
+    "difficulty": {
+      "description": "Designer difficulty 1 (easiest) to 5 (hardest), D-26.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "tier": {
+      "description": "Scoring tier derived from difficulty (D-32: 1-2 Easy, 3 Medium, 4-5 Hard). The validator enforces the mapping.",
+      "enum": ["Easy", "Medium", "Hard"]
+    },
+    "flag": {
+      "description": "Where and how the per-instance flag is placed. Provisional in a stub; confirmed in the challenge's own story.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["placement", "delivery"],
+      "properties": {
+        "placement": {
+          "description": "Placement kind (instance contract section 5 / 8.2).",
+          "enum": [
+            "database-seed",
+            "catalogue-store",
+            "sentinel-table",
+            "file-import-service",
+            "file-mock-services"
+          ]
+        },
+        "delivery": {
+          "description": "How the player ultimately reads the flag. 'env' requires a written reason (FR-FLG-03).",
+          "enum": ["db", "catalogue", "sentinel", "file", "env"]
+        },
+        "reason": {
+          "description": "Why this delivery was chosen. Required when delivery is 'env' (FR-FLG-03); the validator enforces that.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "start_state": {
+      "description": "Seeded starting point for the player (for example a seeded login). Placeholder in a stub.",
+      "type": ["string", "null"]
+    },
+    "milestones": {
+      "description": "M1 (found the weakness, 20%), M2 (working exploit evidence, 40%), M3 (flag captured, 100%). 'signal' is the concrete event/rule, null while a stub.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["m1", "m2", "m3"],
+      "properties": {
+        "m1": { "$ref": "#/$defs/milestone" },
+        "m2": { "$ref": "#/$defs/milestone" },
+        "m3": { "$ref": "#/$defs/milestone" }
+      }
+    },
+    "hints": {
+      "description": "Exactly three hint levels in order 1, 2, 3. 'text' is null while a stub (filled in T-30).",
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        { "$ref": "#/$defs/hint", "type": "object", "properties": { "level": { "const": 1 } } },
+        { "$ref": "#/$defs/hint", "type": "object", "properties": { "level": { "const": 2 } } },
+        { "$ref": "#/$defs/hint", "type": "object", "properties": { "level": { "const": 3 } } }
+      ],
+      "items": false
+    },
+    "exploit_test": {
+      "description": "Path to the challenge's exploit test (pass on vulnerable, fail on fixed).",
+      "type": "string",
+      "pattern": "^challenges/tests/c(0[1-9]|1[01])$"
+    },
+    "fixed_build": {
+      "description": "Path to the challenge's fixed-build reference.",
+      "type": "string",
+      "pattern": "^challenges/fixed/c(0[1-9]|1[01])$"
+    }
+  },
+  "$defs": {
+    "milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "signal"],
+      "properties": {
+        "summary": { "type": ["string", "null"] },
+        "signal": { "type": ["string", "null"] }
+      }
+    },
+    "hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "text"],
+      "properties": {
+        "level": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "text": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "Tier is derived from difficulty (D-32: 1-2 Easy, 3 Medium, 4-5 Hard).",
+      "if": { "properties": { "difficulty": { "type": "integer", "maximum": 2 } }, "required": ["difficulty"] },
+      "then": { "properties": { "tier": { "const": "Easy" } } }
+    },
+    {
+      "if": { "properties": { "difficulty": { "type": "integer", "const": 3 } }, "required": ["difficulty"] },
+      "then": { "properties": { "tier": { "const": "Medium" } } }
+    },
+    {
+      "if": { "properties": { "difficulty": { "type": "integer", "minimum": 4 } }, "required": ["difficulty"] },
+      "then": { "properties": { "tier": { "const": "Hard" } } }
+    }
+  ]
+}

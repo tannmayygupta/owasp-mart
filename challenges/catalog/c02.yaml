@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c02
+title: "Cryptographic Failures"
+status: stub
+owasp:
+  "2021": "A02"
+  "2025": "A04"
+cwe:
+  primary: "CWE-328"
+  related: ["CWE-799", "CWE-330", "CWE-338"]
+attack: ["T1657"]
+difficulty: 3
+tier: Medium
+flag:
+  placement: database-seed
+  delivery: db
+start_state: "a customer who has bought a few gift cards (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player tried a well-formed gift-card code that is not their own"
+    signal: null
+  m2:
+    summary: "the player redeemed a card they did not buy"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c02
+fixed_build: challenges/fixed/c02

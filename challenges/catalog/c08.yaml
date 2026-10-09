@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c08
+title: "Software or Data Integrity Failures"
+status: stub
+owasp:
+  "2021": "A08"
+  "2025": "A08"
+cwe:
+  primary: "CWE-345"
+  related: []
+attack: ["T1190", "T1565.001"]
+difficulty: 3
+tier: Medium
+flag:
+  placement: sentinel-table
+  delivery: sentinel
+start_state: "a customer with an unpaid order (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player posted their own payment event to the webhook"
+    signal: null
+  m2:
+    summary: "an unsigned event was accepted and the order turned paid"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c08
+fixed_build: challenges/fixed/c08

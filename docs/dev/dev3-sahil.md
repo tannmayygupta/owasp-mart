@@ -41,7 +41,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: L-01 (repository skeleton).
   - Done when: `docker run` of the shop image answers its health endpoints and Docker, Node 24, uv and `node scripts/verify-skills.mjs` succeed on your PC.
 
-- [ ] **T-02. Challenge catalogue schema and 11 stub entries (IF-7)**
+- [x] **T-02. Challenge catalogue schema and 11 stub entries (IF-7)**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-target-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. P-04 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.

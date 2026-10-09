@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c03
+title: "Injection"
+status: stub
+owasp:
+  "2021": "A03"
+  "2025": "A05"
+cwe:
+  primary: "CWE-89"
+  related: ["CWE-79"]
+attack: ["T1190", "T1059.007"]
+difficulty: 3
+tier: Medium
+flag:
+  placement: catalogue-store
+  delivery: catalogue
+start_state: "a customer able to search products and open support tickets (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player found a weakness in product search or stored ticket markup"
+    signal: null
+  m2:
+    summary: "the player exploited the SQL injection or ran stored XSS in the support bot"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c03
+fixed_build: challenges/fixed/c03

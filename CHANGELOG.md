@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-02 challenge catalogue IF-7, 2026-10-09, Sahil)
+- Challenge catalogue contract IF-7: `contracts/catalog/challenge.schema.json` (JSON Schema 2020-12) and 11 stub entries `challenges/catalog/c01..c11.yaml` with OWASP 2021/2025 tags, CWE and ATT&CK ids, difficulty and tier (derived per D-32), placeholder milestones and three hint slots, and provisional flag placement/delivery. Validator `scripts/validate-catalog.mjs` (`pnpm run catalog:check`) and tests enforce the schema plus semantic rules (tier↔difficulty, key↔filename, key-matched test/fixed paths, env-delivery reason, exactly 11 entries, no real flag). `js-yaml` 4.1.0 added as a pinned dev dependency. Covers TB-1. EARLY PR; P-04 (Akshay) consumes it.
+
 ### Added (instance contract v0, L-02, 2026-10-08, Tanmay)
 - Instance contract v0 (IF-6) in `contracts/instance/`: contract text, three JSON Schemas (injection document, flags file, instance template), 5 valid and 129 invalid examples, `contracts/CHANGELOG.md`. Checked by `scripts/validate-contracts.mjs` (`pnpm run contracts:check`) with tests. Ajv 8.20.0 and ajv-formats 3.0.1 added as pinned dev dependencies; CI `scripts` job now installs dependencies first. End-to-end tests in `scripts/e2e/contracts.e2e.test.mjs`. Awaiting Sahil's approval as consumer.
 

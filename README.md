@@ -31,6 +31,7 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 | `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (empty until later stories) |
 | `node scripts/dev.mjs down` | Stops and removes the project's containers |
 | `pnpm run contracts:check` | Validates the instance contract (IF-6): schemas, examples, semantic rules (needs `pnpm install` once) |
+| `pnpm run catalog:check` | Validates the challenge catalogue (IF-7): the 11 stubs against the schema and the semantic rules (needs `pnpm install` once) |
 | `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed; needs `pnpm install` once) |
 | `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests: real Docker engine and contract copies (about 1 minute; the contract tests also install dependencies in a temporary copy) |
 

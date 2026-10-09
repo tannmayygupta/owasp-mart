@@ -8,10 +8,12 @@
     "test": "node --test \"scripts/*.test.mjs\"",
     "test:e2e": "node --test \"scripts/e2e/*.test.mjs\"",
     "dev": "node scripts/dev.mjs",
-    "contracts:check": "node scripts/validate-contracts.mjs"
+    "contracts:check": "node scripts/validate-contracts.mjs",
+    "catalog:check": "node scripts/validate-catalog.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0",
-    "ajv-formats": "3.0.1"
+    "ajv-formats": "3.0.1",
+    "js-yaml": "4.1.0"
   }
 }

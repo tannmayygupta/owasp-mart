@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c10
+title: "Server-Side Request Forgery"
+status: stub
+owasp:
+  "2021": "A10"
+  "2025": "A01"
+cwe:
+  primary: "CWE-918"
+  related: []
+attack: ["T1190", "T1552.005"]
+difficulty: 4
+tier: Hard
+flag:
+  placement: file-mock-services
+  delivery: file
+start_state: "a seller able to import a product image by URL (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player pointed the image importer at an internal-looking address"
+    signal: null
+  m2:
+    summary: "the importer reached the internal metadata service"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c10
+fixed_build: challenges/fixed/c10
