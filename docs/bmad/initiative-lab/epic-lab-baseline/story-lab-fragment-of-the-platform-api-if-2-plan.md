@@ -64,12 +64,12 @@ context: []
 **Execution:**
 - [x] `contracts/api/lab/lab.openapi.yaml` -- OpenAPI 3.1 for: instances (request, get, open ticket, reset, stop), attempts (get, start pending OI-22, submit), flag submit, score, challenges, hints (list, unlock), evidence, integrity flags with review decisions, per-candidate report, timeline; shared schemas and enums with sources; cookie and CSRF security scheme -- the contract
 - [x] `contracts/api/lab/lab-api.md` -- prose: scope and ownership table, enums, auth and cross-cutting rules, error placeholders, forbidden fields, what is not here (P-owned routes), open-points table with proposals -- readable contract
-- [ ] `contracts/api/lab/examples/{valid,invalid}/` with `manifest.json` files -- one valid answer per operation and error, many invalid ones with expected JSON Pointer -- proof and mock data
-- [ ] `scripts/check_lab_contract.py` and `package.json` (`contracts:check`) -- validate the file, examples, operation set, secret-name and fake-flag rules; run with the other checks -- guard
+- [x] `contracts/api/lab/examples/{valid,invalid}/` with `manifest.json` files -- one valid answer per operation and error, many invalid ones with expected JSON Pointer -- proof and mock data
+- [x] `scripts/check_lab_contract.py` and `package.json` (`contracts:check`) -- validate the file, examples, operation set, secret-name and fake-flag rules; run with the other checks -- guard
 - [x] `contracts/mocks/fake-lab/server.mjs` -- Node mock: every operation, cookie, CSRF and Origin checks, ownership 404, flag results by input, rate limit 429, state rules -- UI can be built now
 - [x] `apps/api/tests/test_lab_contract.py` -- every mock answer validates against the OpenAPI response schemas; the matrix rows; checker negative tests (secret name added, operation removed) -- conformance
 - [x] `scripts/e2e/lab.e2e.test.mjs` -- independent Node consumer drives the mock process over HTTP -- black-box check
-- [ ] `contracts/CHANGELOG.md`, `docs/dev/HANDOFFS.md` (answer H-78; rows for Akshay: layout and bundling, enums and codes, P-owned routes, OI-22, cross-cutting proposals; row for L-08 if needed), `initial.md` D-39 and `docs/adr/0019-lab-api-conventions.md` (route prefix, Node mock instead of Prism, scope; research sources) -- records
+- [x] `contracts/CHANGELOG.md`, `docs/dev/HANDOFFS.md` (answer H-78; rows for Akshay: layout and bundling, enums and codes, P-owned routes, OI-22, cross-cutting proposals; row for L-08 if needed), `initial.md` D-39 and `docs/adr/0019-lab-api-conventions.md` (route prefix, Node mock instead of Prism, scope; research sources) -- records
 - [x] Documentation rule -- dev-log, CHANGELOG, traceability LB-9 and decisions, evidence in `docs/assets/l-05-lab-api/`; tick L-05 only after the developer confirms
 
 **Acceptance Criteria:**
