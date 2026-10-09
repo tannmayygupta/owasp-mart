@@ -1,0 +1,167 @@
+{
+  "create-bad-instance-id.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/instance_id",
+    "rule": "instance id is i- plus 16 Base32"
+  },
+  "create-missing-template.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/template_id",
+    "rule": "template_id is required"
+  },
+  "create-template-bad-format.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/template_id",
+    "rule": "template name shape"
+  },
+  "create-epoch-zero.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "epoch starts at 1"
+  },
+  "create-image-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/image",
+    "rule": "no image (NFR-SEC-04)"
+  },
+  "create-command-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/command",
+    "rule": "no command (NFR-SEC-04)"
+  },
+  "create-volume-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/volumes",
+    "rule": "no volume (NFR-SEC-04)"
+  },
+  "create-port-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/ports",
+    "rule": "no port (NFR-SEC-04)"
+  },
+  "create-network-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/network",
+    "rule": "no network (NFR-SEC-04)"
+  },
+  "create-env-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/env",
+    "rule": "no environment value (NFR-SEC-04)"
+  },
+  "create-flag-bad-format.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/flags/0/flag",
+    "rule": "flag format"
+  },
+  "create-empty-flags.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/flags",
+    "rule": "at least one flag"
+  },
+  "create-digest-bad.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/flag_digests/0/sha256",
+    "rule": "digest is 64 hex characters"
+  },
+  "create-event-key-short.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/event_key",
+    "rule": "event key shape"
+  },
+  "create-missing-seed.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/seed",
+    "rule": "seed is required"
+  },
+  "create-bad-hostname.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/hostname",
+    "rule": "DNS name"
+  },
+  "create-memory-too-low.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/limits/memory_mb",
+    "rule": "memory limit lower bound"
+  },
+  "create-missing-limit.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/limits/max_minutes",
+    "rule": "all five limits are required"
+  },
+  "reset-missing-epoch.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "reset-epoch-one.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/epoch",
+    "rule": "a reset epoch is at least 2"
+  },
+  "reset-template-field.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/template_id",
+    "rule": "reset cannot change the template"
+  },
+  "access-bad-value.json": {
+    "schema": "AccessRequest",
+    "path": "/access",
+    "rule": "open, frozen or closed"
+  },
+  "access-negative-epoch.json": {
+    "schema": "AccessRequest",
+    "path": "/access_epoch",
+    "rule": "access epoch is not negative"
+  },
+  "status-with-flags.json": {
+    "schema": "InstanceStatus",
+    "path": "/flags",
+    "rule": "a GET answer never holds a flag"
+  },
+  "status-with-digest.json": {
+    "schema": "InstanceStatus",
+    "path": "/flag_digests",
+    "rule": "a GET answer never holds a digest"
+  },
+  "status-with-event-key.json": {
+    "schema": "InstanceStatus",
+    "path": "/event_key",
+    "rule": "a GET answer never holds an event key"
+  },
+  "status-with-seed.json": {
+    "schema": "InstanceStatus",
+    "path": "/seed",
+    "rule": "a GET answer never holds a seed"
+  },
+  "status-bad-state.json": {
+    "schema": "InstanceStatus",
+    "path": "/state",
+    "rule": "state is in the state machine"
+  },
+  "host-bad-health.json": {
+    "schema": "HostStatus",
+    "path": "/health",
+    "rule": "ok, degraded or down"
+  },
+  "state-report-bad-state.json": {
+    "schema": "StateReport",
+    "path": "/to_state",
+    "rule": "state is in the state machine"
+  },
+  "state-report-missing-reason.json": {
+    "schema": "StateReport",
+    "path": "/reason",
+    "rule": "reason is required"
+  },
+  "problem-bad-code.json": {
+    "schema": "Problem",
+    "path": "/code",
+    "rule": "code family and shape"
+  },
+  "problem-stack-trace.json": {
+    "schema": "Problem",
+    "path": "/stack",
+    "rule": "never a stack trace (NFR-SEC-03)"
+  }
+}

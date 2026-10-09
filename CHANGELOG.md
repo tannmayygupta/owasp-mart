@@ -5,6 +5,10 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (orchestrator API v0, L-04, 2026-10-09, Tanmay)
+- Orchestrator API contract v0 (IF-5) in `contracts/orchestrator/`: OpenAPI 3.1 file for the seven calls and the signed state report, contract text with state machine, signing, idempotence, errors and 30 open points (proposals for Akshay), 15 valid and 33 invalid examples, a signing vector. Checked by `scripts/check_orchestrator_contract.py`, now the second half of `pnpm run contracts:check`.
+- Python package `vulnmart-api` (`apps/api`, only the ports): `InstanceHost` protocol, `FakeInstanceHost`, `HttpInstanceHost` (standard library only). Fake orchestrator service in `contracts/mocks/fake-orchestrator/server.mjs` (Node, no dependencies). 204 Python tests; the protocol suite runs against the fake host and against the client plus the fake service. After review: the fake host mirrors the service validation, the client refuses unsafe setups and treats any odd answer as `OrchestratorUnavailable`, the fake service hardens body, query and method handling (405), the contract check no longer fails with a traceback.
+- Pinned Python dev dependencies (pytest 9.1.1, openapi-spec-validator 0.9.0, jsonschema 4.26.0, pyyaml 6.0.3, uv_build 0.12.23); `apps/api` added to the uv workspace; CI `scripts` job now also runs the Python tests and `contracts:check`.
 ### Added (instance contract v0, L-02, 2026-10-08, Tanmay)
 - Instance contract v0 (IF-6) in `contracts/instance/`: contract text, three JSON Schemas (injection document, flags file, instance template), 5 valid and 129 invalid examples, `contracts/CHANGELOG.md`. Checked by `scripts/validate-contracts.mjs` (`pnpm run contracts:check`) with tests. Ajv 8.20.0 and ajv-formats 3.0.1 added as pinned dev dependencies; CI `scripts` job now installs dependencies first. End-to-end tests in `scripts/e2e/contracts.e2e.test.mjs`. Merged in pull request #2 (CI green); Sahil's "to confirm" rows are still open. Decisions D-36 (placement volumes, injector without network) and D-37 (pull request review optional during initial development).
 

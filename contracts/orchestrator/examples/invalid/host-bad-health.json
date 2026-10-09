@@ -1,0 +1,8 @@
+{
+  "host_id": "fake-host-1",
+  "kind": "fake",
+  "capacity_memory_mb": 8192,
+  "used_memory_mb": 1024,
+  "instances": 1,
+  "health": "great"
+}

@@ -1,0 +1,15 @@
+{
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "template_id": "shop-v0",
+  "epoch": 1,
+  "state": "ready",
+  "access": "closed",
+  "access_epoch": 0,
+  "health": "unknown",
+  "error_code": null,
+  "host_id": "fake-host-1",
+  "hostname": "fake-0001.instances.example.invalid",
+  "created_at": "2026-10-09T12:00:00Z",
+  "updated_at": "2026-10-09T12:00:00Z",
+  "seed": "FAKE-SEED-NOT-REAL-0000000000000000"
+}

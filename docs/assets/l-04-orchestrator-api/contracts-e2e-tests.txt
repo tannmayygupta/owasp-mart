@@ -1,0 +1,17 @@
+(node:13644) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ fresh checkout parity: install with a frozen lockfile, then the CI scripts job command passes (64242.0427ms)
+✔ pnpm run contracts:check passes in the real repository and prints the counts (1500.4059ms)
+✔ breaking a rule exits 1: removing epoch from the injection schema (461.0337ms)
+✔ breaking a rule exits 1: the injector and the shop use different /run/vm volumes (411.7423ms)
+✔ breaking a rule exits 1: a real-looking flag in an example (535.8824ms)
+✔ usage: --help exits 0, an unknown argument exits 2, a missing folder fails with exit 1 (602.3386ms)
+✔ the contract document has sections 1 to 11 in order and an open-points table (1.3925ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68566.7253

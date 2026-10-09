@@ -1,0 +1,24 @@
+{
+  "epoch": 2,
+  "flags": [
+    {
+      "challenge_key": "C01",
+      "flag": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"
+    }
+  ],
+  "decoys": [
+    {
+      "challenge_key": "C01",
+      "index": 0,
+      "value": "VM{BBBBBBBBBBBBBBBBBBBBBBBB}"
+    }
+  ],
+  "flag_digests": [
+    {
+      "challenge_key": "C01",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "event_key": "FAKE-EVENT-KEY-NOT-REAL-000000000000",
+  "seed": "FAKE-SEED-NOT-REAL-0000000000000000"
+}

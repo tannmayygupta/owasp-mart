@@ -1,0 +1,17 @@
+{
+  "create.request.json": "CreateInstanceRequest",
+  "create.response.json": "InstanceStatus",
+  "get.response.json": "InstanceStatus",
+  "get.response.failed.json": "InstanceStatus",
+  "reset.request.json": "ResetInstanceRequest",
+  "reset.response.json": "InstanceStatus",
+  "access.request.json": "AccessRequest",
+  "access.response.json": "InstanceStatus",
+  "destroy.response.json": "InstanceStatus",
+  "list.response.json": "InstancePage",
+  "host.response.json": "HostStatus",
+  "state-report.json": "StateReport",
+  "error.template-unknown.json": "Problem",
+  "error.field-forbidden.json": "Problem",
+  "error.bad-signature.json": "Problem"
+}

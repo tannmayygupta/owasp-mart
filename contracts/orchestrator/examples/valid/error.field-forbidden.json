@@ -1,0 +1,6 @@
+{
+  "code": "ORCH-FIELD-FORBIDDEN",
+  "message": "the orchestrator accepts no image",
+  "request_id": "req-0000000002",
+  "field": "image"
+}

@@ -30,7 +30,8 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 | `node scripts/dev.mjs hello` | Starts a hardened hello container, checks it, removes it |
 | `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (empty until later stories) |
 | `node scripts/dev.mjs down` | Stops and removes the project's containers |
-| `pnpm run contracts:check` | Validates the instance contract (IF-6): schemas, examples, semantic rules (needs `pnpm install` once) |
+| `pnpm run contracts:check` | Validates the instance contract (IF-6: schemas, examples, semantic rules) and then the orchestrator contract (IF-5: OpenAPI file, examples, signing vector); needs `pnpm install` once and uv |
+| `uv run --package vulnmart-api pytest` | Runs the Python tests: the orchestrator API (IF-5) protocol suite against `FakeInstanceHost` and against the HTTP client plus the fake orchestrator `contracts/mocks/fake-orchestrator/server.mjs` (needs Node and uv) |
 | `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed; needs `pnpm install` once) |
 | `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests: real Docker engine and contract copies (about 1 minute; the contract tests also install dependencies in a temporary copy) |
 

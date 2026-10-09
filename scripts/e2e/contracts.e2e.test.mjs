@@ -53,10 +53,16 @@ test('fresh checkout parity: install with a frozen lockfile, then the CI scripts
   assert.equal(tests.status, 0, tests.stdout.slice(-3000) + tests.stderr.slice(-1000));
   const ran = Number((tests.stdout.match(/^(?:#|ℹ) tests (\d+)/m) || [])[1]);
   assert.ok(ran >= 30, `the CI scripts job command must run the real unit tests, ran ${ran}`);
+  // the CI scripts job also runs the Python tests (needs uv and a lockfile that matches)
+  const py = run('uv', ['run', '--locked', '--package', 'vulnmart-api', 'pytest', '-q'], { cwd: copy });
+  assert.equal(py.status, 0, py.stdout.slice(-3000) + py.stderr.slice(-1000));
+  assert.match(py.stdout, /\d+ passed/);
   const check = run('pnpm', ['run', 'contracts:check'], { cwd: copy });
   assert.equal(check.status, 0, check.stdout + check.stderr);
   assert.match(check.stdout, /checked 3 schemas, \d+ valid and \d+ invalid examples/);
   assert.match(check.stdout, /contracts: PASS/);
+  assert.match(check.stdout, /orchestrator contract: checked 8 operations, \d+ valid and \d+ invalid examples/);
+  assert.match(check.stdout, /orchestrator contract: PASS/);
 });
 
 test('pnpm run contracts:check passes in the real repository and prints the counts', () => {
@@ -64,6 +70,7 @@ test('pnpm run contracts:check passes in the real repository and prints the coun
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /checked 3 schemas, \d+ valid and \d+ invalid examples/);
   assert.match(r.stdout, /contracts: PASS/);
+  assert.match(r.stdout, /orchestrator contract: PASS/);
 });
 
 test('breaking a rule exits 1: removing epoch from the injection schema', () => {

@@ -1,0 +1,543 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
+info:
+  title: Orchestrator API (IF-5), contract v0.1.0 (proposal)
+  version: 0.1.0
+  description: |
+    The calls between the platform worker (stream P, VM-P) and the lab orchestrator (stream L, VM-I).
+    Seven calls go from the platform to the orchestrator; one signed state report goes back.
+    Status: DRAFT, a proposal for Akshay to confirm in the team chat (D-37). Every value that the
+    architecture does not fix is listed in the "Open points (to confirm)" table of
+    orchestrator-api.md. Error codes named ORCH-* and INST-* are placeholders until the error
+    registry (IF-8, story P-02) is merged.
+
+    Rules that hold for every call (the text is in orchestrator-api.md):
+    * Transport is mutual TLS on the private link. mTLS is not modelled in this file.
+    * Every request, also GET, carries the three signing headers below. The signature covers the
+      method, the request target, the timestamp, the nonce and the SHA-256 of the body.
+    * The orchestrator accepts instance ids, allow-listed template names, flags, digests and
+      limits. It never accepts an image, a command, a volume, a port, a network or an
+      environment value (NFR-SEC-04). A body that names one is refused with 422
+      ORCH-FIELD-FORBIDDEN and nothing is created.
+    * No answer to a GET contains a flag, a decoy, a digest, a seed or an event key.
+    * Only the orchestrator writes the instance state (FR-INS-07). The platform reads it.
+    * All examples use obviously fake values.
+  license:
+    name: Proprietary, project internal
+    identifier: LicenseRef-VulnMart-Internal
+servers:
+  - url: https://orchestrator.internal.invalid
+    description: Orchestrator on VM-I (private address, mTLS). The host name is a placeholder.
+tags:
+  - name: instances
+  - name: host
+  - name: state-report
+paths:
+  /v1/instances:
+    post:
+      tags: [instances]
+      operationId: createInstance
+      summary: Create an instance (idempotent on instance_id and epoch)
+      description: |
+        Asks the orchestrator to build an instance from an allow-listed template. Answers 202 when
+        the request is new (state `requested`, then advancing). Answers 200 with the current state
+        when the identical body is sent again. Answers 409 ORCH-REQUEST-MISMATCH when the same
+        instance_id and epoch arrive with a different body, and 409 ORCH-INSTANCE-EXISTS when the
+        instance exists with another epoch (use reset). Answers 429 ORCH-BUSY when the host has no
+        capacity; nothing is created.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstanceRequest'
+      responses:
+        '202':
+          description: Accepted. The instance is `requested` and advances on its own.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '200':
+          description: The identical request was already accepted. Current state returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/Busy' }
+    get:
+      tags: [instances]
+      operationId: listInstances
+      summary: List instances by label (reconciler and Admin view)
+      description: |
+        Cursor-paged, ordered by instance_id. The filters are the labels of the instance contract:
+        instance, epoch, component, template, kind. A query parameter that is not one of them is
+        refused with 422 ORCH-LABEL-UNKNOWN.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+        - { name: instance, in: query, required: false, schema: { $ref: '#/components/schemas/InstanceId' } }
+        - { name: epoch, in: query, required: false, schema: { type: integer, minimum: 1 } }
+        - { name: component, in: query, required: false, schema: { $ref: '#/components/schemas/ComponentName' } }
+        - { name: template, in: query, required: false, schema: { $ref: '#/components/schemas/TemplateId' } }
+        - { name: kind, in: query, required: false, schema: { enum: [inst, front] } }
+        - { name: cursor, in: query, required: false, schema: { $ref: '#/components/schemas/Cursor' } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200':
+          description: One page of matching instances (destroyed ones included while the orchestrator keeps them).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstancePage' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/instances/{instance_id}:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    get:
+      tags: [instances]
+      operationId: getInstance
+      summary: Current state, health and error code of one instance
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '200':
+          description: The instance. Never holds a flag, decoy, digest, seed or event key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/instances/{instance_id}/reset:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    post:
+      tags: [instances]
+      operationId: resetInstance
+      summary: Destroy and recreate with a new epoch and new flag material
+      description: |
+        Allowed only in state ready, active or idle (409 ORCH-INVALID-STATE otherwise). The new
+        epoch must be the current epoch plus one (409 ORCH-STALE-EPOCH otherwise). State becomes
+        `resetting`, then `provisioning`. The identical request sent again answers 200.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetInstanceRequest' }
+      responses:
+        '202':
+          description: Accepted. The instance is `resetting`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '200':
+          description: The identical reset was already accepted. Current state returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/instances/{instance_id}/access:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    post:
+      tags: [instances]
+      operationId: setAccess
+      summary: Set the access flag (open, frozen, closed) with an access epoch
+      description: |
+        The access epoch only grows. A request with an older epoch is refused with 409
+        ORCH-STALE-ACCESS-EPOCH. The same epoch with the same value is a repeat and answers 200.
+        The same epoch with another value is also 409 ORCH-STALE-ACCESS-EPOCH. Refused with 409
+        ORCH-INVALID-STATE on a destroyed instance.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccessRequest' }
+      responses:
+        '200':
+          description: Applied (or an identical repeat). Current state returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/instances/{instance_id}/destroy:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    post:
+      tags: [instances]
+      operationId: destroyInstance
+      summary: Remove everything of the instance
+      description: |
+        State becomes `stopping`, then `destroyed`. A repeat, on a destroyed or stopping instance,
+        answers 200. An id the orchestrator has never seen answers 404. The body is empty.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '202':
+          description: Accepted. The instance is `stopping`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '200':
+          description: Already stopping or destroyed. Current state returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/host:
+    get:
+      tags: [host]
+      operationId: getHost
+      summary: Capacity and health of the host
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '200':
+          description: Capacity and health.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HostStatus' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+  /internal/v1/orch/state:
+    post:
+      tags: [state-report]
+      operationId: reportState
+      summary: State transition report (orchestrator to platform API), signed
+      description: |
+        Sent by the orchestrator on every state change. Signed like every other call, with the
+        orchestrator's own key (a different key from the one the platform uses). The platform
+        treats a report as a claim and checks it against the state machine. Idempotent: the same
+        report sent again is accepted again.
+      servers:
+        - url: https://api.internal.invalid
+          description: Platform API on VM-P (private address, mTLS). The host name is a placeholder.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StateReport' }
+      responses:
+        '204':
+          description: Accepted.
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '422': { $ref: '#/components/responses/Invalid' }
+components:
+  parameters:
+    Timestamp:
+      name: X-VM-Timestamp
+      in: header
+      required: true
+      description: Time the request was signed, UTC, RFC 3339 with a trailing Z and whole seconds. Accepted within 60 seconds of the receiver's clock (proposal).
+      schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$' }
+      example: '2026-10-09T12:00:00Z'
+    Nonce:
+      name: X-VM-Nonce
+      in: header
+      required: true
+      description: 128 random bits as 32 lowercase hex characters. Remembered for 5 minutes; a second use is refused (proposal).
+      schema: { type: string, pattern: '^[0-9a-f]{32}$' }
+      example: '00112233445566778899aabbccddeeff'
+    Signature:
+      name: X-VM-Signature
+      in: header
+      required: true
+      description: '`v1=` plus the lowercase hex HMAC-SHA256 of the signing string (see orchestrator-api.md, section 4).'
+      schema: { type: string, pattern: '^v1=[0-9a-f]{64}$' }
+    InstanceIdPath:
+      name: instance_id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/InstanceId' }
+  responses:
+    BadSignature:
+      description: Wrong signature, stale timestamp, malformed header or replayed nonce. ORCH-BAD-SIGNATURE. Nothing changed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: ORCH-INSTANCE-NOT-FOUND.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: ORCH-REQUEST-MISMATCH, ORCH-INSTANCE-EXISTS, ORCH-INVALID-STATE, ORCH-STALE-EPOCH or ORCH-STALE-ACCESS-EPOCH. Nothing changed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooLarge:
+      description: Body larger than 64 KiB. ORCH-BODY-TOO-LARGE.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Invalid:
+      description: |
+        ORCH-FIELD-FORBIDDEN (the body names an image, command, volume, port, network or
+        environment value; `field` names it), ORCH-TEMPLATE-UNKNOWN, ORCH-LABEL-UNKNOWN or
+        ORCH-VALIDATION (any other malformed value; `field` is a JSON Pointer). Nothing created.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Busy:
+      description: The host has no capacity. ORCH-BUSY. Nothing created.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    InstanceId:
+      description: 'Proposal from the instance contract: i- plus 16 Base32 characters.'
+      type: string
+      pattern: '^i-[A-Z2-7]{16}$'
+    TemplateId:
+      description: Name of an allow-listed template (the instance contract template_id). The allow-list itself is the orchestrator's; the first name is shop-v0.
+      type: string
+      pattern: '^[a-z][a-z0-9-]{2,31}$'
+    ComponentName:
+      type: string
+      pattern: '^[a-z][a-z0-9-]{1,31}$'
+    ChallengeKey:
+      type: string
+      pattern: '^C(0[1-9]|10|11)$'
+    Flag:
+      description: VM{ plus 24 Base32 characters } (architecture 04 section 11.1). A secret.
+      type: string
+      pattern: '^VM\{[A-Z2-7]{24}\}$'
+    Cursor:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{1,128}$'
+    State:
+      description: The instance state machine of the PRD (FR-INS-07). Only the orchestrator writes it.
+      enum: [requested, provisioning, starting, ready, active, idle, resetting, stopping, destroyed, failed]
+    Access:
+      enum: [open, frozen, closed]
+    Health:
+      enum: [unknown, healthy, unhealthy]
+    ErrorCode:
+      description: |
+        Placeholder code until the error registry (IF-8) is merged. Codes in use: ORCH-BAD-SIGNATURE,
+        ORCH-INSTANCE-NOT-FOUND, ORCH-METHOD-NOT-ALLOWED, ORCH-REQUEST-MISMATCH, ORCH-INSTANCE-EXISTS,
+        ORCH-INVALID-STATE, ORCH-STALE-EPOCH, ORCH-STALE-ACCESS-EPOCH, ORCH-BODY-TOO-LARGE,
+        ORCH-FIELD-FORBIDDEN, ORCH-TEMPLATE-UNKNOWN, ORCH-LABEL-UNKNOWN, ORCH-VALIDATION, ORCH-BUSY,
+        ORCH-RATE-LIMITED and INST-* codes for failed instances.
+      type: string
+      pattern: '^(ORCH|INST)-[A-Z0-9]+(-[A-Z0-9]+)*$'
+    Limits:
+      description: Per-instance limits (proposal). The template declares per-component limits; these bound the instance as a whole.
+      type: object
+      additionalProperties: false
+      required: [memory_mb, cpu_limit, pids_limit, idle_minutes, max_minutes]
+      properties:
+        memory_mb: { type: integer, minimum: 64, maximum: 8192 }
+        cpu_limit: { type: number, exclusiveMinimum: 0, maximum: 8 }
+        pids_limit: { type: integer, minimum: 16, maximum: 4096 }
+        idle_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        max_minutes: { type: integer, minimum: 1, maximum: 1440 }
+    FlagEntry:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, flag]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        flag: { $ref: '#/components/schemas/Flag' }
+    DecoyEntry:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, index, value]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        index: { type: integer, minimum: 0 }
+        value: { $ref: '#/components/schemas/Flag' }
+    DigestEntry:
+      description: SHA-256 of a flag, for the sidecar. A secret in the sense that it must never be answered by a GET.
+      type: object
+      additionalProperties: false
+      required: [challenge_key, sha256]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+    FlagMaterial:
+      description: The secrets of one epoch. Used by create and reset.
+      type: object
+      required: [flags, decoys, flag_digests, event_key, seed]
+      properties:
+        flags:
+          type: array
+          minItems: 1
+          maxItems: 11
+          items: { $ref: '#/components/schemas/FlagEntry' }
+        decoys:
+          type: array
+          maxItems: 64
+          items: { $ref: '#/components/schemas/DecoyEntry' }
+        flag_digests:
+          type: array
+          minItems: 1
+          maxItems: 11
+          items: { $ref: '#/components/schemas/DigestEntry' }
+        event_key:
+          description: Per-instance key the sidecar signs events with. A secret. Proposal on the shape (URL-safe characters, 32 to 128).
+          type: string
+          pattern: '^[A-Za-z0-9_-]{32,128}$'
+        seed:
+          description: Per-instance seed for seeded data (the instance contract injection document needs it, the architecture list of create fields omits it; see open points).
+          type: string
+          pattern: '^[A-Za-z0-9_-]{32,128}$'
+    CreateInstanceRequest:
+      description: |
+        Exactly these fields and no others. A property named image, command, volume, port,
+        network or env (or anything else not listed) is refused: forbidden names with
+        ORCH-FIELD-FORBIDDEN, others with ORCH-VALIDATION. The schema is closed
+        (additionalProperties false) on purpose.
+      type: object
+      additionalProperties: false
+      required: [instance_id, template_id, epoch, flags, decoys, flag_digests, event_key, seed, hostname, limits]
+      properties:
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        template_id: { $ref: '#/components/schemas/TemplateId' }
+        epoch: { type: integer, minimum: 1 }
+        flags: { $ref: '#/components/schemas/FlagMaterial/properties/flags' }
+        decoys: { $ref: '#/components/schemas/FlagMaterial/properties/decoys' }
+        flag_digests: { $ref: '#/components/schemas/FlagMaterial/properties/flag_digests' }
+        event_key: { $ref: '#/components/schemas/FlagMaterial/properties/event_key' }
+        seed: { $ref: '#/components/schemas/FlagMaterial/properties/seed' }
+        hostname: { $ref: '#/components/schemas/Hostname' }
+        limits: { $ref: '#/components/schemas/Limits' }
+    ResetInstanceRequest:
+      description: The new epoch (current plus one) and its new secrets. The template and limits stay as they were.
+      type: object
+      additionalProperties: false
+      required: [epoch, flags, decoys, flag_digests, event_key, seed]
+      properties:
+        epoch: { type: integer, minimum: 2 }
+        flags: { $ref: '#/components/schemas/FlagMaterial/properties/flags' }
+        decoys: { $ref: '#/components/schemas/FlagMaterial/properties/decoys' }
+        flag_digests: { $ref: '#/components/schemas/FlagMaterial/properties/flag_digests' }
+        event_key: { $ref: '#/components/schemas/FlagMaterial/properties/event_key' }
+        seed: { $ref: '#/components/schemas/FlagMaterial/properties/seed' }
+    AccessRequest:
+      type: object
+      additionalProperties: false
+      required: [access, access_epoch]
+      properties:
+        access: { $ref: '#/components/schemas/Access' }
+        access_epoch: { type: integer, minimum: 0 }
+    Hostname:
+      description: DNS name the instance answers on (the edge routes by it).
+      type: string
+      maxLength: 253
+      pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$'
+    InstanceStatus:
+      description: What a GET may say. Closed on purpose, so no flag, decoy, digest, seed or event key can appear.
+      type: object
+      additionalProperties: false
+      required: [instance_id, template_id, epoch, state, access, access_epoch, health, error_code, host_id, hostname, created_at, updated_at]
+      properties:
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        template_id: { $ref: '#/components/schemas/TemplateId' }
+        epoch: { type: integer, minimum: 1 }
+        state: { $ref: '#/components/schemas/State' }
+        access: { $ref: '#/components/schemas/Access' }
+        access_epoch: { type: integer, minimum: 0 }
+        health: { $ref: '#/components/schemas/Health' }
+        error_code:
+          description: Set while the state is failed, otherwise null.
+          anyOf:
+            - { $ref: '#/components/schemas/ErrorCode' }
+            - { type: 'null' }
+        host_id: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,31}$' }
+        hostname: { $ref: '#/components/schemas/Hostname' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    InstancePage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/InstanceStatus' }
+        next_cursor:
+          description: Null on the last page.
+          anyOf:
+            - { $ref: '#/components/schemas/Cursor' }
+            - { type: 'null' }
+    HostStatus:
+      type: object
+      additionalProperties: false
+      required: [host_id, kind, capacity_memory_mb, used_memory_mb, instances, health]
+      properties:
+        host_id: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,31}$' }
+        kind: { enum: [vm, laptop, fake] }
+        capacity_memory_mb: { type: integer, minimum: 0 }
+        used_memory_mb: { type: integer, minimum: 0 }
+        instances: { type: integer, minimum: 0, description: Instances that hold capacity (every state except destroyed). }
+        health: { enum: [ok, degraded, down] }
+    StateReport:
+      type: object
+      additionalProperties: false
+      required: [instance_id, epoch, from_state, to_state, at, reason, error_code, health]
+      properties:
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        epoch: { type: integer, minimum: 1 }
+        from_state:
+          description: Null only for the first report of an instance.
+          anyOf:
+            - { $ref: '#/components/schemas/State' }
+            - { type: 'null' }
+        to_state: { $ref: '#/components/schemas/State' }
+        at: { type: string, format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+        error_code:
+          anyOf:
+            - { $ref: '#/components/schemas/ErrorCode' }
+            - { type: 'null' }
+        health: { $ref: '#/components/schemas/Health' }
+    Problem:
+      description: Problem-details style error body (architecture 07 section 3.6). Never a stack trace.
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string, maxLength: 500 }
+        request_id: { type: string, pattern: '^[A-Za-z0-9-]{8,64}$' }
+        field:
+          description: The offending field (for ORCH-FIELD-FORBIDDEN its name, for ORCH-VALIDATION a JSON Pointer).
+          type: string
+          maxLength: 200

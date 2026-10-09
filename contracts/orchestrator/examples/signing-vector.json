@@ -1,0 +1,12 @@
+{
+  "description": "A fixed request and its signature, for both sides to check their implementation (orchestrator-api.md section 4). The key is fake.",
+  "key": "FAKE-SIGNING-KEY-NOT-REAL",
+  "method": "POST",
+  "target": "/v1/instances/i-AAAAAAAAAAAAAAAA/access",
+  "timestamp": "2026-10-09T12:00:00Z",
+  "nonce": "00112233445566778899aabbccddeeff",
+  "body": "{\"access\":\"open\",\"access_epoch\":1}",
+  "body_sha256": "eb8ce8802943020b1bb28dbaf2cd962e657bdeacc8396a33d878ea3d4cb5ff57",
+  "signing_string": "v1\nPOST\n/v1/instances/i-AAAAAAAAAAAAAAAA/access\n2026-10-09T12:00:00Z\n00112233445566778899aabbccddeeff\neb8ce8802943020b1bb28dbaf2cd962e657bdeacc8396a33d878ea3d4cb5ff57",
+  "signature": "v1=5d0f4c0b79acd73d79ba3d045dbbaf2fa9604e77210e1e1fbd9eca1404a8cdda"
+}

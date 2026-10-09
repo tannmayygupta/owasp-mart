@@ -8,7 +8,7 @@
     "test": "node --test \"scripts/*.test.mjs\"",
     "test:e2e": "node --test \"scripts/e2e/*.test.mjs\"",
     "dev": "node scripts/dev.mjs",
-    "contracts:check": "node scripts/validate-contracts.mjs"
+    "contracts:check": "node scripts/validate-contracts.mjs && uv run --locked --package vulnmart-api python scripts/check_orchestrator_contract.py"
   },
   "devDependencies": {
     "ajv": "8.20.0",

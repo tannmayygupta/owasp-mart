@@ -1,0 +1,48 @@
+✔ parseArgs: help forms (1.4647ms)
+✔ parseArgs: simple commands and extra args (0.2982ms)
+✔ parseArgs: up needs valid profiles, dedupes (0.8096ms)
+✔ parseArgs: unknown command (0.1972ms)
+✔ hello: Docker down gives exit 1, message, and no compose up (0.4673ms)
+✔ hello: busy port gives exit 1 naming the port, no compose up (0.3732ms)
+✔ hello: success removes stale first, prints hello, always tears down (0.4447ms)
+✔ hello: bad HTTP answer exits 1 and still tears down (0.2694ms)
+✔ up: Docker down exits 1 (0.2557ms)
+✔ up: profile with no services exits 1 with a clear message (0.3ms)
+✔ up: requested profiles are all passed, starts with up -d --wait, logs Started (0.3766ms)
+✔ up: config failure exits 1 (0.1739ms)
+✔ down: Docker down exits 1 (0.1791ms)
+✔ down: passes every profile and --remove-orphans, returns 0 (0.2687ms)
+✔ compose.yaml: hello hardening and limits are present (0.7093ms)
+✔ doctor: all pass gives 0, a missing tool gives 1 (0.7979ms)
+✔ doctor: a different Node major fails and names the pin (0.2487ms)
+✔ doctor: a different pnpm version fails and names the pin (0.2284ms)
+✔ portFree: false when something listens (23.5771ms)
+✔ the real contract validates: exit 0, every schema and example counted (157.004ms)
+✔ coverage: every rule family has invalid examples and every schema has a valid one (1.0863ms)
+✔ CLI: exit 0 on the real contract and lists the examples (389.0997ms)
+✔ CLI: --help exits 0, unknown argument exits 2, importing does not run main (394.0445ms)
+✔ CLI: exits non-zero on a broken copy and prints the failing path (467.039ms)
+✔ removing epoch from the injection schema makes the run fail (196.0335ms)
+✔ a template without the shop role fails (as the valid example) (203.6822ms)
+✔ injector and shop not sharing one /run/vm volume fails (as the valid example) (181.5577ms)
+✔ a non-memory-backed volume fails (as the valid example) (193.4756ms)
+✔ an invalid example that passes is reported (217.3585ms)
+✔ an invalid example failing at the wrong path is reported with both paths (166.9252ms)
+✔ orphan example, example without manifest entry, manifest entry without file (352.5852ms)
+✔ malformed JSON is reported, not thrown (210.8984ms)
+✔ a schema that does not compile names the cause (215.8934ms)
+✔ a missing schema file and a missing contract text are reported (150.7332ms)
+✔ contract text must keep its 11 sections and the open-points table (170.4134ms)
+✔ a real-looking flag or a private key in an example or in the text is rejected (180.4255ms)
+✔ a byte-order mark is rejected (183.3138ms)
+✔ no file of the contract or its tooling starts with a byte-order mark (19.2641ms)
+✔ OS metadata files and .gitkeep in examples are not orphans; a secret in a schema is found (276.3112ms)
+✔ errorPath builds JSON Pointers for required, additional and property-name errors (0.2924ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4701.0783

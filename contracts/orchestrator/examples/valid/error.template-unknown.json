@@ -1,0 +1,6 @@
+{
+  "code": "ORCH-TEMPLATE-UNKNOWN",
+  "message": "template_id is not on the allow-list",
+  "request_id": "req-0000000001",
+  "field": "/template_id"
+}
