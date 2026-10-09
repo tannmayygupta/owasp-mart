@@ -32,7 +32,7 @@ OPERATIONS = {
     ("post", "/v1/instances/{instance_id}/reset"), ("post", "/v1/instances/{instance_id}/access"),
     ("post", "/v1/instances/{instance_id}/destroy"), ("get", "/v1/host"), ("post", "/internal/v1/orch/state"),
 }
-SECRET_NAMES = {"flags", "flag", "decoys", "decoy", "flag_digests", "sha256", "seed", "event_key", "value"}
+SECRET_NAMES = {"flags", "flag", "decoys", "decoy", "flag_digests", "sha256", "seed", "event_key", "value", "owner_hash", "first_seq"}
 FREE_FORM = "<free-form object>"
 FAKE_FLAG = re.compile(r"^VM\{([A-Z2-7])\1{23}\}$")
 FLAG_LIKE = re.compile(r"VM\{[A-Z2-7]{24}\}")

@@ -147,6 +147,43 @@ test('no GET answer contains a flag, decoy, digest, seed or event key', async ()
   }
 });
 
+test('owner_hash and first_seq: required and checked on create, first_seq on reset, no owner_hash in a reset, nothing returned by a GET', async () => {
+  for (const [mutate, field] of [
+    [(b) => { delete b.owner_hash; }, '/owner_hash'], [(b) => { b.owner_hash = 'F'.repeat(64); }, '/owner_hash'],
+    [(b) => { b.owner_hash = 'a'.repeat(63); }, '/owner_hash'], [(b) => { delete b.first_seq; }, '/first_seq'],
+    [(b) => { b.first_seq = 0; }, '/first_seq'], [(b) => { b.first_seq = '1'; }, '/first_seq'],
+  ]) {
+    const id = newId();
+    const body = { ...clone(createExample), instance_id: id };
+    mutate(body);
+    const r = await call(base, 'POST', '/v1/instances', body);
+    assertProblem(r, 422, 'ORCH-VALIDATION');
+    assert.equal(r.json.field, field);
+    assertProblem(await call(base, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+  }
+  const id = newId();
+  const body = { ...clone(createExample), instance_id: id, first_seq: 777001 };
+  assert.equal((await call(base, 'POST', '/v1/instances', body)).status, 202);
+  await waitFor(base, id, (s) => s.state === 'ready');
+  // owner_hash and first_seq are part of the identity of a request
+  assertProblem(await call(base, 'POST', '/v1/instances', { ...clone(body), first_seq: 777002 }), 409, 'ORCH-REQUEST-MISMATCH');
+  assertProblem(await call(base, 'POST', '/v1/instances', { ...clone(body), owner_hash: 'b'.repeat(64) }), 409, 'ORCH-REQUEST-MISMATCH');
+  const noSeq = clone(resetExample);
+  delete noSeq.first_seq;
+  const r1 = await call(base, 'POST', `/v1/instances/${id}/reset`, noSeq);
+  assertProblem(r1, 422, 'ORCH-VALIDATION');
+  assert.equal(r1.json.field, '/first_seq');
+  const r2 = await call(base, 'POST', `/v1/instances/${id}/reset`, { ...clone(resetExample), owner_hash: body.owner_hash });
+  assertProblem(r2, 422, 'ORCH-VALIDATION');
+  assert.equal(r2.json.field, '/owner_hash');
+  assert.equal((await call(base, 'POST', `/v1/instances/${id}/reset`, { ...clone(resetExample), first_seq: 888002 })).status, 202);
+  await waitFor(base, id, (s) => s.state === 'ready' && s.epoch === 2);
+  for (const a of [await call(base, 'GET', `/v1/instances/${id}`), await call(base, 'GET', '/v1/instances'), await call(base, 'GET', '/v1/host')]) {
+    assert.equal(a.status, 200);
+    for (const marker of [body.owner_hash, '777001', '888002', 'owner', 'first_seq']) assert.ok(!a.text.includes(marker), `a GET answer holds ${marker}`);
+  }
+});
+
 test('a body that names an image, command, volume, port or env is refused with 422 and nothing is created; an unknown template is 422', async () => {
   for (const [name, value] of [['image', 'evil:latest'], ['command', 'sh'], ['volumes', ['/:/host']], ['ports', [22]], ['env', { A: 'b' }]]) {
     const id = newId();

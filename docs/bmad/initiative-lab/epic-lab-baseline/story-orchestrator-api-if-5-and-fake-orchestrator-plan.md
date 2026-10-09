@@ -87,6 +87,8 @@ context:
 
 ## Plan Change Log
 
+- Follow-up (2026-10-09, after the review fixes; requested by Tanmay): three gaps found while writing the handoff register (H-20, H-59, H-50). Amended: IF-5 create body gets a required `owner_hash` (64 lowercase hex, the opaque `vm.owner` label value, computed by the platform) and create and reset bodies get a required `first_seq` (the number the new sidecar starts counting from, so a reset never repeats a `seq` of an earlier epoch); IF-4 and IF-6 text state who uses them and that the import service never posts (the shop posts `import` events for it). KEEP everything else as built.
+
 ## Review Triage Log
 
 Pass 1 (thorough: blind-hunter BH, edge-case-hunter EH, verification-gap VG, intent-alignment IA). The BH and VG lenses read only part of the diff. No bad_plan or intent_gap.

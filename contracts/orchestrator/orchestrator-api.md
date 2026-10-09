@@ -26,7 +26,15 @@ Python side: the `InstanceHost` protocol in `apps/api/src/vulnmart/ports/instanc
 
 ## 2. What the orchestrator accepts (NFR-SEC-04)
 
-A create or reset body holds only: instance id, allow-listed template name, epoch, flags, decoys, flag digests, event key, seed, host name and limits. It never holds an image, a command, an entrypoint, a volume, a mount, a port, a network or an environment value. The OpenAPI schemas are closed (`additionalProperties: false`). A body that names one of those is refused with **422 `ORCH-FIELD-FORBIDDEN`** and the `field` of the error names it; any other unknown or malformed field is **422 `ORCH-VALIDATION`**. Only top-level names are matched against the forbidden list; a forbidden name nested inside an object (for example inside `limits`) is just an unknown field and is reported as `ORCH-VALIDATION` (open point 28). Nothing is created in either case. A template name that is well-formed but not on the allow-list is **422 `ORCH-TEMPLATE-UNKNOWN`**. The allow-list maps names to image digests in the signed release manifest; that map is the orchestrator's, never part of a request.
+A create or reset body holds only: instance id, allow-listed template name, epoch, flags, decoys, flag digests, event key, seed, owner hash (create only), first sequence number (`first_seq`), host name (create only) and limits (create only). It never holds an image, a command, an entrypoint, a volume, a mount, a port, a network or an environment value. The OpenAPI schemas are closed (`additionalProperties: false`). A body that names one of those is refused with **422 `ORCH-FIELD-FORBIDDEN`** and the `field` of the error names it; any other unknown or malformed field is **422 `ORCH-VALIDATION`**. Only top-level names are matched against the forbidden list; a forbidden name nested inside an object (for example inside `limits`) is just an unknown field and is reported as `ORCH-VALIDATION` (open point 28). Nothing is created in either case. A template name that is well-formed but not on the allow-list is **422 `ORCH-TEMPLATE-UNKNOWN`**. The allow-list maps names to image digests in the signed release manifest; that map is the orchestrator's, never part of a request.
+
+**`owner_hash` (create, required).** The opaque value of the `vm.owner` label of the instance contract (section 4): 64 lowercase hex characters, never an email or a user id (FR-INS-05). The platform computes it, so the orchestrator never sees a user id; the proposal is HMAC-SHA256 of the user id with a platform label key, written as hex (key handling per ADR 0009, open point 32). The orchestrator stores it and applies it as the `vm.owner` label of every container and network of the instance. A reset keeps the owner of the instance: the reset body has no `owner_hash`, and one that names it is 422 `ORCH-VALIDATION`. No GET answer returns it.
+
+**`first_seq` (create and reset, required).** An integer of at least 1: the sequence number the new sidecar starts counting from (event contract IF-4, sequence rules). The platform sets it to the highest stored `seq` of that instance plus one, and 1 for a first create, so a reset never repeats a `seq` of an earlier epoch. The orchestrator passes it to the sidecar at start, with the event key and the flag digests, on standard input (the exact shape of that input is defined with stories L-06 and L-13, open point 31). No GET answer returns it.
+
+**Event key across a reset (proposal, open point 33).** The event key is derived per instance from the master key and the instance id (architecture 06, ADR 0009), so a reset sends the same `event_key` unless the platform has raised the key version. The reset body always carries an `event_key` (the same value or the new one); the orchestrator does not decide.
+
+Both fields are part of the request fingerprint (section 5): a repeat with another `owner_hash` or `first_seq` is a different request.
 
 No `GET` answer contains a flag, a decoy, a digest, a seed or an event key. The `InstanceStatus` schema is closed so that none of them can appear, and the contract check walks every GET answer schema to prove it.
 
@@ -94,7 +102,7 @@ Two keys, one per direction: the platform signs calls to the orchestrator with t
 
 | Call | Repeat of an accepted request | A different request with the same identity |
 |---|---|---|
-| create | 200, current state. Identity is `(instance_id, epoch)`; "identical" means the same canonical JSON body (SHA-256 of the body with keys sorted) | same id and epoch, other body: 409 `ORCH-REQUEST-MISMATCH`. Same id, other epoch above the current one: 409 `ORCH-INSTANCE-EXISTS` (use reset); epoch below the current one: 409 `ORCH-STALE-EPOCH`; an id that was destroyed: 409 `ORCH-INSTANCE-EXISTS`, even with an identical body |
+| create | 200, current state. Identity is `(instance_id, epoch)`; "identical" means the same canonical JSON body (SHA-256 of the body with keys sorted; `owner_hash` and `first_seq` are part of it, so a repeat with another value of either is a different request) | same id and epoch, other body: 409 `ORCH-REQUEST-MISMATCH`. Same id, other epoch above the current one: 409 `ORCH-INSTANCE-EXISTS` (use reset); epoch below the current one: 409 `ORCH-STALE-EPOCH`; an id that was destroyed: 409 `ORCH-INSTANCE-EXISTS`, even with an identical body |
 | reset | 200, current state (identity is the new epoch plus the same body) | same new epoch, other body: 409 `ORCH-REQUEST-MISMATCH`; epoch not current plus one: 409 `ORCH-STALE-EPOCH` |
 | access | 200 when the access epoch equals the stored one and the value is the same | older access epoch, or the same epoch with another value: 409 `ORCH-STALE-ACCESS-EPOCH` |
 | destroy | 200 | none |
@@ -124,7 +132,7 @@ Body: `application/problem+json` with `code`, `message`, `request_id` and an opt
 | 429 | `ORCH-RATE-LIMITED` | request rate over the limit (section 7) |
 | any | `INST-*` | an instance failure appears in `error_code` of a `failed` instance, for example `INST-HEALTH-TIMEOUT` (placeholder) |
 
-Order of checks: body size (a body over the limit is not read further or hashed, the answer is 413 and the connection is dropped), signature, body shape, template allow-list, existence and state, capacity. So apart from an oversize body, a bad signature is always 401, whatever else is wrong. A query parameter given twice, or a `limit` that is not a plain whole number from 1 to 500, is 422 `ORCH-VALIDATION`.
+Order of checks: body size (a body over the limit is not read further or hashed, the answer is 413 and the connection is dropped; a client that sends a body over 64 KiB may see the connection reset before it reads the 413, and must treat that as a refusal or as unavailable, not as success), signature, body shape, template allow-list, existence and state, capacity. So apart from an oversize body, a bad signature is always 401, whatever else is wrong. A query parameter given twice, or a `limit` that is not a plain whole number from 1 to 500, is 422 `ORCH-VALIDATION`.
 
 ## 7. Limits (proposals)
 
@@ -160,7 +168,7 @@ Each row is a proposal made while writing the contract. None is decided; Akshay 
 | 8 | `limits` is `{memory_mb, cpu_limit, pids_limit, idle_minutes, max_minutes}` with the ranges in section 7 | Architecture names `limits` without fields |
 | 9 | Create also carries `seed` | The injection document of IF-6 needs a seed; the architecture list of create fields omits it |
 | 10 | `event_key` is 32 to 128 URL-safe characters; a flag digest is 64 lowercase hex characters | Shapes not fixed (ADR 0009) |
-| 11 | Reset body carries the new epoch (current plus one) and the new secrets; template and limits stay | Architecture says "destroy and recreate with a new epoch" only |
+| 11 | Reset body carries the new epoch (current plus one), `first_seq` and the new secrets; template, limits and owner stay (no `owner_hash` in a reset) | Architecture says "destroy and recreate with a new epoch" only |
 | 12 | A new instance starts with access `closed` and access epoch 0; the platform opens it | ADR 0004 gate; start value not fixed |
 | 13 | An access request with the same epoch and another value is refused as stale | Equal-epoch rule not fixed |
 | 14 | Destroy of an unknown id answers 404; destroyed instances stay visible as tombstones (retention not set) | Matrix says "known or already destroyed" |
@@ -180,3 +188,6 @@ Each row is a proposal made while writing the contract. None is decided; Akshay 
 | 28 | A forbidden name nested inside an object (for example `limits.env`) is reported as 422 `ORCH-VALIDATION`; only top-level names get `ORCH-FIELD-FORBIDDEN` | Depth of the forbidden-name check is not fixed |
 | 29 | A known path with a wrong method answers 405 `ORCH-METHOD-NOT-ALLOWED` with an `Allow` header | Not fixed |
 | 30 | `Retry-After` (seconds) accompanies 429 `ORCH-BUSY` and `ORCH-RATE-LIMITED`; the client exposes it as `retry_after` | Not fixed |
+| 31 | Create and reset carry `first_seq` (integer of at least 1, required); the platform sends the highest stored `seq` of the instance plus one, 1 for a first create; the orchestrator passes it to the sidecar on standard input at start with the event key and the flag digests. The exact shape of that sidecar input is open | Handoff H-59. Shape to be defined with L-06 and L-13 |
+| 32 | Create carries `owner_hash` (64 lowercase hex characters, required), the opaque `vm.owner` label value; the platform computes it, proposal HMAC-SHA256 of the user id with a platform label key, hex; the orchestrator stores it, applies it as the label and never returns it; a reset keeps the owner | Handoff H-20. Key handling per ADR 0009, to confirm with Akshay |
+| 33 | The event key is derived per instance from the master key and the instance id, so a reset sends the same `event_key` unless the platform raised the key version | Handoff H-59. Architecture 06 and ADR 0009 do not say whether the key changes with the epoch |

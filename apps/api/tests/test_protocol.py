@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from support import create_request, material, new_id, reset_request
+from support import create_request, material, new_id, owner_hash, reset_request
 from vulnmart.ports.instance_host import (
     Access, Busy, Health, HostHealth, InstanceExists, InstanceHost, InstanceNotFound, InstanceState, InvalidState,
     LabelUnknown, RequestMismatch, StaleAccessEpoch, StaleEpoch, TemplateUnknown, ValidationFailed,
@@ -109,6 +109,54 @@ def test_malformed_create_values_are_validation_errors(harness, what):
     assert err.value.code == "ORCH-VALIDATION" and err.value.field
     with pytest.raises(InstanceNotFound):
         harness.host.get(req.instance_id)
+
+
+@pytest.mark.parametrize("bad", ["abc", "A" * 64, "g" * 64, "someone@example.invalid", "0" * 63, "0" * 65, ""])
+def test_a_bad_owner_hash_is_a_validation_error(harness, bad):
+    req = dataclasses.replace(create_request(), owner_hash=bad)
+    with pytest.raises(ValidationFailed) as err:
+        harness.host.create(req)
+    assert err.value.field == "/owner_hash"
+    with pytest.raises(InstanceNotFound):
+        harness.host.get(req.instance_id)
+
+
+@pytest.mark.parametrize("bad", [0, -1, "1", True, 1.5, None])
+def test_a_bad_first_seq_is_a_validation_error_on_create_and_reset(harness, bad):
+    req = dataclasses.replace(create_request(), first_seq=bad)
+    with pytest.raises(ValidationFailed) as err:
+        harness.host.create(req)
+    assert err.value.field == "/first_seq"
+    ok = create_request()
+    harness.host.create(ok)
+    harness.settle(ok.instance_id, S.READY)
+    with pytest.raises(ValidationFailed) as err:
+        harness.host.reset(ok.instance_id, dataclasses.replace(reset_request(2), first_seq=bad))
+    assert err.value.field == "/first_seq"
+    assert harness.host.get(ok.instance_id).epoch == 1  # nothing changed
+
+
+def test_owner_hash_and_first_seq_are_part_of_the_request_identity(harness):
+    req = create_request(owner_tag="O", first_seq=1)
+    harness.host.create(req)
+    with pytest.raises(RequestMismatch):
+        harness.host.create(dataclasses.replace(req, owner_hash=create_request(owner_tag="P").owner_hash))
+    with pytest.raises(RequestMismatch):
+        harness.host.create(dataclasses.replace(req, first_seq=2))
+    assert harness.host.create(req).changed is False  # the identical request is still a repeat
+    harness.settle(req.instance_id, S.READY)
+    harness.host.reset(req.instance_id, reset_request(2, first_seq=41))
+    assert harness.host.reset(req.instance_id, reset_request(2, first_seq=41)).changed is False
+    with pytest.raises(RequestMismatch):
+        harness.host.reset(req.instance_id, reset_request(2, first_seq=42))
+
+
+def test_a_reset_keeps_the_instance_and_needs_no_owner(harness):
+    req = create_request()
+    harness.host.create(req)
+    harness.settle(req.instance_id, S.READY)
+    assert not hasattr(reset_request(2), "owner_hash")
+    assert harness.host.reset(req.instance_id, reset_request(2)).status.epoch == 2
 
 
 def test_create_with_an_older_epoch_is_stale(harness):
@@ -341,3 +389,4 @@ def _secrets(tag: str):
     yield from (d.sha256 for d in m.flag_digests)
     yield m.event_key
     yield m.seed
+    yield owner_hash("O")

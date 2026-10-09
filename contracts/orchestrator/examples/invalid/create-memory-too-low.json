@@ -23,6 +23,8 @@
   ],
   "event_key": "FAKE-EVENT-KEY-NOT-REAL-000000000000",
   "seed": "FAKE-SEED-NOT-REAL-0000000000000000",
+  "owner_hash": "00000000000000000000000000000000000000000000000000000000000fa4e0",
+  "first_seq": 1,
   "hostname": "fake-0001.instances.example.invalid",
   "limits": {
     "memory_mb": 8,

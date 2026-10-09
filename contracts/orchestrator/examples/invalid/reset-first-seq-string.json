@@ -1,5 +1,6 @@
 {
-  "first_seq": 41,
+  "epoch": 2,
+  "first_seq": "41",
   "flags": [
     {
       "challenge_key": "C01",

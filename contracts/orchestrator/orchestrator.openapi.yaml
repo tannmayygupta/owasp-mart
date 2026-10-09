@@ -356,6 +356,22 @@ components:
         ORCH-RATE-LIMITED and INST-* codes for failed instances.
       type: string
       pattern: '^(ORCH|INST)-[A-Z0-9]+(-[A-Z0-9]+)*$'
+    OwnerHash:
+      description: |
+        The opaque value of the vm.owner label (instance contract section 4): 64 lowercase hex characters,
+        never an email or a user id. Computed by the platform (proposal: HMAC-SHA256 of the user id with a
+        platform label key); the orchestrator never sees a user id. The orchestrator stores it and applies
+        it as the label. It is never returned by any GET answer.
+      type: string
+      pattern: '^[0-9a-f]{64}$'
+    FirstSeq:
+      description: |
+        The sequence number the new sidecar starts counting from (event contract, sequence rules). The
+        platform sends the highest stored seq of the instance plus one, and 1 for a first create, so a
+        reset never repeats a seq of an earlier epoch. The orchestrator passes it to the sidecar at start
+        together with the event key and the flag digests, and never returns it.
+      type: integer
+      minimum: 1
     Limits:
       description: Per-instance limits (proposal). The template declares per-component limits; these bound the instance as a whole.
       type: object
@@ -425,11 +441,13 @@ components:
         (additionalProperties false) on purpose.
       type: object
       additionalProperties: false
-      required: [instance_id, template_id, epoch, flags, decoys, flag_digests, event_key, seed, hostname, limits]
+      required: [instance_id, template_id, epoch, flags, decoys, flag_digests, event_key, seed, owner_hash, first_seq, hostname, limits]
       properties:
         instance_id: { $ref: '#/components/schemas/InstanceId' }
         template_id: { $ref: '#/components/schemas/TemplateId' }
         epoch: { type: integer, minimum: 1 }
+        owner_hash: { $ref: '#/components/schemas/OwnerHash' }
+        first_seq: { $ref: '#/components/schemas/FirstSeq' }
         flags: { $ref: '#/components/schemas/FlagMaterial/properties/flags' }
         decoys: { $ref: '#/components/schemas/FlagMaterial/properties/decoys' }
         flag_digests: { $ref: '#/components/schemas/FlagMaterial/properties/flag_digests' }
@@ -438,12 +456,16 @@ components:
         hostname: { $ref: '#/components/schemas/Hostname' }
         limits: { $ref: '#/components/schemas/Limits' }
     ResetInstanceRequest:
-      description: The new epoch (current plus one) and its new secrets. The template and limits stay as they were.
+      description: |
+        The new epoch (current plus one), its new secrets and the first event sequence number of the new
+        sidecar. The template, the limits and the owner stay as they were: there is no owner_hash here, and
+        a body that names one is refused (422 ORCH-VALIDATION).
       type: object
       additionalProperties: false
-      required: [epoch, flags, decoys, flag_digests, event_key, seed]
+      required: [epoch, first_seq, flags, decoys, flag_digests, event_key, seed]
       properties:
         epoch: { type: integer, minimum: 2 }
+        first_seq: { $ref: '#/components/schemas/FirstSeq' }
         flags: { $ref: '#/components/schemas/FlagMaterial/properties/flags' }
         decoys: { $ref: '#/components/schemas/FlagMaterial/properties/decoys' }
         flag_digests: { $ref: '#/components/schemas/FlagMaterial/properties/flag_digests' }

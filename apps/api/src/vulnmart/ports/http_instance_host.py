@@ -35,12 +35,12 @@ from .instance_host import (
 SIGNATURE_VERSION = "v1"
 MAX_RESPONSE_BYTES = 1024 * 1024
 MIN_KEY_LENGTH = 32
-_INSTANCE_ID = re.compile(r"^i-[A-Z2-7]{16}$")
+_INSTANCE_ID = re.compile(r"^i-[A-Z2-7]{16}\Z")
 MAX_SKEW_SECONDS = 60
 NONCE_TTL_SECONDS = 300
-_TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
-_NONCE = re.compile(r"^[0-9a-f]{32}$")
-_SIG = re.compile(r"^v1=[0-9a-f]{64}$")
+_TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
+_NONCE = re.compile(r"^[0-9a-f]{32}\Z")
+_SIG = re.compile(r"^v1=[0-9a-f]{64}\Z")
 
 
 def utc_timestamp(now: datetime | None = None) -> str:

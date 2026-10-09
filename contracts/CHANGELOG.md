@@ -22,7 +22,13 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ### 0.1.1 (2026-10-09, Tanmay, story L-03)
 - Section 6 and open point 22 now point at IF-4 and name the event path `/v1/events` (changed in substance, not only editorial: the path and the event body are now fixed by IF-4). Approval of this change is waived under D-37.
 
+### 0.1.2 (2026-10-09, Tanmay, story L-04 follow-up)
+- Additive, no schema change: section 4 notes that the `vm.owner` label value comes from the required `owner_hash` of the IF-5 create body (handoff H-20); section 6 says the orchestrator gives the sidecar the event key, flag digests and `first_seq` on standard input at start (handoff H-59); open points 23 updated and 35 added (sidecar start input).
+
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
+
+### 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft, nothing was confirmed yet)
+- Create body: new required `owner_hash` (64 lowercase hex, the opaque `vm.owner` label value, computed by the platform, never returned) and required `first_seq` (integer of at least 1). Reset body: new required `first_seq`; no `owner_hash` (the owner stays). Both are part of the request fingerprint; no GET answer returns either. Open points 31 to 33 added (sidecar start input, owner hash computation, event key across a reset). Handoffs H-20 and H-59.
 
 ### 0.1.0 (2026-10-09, Tanmay, story L-04)
 - First draft, a proposal for Akshay to confirm in the team chat (D-37): `orchestrator.openapi.yaml` (OpenAPI 3.1: the seven calls and the signed state report `POST /internal/v1/orch/state`), `orchestrator-api.md` (state machine, signing and replay rules, idempotence, errors, limits, 30 open points).
@@ -34,6 +40,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting optional confirmation by Akshay (consumer).
 
 ## Instance events (IF-4), `contracts/events/`
+
+### 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft)
+- The import service never posts: the shop posts `import.job` (source `import`) on its behalf after it has the job result over the unix socket (section 3 and the catalogue row; the posted schema and the examples do not change; handoff H-50).
+- Sequence rules (section 6, open points 8 and 9): the platform gives the sidecar its first `seq` through the required `first_seq` of the IF-5 create and reset bodies; the event key is the same on a reset unless the key version is raised (proposal; handoff H-59).
 
 ### 0.1.0 (2026-10-08, Tanmay, story L-03)
 - First draft: `app-events.md` (identity `(instance_id, seq)`, wire event, shop-to-sidecar and sidecar-to-ingest transport, signing, ingest answers, size caps, catalogue of 29 event types, table of 28 open points to confirm) and `instance-events.schema.json` (JSON Schema 2020-12, one data rule per type).

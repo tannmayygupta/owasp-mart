@@ -112,12 +112,19 @@ class CreateRequest:
     material: FlagMaterial = dc_field(repr=False)
     hostname: str
     limits: Limits
+    # Opaque vm.owner label value: 64 lowercase hex characters (never an email). Stored by the orchestrator,
+    # applied as the label, never returned. A reset keeps it.
+    owner_hash: str = dc_field(repr=False)
+    # First event sequence number of the new sidecar: highest stored seq of the instance plus one, 1 at first create.
+    first_seq: int
 
     def to_json(self) -> dict:
         return {
             "instance_id": self.instance_id,
             "template_id": self.template_id,
             "epoch": self.epoch,
+            "owner_hash": self.owner_hash,
+            "first_seq": self.first_seq,
             **self.material.to_json(),
             "hostname": self.hostname,
             "limits": {
@@ -132,13 +139,17 @@ class CreateRequest:
 
 @dataclass(frozen=True, slots=True)
 class ResetRequest:
-    """New epoch (current plus one) and its new secrets. Template and limits stay."""
+    """New epoch (current plus one), its new secrets and the first sequence number of the new sidecar.
+
+    Template, limits and owner stay: there is no owner_hash here.
+    """
 
     epoch: int
     material: FlagMaterial = dc_field(repr=False)
+    first_seq: int
 
     def to_json(self) -> dict:
-        return {"epoch": self.epoch, **self.material.to_json()}
+        return {"epoch": self.epoch, "first_seq": self.first_seq, **self.material.to_json()}
 
 
 @dataclass(frozen=True, slots=True)

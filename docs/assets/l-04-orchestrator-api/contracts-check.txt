@@ -1,11 +1,4 @@
-pnpm.exe : $ node scripts/validate-contracts.mjs && uv run --locked --package vulnmart-api python 
-scripts/check_orchestrator_contract.py
-At C:\Users\tanma\AppData\Roaming\npm\pnpm.ps1:14 char:3
-+   & "$basedir/node_modules/pnpm/pnpm.exe"   $args
-+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: ($ node scripts/...tor_contract.py:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
+$ node scripts/validate-contracts.mjs && node scripts/validate-events.mjs && uv run --locked --package vulnmart-api python scripts/check_orchestrator_contract.py
 schema ok: injection-document.schema.json
 schema ok: flags-file.schema.json
 schema ok: instance-template.schema.json
@@ -146,5 +139,110 @@ valid example ok: examples/valid/instance-template/shop-template-flag-delivery-e
 valid example ok: examples/valid/instance-template/shop-template.json
 checked 3 schemas, 5 valid and 129 invalid examples
 contracts: PASS
-orchestrator contract: checked 8 operations, 15 valid and 33 invalid examples
+schema ok: instance-events.schema.json
+schema ok: instance-events.posted.schema.json
+catalogue table: 29 types, schema: 29 types
+invalid example rejected at /data/route: examples/invalid/instance-events/auth-attempt-bad-route.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/bad-challenge-key.json
+invalid example rejected at /instance_id: examples/invalid/instance-events/bad-instance-id.json
+invalid example rejected at /schema_version: examples/invalid/instance-events/bad-schema-version.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/bot-source-with-player-session.json
+invalid example rejected at /source: examples/invalid/instance-events/bot-visit-from-shop.json
+invalid example rejected at /data/anomaly_score: examples/invalid/instance-events/crs-match-score-negative.json
+invalid example rejected at /data: examples/invalid/instance-events/data-not-object.json
+invalid example rejected at /data/body: examples/invalid/instance-events/evidence-body-too-long.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/evidence-missing-challenge-key.json
+invalid example rejected at /data/note: examples/invalid/instance-events/extra-data-field.json
+invalid example rejected at /actor_role: examples/invalid/instance-events/extra-envelope-field-actor-role.json
+invalid example rejected at /event_id: examples/invalid/instance-events/extra-envelope-field-event-id.json
+invalid example rejected at /data/detail_code: examples/invalid/instance-events/fault-bad-detail-code.json
+invalid example rejected at /data/kind: examples/invalid/instance-events/flag-seen-bad-kind.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/flag-seen-challenge-key-mismatch.json
+invalid example rejected at /data/challenge_key: examples/invalid/instance-events/flag-seen-foreign-with-challenge-key.json
+invalid example rejected at /data/candidate: examples/invalid/instance-events/flag-seen-raw-candidate.json
+invalid example rejected at /data/challenge_key: examples/invalid/instance-events/flag-seen-real-without-challenge-key.json
+invalid example rejected at /data/candidate_sha256: examples/invalid/instance-events/flag-seen-uppercase-hash.json
+invalid example rejected at /data/body: examples/invalid/instance-events/flag-value-in-evidence-body.json
+invalid example rejected at /data/headers_redacted/cookie: examples/invalid/instance-events/flag-value-in-header.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-in-route.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-lowercase.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-url-encoded.json
+invalid example rejected at /data/challenge_ids: examples/invalid/instance-events/flags-injected-duplicate-keys.json
+invalid example rejected at /data/challenge_ids: examples/invalid/instance-events/flags-injected-empty.json
+invalid example rejected at /source: examples/invalid/instance-events/flags-injected-from-shop.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/flags-injected-player-session.json
+invalid example rejected at /data/result: examples/invalid/instance-events/giftcard-bad-result.json
+invalid example rejected at /data/url_class: examples/invalid/instance-events/importer-bad-url-class.json
+invalid example rejected at /data/outcome: examples/invalid/instance-events/kyc-bad-outcome.json
+invalid example rejected at /data/status: examples/invalid/instance-events/missing-data-field.json
+invalid example rejected at /data: examples/invalid/instance-events/missing-data.json
+invalid example rejected at /instance_id: examples/invalid/instance-events/missing-instance-id.json
+invalid example rejected at /user_id: examples/invalid/instance-events/missing-user-id.json
+invalid example rejected at /data/amount: examples/invalid/instance-events/refund-negative-amount.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-missing.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-string.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-zero.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/session-kind-internal-from-shop.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/session-kind-internal-from-sidecar.json
+invalid example rejected at /source: examples/invalid/instance-events/source-not-allowed-for-type.json
+invalid example rejected at /data/status: examples/invalid/instance-events/status-out-of-range.json
+invalid example rejected at /ts: examples/invalid/instance-events/ts-not-a-date.json
+invalid example rejected at /ts: examples/invalid/instance-events/ts-not-utc.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/unknown-session-kind.json
+invalid example rejected at /source: examples/invalid/instance-events/unknown-source.json
+invalid example rejected at /type: examples/invalid/instance-events/unknown-type.json
+invalid example rejected at /user_id: examples/invalid/instance-events/user-id-number.json
+invalid example rejected at /data/status: examples/invalid/instance-events/wrong-data-type.json
+invalid example rejected at /data/body: examples/invalid/posted/evidence-body-over-2-kib.json
+invalid example rejected at /data/user_id: examples/invalid/posted/flag-value-in-data.json
+invalid example rejected at /instance_id: examples/invalid/posted/includes-instance-id.json
+invalid example rejected at /seq: examples/invalid/posted/includes-seq.json
+invalid example rejected at /type: examples/invalid/posted/missing-type.json
+invalid example rejected at /source: examples/invalid/posted/shop-posts-bot-visit.json
+invalid example rejected at /source: examples/invalid/posted/shop-posts-proxy-request.json
+invalid example rejected at /source: examples/invalid/posted/source-orchestrator-refused.json
+invalid example rejected at /source: examples/invalid/posted/source-sidecar-refused.json
+invalid example rejected at /type: examples/invalid/posted/unknown-type.json
+envelope example accepted (202): examples/valid/envelopes/evidence-capture.json
+envelope example accepted (202): examples/valid/envelopes/proxy-flag_seen.json
+envelope example accepted (202): examples/valid/envelopes/proxy-request.json
+valid example ok: examples/valid/instance-events/auth.attempt.json
+valid example ok: examples/valid/instance-events/auth.password_reset_completed.json
+valid example ok: examples/valid/instance-events/auth.reset_confirm_batch.json
+valid example ok: examples/valid/instance-events/auth.reset_requested.json
+valid example ok: examples/valid/instance-events/bot.visit.json
+valid example ok: examples/valid/instance-events/collector.hit.json
+valid example ok: examples/valid/instance-events/evidence.capture.json
+valid example ok: examples/valid/instance-events/gateway.ledger_entry.json
+valid example ok: examples/valid/instance-events/import.job.json
+valid example ok: examples/valid/instance-events/importer.fetch_attempt.json
+valid example ok: examples/valid/instance-events/infrastructure_fault.json
+valid example ok: examples/valid/instance-events/instance.flags_injected.json
+valid example ok: examples/valid/instance-events/kyc.result.json
+valid example ok: examples/valid/instance-events/meta.request_served.json
+valid example ok: examples/valid/instance-events/ops.page_served.json
+valid example ok: examples/valid/instance-events/order.paid.json
+valid example ok: examples/valid/instance-events/proxy.crs_match.json
+valid example ok: examples/valid/instance-events/proxy.flag_seen.json
+valid example ok: examples/valid/instance-events/proxy.request.json
+valid example ok: examples/valid/instance-events/shop.catalog_query_error.json
+valid example ok: examples/valid/instance-events/shop.cross_store_order_read.json
+valid example ok: examples/valid/instance-events/shop.giftcard_attempt.json
+valid example ok: examples/valid/instance-events/shop.refund_decision.json
+valid example ok: examples/valid/instance-events/shop.refund_invariant_broken.json
+valid example ok: examples/valid/instance-events/shop.security_event_written.json
+valid example ok: examples/valid/instance-events/shop.ticket_markup_stored.json
+valid example ok: examples/valid/instance-events/shop.verbose_error.json
+valid example ok: examples/valid/instance-events/store.approved.json
+valid example ok: examples/valid/instance-events/webhook.received.json
+valid posted body ok: examples/valid/posted/bot.visit.json
+valid posted body ok: examples/valid/posted/collector.hit.json
+valid posted body ok: examples/valid/posted/evidence.capture.json
+valid posted body ok: examples/valid/posted/import.job.json
+valid posted body ok: examples/valid/posted/shop.cross_store_order_read.json
+valid posted body ok: examples/valid/posted/shop.refund_decision.json
+fake ingest: 34 of 34 matrix checks as expected
+checked 1 schema, 29 event types, 29 valid events, 3 signed envelopes, 6 valid posted bodies and 61 invalid examples
+events: PASS
+orchestrator contract: checked 8 operations, 15 valid and 44 invalid examples
 orchestrator contract: PASS

@@ -69,7 +69,7 @@ A review found problems; fixed in six steps, each followed by the tests of the t
 5. Test helper: the service's stderr goes to a temporary file, and the first stdout line is read with a 15 second timeout (a test proves a silent service fails fast).
 6. Docs and tidy: a garbled word in the contract text (`pps/api/...`, an escape mistake of mine in a PowerShell string that also dropped some backticks) fixed and all new files scanned for control characters; open points 24 to 30 added; one pytest setting (root `pyproject.toml`); `py.typed` added; traceability wording corrected (built and tested, not closed).
 Result after the fixes: 204 of 204 Python tests, 40 of 40 script tests, 7 of 7 contract end-to-end tests; `pnpm run contracts:check` PASS; `uv lock --check`, `pnpm audit` and `uv audit --locked` clean.
-Problem met during the fixes: PowerShell has an alias `R` for `Invoke-History`, so a first batch of helper-based edits did nothing; the edits were redone with the edit tool.
+Problem met during the fixes (also see the follow-up below): PowerShell has an alias `R` for `Invoke-History`, so a first batch of helper-based edits did nothing; the edits were redone with the edit tool.
 
 ## Problems met and how they were fixed
 - The first YAML parse failed: an unquoted description held ": " inside a mapping value. Reworded.
@@ -81,6 +81,15 @@ Problem met during the fixes: PowerShell has an alias `R` for `Invoke-History`, 
 
 ## Security notes
 No intentionally vulnerable part. The contract protects the orchestrator boundary (TB-5): closed request schemas, no image, command, volume, port, network or env accepted (NFR-SEC-04), signed and replay-protected requests, no secret in any GET answer. All keys, flags, digests and seeds in examples and tests are obviously fake. mTLS is not exercised (plain HTTP on localhost in tests).
+
+## Follow-up: gaps closed (2026-10-09, handoffs H-20, H-59, H-50)
+Decisions by Tanmay, written as proposals (open points 31 to 33 of the orchestrator contract; nothing is confirmed by Akshay yet):
+- IF-5 create body: new required `owner_hash` (64 lowercase hex, the opaque `vm.owner` label value, computed by the platform, proposal HMAC-SHA256 of the user id with a platform label key). The orchestrator stores it, applies it as the label and never returns it. A reset keeps the owner, so a reset body with `owner_hash` is refused (422 `ORCH-VALIDATION`, `/owner_hash`).
+- IF-5 create and reset bodies: new required integer `first_seq` (at least 1), the first sequence number of the new sidecar (highest stored seq plus one, 1 at first create). Passed to the sidecar on standard input at start with the event key and the flag digests; the exact shape is left to L-06 and L-13. Part of the request fingerprint, never returned. A reset sends the same event key unless the platform raised the key version (proposal).
+- IF-4: the import service never posts; the shop posts `import.job` on its behalf. IF-6: section 4 and 6 notes, open points 23 and 35.
+Built: OpenAPI schemas `OwnerHash` and `FirstSeq`, 11 new invalid examples (44 in total), Python types and validation in `FakeInstanceHost`, serialisation in the client, validation in `server.mjs`, test builders, new shared protocol cases (bad owner hash, bad `first_seq` on create and reset, both fields in the request identity), service tests (JSON Pointer errors, reset refuses `owner_hash`, no GET answer holds the owner hash or either `first_seq`), and a case in `scripts/e2e/orchestrator.e2e.test.mjs`. The contract check now also treats `owner_hash` and `first_seq` as names a GET answer schema must not carry. `HANDOFFS.md` rows H-20, H-59 and H-50 now carry the proposals (status still `open`).
+Results: `uv run --locked --package vulnmart-api pytest`: 244 passed; `pnpm run contracts:check`: PASS (orchestrator part: 8 operations, 15 valid and 44 invalid examples); `node --test "scripts/*.test.mjs"`: 82 of 82; `node --test` on the orchestrator, events and contracts end-to-end files: 30 of 30. Evidence regenerated in `docs/assets/l-04-orchestrator-api/` (`pytest-verbose.txt`, `contracts-check.txt`, `node-script-tests.txt`, `e2e-tests.txt`).
+Problem met: the first full end-to-end run failed once, in the fresh-checkout copy, because the oversize-body test sometimes saw a connection reset instead of the 413 (the service drops the connection while the client is still sending). The test now retries a few times to see the real answer.
 
 ## Limitations and follow-ups
 - All 30 open points are proposals. Akshay's reading is optional (D-37); tell him in the team chat, also about the new `apps/api` skeleton.

@@ -1,20 +1,21 @@
 # node --test "scripts/e2e/orchestrator.e2e.test.mjs"  (real fake-orchestrator process; own signing code; includes the Python suite)
-✔ the signing rule written here reproduces the signing vector of the contract (95.1799ms)
-✔ create: 202, the instance reaches ready, a repeat is 200, another body with the same identity is 409 (84.1095ms)
-✔ no GET answer contains a flag, decoy, digest, seed or event key (35.9197ms)
-✔ a body that names an image, command, volume, port or env is refused with 422 and nothing is created; an unknown template is 422 (18.9862ms)
-✔ a bad signature, a stale timestamp and a replayed nonce are refused with 401 and change nothing (7.3525ms)
-✔ access: open, frozen and closed with a growing access epoch work; an older access epoch is 409 (29.4645ms)
-✔ reset: a ready instance gets epoch + 1 and goes through resetting and provisioning back to ready; a wrong epoch is 409 (876.7784ms)
-✔ destroy: 202 then 200 on a repeat, and a destroyed id cannot be created again (409) (69.8285ms)
-✔ list: label filters, cursor paging, an unknown label is 422; host answers capacity (121.1358ms)
-✔ a host with little capacity answers 429 ORCH-BUSY with Retry-After and creates nothing (120.7623ms)
-✔ the Python suite (protocol on both hosts, HTTP service, contract) still passes (51483.6159ms)
-ℹ tests 11
+✔ the signing rule written here reproduces the signing vector of the contract (165.0564ms)
+✔ create: 202, the instance reaches ready, a repeat is 200, another body with the same identity is 409 (115.2651ms)
+✔ no GET answer contains a flag, decoy, digest, seed or event key (46.5828ms)
+✔ owner_hash and first_seq: required and checked on create, first_seq on reset, no owner_hash in a reset, nothing returned by a GET (101.3569ms)
+✔ a body that names an image, command, volume, port or env is refused with 422 and nothing is created; an unknown template is 422 (26.8211ms)
+✔ a bad signature, a stale timestamp and a replayed nonce are refused with 401 and change nothing (15.9026ms)
+✔ access: open, frozen and closed with a growing access epoch work; an older access epoch is 409 (46.0521ms)
+✔ reset: a ready instance gets epoch + 1 and goes through resetting and provisioning back to ready; a wrong epoch is 409 (976.0493ms)
+✔ destroy: 202 then 200 on a repeat, and a destroyed id cannot be created again (409) (51.8641ms)
+✔ list: label filters, cursor paging, an unknown label is 422; host answers capacity (224.9682ms)
+✔ a host with little capacity answers 429 ORCH-BUSY with Retry-After and creates nothing (215.617ms)
+✔ the Python suite (protocol on both hosts, HTTP service, contract) still passes (96929.7168ms)
+ℹ tests 12
 ℹ suites 0
-ℹ pass 11
+ℹ pass 12
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 53146.9762
+ℹ duration_ms 99299.2213

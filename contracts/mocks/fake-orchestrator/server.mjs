@@ -5,7 +5,8 @@
 // What it does: the seven calls, the instance state machine, request signing (HMAC, timestamp, nonce),
 // a memory capacity limit, a step delay, and optional signed state reports to the platform.
 // What it never does: answer a flag, decoy, digest, seed or event key. A create or reset body is checked and
-// then reduced to a SHA-256 fingerprint; the secrets are dropped, never stored.
+// then reduced to a SHA-256 fingerprint (owner_hash and first_seq are part of it); the secrets, the owner hash and
+// the first sequence number are dropped, never stored and never returned.
 //
 // Not part of the contract (test aids): the template name shop-fail-v0, which ends in `failed` with the
 // placeholder code INST-HEALTH-TIMEOUT, and POST /_fake/v1/instances/{id}/activity (unsigned, loopback only).
@@ -101,12 +102,14 @@ function checkMaterial(b) {
 }
 
 export function validateCreate(b) {
-  const keys = ['instance_id', 'template_id', 'epoch', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed', 'hostname', 'limits'];
+  const keys = ['instance_id', 'template_id', 'epoch', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed', 'owner_hash', 'first_seq', 'hostname', 'limits'];
   const e = checkKeys(b, keys);
   if (e) return e;
   if (typeof b.instance_id !== 'string' || !RE.instanceId.test(b.instance_id)) return bad('/instance_id', 'bad instance id');
   if (typeof b.template_id !== 'string' || !RE.template.test(b.template_id)) return bad('/template_id', 'bad template name');
   if (!isInt(b.epoch, 1)) return bad('/epoch', 'epoch is an integer of at least 1');
+  if (typeof b.owner_hash !== 'string' || !RE.hex64.test(b.owner_hash)) return bad('/owner_hash', 'owner_hash is 64 lowercase hex characters');
+  if (!isInt(b.first_seq, 1)) return bad('/first_seq', 'first_seq is an integer of at least 1');
   const m = checkMaterial(b);
   if (m) return m;
   if (typeof b.hostname !== 'string' || b.hostname.length > 253 || !RE.hostname.test(b.hostname)) return bad('/hostname', 'bad host name');
@@ -124,9 +127,10 @@ export function validateCreate(b) {
 }
 
 export function validateReset(b) {
-  const e = checkKeys(b, ['epoch', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed']);
+  const e = checkKeys(b, ['epoch', 'first_seq', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed']);
   if (e) return e;
   if (!isInt(b.epoch, 2)) return bad('/epoch', 'epoch is an integer of at least 2');
+  if (!isInt(b.first_seq, 1)) return bad('/first_seq', 'first_seq is an integer of at least 1');
   return checkMaterial(b);
 }
 

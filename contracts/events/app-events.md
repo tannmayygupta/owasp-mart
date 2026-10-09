@@ -55,6 +55,7 @@ The shop, the import service, the mock services and the bot controller do not si
 - **Endpoint:** `POST` to the base URL in `VM_SIDECAR_EVENTS_URL` (instance contract section 2, port 9000) plus the path `/v1/events`.
 - **Only POST, only `application/json`.** Any other method or content type is refused. A GET (for example from a server-side request forgery in the shop) cannot create an event.
 - **Body:** the wire event of section 2 **without** `instance_id` and `seq`, and with `source` set by the poster to `shop`, `import`, `mock` or `bot` (the sidecar refuses `sidecar`, `orchestrator` and `platform` from this path, and refuses a `type` whose allowed sources do not include the posted `source`). The machine-checkable form is [instance-events.posted.schema.json](instance-events.posted.schema.json), **derived** from the wire schema by `node scripts/validate-events.mjs --write-posted`; the check fails when the file is stale. Examples are in `examples/valid/posted/` and `examples/invalid/posted/`.
+- **The import service never posts.** It has no network (instance contract section 8) and so cannot reach the sidecar. The shop posts `import.job` (with `source` set to `import`) on the import service's behalf, after the shop has received the job result over the unix socket. The posted schema and the examples do not change; only the poster does. (Handoff H-50.)
 - **Caps per poster:** every body posted by the shop, import service, mock services or bot is at most 4 KiB. So an `evidence.capture` posted by a collector in mock-services has a `data.body` of at most 2 KiB (the posted schema enforces 2048 characters). The sidecar's own `evidence.capture`, built inside the sidecar and not posted, may carry a body up to 8 KiB; the wire cap is 16 KiB.
 - **What the sidecar does:** adds `instance_id` and the next `seq`, validates against the schema, signs (section 4) and forwards (section 5). It buffers when the ingest is unreachable.
 
@@ -130,7 +131,8 @@ The sidecar keeps an event until it gets `202` or `200`. On `401`, `409`, `413` 
 | A text value in `data` | 200 characters for routes and paths, 512 for header values |
 
 - **No batching on the wire.** One event per request. Volume is controlled at the source: the sidecar aggregates `proxy.request` (optional `count`) and the shop aggregates `auth.reset_confirm_batch` per 10 seconds, so brute force does not produce thousands of events.
-- **Ordering.** `seq` starts at 1 and rises by one per event the sidecar emits for an instance. Events may arrive late or out of order; the ingest does not require order, and the platform sorts by `seq`. A gap means an event was dropped or is still buffered; it is not an error.
+- **Where the counter starts.** The platform gives the sidecar its first `seq` through the orchestrator API (IF-5): the `first_seq` field of create and of reset. It is the highest stored `seq` of that instance plus one, and 1 for a first create, so a reset never repeats a `seq` of an earlier epoch. The orchestrator passes it to the sidecar at start with the event key and the flag digests (the exact shape of that input is open, orchestrator contract open point 31). The event key is derived per instance from the master key and the instance id (ADR 0009), so a reset sends the same event key unless the platform raised the key version (proposal, orchestrator contract open point 33).
+- **Ordering.** `seq` starts at the `first_seq` the sidecar was given (1 for a first create) and rises by one per event the sidecar emits for an instance. Events may arrive late or out of order; the ingest does not require order, and the platform sorts by `seq`. A gap means an event was dropped or is still buffered; it is not an error.
 - **Events that do not pass through the sidecar.** `instance.flags_injected` and `infrastructure_fault` come from the orchestrator or the platform. They share the same schema and the same `(instance_id, seq)` identity; how their `seq` values avoid the sidecar's is open point 9.
 
 ## 7. Event catalogue
@@ -153,7 +155,7 @@ The sidecar keeps an event until it gets `202` or `200`. On `401`, `409`, `413` 
 | `shop.refund_invariant_broken` | shop | any | order_id, paid, refunded_total | Reconcile finds refunds above amount paid | C04 M3 |
 | `shop.verbose_error` | shop | any | route, handler | A verbose error is served | C05 M1 |
 | `ops.page_served` | shop | any | path, client_class | An `/_ops/*` page is served | C05 M2, M3 |
-| `import.job` | import | any | job_id, store_id, flagged_keys, polluted, audit_token_issued | Each preview job ends | C06 |
+| `import.job` | import | any | job_id, store_id, flagged_keys, polluted, audit_token_issued | Each preview job ends; posted by the shop on the import service's behalf (the import service has no network), `source` stays `import` | C06 |
 | `auth.reset_requested` | shop | any | account_id, account_role, account_found | `/auth/forgot` called | C07 M1 |
 | `auth.reset_confirm_batch` | shop | any | account_id, fail_count, ok_count, window_s | Every 10 s while confirms arrive (aggregated) | C07 backup |
 | `auth.password_reset_completed` | shop | any | account_id, account_role | A reset ends with a new password | C07 M2 |
@@ -210,8 +212,8 @@ Every value below was chosen by this draft because the architecture does not fix
 | 5 | `EVT-*` codes | `EVT-BAD-SIGNATURE`, `EVT-TOO-LARGE`, `EVT-SCHEMA`, `EVT-DUPLICATE-MISMATCH` (placeholders; one code for all 401 causes) | Akshay (registry P-02) |
 | 6 | Sidecar answers to the shop | 202, 400, 405, 413, 415, 422 | Tanmay, Sahil |
 | 7 | Shop to sidecar path and cap | `/v1/events`, POST only, `application/json`, 4 KiB | Tanmay, Sahil |
-| 8 | Sequence numbers across a reset | The new sidecar of a reset instance must not repeat a `seq` of an earlier epoch, so the platform should give it a starting `seq` at create (orchestrator API, L-04) | Tanmay |
-| 9 | `seq` for events written by the orchestrator or platform | Not defined; one proposal is a reserved range from 2^40 upward so they never collide with the sidecar's counter | Tanmay, Akshay |
+| 8 | Sequence numbers across a reset | The new sidecar of a reset instance must not repeat a `seq` of an earlier epoch, so the platform gives it a starting `seq` at create and at reset: the required field `first_seq` of IF-5 (orchestrator contract section 2, open point 31), highest stored `seq` plus one, 1 for a first create. Proposal, to confirm with Akshay. Whether the event key changes with the epoch stays a proposal: same key unless the key version is raised (orchestrator open point 33) | Tanmay, Akshay |
+| 9 | `seq` for events written by the orchestrator or platform | Not defined; one proposal is a reserved range from 2^40 upward so they never collide with the sidecar's counter. The sidecar's range starts at the `first_seq` the platform gives through IF-5 (open point 8); the ranges for orchestrator and platform events stay a proposal | Tanmay, Akshay |
 | 10 | Name `infrastructure_fault` | Listed as `infrastructure_fault` (no dot), source `orchestrator` or `platform`, data `fault_class` and optional `detail_code` | Tanmay, Akshay |
 | 11 | Data field shapes the specs leave open | Ids are letters, digits, `_`, `.`, `-` (1 to 64); class names are `a-z0-9_` (1 to 32); `method` is a fixed list; CRS `rule_ids` are 3 to 9 digit strings | Sahil, Tanmay |
 | 12 | Fields the specs name loosely | `import.job` `flagged_keys` is a list of class names; `refund_decision` `decision` and `amount` are a class name and a whole number of minor units; `status` is 0 to 599 | Sahil |

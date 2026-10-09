@@ -86,6 +86,8 @@ Every container and network carries nine labels. A template holds placeholders; 
 | `vm.kind` | `inst` | `inst` for instance containers (`front` is used by edge containers, not by templates) |
 | `vm.owner` | `{owner_hash}` | 64 lowercase hex characters, an opaque hash, **never an email** (FR-INS-05) |
 
+The `{owner_hash}` value comes from the required field `owner_hash` of the create body of the orchestrator API (IF-5, [orchestrator-api.md](../orchestrator/orchestrator-api.md) section 2). The platform computes it (the orchestrator never sees a user id), the orchestrator applies it as the `vm.owner` label and never returns it. A reset keeps the owner of the instance.
+
 ## 5. Flag injection
 
 The injector is the shop image's `inject` entrypoint run as a one-shot container with `network_mode: none` (the schema enforces this, open point 29). It has no network: it reads its document on standard input and writes only to volumes. The orchestrator writes one JSON document on its standard input and closes it. The document follows [injection-document.schema.json](injection-document.schema.json): `schema_version`, `instance_id`, `epoch`, optional `issued_at`, `seed`, `flags` (one per challenge, `VM{` plus 24 Base32 characters `}`) and `decoys`. The digests of the flags go to the sidecar, not to the injector (architecture 04 section 11.3).
@@ -125,7 +127,7 @@ The size limit and the UTF-8 handling of the document on standard input are for 
 
 ## 6. Event emission
 
-Defined by IF-4 in [../events/app-events.md](../events/app-events.md) (story L-03). The path stays as fixed here: the shop sends events to the sidecar's event endpoint on the instance network, port 9000, base URL in `VM_SIDECAR_EVENTS_URL`; IF-4 adds the path `/v1/events` (POST only), the body, the event names, the signing and the size caps. Events carry no secrets.
+Defined by IF-4 in [../events/app-events.md](../events/app-events.md) (story L-03). The path stays as fixed here: the shop sends events to the sidecar's event endpoint on the instance network, port 9000, base URL in `VM_SIDECAR_EVENTS_URL`; IF-4 adds the path `/v1/events` (POST only), the body, the event names, the signing and the size caps. Events carry no secrets. At start the orchestrator gives the sidecar, on its standard input, the event key, the flag digests and the first sequence number `first_seq` that the platform sent in the create or reset body (IF-4 section 6, orchestrator contract open point 31); the exact shape of that input is defined with stories L-06 and L-13 (open point 35 below).
 
 ## 7. Runtime profile
 
@@ -191,7 +193,7 @@ Every value below was chosen by this draft because the architecture does not fix
 | 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | Tanmay |
 | 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | Tanmay |
 | 22 | Event endpoint base URL | `http://sidecar:9000` (path `/v1/events`, defined by IF-4); mock base `http://mock-services` | Tanmay, Sahil |
-| 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex; `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
+| 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex and arrives as the required `owner_hash` of the IF-5 create body, computed by the platform (proposal: HMAC-SHA256 of the user id with a platform label key; handoff H-20); `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
 | 24 | Env value limit and reason length | value at most 512 characters; flag-in-env reason 20 to 300 characters, not blank; only the shop may use the exception | Sahil |
 | 25 | Env allowlist | the 13 names in section 2 | Sahil |
 | 26 | `issued_at` handling | optional, advisory and not enforced in v0, no age check | Tanmay |
@@ -203,3 +205,4 @@ Every value below was chosen by this draft because the architecture does not fix
 | 32 | Injection document size limit and UTF-8 handling on standard input | Left to the injector | Sahil |
 | 33 | Who mounts the shared volumes | Only the injector and the shop mount `/run/vm` (the shop read-only); only the shop and the import service mount `/run/import`; only the injector and the import service mount `/run/placement/import`; only the injector and mock-services mount `/run/placement/mock`; the sidecar, mock-services and bot controller never mount `/run/vm` | Sahil |
 | 34 | Volume owner and mode options | The orchestrator creates the memory-backed volumes with uid and gid 65532 and a writable mode for that user (volume options to be confirmed in L-13) | Tanmay |
+| 35 | Sidecar start input | The orchestrator gives the sidecar the event key, the flag digests and `first_seq` on standard input at start (never in the environment or a label); the exact shape, size limit and encoding are defined with L-06 and L-13 (handoff H-59) | Tanmay, Akshay |

@@ -99,6 +99,61 @@
     "path": "/epoch",
     "rule": "a reset epoch is at least 2"
   },
+  "create-missing-owner-hash.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is required"
+  },
+  "create-owner-hash-short.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is 64 hex characters"
+  },
+  "create-owner-hash-uppercase.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is lowercase hex"
+  },
+  "create-owner-hash-email.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is never an email"
+  },
+  "create-missing-first-seq.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq is required"
+  },
+  "create-first-seq-zero.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq is at least 1"
+  },
+  "create-first-seq-string.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq is an integer"
+  },
+  "reset-missing-first-seq.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq is required"
+  },
+  "reset-first-seq-zero.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq is at least 1"
+  },
+  "reset-first-seq-string.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq is an integer"
+  },
+  "reset-owner-hash.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "a reset keeps the owner of the instance"
+  },
   "reset-template-field.json": {
     "schema": "ResetInstanceRequest",
     "path": "/template_id",

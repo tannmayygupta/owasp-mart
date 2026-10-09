@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import itertools
 import json
 import queue
@@ -55,17 +56,24 @@ def material(tag: str = "A") -> FlagMaterial:
     )
 
 
-def create_request(instance_id: str | None = None, *, epoch: int = 1, template: str = "shop-v0", memory_mb: int = 256, tag: str = "A") -> CreateRequest:
+def owner_hash(tag: str = "A") -> str:
+    """A fake opaque owner hash (64 lowercase hex characters), distinct per tag."""
+    return hashlib.sha256(b"FAKE-OWNER-NOT-REAL-" + tag.encode()).hexdigest()
+
+
+def create_request(instance_id: str | None = None, *, epoch: int = 1, template: str = "shop-v0", memory_mb: int = 256,
+                   tag: str = "A", owner_tag: str = "O", first_seq: int = 1) -> CreateRequest:
     iid = instance_id or new_id()
     return CreateRequest(
         instance_id=iid, template_id=template, epoch=epoch, material=material(tag),
+        owner_hash=owner_hash(owner_tag), first_seq=first_seq,
         hostname=f"{iid.lower()}.instances.example.invalid",
         limits=Limits(memory_mb=memory_mb, cpu_limit=1.5, pids_limit=512, idle_minutes=30, max_minutes=120),
     )
 
 
-def reset_request(epoch: int = 2, tag: str = "D") -> ResetRequest:
-    return ResetRequest(epoch=epoch, material=material(tag))
+def reset_request(epoch: int = 2, tag: str = "D", first_seq: int = 41) -> ResetRequest:
+    return ResetRequest(epoch=epoch, material=material(tag), first_seq=first_seq)
 
 
 class ServiceProcess:

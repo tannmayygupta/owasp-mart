@@ -1,4 +1,5 @@
 {
+  "epoch": 2,
   "first_seq": 41,
   "flags": [
     {
@@ -20,5 +21,6 @@
     }
   ],
   "event_key": "FAKE-EVENT-KEY-NOT-REAL-000000000000",
-  "seed": "FAKE-SEED-NOT-REAL-0000000000000000"
+  "seed": "FAKE-SEED-NOT-REAL-0000000000000000",
+  "owner_hash": "00000000000000000000000000000000000000000000000000000000000fa4e0"
 }

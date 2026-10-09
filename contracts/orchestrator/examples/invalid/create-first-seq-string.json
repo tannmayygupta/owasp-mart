@@ -1,5 +1,7 @@
 {
-  "first_seq": 41,
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "template_id": "shop-v0",
+  "epoch": 1,
   "flags": [
     {
       "challenge_key": "C01",
@@ -20,5 +22,15 @@
     }
   ],
   "event_key": "FAKE-EVENT-KEY-NOT-REAL-000000000000",
-  "seed": "FAKE-SEED-NOT-REAL-0000000000000000"
+  "seed": "FAKE-SEED-NOT-REAL-0000000000000000",
+  "owner_hash": "00000000000000000000000000000000000000000000000000000000000fa4e0",
+  "first_seq": "1",
+  "hostname": "fake-0001.instances.example.invalid",
+  "limits": {
+    "memory_mb": 1024,
+    "cpu_limit": 1.5,
+    "pids_limit": 512,
+    "idle_minutes": 30,
+    "max_minutes": 120
+  }
 }

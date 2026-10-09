@@ -29,15 +29,15 @@ from .instance_host import (
 
 ALLOWED_TEMPLATES = frozenset({"shop-v0", "shop-fail-v0"})
 COMPONENTS = ("bot-controller", "import-service", "injector", "mock-services", "shop", "sidecar")
-INSTANCE_ID = re.compile(r"^i-[A-Z2-7]{16}$")
-_TEMPLATE = re.compile(r"^[a-z][a-z0-9-]{2,31}$")
-_CHALLENGE = re.compile(r"^C(0[1-9]|10|11)$")
-_FLAG = re.compile(r"^VM\{[A-Z2-7]{24}\}$")
-_HEX64 = re.compile(r"^[0-9a-f]{64}$")
-_SECRET = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
-_HOSTNAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
-_CURSOR = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
-_EPOCH_LABEL = re.compile(r"^[1-9][0-9]*$")
+INSTANCE_ID = re.compile(r"^i-[A-Z2-7]{16}\Z")
+_TEMPLATE = re.compile(r"^[a-z][a-z0-9-]{2,31}\Z")
+_CHALLENGE = re.compile(r"^C(0[1-9]|10|11)\Z")
+_FLAG = re.compile(r"^VM\{[A-Z2-7]{24}\}\Z")
+_HEX64 = re.compile(r"^[0-9a-f]{64}\Z")
+_SECRET = re.compile(r"^[A-Za-z0-9_-]{32,128}\Z")
+_HOSTNAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\Z")
+_CURSOR = re.compile(r"^[A-Za-z0-9_-]{1,128}\Z")
+_EPOCH_LABEL = re.compile(r"^[1-9][0-9]*\Z")
 _TRANSITIONAL = {
     InstanceState.REQUESTED, InstanceState.PROVISIONING, InstanceState.STARTING,
     InstanceState.RESETTING, InstanceState.STOPPING,
@@ -83,6 +83,12 @@ def _check_material(m) -> None:
         raise _bad("/seed", "bad seed shape")
 
 
+def _check_first_seq(value) -> None:
+    # bool is an int in Python; it is not a sequence number
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise _bad("/first_seq", "first_seq is an integer of at least 1")
+
+
 def _check_create(r: CreateRequest) -> None:
     if not INSTANCE_ID.match(r.instance_id):
         raise _bad("/instance_id", "bad instance id")
@@ -90,6 +96,9 @@ def _check_create(r: CreateRequest) -> None:
         raise _bad("/template_id", "bad template name")
     if not isinstance(r.epoch, int) or r.epoch < 1:
         raise _bad("/epoch", "epoch is an integer of at least 1")
+    if not isinstance(r.owner_hash, str) or not _HEX64.match(r.owner_hash):
+        raise _bad("/owner_hash", "owner_hash is 64 lowercase hex characters")
+    _check_first_seq(r.first_seq)
     _check_material(r.material)
     if len(r.hostname) > 253 or not _HOSTNAME.match(r.hostname):
         raise _bad("/hostname", "bad host name")
@@ -224,6 +233,7 @@ class FakeInstanceHost:
         rec = self._get(instance_id)
         if not isinstance(request.epoch, int) or request.epoch < 2:
             raise _bad("/epoch", "epoch is an integer of at least 2")
+        _check_first_seq(request.first_seq)
         _check_material(request.material)
         print_ = fingerprint(request.to_json())
         known = rec.prints.get((request.epoch, "reset"))

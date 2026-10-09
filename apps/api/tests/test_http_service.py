@@ -182,10 +182,21 @@ def test_a_body_that_is_not_json_is_refused(svc):
 
 def test_an_oversize_body_is_refused(svc):
     body = json.dumps({"pad": "x" * (70 * 1024)}).encode()
-    res = raw_call(svc.url, "POST", "/v1/instances", body)
+
+    def refused(**kw):
+        # The service answers 413 and drops the connection while the client may still be sending, so on a busy machine
+        # the client can see a reset instead of the answer. Try again a few times to see the real 413.
+        for _ in range(5):
+            try:
+                return raw_call(svc.url, "POST", "/v1/instances", body, **kw)
+            except (ConnectionError, OSError):
+                time.sleep(0.2)
+        raise AssertionError("never saw the 413 answer, only connection resets")
+
+    res = refused()
     assert res[0] == 413 and problem(res)["code"] == "ORCH-BODY-TOO-LARGE"
     # an oversize body is refused before the signature is looked at (it is never hashed), so also with a wrong key
-    res = raw_call(svc.url, "POST", "/v1/instances", body, key=WRONG_KEY)
+    res = refused(key=WRONG_KEY)
     assert res[0] == 413
     # the service is still alive afterwards
     assert raw_call(svc.url, "GET", "/v1/host")[0] == 200
@@ -502,6 +513,63 @@ def test_a_step_delay_makes_the_states_observable():
         assert seen == ["requested", "provisioning", "starting", "ready"]
     finally:
         svc.stop()
+
+
+# ---- owner_hash and first_seq ----
+@pytest.mark.parametrize("mutate,field", [
+    (lambda b: b.pop("owner_hash"), "/owner_hash"),
+    (lambda b: b.update(owner_hash="F" * 64), "/owner_hash"),
+    (lambda b: b.update(owner_hash="a" * 63), "/owner_hash"),
+    (lambda b: b.update(owner_hash=None), "/owner_hash"),
+    (lambda b: b.pop("first_seq"), "/first_seq"),
+    (lambda b: b.update(first_seq=0), "/first_seq"),
+    (lambda b: b.update(first_seq="1"), "/first_seq"),
+    (lambda b: b.update(first_seq=True), "/first_seq"),
+])
+def test_create_validates_owner_hash_and_first_seq_with_a_json_pointer(svc, mutate, field):
+    body = create_request().to_json()
+    mutate(body)
+    res = raw_call(svc.url, "POST", "/v1/instances", json.dumps(body).encode())
+    p = problem(res)
+    assert res[0] == 422 and p["code"] == "ORCH-VALIDATION" and p["field"] == field
+
+
+def test_reset_needs_first_seq_and_refuses_an_owner_hash(svc):
+    host = HttpInstanceHost(svc.url, PLATFORM_KEY)
+    req = create_request()
+    host.create(req)
+    _wait(host, req.instance_id, InstanceState.READY)
+    target = f"/v1/instances/{req.instance_id}/reset"
+    body = reset_request(2).to_json()
+    no_seq = {k: v for k, v in body.items() if k != "first_seq"}
+    res = raw_call(svc.url, "POST", target, json.dumps(no_seq).encode())
+    assert res[0] == 422 and problem(res)["field"] == "/first_seq"
+    res = raw_call(svc.url, "POST", target, json.dumps({**body, "owner_hash": req.owner_hash}).encode())
+    p = problem(res)
+    assert res[0] == 422 and p["code"] == "ORCH-VALIDATION" and p["field"] == "/owner_hash"
+    assert host.get(req.instance_id).epoch == 1
+
+
+def test_no_get_answer_holds_the_owner_hash_or_the_first_seq(svc):
+    from support import owner_hash
+    req = create_request(owner_tag="Z", first_seq=777001)
+    status, body, _ = raw_call(svc.url, "POST", "/v1/instances", body_of(req))
+    assert status == 202
+    host = HttpInstanceHost(svc.url, PLATFORM_KEY)
+    _wait(host, req.instance_id, InstanceState.READY)
+    answers = [body]
+    for target in [f"/v1/instances/{req.instance_id}", "/v1/instances", "/v1/host"]:
+        st, b, _ = raw_call(svc.url, "GET", target)
+        assert st == 200
+        answers.append(b)
+    st, b, _ = raw_call(svc.url, "POST", f"/v1/instances/{req.instance_id}/reset", json.dumps(reset_request(2, first_seq=888002).to_json()).encode())
+    assert st == 202
+    answers.append(b)
+    st, b, _ = raw_call(svc.url, "GET", f"/v1/instances/{req.instance_id}")
+    answers.append(b)
+    blob = b"\n".join(answers).decode()
+    assert owner_hash("Z") not in blob and "owner" not in blob and "first_seq" not in blob
+    assert "777001" not in blob and "888002" not in blob
 
 
 # ---- fake service hardening ----
