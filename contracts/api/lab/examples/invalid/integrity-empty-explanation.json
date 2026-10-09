@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "integrity_flag_id": "g-AAAAAAAAAAAAAAAA",
+      "type": "decoy",
+      "challenge_key": "C01",
+      "explanation": "",
+      "status": "open",
+      "held": false,
+      "created_at": "2026-10-09T12:00:00Z",
+      "decided_at": null,
+      "decision_note": null
+    }
+  ]
+}

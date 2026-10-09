@@ -1,0 +1,983 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
+info:
+  title: Lab API (IF-2), browser-facing fragment, contract v0.1.0 (proposal)
+  version: 0.1.0
+  description: |
+    The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
+    flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
+    Status: DRAFT, a proposal for Akshay (stream P) to confirm in the team chat (D-37, review optional).
+    Every value that the architecture does not fix is listed in the table "Open points (to confirm)" of
+    lab-api.md. Error codes named AUTH-*, ATT-*, INST-* and REQ-* are placeholders until the error
+    registry (IF-8, story P-02) is merged.
+
+    Rules that hold for every route (the text is in lab-api.md):
+    * Every route is under /api/v1/. The browser calls the dashboard origin only; the platform
+      forwards (architecture 03).
+    * Authentication is the session cookie __Host-vm_session. A state-changing call (POST) also needs
+      the CSRF header (double submit with the cookie __Host-vm_csrf), an Origin equal to the dashboard
+      origin and a JSON content type. Bodies are JSON only.
+    * Every answer carries Cache-Control private, no-store. Errors are application/problem+json with
+      code, message, request_id and, for 422, field (a JSON Pointer).
+    * A resource that does not exist and a resource that is not yours answer the same 404.
+    * No answer shows a flag, a decoy, a digest, a seed, an event key, an owner hash, an orchestrator
+      address, a host id or a stack trace. The submitted flag text is never echoed and never stored.
+    * The instance states, the access values and the health values are exactly those of the
+      orchestrator contract (IF-5).
+    * All examples use obviously fake values.
+  license:
+    name: Proprietary, project internal
+    identifier: LicenseRef-VulnMart-Internal
+servers:
+  - url: /
+    description: Same origin as the dashboards (the platform forwards /api/* to the API).
+security:
+  - sessionCookie: []
+tags:
+  - name: instances
+  - name: attempts
+  - name: flags
+  - name: hints
+  - name: results
+paths:
+  /api/v1/instances:
+    post:
+      tags: [instances]
+      operationId: requestInstance
+      summary: Request a learner instance
+      description: |
+        Asks for an instance of the learner's practice attempt. Answers 202 with state `requested`; the
+        state then advances on its own (poll the instance, or listen to the live stream). Candidate
+        instances are created by the platform when the attempt starts, not through this route.
+        409 INST-QUOTA-REACHED when the user already holds an instance (the numbers are OI-21).
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestInstanceRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/InstanceAccepted' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/instances/{instance_id}:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    get:
+      tags: [instances]
+      operationId: getInstance
+      summary: State, access and health of one instance
+      responses:
+        '200': { $ref: '#/components/responses/InstanceOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/instances/{instance_id}/open:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    post:
+      tags: [instances]
+      operationId: openInstance
+      summary: Get the one-time URL that opens the instance in a new tab
+      description: |
+        Allowed while the instance is ready, active or idle and its access is open. Otherwise 409
+        INST-NOT-READY. The URL carries a single-use ticket that expires after about a minute. The body is
+        empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200':
+          description: The ticket URL and its expiry.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpenTicket' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/instances/{instance_id}/reset:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    post:
+      tags: [instances]
+      operationId: resetInstance
+      summary: Reset the instance (new epoch, new flags)
+      description: |
+        Needs the body {"confirm": true}. Allowed in state ready, active or idle; otherwise 409
+        INST-INVALID-STATE (also 409 when the instance is frozen or its attempt is not running). Answers 202: the epoch grows by one and the state is `resetting`.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/InstanceAccepted' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/instances/{instance_id}/stop:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    post:
+      tags: [instances]
+      operationId: stopInstance
+      summary: Stop the instance
+      description: |
+        State becomes `stopping`, then `destroyed`. Answers 202 for a new stop and 200 when the instance
+        is already stopping or destroyed. 409 INST-INVALID-STATE when the instance is frozen or its attempt is not running (for example after submit; the freeze is not undone). The body is empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '202': { $ref: '#/components/responses/InstanceAccepted' }
+        '200': { $ref: '#/components/responses/InstanceOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    get:
+      tags: [attempts]
+      operationId: getAttempt
+      summary: State and clock of an attempt
+      description: Readable by its owner and, for a candidate attempt, by a recruiter of the company that owns it.
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/attempts/{attempt_id}/start:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [attempts]
+      operationId: startAttempt
+      summary: Start the clock of a ready attempt (PENDING OI-22)
+      description: |
+        PENDING OI-22: whether the candidate presses Start or the clock starts when the instance becomes
+        ready is open. Both outcomes are recorded in lab-api.md. This route exists for the first outcome;
+        if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 ATT-INVALID-STATE.
+        The body is empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/submit:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [attempts]
+      operationId: submitAttempt
+      summary: Submit early (after a confirmation)
+      description: |
+        Needs the body {"confirm": true}. Allowed in state `running`; otherwise 409 ATT-INVALID-STATE.
+        The attempt becomes `submitted`; the instance is frozen for the freeze period and then destroyed.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/flags:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [flags]
+      operationId: submitFlag
+      summary: Paste a flag for one challenge
+      description: |
+        The answer is 200 with the `result` (correct, wrong, decoy, other_instance, stale_epoch) and the
+        `credit` (credited, held, none). The submitted text is never echoed in any answer and never stored;
+        only the result and the challenge are kept. Allowed while the attempt is `running`, otherwise 409
+        ATT-INVALID-STATE. More than 5 wrong submissions for one challenge in 10 minutes are refused with
+        429 ATT-FLAG-RATE-LIMITED and a Retry-After header, even for a correct value (the placeholder
+        numbers are FR-ACH-01).
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FlagSubmissionRequest' }
+      responses:
+        '200':
+          description: The result of the check.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlagSubmissionResult' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/attempts/{attempt_id}/score:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    get:
+      tags: [results]
+      operationId: getScore
+      summary: Current score snapshot
+      responses:
+        '200':
+          description: The score out of 1000 and the per-challenge points.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Score' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/attempts/{attempt_id}/challenges:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    get:
+      tags: [results]
+      operationId: listChallenges
+      summary: Progress per challenge (milestone, solved, hints used)
+      description: Progress only. Titles, tags and difficulty are catalogue data (IF-7) served by the platform.
+      responses:
+        '200':
+          description: One entry per challenge of the attempt.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChallengeProgressList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+      - $ref: '#/components/parameters/ChallengeKeyPath'
+    get:
+      tags: [hints]
+      operationId: listHints
+      summary: The three hint levels of a challenge
+      description: |
+        The text of a level is null until it is unlocked. When the attempt has hints off the route answers
+        404 ATT-HINTS-DISABLED, as does an unknown challenge key (ATT-CHALLENGE-NOT-FOUND).
+      responses:
+        '200':
+          description: The hint levels.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HintList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints/{level}/unlock:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+      - $ref: '#/components/parameters/ChallengeKeyPath'
+      - $ref: '#/components/parameters/HintLevelPath'
+    post:
+      tags: [hints]
+      operationId: unlockHint
+      summary: Unlock one hint level
+      description: |
+        Repeating the call for an unlocked level answers 200 with the same hint and costs nothing more.
+        Hints off: 404 ATT-HINTS-DISABLED. Attempt not running: 409 ATT-INVALID-STATE. The body is empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200':
+          description: The unlocked hint.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Hint' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/evidence:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    get:
+      tags: [results]
+      operationId: listEvidence
+      summary: The captured requests of an attempt (redacted)
+      description: |
+        For a reviewer (a recruiter of the owning company for a candidate attempt, the owner for a learner
+        attempt). Bodies are capped at 8 KiB and redacted before storage. Whether a candidate sees their own
+        evidence is OI-15.
+      responses:
+        '200':
+          description: Evidence entries.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/attempts/{attempt_id}/integrity-flags:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    get:
+      tags: [results]
+      operationId: listIntegrityFlags
+      summary: Integrity signals of an attempt (evidence for a human)
+      description: Never an automatic fail (FR-ACH-06). Same readers as the evidence.
+      responses:
+        '200':
+          description: Integrity flags.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntegrityFlagList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/attempts/{attempt_id}/integrity-flags/{integrity_flag_id}/decision:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+      - $ref: '#/components/parameters/IntegrityFlagIdPath'
+    post:
+      tags: [results]
+      operationId: decideIntegrityFlag
+      summary: Record the review decision on an integrity flag
+      description: |
+        accept: the evidence is judged fine (a held capture it points to is credited). reject: the evidence
+        is judged a real problem (a held capture stays out of the score). One decision per flag; a second
+        answers 409 ATT-INVALID-STATE. Who may decide is OI-38 (the mock allows a recruiter of the owning
+        company only). The decision is audited by the platform.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IntegrityDecisionRequest' }
+      responses:
+        '200':
+          description: The flag with its decision.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IntegrityFlag' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/report:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    get:
+      tags: [results]
+      operationId: getReport
+      summary: Per-candidate report
+      description: Score, time, per-challenge results and the number of open integrity flags. Same readers as the evidence.
+      responses:
+        '200':
+          description: The report.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Report' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/attempts/{attempt_id}/timeline:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    get:
+      tags: [results]
+      operationId: getTimeline
+      summary: Ordered list of what happened in an attempt
+      description: Oldest first, cursor-paged (the paging form is a proposal).
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: One page of the timeline.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Timeline' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-vm_session
+      description: HttpOnly session cookie set by the platform login (a P-owned route).
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Must equal the cookie __Host-vm_csrf (double submit). The header name is a proposal (open points).
+  headers:
+    CacheControl:
+      description: Always `private, no-store`.
+      schema: { type: string, const: 'private, no-store' }
+    RetryAfter:
+      description: Seconds to wait.
+      schema: { type: integer, minimum: 1 }
+    Allow:
+      description: The methods the path supports.
+      schema: { type: string }
+  parameters:
+    InstanceIdPath:
+      name: instance_id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/InstanceId' }
+    AttemptIdPath:
+      name: attempt_id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/AttemptId' }
+    ChallengeKeyPath:
+      name: challenge_key
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ChallengeKey' }
+    HintLevelPath:
+      name: level
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 3 }
+    IntegrityFlagIdPath:
+      name: integrity_flag_id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/IntegrityFlagId' }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { $ref: '#/components/schemas/Cursor' }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+  responses:
+    InstanceAccepted:
+      description: Accepted. The instance advances on its own.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Instance' }
+    InstanceOk:
+      description: The instance.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Instance' }
+    AttemptOk:
+      description: The attempt.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Attempt' }
+    Unauthenticated:
+      description: No valid session. AUTH-SESSION-REQUIRED.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    CsrfFailed:
+      description: Missing or wrong CSRF header (AUTH-CSRF-FAILED) or an Origin that is not the dashboard origin (AUTH-ORIGIN-FORBIDDEN). Nothing changed.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: |
+        The resource does not exist or is not yours (the same answer): ATT-NOT-FOUND or INST-NOT-FOUND.
+        Also ATT-HINTS-DISABLED, ATT-CHALLENGE-NOT-FOUND and, for an unknown path, REQ-ROUTE-UNKNOWN.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    MethodNotAllowed:
+      description: The path exists but not for this method. REQ-METHOD-NOT-ALLOWED with an Allow header. Any path can answer it.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+        Allow: { $ref: '#/components/headers/Allow' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: ATT-INVALID-STATE, INST-INVALID-STATE, INST-NOT-READY or INST-QUOTA-REACHED. Nothing changed.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooLarge:
+      description: Body larger than 64 KiB. REQ-TOO-LARGE.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnsupportedMedia:
+      description: The content type is not application/json. REQ-UNSUPPORTED-MEDIA-TYPE.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Invalid:
+      description: A missing, extra or wrong-type field, a body where none is allowed, or a bad query value. REQ-VALIDATION; `field` is a JSON Pointer. The wrong value is never repeated.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RateLimited:
+      description: Too many wrong flag submissions for the challenge. ATT-FLAG-RATE-LIMITED with Retry-After.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControl' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    InstanceId:
+      description: 'Same shape as IF-5: i- plus 16 Base32 characters.'
+      type: string
+      pattern: '^i-[A-Z2-7]{16}$'
+    AttemptId:
+      description: 'Proposal: a- plus 16 Base32 characters.'
+      type: string
+      pattern: '^a-[A-Z2-7]{16}$'
+    IntegrityFlagId:
+      description: 'Proposal: g- plus 16 Base32 characters.'
+      type: string
+      pattern: '^g-[A-Z2-7]{16}$'
+    EvidenceId:
+      description: 'Proposal: e- plus 16 Base32 characters.'
+      type: string
+      pattern: '^e-[A-Z2-7]{16}$'
+    ChallengeKey:
+      type: string
+      pattern: '^C(0[1-9]|10|11)$'
+    Cursor:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{1,128}$'
+    Timestamp:
+      description: 'UTC, RFC 3339 with a trailing Z and whole seconds (proposal).'
+      type: string
+      format: date-time
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+    State:
+      description: The instance state machine, identical to IF-5 (FR-INS-07). Only the orchestrator writes it.
+      enum: [requested, provisioning, starting, ready, active, idle, resetting, stopping, destroyed, failed]
+    Access:
+      description: Identical to IF-5.
+      enum: [open, frozen, closed]
+    Health:
+      description: Identical to IF-5.
+      enum: [unknown, healthy, unhealthy]
+    AttemptState:
+      description: The attempt state machine (architecture 04 section 10.1).
+      enum: [invited, consent, ready, running, submitted, reported, withdrawn, expired, cancelled, deleted]
+    AttemptMode:
+      enum: [learner, candidate]
+    Milestone:
+      description: Best milestone reached; none, M1 found, M2 working exploit evidence, M3 flag captured.
+      enum: [none, M1, M2, M3]
+    FlagResult:
+      enum: [correct, wrong, decoy, other_instance, stale_epoch]
+    ErrorCode:
+      description: |
+        Placeholder code until the error registry (IF-8) is merged. Codes in use: AUTH-SESSION-REQUIRED,
+        AUTH-CSRF-FAILED, AUTH-ORIGIN-FORBIDDEN, ATT-NOT-FOUND, ATT-INVALID-STATE, ATT-HINTS-DISABLED,
+        ATT-CHALLENGE-NOT-FOUND, ATT-FLAG-RATE-LIMITED, INST-NOT-FOUND, INST-INVALID-STATE, INST-NOT-READY,
+        INST-QUOTA-REACHED, REQ-VALIDATION, REQ-TOO-LARGE, REQ-UNSUPPORTED-MEDIA-TYPE, REQ-METHOD-NOT-ALLOWED,
+        REQ-ROUTE-UNKNOWN, and INST-* codes for failed instances (for example INST-HEALTH-TIMEOUT).
+      type: string
+      pattern: '^(AUTH|ATT|INST|REQ)-[A-Z0-9]+(-[A-Z0-9]+)*$'
+    Problem:
+      description: Problem-details style error body (architecture 07 section 3.6). Never a stack trace.
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string, maxLength: 500 }
+        request_id: { type: string, pattern: '^[A-Za-z0-9-]{8,64}$' }
+        field:
+          description: For 422, a JSON Pointer to the offending field (empty string for the whole body).
+          type: string
+          maxLength: 200
+    RequestInstanceRequest:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind: { enum: [learner] }
+    ConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [confirm]
+      properties:
+        confirm: { const: true }
+    Instance:
+      description: What the browser may know of an instance. Closed on purpose; no host, address, flag or key.
+      type: object
+      additionalProperties: false
+      required: [instance_id, attempt_id, state, access, health, epoch, error_code, requested_at, ready_at, expires_at, updated_at]
+      properties:
+        instance_id: { $ref: '#/components/schemas/InstanceId' }
+        attempt_id: { $ref: '#/components/schemas/AttemptId' }
+        state: { $ref: '#/components/schemas/State' }
+        access: { $ref: '#/components/schemas/Access' }
+        health: { $ref: '#/components/schemas/Health' }
+        epoch: { type: integer, minimum: 1 }
+        error_code:
+          description: Set while the state is failed, otherwise null.
+          anyOf:
+            - { $ref: '#/components/schemas/ErrorCode' }
+            - { type: 'null' }
+        requested_at: { $ref: '#/components/schemas/Timestamp' }
+        ready_at:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        expires_at:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+    OpenTicket:
+      type: object
+      additionalProperties: false
+      required: [url, expires_at]
+      properties:
+        url:
+          description: One-time URL on the instance host (architecture 03 section 3). Single use.
+          type: string
+          maxLength: 1024
+          pattern: '^https://[a-z0-9.-]+/_vm/enter\?t=[A-Za-z0-9_-]{16,512}$'
+        expires_at: { $ref: '#/components/schemas/Timestamp' }
+    Attempt:
+      type: object
+      additionalProperties: false
+      required: [attempt_id, mode, state, hints_enabled, instance_id, started_at, deadline_at, submitted_at, frozen_until, server_time]
+      properties:
+        attempt_id: { $ref: '#/components/schemas/AttemptId' }
+        mode: { $ref: '#/components/schemas/AttemptMode' }
+        state: { $ref: '#/components/schemas/AttemptState' }
+        hints_enabled: { type: boolean }
+        instance_id:
+          anyOf:
+            - { $ref: '#/components/schemas/InstanceId' }
+            - { type: 'null' }
+        started_at:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        deadline_at:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        submitted_at:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        frozen_until:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        server_time:
+          description: The server clock; the browser timer is cosmetic (FR-SES-02).
+          $ref: '#/components/schemas/Timestamp'
+    FlagSubmissionRequest:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, flag]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        flag:
+          description: The pasted text. Never echoed, never stored.
+          type: string
+          minLength: 1
+          maxLength: 200
+    FlagSubmissionResult:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, result, credit]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        result: { $ref: '#/components/schemas/FlagResult' }
+        credit:
+          description: credited for a correct value that passed the activity check, held when it did not (FR-ACH-02), none otherwise.
+          enum: [credited, held, none]
+    ChallengeScore:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, best_milestone, held, hints_used, points]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        best_milestone: { $ref: '#/components/schemas/Milestone' }
+        held: { type: boolean, description: A capture waits for a human decision and is not counted. }
+        hints_used: { type: integer, minimum: 0, maximum: 3 }
+        points: { type: integer, minimum: 0, description: Net points after hint cost (FR-SCR-01). }
+    Score:
+      type: object
+      additionalProperties: false
+      required: [attempt_id, score, computed_at, per_challenge]
+      properties:
+        attempt_id: { $ref: '#/components/schemas/AttemptId' }
+        score: { type: integer, minimum: 0, maximum: 1000 }
+        computed_at: { $ref: '#/components/schemas/Timestamp' }
+        per_challenge:
+          type: array
+          maxItems: 11
+          items: { $ref: '#/components/schemas/ChallengeScore' }
+    ChallengeProgress:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, best_milestone, solved, held, hints_used, hints_available]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        best_milestone: { $ref: '#/components/schemas/Milestone' }
+        solved: { type: boolean }
+        held: { type: boolean }
+        hints_used: { type: integer, minimum: 0, maximum: 3 }
+        hints_available: { type: boolean, description: False when the attempt has hints off. }
+    ChallengeProgressList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 11
+          items: { $ref: '#/components/schemas/ChallengeProgress' }
+    Hint:
+      type: object
+      additionalProperties: false
+      required: [level, kind, unlocked, cost_pct, text]
+      properties:
+        level: { type: integer, minimum: 1, maximum: 3 }
+        kind: { enum: [nudge, direction, near_solution] }
+        unlocked: { type: boolean }
+        cost_pct:
+          description: Cost as a percentage of the challenge points; 0 for a learner (placeholder 10, 20, 30 for a candidate).
+          type: integer
+          minimum: 0
+          maximum: 100
+        text:
+          description: Null until unlocked. A hint never reveals a flag (FR-HNT-01).
+          anyOf:
+            - { type: string, maxLength: 2000 }
+            - { type: 'null' }
+    HintList:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, items]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        items:
+          type: array
+          maxItems: 3
+          items: { $ref: '#/components/schemas/Hint' }
+    Evidence:
+      type: object
+      additionalProperties: false
+      required: [evidence_id, challenge_key, captured_at, method, path, body, body_truncated]
+      properties:
+        evidence_id: { $ref: '#/components/schemas/EvidenceId' }
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        captured_at: { $ref: '#/components/schemas/Timestamp' }
+        method: { enum: [GET, POST, PUT, PATCH, DELETE] }
+        path: { type: string, minLength: 1, maxLength: 2048 }
+        body:
+          description: Redacted request body, at most 8 KiB (FR-DET-03); null when there was none.
+          anyOf:
+            - { type: string, maxLength: 8192 }
+            - { type: 'null' }
+        body_truncated: { type: boolean }
+    EvidenceList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/Evidence' }
+    IntegrityFlag:
+      type: object
+      additionalProperties: false
+      required: [integrity_flag_id, type, challenge_key, explanation, status, held, created_at, decided_at, decision_note]
+      properties:
+        integrity_flag_id: { $ref: '#/components/schemas/IntegrityFlagId' }
+        type: { enum: [decoy, sharing, timing, activity, similarity] }
+        challenge_key:
+          anyOf:
+            - { $ref: '#/components/schemas/ChallengeKey' }
+            - { type: 'null' }
+        explanation: { type: string, minLength: 1, maxLength: 500 }
+        status: { enum: [open, accepted, rejected] }
+        held: { type: boolean, description: A held capture is linked to this flag and stays out of the score until decided. }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        decided_at:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        decision_note:
+          anyOf:
+            - { type: string, maxLength: 1000 }
+            - { type: 'null' }
+    IntegrityFlagList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/IntegrityFlag' }
+    IntegrityDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision, note]
+      properties:
+        decision: { enum: [accept, reject] }
+        note: { type: string, minLength: 1, maxLength: 1000 }
+    ReportChallenge:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, best_milestone, points, held, hints_used, time_to_capture_seconds, technique_label]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        best_milestone: { $ref: '#/components/schemas/Milestone' }
+        points: { type: integer, minimum: 0 }
+        held: { type: boolean }
+        hints_used: { type: integer, minimum: 0, maximum: 3 }
+        time_to_capture_seconds:
+          anyOf:
+            - { type: integer, minimum: 0 }
+            - { type: 'null' }
+        technique_label:
+          description: An estimate (FR-DET-07), never changes points; null when unknown.
+          anyOf:
+            - { type: string, maxLength: 100 }
+            - { type: 'null' }
+    Report:
+      type: object
+      additionalProperties: false
+      required: [attempt_id, mode, state, generated_at, score, elapsed_seconds, active_seconds, hints_used_total, integrity_open, per_challenge]
+      properties:
+        attempt_id: { $ref: '#/components/schemas/AttemptId' }
+        mode: { $ref: '#/components/schemas/AttemptMode' }
+        state: { $ref: '#/components/schemas/AttemptState' }
+        generated_at: { $ref: '#/components/schemas/Timestamp' }
+        score: { type: integer, minimum: 0, maximum: 1000 }
+        elapsed_seconds:
+          anyOf:
+            - { type: integer, minimum: 0 }
+            - { type: 'null' }
+        active_seconds:
+          description: Estimate (FR-TIM-02); null when not computed.
+          anyOf:
+            - { type: integer, minimum: 0 }
+            - { type: 'null' }
+        hints_used_total: { type: integer, minimum: 0, maximum: 33 }
+        integrity_open: { type: integer, minimum: 0 }
+        per_challenge:
+          type: array
+          maxItems: 11
+          items: { $ref: '#/components/schemas/ReportChallenge' }
+    TimelineEntry:
+      type: object
+      additionalProperties: false
+      required: [at, type, challenge_key, milestone, result]
+      properties:
+        at: { $ref: '#/components/schemas/Timestamp' }
+        type:
+          enum: [attempt.started, milestone.reached, flag.submitted, hint.unlocked, instance.reset, attempt.submitted, attempt.expired]
+        challenge_key:
+          anyOf:
+            - { $ref: '#/components/schemas/ChallengeKey' }
+            - { type: 'null' }
+        milestone:
+          anyOf:
+            - { enum: [M1, M2, M3] }
+            - { type: 'null' }
+        result:
+          anyOf:
+            - { $ref: '#/components/schemas/FlagResult' }
+            - { type: 'null' }
+    Timeline:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/TimelineEntry' }
+        next_cursor:
+          description: Null on the last page.
+          anyOf:
+            - { $ref: '#/components/schemas/Cursor' }
+            - { type: 'null' }

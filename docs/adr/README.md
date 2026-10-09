@@ -20,5 +20,6 @@
 | 0016 | [Per-consumer flag file delivery and injector network](0016-per-consumer-flag-file-delivery-and-injector-network.md) | Accepted (D-36) |
 | 0017 | [Instance event contract: identity, signing, sources](0017-instance-event-contract-identity-signing-source.md) | Accepted (D-38) |
 | 0018 | [Signing of platform-to-orchestrator requests](0018-orchestrator-request-signing.md) | Proposed |
+| 0019 | [Lab API conventions: route prefix, Node mock, scope](0019-lab-api-conventions.md) | Proposed (D-39) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

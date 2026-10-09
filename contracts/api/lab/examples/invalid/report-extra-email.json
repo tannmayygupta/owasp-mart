@@ -1,0 +1,113 @@
+{
+  "attempt_id": "a-AAAAAAAAAAAAAAAA",
+  "mode": "candidate",
+  "state": "reported",
+  "generated_at": "2026-10-09T12:00:00Z",
+  "score": 109,
+  "elapsed_seconds": 6600,
+  "active_seconds": null,
+  "hints_used_total": 1,
+  "integrity_open": 1,
+  "per_challenge": [
+    {
+      "challenge_key": "C01",
+      "best_milestone": "M3",
+      "points": 90,
+      "held": true,
+      "hints_used": 0,
+      "time_to_capture_seconds": 1500,
+      "technique_label": "Broken access control (estimate)"
+    },
+    {
+      "challenge_key": "C02",
+      "best_milestone": "M1",
+      "points": 18,
+      "held": false,
+      "hints_used": 1,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C03",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C04",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C05",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C06",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C07",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C08",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C09",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C10",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    },
+    {
+      "challenge_key": "C11",
+      "best_milestone": "none",
+      "points": 0,
+      "held": false,
+      "hints_used": 0,
+      "time_to_capture_seconds": null,
+      "technique_label": null
+    }
+  ],
+  "email": "x@example.invalid"
+}

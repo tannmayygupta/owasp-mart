@@ -25,6 +25,16 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ### 0.1.2 (2026-10-09, Tanmay, story L-04 follow-up)
 - Additive, no schema change: section 4 notes that the `vm.owner` label value comes from the required `owner_hash` of the IF-5 create body (handoff H-20); section 6 says the orchestrator gives the sidecar the event key, flag digests and `first_seq` on standard input at start (handoff H-59); open points 23 updated and 35 added (sidecar start input).
 
+## Lab API (IF-2), `contracts/api/lab/`
+
+### 0.1.0 (2026-10-09, Tanmay, story L-05)
+- First draft, a proposal for Akshay to confirm in the team chat (D-37): `lab.openapi.yaml` (OpenAPI 3.1, 18 operations under `/api/v1/`: instances request, get, open ticket, reset, stop; attempts get, start (pending OI-22), submit; flag submit; score; challenges; hints list and unlock; evidence; integrity flags with review decisions; per-candidate report; timeline) and `lab-api.md` (scope and ownership, shared enums, auth and cross-cutting rules, error placeholders, 30 open points).
+- Instance states, access and health are identical to IF-5 (handoff H-78). Placeholder error codes `AUTH-*`, `ATT-*`, `INST-*`, `REQ-*` until the registry (IF-8, P-02) is merged.
+- Examples: 38 valid and 82 invalid (each invalid one with its expected error path in `examples/invalid/manifest.json`). Mock: `contracts/mocks/fake-lab/server.mjs` (Node, no dependency, not Prism).
+- Checked by `scripts/check_lab_contract.py` (last part of `pnpm run contracts:check`), `apps/api/tests/test_lab_contract.py` and `scripts/e2e/lab.e2e.test.mjs`.
+- Platform-owned routes are not in this file; they are listed in handoff H-86. No change to IF-1, IF-4, IF-5 or IF-6.
+- Status: awaiting optional confirmation by Akshay (consumer; handoffs H-84 to H-89).
+
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
 
 ### 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft, nothing was confirmed yet)

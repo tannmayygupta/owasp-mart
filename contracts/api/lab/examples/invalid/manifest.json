@@ -1,0 +1,412 @@
+{
+  "instance-bad-state.json": {
+    "schema": "Instance",
+    "path": "/state",
+    "rule": "state is one of the 10 states of IF-5"
+  },
+  "instance-bad-access.json": {
+    "schema": "Instance",
+    "path": "/access",
+    "rule": "access is open, frozen or closed"
+  },
+  "instance-bad-health.json": {
+    "schema": "Instance",
+    "path": "/health",
+    "rule": "health is unknown, healthy or unhealthy"
+  },
+  "instance-bad-id.json": {
+    "schema": "Instance",
+    "path": "/instance_id",
+    "rule": "instance id is i- plus 16 Base32"
+  },
+  "instance-extra-host-id.json": {
+    "schema": "Instance",
+    "path": "/host_id",
+    "rule": "no host id in a browser answer"
+  },
+  "instance-extra-hostname.json": {
+    "schema": "Instance",
+    "path": "/hostname",
+    "rule": "no host name in a browser answer"
+  },
+  "instance-extra-orchestrator-url.json": {
+    "schema": "Instance",
+    "path": "/orchestrator_url",
+    "rule": "no orchestrator address"
+  },
+  "instance-extra-flags.json": {
+    "schema": "Instance",
+    "path": "/flags",
+    "rule": "no flag material"
+  },
+  "instance-extra-seed.json": {
+    "schema": "Instance",
+    "path": "/seed",
+    "rule": "no seed"
+  },
+  "instance-extra-event-key.json": {
+    "schema": "Instance",
+    "path": "/event_key",
+    "rule": "no event key"
+  },
+  "instance-extra-owner-hash.json": {
+    "schema": "Instance",
+    "path": "/owner_hash",
+    "rule": "no owner hash"
+  },
+  "instance-extra-stack.json": {
+    "schema": "Instance",
+    "path": "/stack_trace",
+    "rule": "no stack trace"
+  },
+  "instance-missing-epoch.json": {
+    "schema": "Instance",
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "instance-epoch-zero.json": {
+    "schema": "Instance",
+    "path": "/epoch",
+    "rule": "epoch is at least 1"
+  },
+  "instance-bad-time.json": {
+    "schema": "Instance",
+    "path": "/requested_at",
+    "rule": "time is RFC 3339 UTC with Z"
+  },
+  "instance-bad-error-code.json": {
+    "schema": "Instance",
+    "path": "/error_code",
+    "rule": "error code shape"
+  },
+  "instance-orch-error-code.json": {
+    "schema": "Instance",
+    "path": "/error_code",
+    "rule": "the browser never sees an ORCH code"
+  },
+  "request-instance-bad-kind.json": {
+    "schema": "RequestInstanceRequest",
+    "path": "/kind",
+    "rule": "only learner"
+  },
+  "request-instance-extra-template.json": {
+    "schema": "RequestInstanceRequest",
+    "path": "/template_id",
+    "rule": "closed body"
+  },
+  "request-instance-missing-kind.json": {
+    "schema": "RequestInstanceRequest",
+    "path": "/kind",
+    "rule": "kind is required"
+  },
+  "confirm-false.json": {
+    "schema": "ConfirmRequest",
+    "path": "/confirm",
+    "rule": "confirm must be true"
+  },
+  "confirm-string.json": {
+    "schema": "ConfirmRequest",
+    "path": "/confirm",
+    "rule": "confirm is a boolean"
+  },
+  "confirm-missing.json": {
+    "schema": "ConfirmRequest",
+    "path": "/confirm",
+    "rule": "confirm is required"
+  },
+  "confirm-extra.json": {
+    "schema": "ConfirmRequest",
+    "path": "/epoch",
+    "rule": "the client never sets an epoch"
+  },
+  "ticket-bad-url-http.json": {
+    "schema": "OpenTicket",
+    "path": "/url",
+    "rule": "https only"
+  },
+  "ticket-bad-url-path.json": {
+    "schema": "OpenTicket",
+    "path": "/url",
+    "rule": "path is /_vm/enter"
+  },
+  "ticket-missing-expiry.json": {
+    "schema": "OpenTicket",
+    "path": "/expires_at",
+    "rule": "expiry is required"
+  },
+  "attempt-bad-state.json": {
+    "schema": "Attempt",
+    "path": "/state",
+    "rule": "no paused state (C-1)"
+  },
+  "attempt-bad-mode.json": {
+    "schema": "Attempt",
+    "path": "/mode",
+    "rule": "learner or candidate"
+  },
+  "attempt-bad-id.json": {
+    "schema": "Attempt",
+    "path": "/attempt_id",
+    "rule": "attempt id shape"
+  },
+  "attempt-hints-string.json": {
+    "schema": "Attempt",
+    "path": "/hints_enabled",
+    "rule": "boolean"
+  },
+  "attempt-missing-server-time.json": {
+    "schema": "Attempt",
+    "path": "/server_time",
+    "rule": "server time is required"
+  },
+  "attempt-extra-org.json": {
+    "schema": "Attempt",
+    "path": "/org_id",
+    "rule": "no internal fields"
+  },
+  "flag-request-missing-key.json": {
+    "schema": "FlagSubmissionRequest",
+    "path": "/challenge_key",
+    "rule": "challenge_key is required"
+  },
+  "flag-request-bad-key.json": {
+    "schema": "FlagSubmissionRequest",
+    "path": "/challenge_key",
+    "rule": "C01 to C11"
+  },
+  "flag-request-missing-flag.json": {
+    "schema": "FlagSubmissionRequest",
+    "path": "/flag",
+    "rule": "flag is required"
+  },
+  "flag-request-number.json": {
+    "schema": "FlagSubmissionRequest",
+    "path": "/flag",
+    "rule": "flag is text"
+  },
+  "flag-request-empty.json": {
+    "schema": "FlagSubmissionRequest",
+    "path": "/flag",
+    "rule": "at least 1 character"
+  },
+  "flag-request-too-long.json": {
+    "schema": "FlagSubmissionRequest",
+    "path": "/flag",
+    "rule": "at most 200 characters"
+  },
+  "flag-request-extra.json": {
+    "schema": "FlagSubmissionRequest",
+    "path": "/attempt_id",
+    "rule": "closed body"
+  },
+  "flag-result-bad-result.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/result",
+    "rule": "five results only"
+  },
+  "flag-result-bad-credit.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/credit",
+    "rule": "credited, held or none"
+  },
+  "flag-result-echo-flag.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/flag",
+    "rule": "the submitted text is never echoed"
+  },
+  "flag-result-missing-credit.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/credit",
+    "rule": "credit is required"
+  },
+  "score-over-1000.json": {
+    "schema": "Score",
+    "path": "/score",
+    "rule": "at most 1000"
+  },
+  "score-negative.json": {
+    "schema": "Score",
+    "path": "/score",
+    "rule": "at least 0"
+  },
+  "score-bad-milestone.json": {
+    "schema": "Score",
+    "path": "/per_challenge/0/best_milestone",
+    "rule": "none, M1, M2 or M3"
+  },
+  "score-hints-over-3.json": {
+    "schema": "Score",
+    "path": "/per_challenge/0/hints_used",
+    "rule": "at most 3 hint levels"
+  },
+  "score-extra-decoy.json": {
+    "schema": "Score",
+    "path": "/per_challenge/0/decoy",
+    "rule": "no decoy in an answer"
+  },
+  "challenges-bad-key.json": {
+    "schema": "ChallengeProgressList",
+    "path": "/items/0/challenge_key",
+    "rule": "C01 to C11"
+  },
+  "challenges-missing-items.json": {
+    "schema": "ChallengeProgressList",
+    "path": "/items",
+    "rule": "items is required"
+  },
+  "hint-level-4.json": {
+    "schema": "Hint",
+    "path": "/level",
+    "rule": "levels 1 to 3"
+  },
+  "hint-bad-kind.json": {
+    "schema": "Hint",
+    "path": "/kind",
+    "rule": "nudge, direction or near_solution"
+  },
+  "hint-cost-over-100.json": {
+    "schema": "Hint",
+    "path": "/cost_pct",
+    "rule": "a percentage"
+  },
+  "hint-text-number.json": {
+    "schema": "Hint",
+    "path": "/text",
+    "rule": "text or null"
+  },
+  "hints-four-items.json": {
+    "schema": "HintList",
+    "path": "/items",
+    "rule": "three levels at most"
+  },
+  "evidence-bad-method.json": {
+    "schema": "EvidenceList",
+    "path": "/items/0/method",
+    "rule": "known methods only"
+  },
+  "evidence-body-too-long.json": {
+    "schema": "EvidenceList",
+    "path": "/items/0/body",
+    "rule": "8 KiB cap"
+  },
+  "evidence-extra-headers.json": {
+    "schema": "EvidenceList",
+    "path": "/items/0/headers",
+    "rule": "no headers or cookies are returned"
+  },
+  "evidence-bad-id.json": {
+    "schema": "EvidenceList",
+    "path": "/items/0/evidence_id",
+    "rule": "evidence id shape"
+  },
+  "integrity-bad-type.json": {
+    "schema": "IntegrityFlagList",
+    "path": "/items/0/type",
+    "rule": "five types"
+  },
+  "integrity-bad-status.json": {
+    "schema": "IntegrityFlagList",
+    "path": "/items/0/status",
+    "rule": "no automatic fail"
+  },
+  "integrity-extra-decided-by.json": {
+    "schema": "IntegrityFlagList",
+    "path": "/items/0/decided_by",
+    "rule": "no reviewer name in the answer"
+  },
+  "integrity-empty-explanation.json": {
+    "schema": "IntegrityFlagList",
+    "path": "/items/0/explanation",
+    "rule": "a plain-language explanation is required"
+  },
+  "decision-bad-decision.json": {
+    "schema": "IntegrityDecisionRequest",
+    "path": "/decision",
+    "rule": "accept or reject"
+  },
+  "decision-missing-note.json": {
+    "schema": "IntegrityDecisionRequest",
+    "path": "/note",
+    "rule": "a note is required"
+  },
+  "decision-empty-note.json": {
+    "schema": "IntegrityDecisionRequest",
+    "path": "/note",
+    "rule": "note is not empty"
+  },
+  "decision-note-too-long.json": {
+    "schema": "IntegrityDecisionRequest",
+    "path": "/note",
+    "rule": "at most 1000 characters"
+  },
+  "decision-extra-status.json": {
+    "schema": "IntegrityDecisionRequest",
+    "path": "/status",
+    "rule": "closed body"
+  },
+  "report-score-over-1000.json": {
+    "schema": "Report",
+    "path": "/score",
+    "rule": "at most 1000"
+  },
+  "report-bad-state.json": {
+    "schema": "Report",
+    "path": "/state",
+    "rule": "attempt states only"
+  },
+  "report-extra-email.json": {
+    "schema": "Report",
+    "path": "/email",
+    "rule": "no personal data in the report"
+  },
+  "report-missing-per-challenge.json": {
+    "schema": "Report",
+    "path": "/per_challenge",
+    "rule": "per_challenge is required"
+  },
+  "timeline-bad-type.json": {
+    "schema": "Timeline",
+    "path": "/items/0/type",
+    "rule": "known timeline types"
+  },
+  "timeline-extra-seq.json": {
+    "schema": "Timeline",
+    "path": "/items/0/seq",
+    "rule": "no event sequence number"
+  },
+  "timeline-bad-cursor.json": {
+    "schema": "Timeline",
+    "path": "/next_cursor",
+    "rule": "cursor characters"
+  },
+  "timeline-missing-cursor.json": {
+    "schema": "Timeline",
+    "path": "/next_cursor",
+    "rule": "next_cursor is required (null on the last page)"
+  },
+  "problem-missing-request-id.json": {
+    "schema": "Problem",
+    "path": "/request_id",
+    "rule": "request_id is required"
+  },
+  "problem-bad-code.json": {
+    "schema": "Problem",
+    "path": "/code",
+    "rule": "code shape"
+  },
+  "problem-orch-code.json": {
+    "schema": "Problem",
+    "path": "/code",
+    "rule": "no ORCH code in a browser answer"
+  },
+  "problem-extra-stack.json": {
+    "schema": "Problem",
+    "path": "/stack",
+    "rule": "no stack trace"
+  },
+  "problem-message-too-long.json": {
+    "schema": "Problem",
+    "path": "/message",
+    "rule": "at most 500 characters"
+  }
+}

@@ -3,14 +3,14 @@ title: 'Lab fragment of the platform API (IF-2)'
 type: 'feature'
 ticket: '9'
 created: '2026-10-09'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'f76f76d53d6ee614946a3dfaf8c66e579f04a8e6'
 route: 'full'
 route_source: 'pinned'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'thorough'
+review_source: 'pinned'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
 ---
@@ -62,15 +62,15 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `contracts/api/lab/lab.openapi.yaml` -- OpenAPI 3.1 for: instances (request, get, open ticket, reset, stop), attempts (get, start pending OI-22, submit), flag submit, score, challenges, hints (list, unlock), evidence, integrity flags with review decisions, per-candidate report, timeline; shared schemas and enums with sources; cookie and CSRF security scheme -- the contract
-- [ ] `contracts/api/lab/lab-api.md` -- prose: scope and ownership table, enums, auth and cross-cutting rules, error placeholders, forbidden fields, what is not here (P-owned routes), open-points table with proposals -- readable contract
+- [x] `contracts/api/lab/lab.openapi.yaml` -- OpenAPI 3.1 for: instances (request, get, open ticket, reset, stop), attempts (get, start pending OI-22, submit), flag submit, score, challenges, hints (list, unlock), evidence, integrity flags with review decisions, per-candidate report, timeline; shared schemas and enums with sources; cookie and CSRF security scheme -- the contract
+- [x] `contracts/api/lab/lab-api.md` -- prose: scope and ownership table, enums, auth and cross-cutting rules, error placeholders, forbidden fields, what is not here (P-owned routes), open-points table with proposals -- readable contract
 - [ ] `contracts/api/lab/examples/{valid,invalid}/` with `manifest.json` files -- one valid answer per operation and error, many invalid ones with expected JSON Pointer -- proof and mock data
 - [ ] `scripts/check_lab_contract.py` and `package.json` (`contracts:check`) -- validate the file, examples, operation set, secret-name and fake-flag rules; run with the other checks -- guard
-- [ ] `contracts/mocks/fake-lab/server.mjs` -- Node mock: every operation, cookie, CSRF and Origin checks, ownership 404, flag results by input, rate limit 429, state rules -- UI can be built now
-- [ ] `apps/api/tests/test_lab_contract.py` -- every mock answer validates against the OpenAPI response schemas; the matrix rows; checker negative tests (secret name added, operation removed) -- conformance
-- [ ] `scripts/e2e/lab.e2e.test.mjs` -- independent Node consumer drives the mock process over HTTP -- black-box check
+- [x] `contracts/mocks/fake-lab/server.mjs` -- Node mock: every operation, cookie, CSRF and Origin checks, ownership 404, flag results by input, rate limit 429, state rules -- UI can be built now
+- [x] `apps/api/tests/test_lab_contract.py` -- every mock answer validates against the OpenAPI response schemas; the matrix rows; checker negative tests (secret name added, operation removed) -- conformance
+- [x] `scripts/e2e/lab.e2e.test.mjs` -- independent Node consumer drives the mock process over HTTP -- black-box check
 - [ ] `contracts/CHANGELOG.md`, `docs/dev/HANDOFFS.md` (answer H-78; rows for Akshay: layout and bundling, enums and codes, P-owned routes, OI-22, cross-cutting proposals; row for L-08 if needed), `initial.md` D-39 and `docs/adr/0019-lab-api-conventions.md` (route prefix, Node mock instead of Prism, scope; research sources) -- records
-- [ ] Documentation rule -- dev-log, CHANGELOG, traceability LB-9 and decisions, evidence in `docs/assets/l-05-lab-api/`; tick L-05 only after the developer confirms
+- [x] Documentation rule -- dev-log, CHANGELOG, traceability LB-9 and decisions, evidence in `docs/assets/l-05-lab-api/`; tick L-05 only after the developer confirms
 
 **Acceptance Criteria:**
 - Given the fragment and examples, when `pnpm run contracts:check` runs, then it passes, and fails when a secret name is added to a GET answer or an operation is removed.
@@ -85,6 +85,27 @@ context: []
 
 ## Review Triage Log
 
+Pass 1 (2026-10-09, thorough, four lenses). About 55 findings from Blind Hunter (15), Edge Case Hunter (24), Verification Gap (2 gaps and 3 others) and Intent Alignment (descriptive). Verdict counts: medium 8, low 17, false 6, maybe-false 0. No intent_gap or bad_plan.
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| Mock session lookup accepts prototype keys as a signed-in user (Blind, Edge) | medium | patch | `USERS[cookie]` on an object literal; fixed with `Object.hasOwn`. |
+| Reset or stop of a frozen instance accepted; timer reopens access after submit (Edge, Blind) | medium | patch | The reset checks only instance state; contradicts the freeze in the contract; fixed in the mock plus a test. |
+| Owner of a learner attempt can decide integrity flags although the table says no (Blind) | medium | patch | Mock and table disagree; mock made to refuse, test added. |
+| 422 test pointer assertion is always true; exact `field` not asserted for confirm, kind, decision, note (Verification, Blind, Edge) | medium | patch | `startswith(("/", ""))` is true for every string; exact field per row added. |
+| Secret-name check covers GET answers only; missing enum compares None with None; non-string manifest value aborts the run (Blind, Edge) | medium | patch | Checker extended to all answer schemas, missing enum fails, bad manifest value reported. |
+| Malformed percent-encoding gives an undeclared 500; CSRF compare can throw (Edge, Blind) | medium | patch | Both answered as 404 and 403. |
+| Documented check order differs from the mock (413 first) (Blind) | medium | patch | Text changed to match IF-5 (oversize body refused first). |
+| H-78 marked done though codes are placeholders; duplicate LB-5 traceability row; changelog spacing; dev-log base commit and files list (Blind) | low | patch | Real documentation errors; corrected. |
+| Evidence `path` redaction, missing rate limits for other operations (Blind) | low | patch | Added as open points, not decided. |
+| ADR 0019 external sources not read this session (Blind) | low | defer | Honestly labelled unverified; read the sources before accepting the ADR. |
+| Node e2e test and mock-vs-spec drift not covered by `contracts:check` or CI (Verification, Blind) | medium | defer | Pytest covers the mock in CI; add the e2e file to CI with the contract CI story (1.6). |
+| Duplicate timeline rows on repeated correct flags; deciding one held flag clears the others; hint level order; cursor format; query parameters ignored on other GETs; listen error; checker scope of fake-flag scan; Request suffix naming; e2e order dependence; loose count thresholds; header loop; 413 test swallows reset (Edge, Verification, Blind) | low | defer | Mock-only edge cases or test hardening; recorded in deferred work. |
+| Submissions list never pruned (Edge) | false | none | In-memory test mock restarted per run. |
+| Fake flag scan misses mock and tests (Edge) | false | none | A separate pytest scans `server.mjs`. |
+| Sixth correct flag refused with 429 (Edge) | false | none | Matches the 5 wrong then lock rule (PRD FR-ACH-01). |
+| Unauthenticated callers can probe routes (Edge) | false | none | Routing before auth is normal; ids are not leaked. |
+| Intent: the mock carries rules the OpenAPI cannot express; IF-5 consistency checked for 3 enums; the docs disagreement is recorded, not edited (Intent) | false | none | Descriptive; the rules are proposals in the open points and D-39, matching the plan. |
 ## Design Notes
 
 Ownership rule used: a route is lab-owned when it reads or changes the tables the lab owns (attempts runtime, instances, milestones, flag submissions, hints, evidence, integrity flags, scores) per architecture 07 s5; consent, invitations, cancel, withdraw, purge, exports and live stream are P. The mock keeps a small in-memory state per test session and is reset by restarting it.

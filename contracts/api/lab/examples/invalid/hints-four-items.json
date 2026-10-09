@@ -1,0 +1,33 @@
+{
+  "challenge_key": "C02",
+  "items": [
+    {
+      "level": 1,
+      "kind": "nudge",
+      "unlocked": true,
+      "cost_pct": 0,
+      "text": "Fake hint text, level 1 (example only)."
+    },
+    {
+      "level": 2,
+      "kind": "direction",
+      "unlocked": false,
+      "cost_pct": 0,
+      "text": null
+    },
+    {
+      "level": 3,
+      "kind": "near_solution",
+      "unlocked": false,
+      "cost_pct": 0,
+      "text": null
+    },
+    {
+      "level": 1,
+      "kind": "nudge",
+      "unlocked": true,
+      "cost_pct": 0,
+      "text": "Fake hint text, level 1 (example only)."
+    }
+  ]
+}

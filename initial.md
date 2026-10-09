@@ -557,6 +557,10 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 - **Decision (Tanmay, 2026-10-08/09, three questions answered during story L-03):** (1) an event is identified by **`(instance_id, seq)` only** (the catalogue's `event_id` is dropped); (2) **`proxy.flag_seen`** carries `kind` (real, decoy or foreign), the `challenge_key` when it is this instance's, and the candidate's SHA-256; (3) **`source`** is fine-grained: sidecar, shop, import, mock, bot, orchestrator, platform. The signing form (HMAC-SHA256 over instance id, `seq` and body digest), the answers (202, 200, 409, 401, 413, 422) and all caps are proposals in `contracts/events/app-events.md`, to be confirmed by Akshay and Sahil in the team chat.
 - **Supersedes:** the event descriptions in architecture 07 section 3.2 item 6, architecture 04 (events table `source`), and challenge specs section 10 (envelope). **Evidence:** ADR 0017. (D-37 is recorded on the `sprint-1-tanmay` branch.)
 
+### D-39 - Lab API conventions (IF-2)
+- **Decision (Tanmay, 2026-10-09, four questions answered during story L-05):** (1) every browser-facing route is under **`/api/v1/`**; (2) the IF-2 mock is a **dependency-free Node fake** (`contracts/mocks/fake-lab/`), not Prism; (3) the fragment covers the **lab-owned routes only** (instances, attempts runtime, flag submit, hints, score, evidence, integrity flags, report, timeline); (4) the attempt start route is included and **marked pending OI-22**. Everything else in `contracts/api/lab/lab-api.md` (CSRF header name, paging, error code names, id shapes, time format) is a proposal for Akshay to confirm, listed in its open-points table.
+- **Supersedes:** the wording of architecture 07 section 3.1 that names a Prism mock for IF-2 (the Prism tool is UNVERIFIED there, ADR 0012). **Evidence:** ADR 0019.
+
 ---
 
 ## 16. Next steps

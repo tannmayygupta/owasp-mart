@@ -18,3 +18,7 @@
 - Run the Node end-to-end tests in CI (they are not part of any CI job); plan with the contract CI story (1.6).
 - Check the Linux CI result of the mTLS tests (TLS 1.3 refusal mapping, host name check); settled by the first pull request run.
 - Add tests: missing `openssl` on CI really fails, `CI=false` handling, expired and wrong-usage certificates, TLS 1.1 refused; share the certificate helper between the Python and Node tests; look at the 38 s runtime.
+## From story 1.9 review (2026-10-09)
+- Read the external sources of ADR 0019 (OpenAPI 3.1, RFC 9457, OWASP CSRF, Prism docs) before the ADR is accepted.
+- Run `scripts/e2e/lab.e2e.test.mjs` in CI and tie mock drift to `contracts:check` (story 1.6).
+- Mock hardening (low): no duplicate timeline rows on repeated correct flags; deciding one held flag must not clear others; hint levels in order; strict cursor format; reject unknown query parameters on every GET; handle listen errors; pin exact example counts in tests; assert every declared response header; make e2e tests order independent; the 413 test must not accept a reset.
