@@ -50,4 +50,5 @@ Stream T's share of sprint zero. Not the harness and the fakes themselves (initi
 - Decision: no closing end-to-end suite for this epic; the exploit test runner skeleton plays that role (2026-10-08).
 - Waits on initiative-lab epic-lab-baseline entries 2, 3 and 5 (instance contract, instance events, lab harness); entries 3 and 4 here carry that as unknowns.
 - Decision (2026-10-09): entry 1 (story 1.1, T-01) unknown settled. initiative-lab epic-lab-baseline entry 1 (L-01, repository skeleton) is merged to `main` (PR #1, commit 091b820), so the shop folder `apps/shop/` has a home. Unknown removed; story 1.1 is ready to start.
+- Decision (2026-10-09): entry 3 (story 1.3, T-03) unknown settled. IF-6 (instance contract, L-02) is merged to `main` and IF-4 (instance events, L-03) is open for review on `origin/shared-L-03`, so both contracts the shop consumes are reviewable. Unknown removed; story 1.3 is ready. Done on `sprint-1-sahil`.
 - Draft written 2026-10-08 by Claude Code for the user to approve; not yet confirmed.

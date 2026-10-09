@@ -33,7 +33,6 @@ covers = ["TB-2"]
 after = []
 hitl = true
 risk = "low"
-unknown = "Waits on draft pull requests of initiative-lab epic-lab-baseline entries 2 and 3 (instance contract v0, instance event schema); remove when they are open for review."
 
 [[entry]]
 id = 4
