@@ -3,7 +3,7 @@ title: 'Shop skeleton runs in a container (tracer bullet)'
 type: 'feature'
 ticket: '1'
 created: '2026-10-09'
-status: built
+status: done
 baseline_revision: 'cc25d1374bdb010a585c2151843b3dadfb109bde'
 route: 'full'
 route_source: 'pinned'
