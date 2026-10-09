@@ -22,6 +22,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const MAX_BODY = 64 * 1024;
+const DRAIN_CAP = 1024 * 1024;
 const SESSION_COOKIE = '__Host-vm_session';
 const CSRF_COOKIE = '__Host-vm_csrf';
 const KEYS = ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11'];
@@ -49,7 +50,7 @@ const USERS = {
 };
 
 export function createFakeLab(options = {}) {
-  const cfg = { host: '127.0.0.1', port: 0, origin: 'https://dashboard.example.invalid', stepDelayMs: 0, ...options };
+  const cfg = { host: '127.0.0.1', port: 0, origin: 'https://dashboard.example.invalid', stepDelayMs: 0, drainStallMs: 5000, ...options };
   let idCounter = 0;
   const newId = (prefix) => {
     let n = ++idCounter + 5000;
@@ -161,14 +162,30 @@ export function createFakeLab(options = {}) {
   }
 
   // ---- request helpers ----
-  function readBody(req) {
+  // An oversize body is refused with 413 at once, with `Connection: close`. The rest of the body is read and thrown away, so the client can
+  // finish sending and read the 413 (closing at once would reset the connection before the answer is read). The socket is destroyed when the
+  // body ends (after the answer is out), when more than DRAIN_CAP has arrived, or after 5 seconds without the end (lab-api.md, order of checks).
+  function drain(req, res, already = 0) {
+    const closeAfterAnswer = () => {
+      if (res.writableEnded && !res.writableFinished) res.once('finish', () => req.socket.destroy());
+      else req.socket.destroy();
+    };
+    if (req.readableEnded || req.complete) return closeAfterAnswer();
+    let seen = already;
+    const timer = setTimeout(() => req.socket.destroy(), cfg.drainStallMs);
+    timer.unref?.();
+    req.on('data', (c) => { seen += c.length; if (seen > DRAIN_CAP) { clearTimeout(timer); req.socket.destroy(); } });
+    req.on('end', () => { clearTimeout(timer); closeAfterAnswer(); });
+    req.on('close', () => clearTimeout(timer));
+    req.resume();
+  }  function readBody(req, res) {
     return new Promise((resolve, reject) => {
-      if (Number(req.headers['content-length']) > MAX_BODY) return resolve({ tooLarge: true, buf: Buffer.alloc(0) });
+      if (Number(req.headers['content-length']) > MAX_BODY) { drain(req, res); return resolve({ tooLarge: true, buf: Buffer.alloc(0) }); }
       const chunks = [];
       let size = 0;
       const onData = (c) => {
         size += c.length;
-        if (size > MAX_BODY) { req.off('data', onData); req.pause(); return resolve({ tooLarge: true, buf: Buffer.alloc(0) }); }
+        if (size > MAX_BODY) { req.off('data', onData); drain(req, res, size); return resolve({ tooLarge: true, buf: Buffer.alloc(0) }); }
         chunks.push(c);
       };
       req.on('data', onData);
@@ -207,6 +224,15 @@ export function createFakeLab(options = {}) {
     return true;
   }
 
+  // A GET takes only the listed query parameters, each at most once. Returns the parameters, or null after answering 422.
+  function queryOf(res, url, allowed) {
+    const q = url.searchParams;
+    const pointer = (name) => { const s = name.slice(0, 32).replace(/[^A-Za-z0-9_-]/g, ''); return s === name && s !== '' ? '/' + s : ''; };
+    for (const name of q.keys()) if (!allowed.includes(name)) { invalid(res, pointer(name), 'unknown query parameter'); return null; }
+    for (const name of new Set(q.keys())) if (q.getAll(name).length > 1) { invalid(res, pointer(name), 'a query parameter is given more than once'); return null; }
+    return q;
+  }
+
   // ---- handlers; each gets ({ res, user, params, body, url }) ----
   const H = {};
   H.requestInstance = ({ res, user, take }) => {
@@ -231,7 +257,7 @@ export function createFakeLab(options = {}) {
     if (!r || r.ownerId !== user.id) { instanceNotFound(res); return null; }
     return r;
   };
-  H.getInstance = ({ res, user, params }) => { const r = ownInstance(res, user, params.instance_id); if (r) send(res, 200, instanceView(r)); };
+  H.getInstance = ({ res, user, params, url }) => { const r = ownInstance(res, user, params.instance_id); if (r && queryOf(res, url, [])) send(res, 200, instanceView(r)); };
   H.openInstance = ({ res, user, params, take }) => {
     const r = ownInstance(res, user, params.instance_id);
     if (!r || take() === false) return;
@@ -271,7 +297,7 @@ export function createFakeLab(options = {}) {
   const owned = (res, user, id) => { const a = findAttempt(res, id); if (!a) return null; if (a.ownerId !== user.id) { attemptNotFound(res); return null; } return a; };
   const reviewable = (res, user, id) => { const a = findAttempt(res, id); if (!a) return null; if (!isReviewer(user, a)) { attemptNotFound(res); return null; } return a; };
 
-  H.getAttempt = ({ res, user, params }) => { const a = readable(res, user, params.attempt_id); if (a) send(res, 200, attemptView(a)); };
+  H.getAttempt = ({ res, user, params, url }) => { const a = readable(res, user, params.attempt_id); if (a && queryOf(res, url, [])) send(res, 200, attemptView(a)); };
   H.startAttempt = ({ res, user, params, take }) => {
     const a = owned(res, user, params.attempt_id);
     if (!a || take() === false) return;
@@ -313,8 +339,13 @@ export function createFakeLab(options = {}) {
       return problem(res, 429, 'ATT-FLAG-RATE-LIMITED', 'too many wrong submissions for this challenge', undefined, { 'retry-after': String(wait) });
     }
     const result = RESULT_BY_FLAG.get(body.flag) ?? 'wrong'; // only the result is kept, never the text
-    a.submissions.push({ key, result, at: now });
     const p = a.progress.get(key);
+    // A correct value for a challenge that is already credited, or already held with an open flag, answers the same again and records nothing new.
+    if (result === 'correct') {
+      if (p.best === 3) return send(res, 200, { challenge_key: key, result, credit: 'credited' });
+      if (a.integrity.some((f) => f.held && f.status === 'open' && f.challenge === key)) return send(res, 200, { challenge_key: key, result, credit: 'held' });
+    }
+    a.submissions.push({ key, result, at: now });
     let credit = 'none';
     if (result === 'correct') {
       if (a.mode === 'candidate' && key === 'C11') {
@@ -335,13 +366,13 @@ export function createFakeLab(options = {}) {
     a.timeline.push({ at: stamp(), type: 'flag.submitted', challenge_key: key, milestone: null, result });
     send(res, 200, { challenge_key: key, result, credit });
   };
-  H.getScore = ({ res, user, params }) => {
+  H.getScore = ({ res, user, params, url }) => {
     const a = readable(res, user, params.attempt_id);
-    if (a) send(res, 200, { attempt_id: a.id, score: total(a), computed_at: stamp(), per_challenge: scoreRows(a) });
+    if (a && queryOf(res, url, [])) send(res, 200, { attempt_id: a.id, score: total(a), computed_at: stamp(), per_challenge: scoreRows(a) });
   };
-  H.listChallenges = ({ res, user, params }) => {
+  H.listChallenges = ({ res, user, params, url }) => {
     const a = readable(res, user, params.attempt_id);
-    if (!a) return;
+    if (!a || !queryOf(res, url, [])) return;
     send(res, 200, { items: KEYS.map((k) => { const p = a.progress.get(k);
       return { challenge_key: k, best_milestone: MILESTONES[p.best], solved: p.best === 3, held: p.held, hints_used: p.hints.size, hints_available: a.hintsEnabled }; }) });
   };
@@ -354,9 +385,9 @@ export function createFakeLab(options = {}) {
   }
   const hintView = (a, key, level) => { const open = a.progress.get(key).hints.has(level);
     return { level, kind: HINT_KINDS[level - 1], unlocked: open, cost_pct: costPct(a, level), text: open ? hintText(key, level) : null }; };
-  H.listHints = ({ res, user, params }) => {
+  H.listHints = ({ res, user, params, url }) => {
     const a = hintContext(res, user, params);
-    if (a) send(res, 200, { challenge_key: params.challenge_key, items: [1, 2, 3].map((l) => hintView(a, params.challenge_key, l)) });
+    if (a && queryOf(res, url, [])) send(res, 200, { challenge_key: params.challenge_key, items: [1, 2, 3].map((l) => hintView(a, params.challenge_key, l)) });
   };
   H.unlockHint = ({ res, user, params, take }) => {
     const a = hintContext(res, user, params);
@@ -366,13 +397,16 @@ export function createFakeLab(options = {}) {
     const level = Number(params.level);
     const set = a.progress.get(params.challenge_key).hints;
     if (!set.has(level)) {
+      for (let lower = 1; lower < level; lower++) {
+        if (!set.has(lower)) return problem(res, 409, 'ATT-INVALID-STATE', `hint level ${lower} must be unlocked first`, '/level');
+      }
       set.add(level);
       a.timeline.push({ at: stamp(), type: 'hint.unlocked', challenge_key: params.challenge_key, milestone: null, result: null });
     }
     send(res, 200, hintView(a, params.challenge_key, level));
   };
-  H.listEvidence = ({ res, user, params }) => { const a = reviewable(res, user, params.attempt_id); if (a) send(res, 200, { items: a.evidence }); };
-  H.listIntegrityFlags = ({ res, user, params }) => { const a = reviewable(res, user, params.attempt_id); if (a) send(res, 200, { items: a.integrity.map(flagView) }); };
+  H.listEvidence = ({ res, user, params, url }) => { const a = reviewable(res, user, params.attempt_id); if (a && queryOf(res, url, [])) send(res, 200, { items: a.evidence }); };
+  H.listIntegrityFlags = ({ res, user, params, url }) => { const a = reviewable(res, user, params.attempt_id); if (a && queryOf(res, url, [])) send(res, 200, { items: a.integrity.map(flagView) }); };
   H.decideIntegrityFlag = ({ res, user, params, take }) => {
     const a = reviewable(res, user, params.attempt_id);
     if (!a) return;
@@ -389,14 +423,14 @@ export function createFakeLab(options = {}) {
     f.note = body.note;
     if (f.held && f.challenge) {
       const p = a.progress.get(f.challenge);
-      p.held = false;
+      p.held = a.integrity.some((x) => x !== f && x.held && x.status === 'open' && x.challenge === f.challenge); // held until no held flag is open
       if (body.decision === 'accept') p.best = 3;
     }
     send(res, 200, flagView(f));
   };
-  H.getReport = ({ res, user, params }) => {
+  H.getReport = ({ res, user, params, url }) => {
     const a = reviewable(res, user, params.attempt_id);
-    if (!a) return;
+    if (!a || !queryOf(res, url, [])) return;
     const end = a.submittedAt ? Date.parse(a.submittedAt) : Date.now();
     const elapsed = a.startedAt ? Math.max(0, Math.round((end - Date.parse(a.startedAt)) / 1000)) : null;
     const rows = KEYS.map((k) => { const p = a.progress.get(k);
@@ -408,9 +442,8 @@ export function createFakeLab(options = {}) {
   H.getTimeline = ({ res, user, params, url }) => {
     const a = readable(res, user, params.attempt_id);
     if (!a) return;
-    const q = url.searchParams;
-    for (const name of q.keys()) if (name !== 'cursor' && name !== 'limit') return invalid(res, '/' + name.slice(0, 32).replace(/[^A-Za-z0-9_-]/g, ''), 'unknown query parameter');
-    for (const name of new Set(q.keys())) if (q.getAll(name).length > 1) return invalid(res, '/' + name, `${name} is given more than once`);
+    const q = queryOf(res, url, ['cursor', 'limit']);
+    if (!q) return;
     let limit = 50;
     if (q.has('limit')) {
       if (!/^[1-9][0-9]{0,2}$/.test(q.get('limit')) || Number(q.get('limit')) > 200) return invalid(res, '/limit', 'limit is 1 to 200');
@@ -419,9 +452,10 @@ export function createFakeLab(options = {}) {
     let start = 0;
     if (q.has('cursor')) {
       if (!RE.cursor.test(q.get('cursor'))) return invalid(res, '/cursor', 'bad cursor');
-      const n = Number(Buffer.from(q.get('cursor'), 'base64url').toString('utf8'));
-      if (!Number.isInteger(n) || n < 0) return invalid(res, '/cursor', 'bad cursor');
-      start = n;
+      const text = Buffer.from(q.get('cursor'), 'base64url').toString('utf8');
+      // the cursor is a plain decimal offset written in base64url, exactly as this service makes it (no spaces, signs, exponent or hex)
+      if (!/^(0|[1-9][0-9]{0,8})$/.test(text) || Buffer.from(text).toString('base64url') !== q.get('cursor')) return invalid(res, '/cursor', 'bad cursor');
+      start = Number(text);
     }
     const items = [...a.timeline].sort((x, y) => x.at.localeCompare(y.at));
     const page = items.slice(start, start + limit);
@@ -455,10 +489,9 @@ export function createFakeLab(options = {}) {
   async function handle(req, res) {
     const url = new URL(req.url, 'http://fake.invalid');
     const method = req.method;
-    const { buf, tooLarge } = await readBody(req);
+    const { buf, tooLarge } = await readBody(req, res);
     if (tooLarge) {
       res.setHeader('connection', 'close');
-      res.on('finish', () => req.socket.destroy());
       return problem(res, 413, 'REQ-TOO-LARGE', `the body is larger than ${MAX_BODY} bytes`);
     }
     const onPath = ROUTES.filter((r) => r[1].test(url.pathname));
@@ -499,7 +532,11 @@ export function createFakeLab(options = {}) {
   });
   return {
     server, config: cfg, attempts, instances,
-    listen: () => new Promise((resolve) => server.listen(cfg.port, cfg.host, () => resolve(server.address().port))),
+    // Rejects when the port is in use or cannot be used (the command line then exits 2 with a message).
+    listen: () => new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(cfg.port, cfg.host, () => { server.off('error', reject); resolve(server.address().port); });
+    }),
     close: () => new Promise((resolve) => {
       for (const r of instances.values()) clearTimeout(r.timer);
       server.close(() => resolve());
@@ -515,8 +552,10 @@ function parseArgs(argv) {
     const name = map[argv[i]];
     if (!name || argv[i + 1] === undefined) throw new Error(`Unknown or incomplete argument: ${argv[i]}`);
     if (name === 'port' || name === 'stepDelayMs') {
+      if (name === 'port' && !/^[0-9]{1,5}$/.test(argv[i + 1])) throw new Error('--port must be a whole number from 0 to 65535');
       const n = Number(argv[i + 1]);
       if (argv[i + 1].trim() === '' || !Number.isFinite(n) || n < 0) throw new Error(`${argv[i]} must be a finite number of 0 or more`);
+      if (name === 'port' && (!Number.isInteger(n) || n > 65535)) throw new Error('--port must be a whole number from 0 to 65535');
       out[name] = n;
     } else out[name] = argv[i + 1];
   }
@@ -527,7 +566,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   let opts;
   try { opts = parseArgs(process.argv.slice(2)); } catch (err) { process.stderr.write(err.message + '\n'); process.exit(2); }
   const svc = createFakeLab(opts);
-  const port = await svc.listen();
+  let port;
+  try { port = await svc.listen(); } catch (err) { process.stderr.write(`cannot listen on ${opts.host ?? '127.0.0.1'}:${opts.port ?? 0}: ${err.code ?? err.message}\n`); process.exit(2); }
   process.stdout.write(JSON.stringify({ listening: true, port }) + '\n');
   const stop = () => svc.close().then(() => process.exit(0));
   process.on('SIGTERM', stop);

@@ -99,9 +99,12 @@ class Mock:
         if "$ref" in response:
             response = base._resolve(SPEC, response["$ref"])
         assert hdr.get("cache-control") == "private, no-store", (path, hdr)
-        for name in response.get("headers") or {}:
-            if name.lower() in ("retry-after", "allow"):
-                assert name.lower() in hdr, f"{method} {path} {status} lacks the header {name}"
+        for name, declared in (response.get("headers") or {}).items():
+            declared = base._resolve(SPEC, declared["$ref"]) if "$ref" in declared else declared
+            assert name.lower() in hdr, f"{method} {path} {status} lacks the declared header {name}"
+            const = (declared.get("schema") or {}).get("const")
+            if const is not None:
+                assert hdr[name.lower()] == const, (name, hdr[name.lower()])
         content = response.get("content") or {}
         if not content:
             assert body is None
@@ -172,7 +175,14 @@ def test_the_openapi_file_is_valid_openapi_3_1():
 def test_the_contract_check_passes_on_the_repository():
     errors, counts = contract.run(LAB_DIR)
     assert errors == []
-    assert counts["operations"] == 18 and counts["valid"] >= 30 and counts["invalid"] >= 60
+    valid = json.loads((LAB_DIR / "examples" / "valid" / "manifest.json").read_text(encoding="utf-8"))
+    invalid = json.loads((LAB_DIR / "examples" / "invalid" / "manifest.json").read_text(encoding="utf-8"))
+    assert counts["operations"] == 18
+    assert counts["valid"] == len(valid) and counts["invalid"] == len(invalid)
+    # every file in the folders is in its manifest, and every manifest entry is a file (the counts cannot drift apart)
+    for folder, manifest in (("valid", valid), ("invalid", invalid)):
+        files = {p.name for p in (LAB_DIR / "examples" / folder).glob("*.json")} - {"manifest.json"}
+        assert files == set(manifest), folder
 
 
 def test_the_contract_check_command_exits_0_and_prints_pass():
@@ -472,6 +482,7 @@ def test_hints_text_is_null_until_unlocked_and_unlock_is_repeatable(fresh):
     m = fresh()
     base_path = f"/api/v1/attempts/{A_LEARNER}/challenges/C04/hints"
     assert [h["text"] for h in m.call("GET", base_path)[1]["items"]] == [None, None, None]
+    assert m.call("POST", base_path + "/1/unlock")[0] == 200  # levels unlock in order
     first = m.call("POST", base_path + "/2/unlock")[1]
     assert first["unlocked"] and first["text"] and first["kind"] == "direction"
     assert m.call("POST", base_path + "/2/unlock")[1] == first
@@ -549,11 +560,20 @@ def test_json_only_size_and_a_body_where_none_is_allowed(mock):
     assert mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{not json")[0] == 422
     assert mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"[1]")[0] == 422
     assert mock.call("POST", f"/api/v1/instances/{I_CAND}/open", "cam", raw=b"{}")[0] == 422
+    # a body a little over the limit: the client always reads the 413 (the mock reads and discards the rest before it closes)
+    s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{" + b" " * (70 * 1024) + b"}")
+    assert s == 413 and b["code"] == "REQ-TOO-LARGE"
+
+
+def test_a_huge_body_gets_413_or_a_dropped_connection_and_the_service_goes_on(fresh):
+    # lab-api.md (order of checks): past the drain limit the connection is dropped, so the client may see a reset before it reads the 413.
+    m = fresh()
     try:
-        s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{" + b" " * (70 * 1024) + b"}")
+        s, b, _ = m.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{" + b" " * (4 * 1024 * 1024) + b"}")
         assert s == 413 and b["code"] == "REQ-TOO-LARGE"
-    except (urllib.error.URLError, ConnectionError, OSError):
-        pass  # the mock drops the connection after answering; a reset while sending is also a refusal
+    except (urllib.error.URLError, ConnectionError):
+        pass  # reset or broken pipe: the connection was dropped, which the contract allows here and nowhere else
+    assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}", "ada")[0] == 200
 
 
 def test_unknown_path_and_method(mock):
@@ -613,6 +633,21 @@ def test_the_mock_startup_line_and_bad_arguments():
     assert r.returncode == 2
 
 
+@pytest.mark.parametrize("port", ["65536", "70000", "1.5", "1e3x", "0x10", "1e3", "-1", " 80", "+80", "123456"])
+def test_a_port_out_of_range_or_not_whole_exits_2_with_a_message(port):
+    r = subprocess.run([shutil.which("node"), str(SERVER), "--port", port], capture_output=True, text=True, timeout=15)
+    assert r.returncode == 2 and "--port" in r.stderr
+
+
+def test_a_port_that_is_in_use_exits_2_with_a_message_and_does_not_hang():
+    import socket
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        r = subprocess.run([shutil.which("node"), str(SERVER), "--port", str(taken.getsockname()[1])], capture_output=True, text=True, timeout=15)
+    assert r.returncode == 2 and "cannot listen" in r.stderr and "EADDRINUSE" in r.stderr
+
+
 def test_no_flag_like_value_in_the_mock_except_the_fake_ones():
     text = SERVER.read_text(encoding="utf-8")
     assert "VM{" in text  # the fake test flags are built from it
@@ -621,6 +656,116 @@ def test_no_flag_like_value_in_the_mock_except_the_fake_ones():
     for n, line in enumerate(text.splitlines(), 1):
         for lit in re.findall(r"VM\{[^}]*\}", line):
             assert re.fullmatch(r"VM\{([A-Z2-7])\1*\}", lit) or "'" in lit or "+" in line, (n, lit)
+
+
+# ---- story 1.11: weaknesses found in review ----
+def _timeline(m, user, attempt=A_LEARNER):
+    return m.call("GET", f"/api/v1/attempts/{attempt}/timeline?limit=200", user)[1]["items"]
+
+
+def test_a_repeated_correct_flag_adds_no_second_milestone_or_timeline_row(fresh):
+    m = fresh()
+    body = {"challenge_key": "C03", "flag": flag("A")}
+    assert m.call("POST", FLAGS, "ada", body)[1]["credit"] == "credited"
+    first = _timeline(m, "ada")
+    score = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score", "ada")[1]["score"]
+    s, b, _ = m.call("POST", FLAGS, "ada", body)
+    assert s == 200 and b == {"challenge_key": "C03", "result": "correct", "credit": "credited"}
+    assert _timeline(m, "ada") == first
+    assert [r["milestone"] for r in first if r["type"] == "milestone.reached"] == ["M3"]
+    assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score", "ada")[1]["score"] == score  # counted once
+
+
+def test_a_repeated_correct_flag_on_a_held_challenge_adds_no_integrity_flag_or_timeline_row(fresh):
+    m = fresh()
+    flags_before = m.call("GET", f"/api/v1/attempts/{A_CAND}/integrity-flags", "rex")[1]["items"]
+    timeline_before = _timeline(m, "rex", A_CAND)
+    for _ in range(2):
+        s, b, _ = m.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "cam", {"challenge_key": "C11", "flag": flag("A")})
+        assert s == 200 and b["credit"] == "held"
+    assert m.call("GET", f"/api/v1/attempts/{A_CAND}/integrity-flags", "rex")[1]["items"] == flags_before
+    assert _timeline(m, "rex", A_CAND) == timeline_before
+
+
+def test_hint_levels_unlock_in_order_and_an_early_level_unlocks_nothing(fresh):
+    m = fresh()
+    base_path = f"/api/v1/attempts/{A_LEARNER}/challenges/C04/hints"
+    s, b, _ = m.call("POST", base_path + "/3/unlock")
+    assert s == 409 and b["code"] == "ATT-INVALID-STATE" and b["field"] == "/level"
+    assert m.call("POST", base_path + "/2/unlock")[0] == 409
+    assert [h["unlocked"] for h in m.call("GET", base_path)[1]["items"]] == [False, False, False]
+    assert _timeline(m, "ada") == []
+    assert m.call("POST", base_path + "/1/unlock")[0] == 200
+    assert m.call("POST", base_path + "/3/unlock")[0] == 409  # level 2 is still missing
+    assert m.call("POST", base_path + "/2/unlock")[0] == 200
+    assert m.call("POST", base_path + "/3/unlock")[0] == 200
+    assert [h["unlocked"] for h in m.call("GET", base_path)[1]["items"]] == [True, True, True]
+
+
+def _cursor(text):
+    import base64
+    return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
+
+
+@pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+    s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+    assert s == 422 and b["field"] == "/cursor", text
+
+
+def test_a_cursor_that_is_not_the_canonical_encoding_is_422(mock):
+    good = _cursor("1")
+    assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={good}", "rex")[0] == 200
+    assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={good}%3D", "rex")[0] == 422  # padding is not the form this service makes
+
+
+def test_timeline_pages_do_not_repeat_or_skip_when_the_list_grows_between_pages(fresh):
+    m = fresh()
+    path = f"/api/v1/attempts/{A_LEARNER}/timeline"
+    for n in range(1, 4):
+        m.call("POST", f"/api/v1/attempts/{A_LEARNER}/challenges/C0{n}/hints/1/unlock")
+    everything = _timeline(m, "ada")
+    pages, cursor, grown = [], None, False
+    for _ in range(20):  # 6 rows at 2 per page need 3 to 5 pages; more means the paging does not end
+        s, b, _ = m.call("GET", f"{path}?limit=2" + (f"&cursor={cursor}" if cursor else ""), "ada")
+        assert s == 200
+        pages.extend(b["items"])
+        if not grown:  # three more rows appear after the first page was read
+            for n in range(4, 7):
+                m.call("POST", f"/api/v1/attempts/{A_LEARNER}/challenges/C0{n}/hints/1/unlock")
+            grown = True
+        cursor = b["next_cursor"]
+        if cursor is None:
+            break
+    else:
+        pytest.fail("the timeline paging did not end after 20 pages (next_cursor never became null)")
+    assert pages[: len(everything)] == everything  # no repeat and no skip of what existed
+    assert len(pages) == len(everything) + 3 and len({json.dumps(p, sort_keys=True) for p in pages}) == len(pages)
+
+
+GET_PATHS = [f"/api/v1/instances/{I_CAND}", f"/api/v1/attempts/{A_CAND}", f"/api/v1/attempts/{A_CAND}/score",
+             f"/api/v1/attempts/{A_CAND}/challenges", f"/api/v1/attempts/{A_CAND}/evidence",
+             f"/api/v1/attempts/{A_CAND}/integrity-flags", f"/api/v1/attempts/{A_CAND}/report", f"/api/v1/attempts/{A_CAND}/timeline"]
+
+
+@pytest.mark.parametrize("path", GET_PATHS)
+def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+    user = "cam" if "instances" in path else "rex"
+    s, b, _ = mock.call("GET", path + "?surprise=1", user)
+    assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+    s, b, _ = mock.call("GET", path + ("?limit=1&limit=2" if path.endswith("timeline") else "?x=1&x=2"), user)
+    assert s == 422 and b["field"] in ("/limit", "/x")
+    assert mock.call("GET", path, user)[0] == 200
+
+
+def test_the_hints_get_refuses_a_query_parameter_and_a_hostile_name_is_not_echoed(fresh):
+    m = fresh()
+    s, b, _ = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges/C01/hints?surprise=1")
+    assert s == 422 and b["field"] == "/surprise"
+    s, b, _ = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score?%3Cscript%3E=1")
+    assert s == 422 and b["field"] == "" and "script" not in json.dumps(b)
+    # an outsider still gets the uniform 404 first, not a validation answer
+    assert m.call("GET", f"/api/v1/attempts/{A_CAND}/score?surprise=1", "eve")[0] == 404
 
 
 # ---- review fixes ----

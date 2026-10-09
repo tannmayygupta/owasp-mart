@@ -189,7 +189,7 @@ def test_an_oversize_body_is_refused(svc):
         for _ in range(5):
             try:
                 return raw_call(svc.url, "POST", "/v1/instances", body, **kw)
-            except (ConnectionError, OSError):
+            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):  # only these three (Windows gives ConnectionAbortedError); any other error is a real failure and is not retried
                 time.sleep(0.2)
         raise AssertionError("never saw the 413 answer, only connection resets")
 
@@ -567,9 +567,22 @@ def test_no_get_answer_holds_the_owner_hash_or_the_first_seq(svc):
     answers.append(b)
     st, b, _ = raw_call(svc.url, "GET", f"/v1/instances/{req.instance_id}")
     answers.append(b)
-    blob = b"\n".join(answers).decode()
-    assert owner_hash("Z") not in blob and "owner" not in blob and "first_seq" not in blob
-    assert "777001" not in blob and "888002" not in blob
+    # parse every answer: no key named like the secrets at any depth, and no value equal to them
+    def walk(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                yield k
+                yield from walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                yield from walk(v)
+        else:
+            yield node
+
+    for answer in answers:
+        seen = list(walk(json.loads(answer)))
+        assert not any(isinstance(x, str) and ("owner" in x or x == "first_seq") for x in seen), answer
+        assert owner_hash("Z") not in seen and 777001 not in seen and 888002 not in seen, answer
 
 
 # ---- fake service hardening ----

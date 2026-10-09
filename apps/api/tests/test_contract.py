@@ -75,6 +75,17 @@ def test_check_fails_when_a_get_answer_schema_can_carry_a_secret(copy_of_contrac
     assert any("secret-looking property 'seed'" in e for e in errors)
 
 
+@pytest.mark.parametrize("name", ["owner_hash", "first_seq"])
+def test_check_fails_when_owner_hash_or_first_seq_is_in_a_get_answer_schema(copy_of_contract, name):
+    # both are accepted by POST create and reset, so they exist in the file, but no GET answer may be able to carry them
+    f = copy_of_contract / contract.SPEC
+    spec = yaml.safe_load(f.read_text(encoding="utf-8"))
+    spec["components"]["schemas"]["InstanceStatus"]["properties"][name] = {"type": "string"}
+    f.write_text(yaml.safe_dump(spec), encoding="utf-8")
+    errors, _ = contract.run(copy_of_contract)
+    assert any(f"secret-looking property {name!r}" in e for e in errors), errors
+
+
 def test_check_fails_when_an_invalid_example_becomes_valid(copy_of_contract):
     (copy_of_contract / "examples" / "invalid" / "create-image-field.json").write_text(
         (copy_of_contract / "examples" / "valid" / "create.request.json").read_text(encoding="utf-8"), encoding="utf-8")

@@ -2,7 +2,7 @@
 // process, requests are made with node:http, and answers are checked by hand against the rules of contracts/api/lab/lab-api.md
 // and the valid examples. The repository's mock code and the Python checker are NOT imported.
 // Run: node --test "scripts/e2e/lab.e2e.test.mjs"   (Node built-ins only)
-import test, { before, after } from 'node:test';
+import test, { beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import path from 'node:path';
@@ -66,14 +66,18 @@ const keysOf = (o) => (Array.isArray(o) ? o.flatMap(keysOf) : o && typeof o === 
 const A_LEARNER = 'a-AAAAAAAAAAAAAAAA';
 const A_CAND = 'a-BBBBBBBBBBBBBBBB';
 const I_CAND = 'i-BBBBBBBBBBBBBBBB';
-const ANSWERS = [];
+let ANSWERS = [];
 const seen = (r) => { ANSWERS.push(r.text); assert.equal(r.headers['cache-control'], 'private, no-store'); return r; };
 
-before(async () => {
+// Every test gets its own fresh fake lab (and its own answer list), so the tests do not depend on each other or on their order.
+// `slow` (instance steps held for ten minutes) is started only by the tests that need it.
+beforeEach(async () => {
+  ANSWERS = [];
+  slow = undefined;
   base = await start();
-  slow = await start('--step-delay-ms', '600000');
 });
-after(() => { for (const c of children) c.kill(); });
+afterEach(() => { for (const c of children.splice(0)) c.kill(); });
+const startSlow = async () => { slow = await start('--step-delay-ms', '600000'); return slow; };
 
 test('the startup line is printed once and unknown arguments exit 2', async () => {
   const r = await new Promise((resolve) => {
@@ -181,6 +185,7 @@ test('an instance goes requested to ready, opens with a ticket, resets with a ne
   assert.equal(reset.json.epoch, 2);
   assert.equal(reset.json.state, 'resetting');
   // A second reset while resetting is 409. Checked on the slow server, where the seeded ready instance stays in the resetting state.
+  await startSlow();
   assert.equal((await call(slow, 'POST', `/api/v1/instances/${I_CAND}/reset`, { user: 'CAM', body: { confirm: true } })).status, 202);
   assert.equal((await call(slow, 'POST', `/api/v1/instances/${I_CAND}/reset`, { user: 'CAM', body: { confirm: true } })).status, 409);
   assert.equal(seen(await post('/api/v1/instances', { kind: 'learner' }, { user: 'EVE' })).status, 409);
@@ -188,6 +193,7 @@ test('an instance goes requested to ready, opens with a ticket, resets with a ne
 });
 
 test('an instance that is not ready cannot be opened or reset (409)', async () => {
+  await startSlow();
   const r = await call(slow, 'POST', '/api/v1/instances', { user: 'ADA', body: { kind: 'learner' } });
   assert.equal(r.status, 202);
   const id = r.json.instance_id;
@@ -232,9 +238,26 @@ test('unknown path is 404 and a wrong method is 405 with Allow', async () => {
   assert.equal(r.headers.allow, 'GET');
 });
 
-test('no answer holds a flag, key, seed, owner hash, host id or stack trace', () => {
+test('no answer holds a flag, key, seed, owner hash, host id or stack trace', async () => {
+  // A fixed set of calls on this test's own lab; every answer is kept by seen(), so the count is exact.
+  const planned = [
+    () => get(`/api/v1/attempts/${A_LEARNER}`), () => get(`/api/v1/attempts/${A_LEARNER}/score`), () => get(`/api/v1/attempts/${A_LEARNER}/timeline`),
+    () => get(`/api/v1/attempts/${A_LEARNER}/challenges`), () => get(`/api/v1/attempts/${A_LEARNER}/challenges/C01/hints`),
+    () => get(`/api/v1/attempts/${A_LEARNER}/report`), () => get(`/api/v1/attempts/${A_LEARNER}/evidence`), () => get(`/api/v1/attempts/${A_LEARNER}/integrity-flags`),
+    () => post(`/api/v1/attempts/${A_LEARNER}/flags`, { challenge_key: 'C01', flag: fakeFlag('B') }),
+    () => post(`/api/v1/attempts/${A_LEARNER}/flags`, { challenge_key: 'C01', flag: fakeFlag('C') }),
+    () => post(`/api/v1/attempts/${A_LEARNER}/flags`, { challenge_key: 'C01', flag: fakeFlag('A') }),
+    () => post(`/api/v1/attempts/${A_LEARNER}/flags`, { challenge_key: 'C01' }),
+    () => get(`/api/v1/attempts/${A_LEARNER}/integrity-flags`),
+    () => get(`/api/v1/attempts/${A_CAND}`, { user: 'CAM' }), () => get(`/api/v1/attempts/${A_CAND}/report`, { user: 'REX' }),
+    () => get(`/api/v1/attempts/${A_CAND}/evidence`, { user: 'REX' }), () => get(`/api/v1/attempts/${A_CAND}/integrity-flags`, { user: 'REX' }),
+    () => get(`/api/v1/attempts/${A_CAND}/timeline`, { user: 'REX' }), () => get(`/api/v1/instances/${I_CAND}`, { user: 'CAM' }),
+    () => post(`/api/v1/instances/${I_CAND}/open`, undefined, { user: 'CAM' }), () => get('/api/v1/nothing'), () => get(`/api/v1/attempts/${A_CAND}`, { user: 'EVE' }),
+    () => get(`/api/v1/attempts/${A_LEARNER}`, { user: null }), () => call(base, 'DELETE', `/api/v1/instances/${I_CAND}`, { user: 'CAM' }),
+  ];
+  for (const make of planned) seen(await make());
+  assert.equal(ANSWERS.length, planned.length);
   const text = ANSWERS.join('\n');
-  assert.ok(ANSWERS.length > 30);
   assert.ok(!/VM\{/.test(text));
   for (const name of ['owner_hash', 'event_key', 'flag_digests', 'host_id', 'seed', 'stack', 'orchestrator']) assert.ok(!text.includes(name), name);
   for (const answer of ANSWERS) if (answer) assert.ok(!keysOf(JSON.parse(answer)).some((k) => ['flag', 'flags', 'decoys', 'sha256', 'hostname'].includes(k)));

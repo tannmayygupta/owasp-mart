@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import https from 'node:https';
 import { fileURLToPath } from 'node:url';
+import { flagOn } from '../env-flag.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVER = path.join(ROOT, 'contracts', 'mocks', 'fake-orchestrator', 'server.mjs');
@@ -315,7 +316,7 @@ test('a host with little capacity answers 429 ORCH-BUSY with Retry-After and cre
 test('with --tls flags the fake serves HTTPS and refuses a call without a client certificate', async (t) => {
   const probe = spawnSync('openssl', ['version'], { encoding: 'utf8' });
   if (probe.error || probe.status !== 0) {
-    if (process.env.CI) assert.fail('openssl is not installed, the mTLS test cannot make certificates');
+    if (flagOn(process.env.CI)) assert.fail('openssl is not installed, the mTLS test cannot make certificates');
     t.skip('openssl is not installed');
     return;
   }
@@ -358,7 +359,10 @@ test('with --tls flags the fake serves HTTPS and refuses a call without a client
   }
 });
 
-test('the Python suite (protocol on both hosts, HTTP service, contract) still passes', { timeout: 600000 }, () => {
+// The nested Python run is kept for local use. The CI job `e2e` switches it off with VULNMART_E2E_SKIP_NESTED_PYTEST=1 (or `true`), because the
+// CI job `scripts` already runs pytest; running it a second time would only double the minutes (see docs/dev-log, story 1.11).
+const skipNested = flagOn(process.env.VULNMART_E2E_SKIP_NESTED_PYTEST);
+test('the Python suite (protocol on both hosts, HTTP service, contract) still passes', { timeout: 600000, skip: skipNested ? 'VULNMART_E2E_SKIP_NESTED_PYTEST is set (the CI job scripts runs pytest)' : false }, () => {
   const r = spawnSync('uv', ['run', '--locked', '--package', 'vulnmart-api', 'pytest', '-q'], { cwd: ROOT, env: cleanEnv, encoding: 'utf8', timeout: 540000 });
   assert.equal(r.status, 0, (r.stdout || '').slice(-3000) + (r.stderr || '').slice(-1000));
   assert.match(r.stdout, /\d+ passed/);

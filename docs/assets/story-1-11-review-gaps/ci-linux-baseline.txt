@@ -1,0 +1,439 @@
+﻿sha256:fcb7ca5f0ee999131b3289f82d1c22dc658b7cb2298462a1a07f275e2d9574c5
+=== STEP skills: node scripts/verify-skills.mjs
+OK: all 217 installed skill files match the manifest.
+=== RESULT skills: PASS
+=== STEP pnpm-install: pnpm install --frozen-lockfile
+? Verifying lockfile against supply-chain policies (6 entries)...
+✓ Lockfile passes supply-chain policies (6 entries in 764ms)
+Lockfile is up to date, resolution step is skipped
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /root/.local/share/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Packages: +6
+++++++
+Progress: resolved 6, reused 0, downloaded 6, added 6, done
+
+devDependencies:
++ ajv 8.20.0
++ ajv-formats 3.0.1
+
+Done in 1.1s using pnpm v12.10.1
+=== RESULT pnpm-install: PASS
+=== STEP unit-tests: node --test "scripts/*.test.mjs"
+✔ parseArgs: help forms (3.878607ms)
+✔ parseArgs: simple commands and extra args (0.619595ms)
+✔ parseArgs: up needs valid profiles, dedupes (1.894626ms)
+✔ parseArgs: unknown command (0.330999ms)
+✔ hello: Docker down gives exit 1, message, and no compose up (1.194622ms)
+✔ hello: busy port gives exit 1 naming the port, no compose up (1.290876ms)
+✔ hello: success removes stale first, prints hello, always tears down (1.457379ms)
+✔ hello: bad HTTP answer exits 1 and still tears down (0.554597ms)
+✔ up: Docker down exits 1 (0.844557ms)
+✔ up: profile with no services exits 1 with a clear message (0.790721ms)
+✔ up: requested profiles are all passed, starts with up -d --wait, logs Started (0.998989ms)
+✔ up: config failure exits 1 (0.346179ms)
+✔ down: Docker down exits 1 (0.445584ms)
+✔ down: passes every profile and --remove-orphans, returns 0 (0.51488ms)
+✔ compose.yaml: hello hardening and limits are present (0.924162ms)
+✔ doctor: all pass gives 0, a missing tool gives 1 (1.563046ms)
+✔ doctor: a different Node major fails and names the pin (0.407379ms)
+✔ doctor: a different pnpm version fails and names the pin (2.216627ms)
+✔ portFree: false when something listens (21.631279ms)
+✔ the real contract validates: exit 0, every schema and example counted (359.546719ms)
+✔ coverage: every rule family has invalid examples and every schema has a valid one (1.920196ms)
+✔ CLI: exit 0 on the real contract and lists the examples (520.306579ms)
+✔ CLI: --help exits 0, unknown argument exits 2, importing does not run main (301.320282ms)
+✔ CLI: exits non-zero on a broken copy and prints the failing path (546.530381ms)
+✔ removing epoch from the injection schema makes the run fail (278.906943ms)
+✔ a template without the shop role fails (as the valid example) (219.273439ms)
+✔ injector and shop not sharing one /run/vm volume fails (as the valid example) (199.236545ms)
+✔ a non-memory-backed volume fails (as the valid example) (173.630741ms)
+✔ an invalid example that passes is reported (159.408826ms)
+✔ an invalid example failing at the wrong path is reported with both paths (207.271799ms)
+✔ orphan example, example without manifest entry, manifest entry without file (364.144921ms)
+✔ malformed JSON is reported, not thrown (220.715928ms)
+✔ a schema that does not compile names the cause (213.016439ms)
+✔ a missing schema file and a missing contract text are reported (116.029921ms)
+✔ contract text must keep its 11 sections and the open-points table (170.092102ms)
+✔ a real-looking flag or a private key in an example or in the text is rejected (208.243836ms)
+✔ a byte-order mark is rejected (189.525095ms)
+✔ no file of the contract or its tooling starts with a byte-order mark (13.680472ms)
+✔ OS metadata files and .gitkeep in examples are not orphans; a secret in a schema is found (339.469706ms)
+✔ errorPath builds JSON Pointers for required, additional and property-name errors (1.018802ms)
+✔ the real contract validates: counts printed, schema and catalogue agree (2297.574798ms)
+✔ the 29 types of the challenge specs plus infrastructure_fault are all listed (1.454342ms)
+✔ decision 1: the catalogue event_id is gone, identity is (instance_id, seq) (1.165816ms)
+✔ a type removed from the schema but still in the catalogue exits non-zero (3588.477464ms)
+✔ a type in the schema but missing from the catalogue fails (1436.483399ms)
+✔ a catalogue source that differs from the schema fails (1739.531196ms)
+✔ a type with no per-type rule or no example fails (3157.032184ms)
+✔ the catalogue parser reads section 7 only (0.748828ms)
+✔ every type has exactly one valid example and every example file is named after its type (2.648527ms)
+✔ an invalid example that passes, a missing manifest path and an orphan are all failures (6104.664126ms)
+✔ a valid example that breaks the schema fails and names the path (1481.380437ms)
+✔ a tampered signed envelope example fails (1436.529158ms)
+✔ no real-looking flag, key block or byte-order mark in the contract files (4129.458059ms)
+✔ a missing contract text, section or open-points table fails (2879.202487ms)
+✔ schema: source and session kind rules per type (89.980374ms)
+✔ schema: proxy.flag_seen needs challenge_key for real and decoy, forbids it for foreign (85.54928ms)
+✔ fake ingest: every row of the I/O matrix answers as the contract says (999.505635ms)
+✔ fake ingest: valid -> 202 stored; duplicate -> 200 not stored twice (81.465125ms)
+✔ fake ingest: 401 for bad signature and wrong instance, problem-details body, nothing stored (98.52166ms)
+✔ fake ingest: signature check happens before the schema check (87.074499ms)
+✔ fake ingest: 422 names the JSON path and never echoes a flag-like value (102.317103ms)
+✔ fake ingest: 413 above 16 KiB and for an evidence body above 8 KiB (bytes, not characters) (87.900116ms)
+✔ fake ingest: a ts more than 10 minutes ahead is refused, an old ts is accepted (83.956573ms)
+✔ signing helper: format, tamper detection, instance and seq are covered (0.856859ms)
+✔ fake ingest server: POST answers 202, 200, 401, 413, 422; other methods and paths are refused (262.278087ms)
+✔ fake ingest server: argument parsing (1.41241ms)
+✔ raw bytes: the signature covers the received bytes, invalid UTF-8 included (328.897664ms)
+✔ unknown instance and wrong signature give the same 401 body (apart from request_id) (82.384808ms)
+✔ duplicate with the same body is 200, with a different body is 409 and nothing is stored (106.632574ms)
+✔ the number of stored events is capped (503), duplicates are still answered (100.248708ms)
+✔ error paths never echo a flag-like property name; a leap second is "not a usable time" (84.306702ms)
+✔ schema: flag-like check ignores letter case and sees an encoded brace; internal is not for the shop (87.460514ms)
+✔ proxy.flag_seen: envelope and data challenge_key must agree when both are present (85.307812ms)
+✔ the evidence example shows the [FLAG-REDACTED] marker and is accepted (85.712293ms)
+✔ posted-body schema: the file on disk equals what the wire schema derives (3.205284ms)
+✔ posted-body schema: stale file fails; --write-posted regenerates it (4243.97295ms)
+✔ posted-body schema: sources, ids, caps and types the poster may use (1.446718ms)
+✔ a null or malformed envelope example is reported, not a crash (2974.399247ms)
+✔ fake ingest server: a body far over 16 KiB is answered 413 and not stored; the server keeps working (141.977463ms)
+✔ fake ingest server: a client that aborts mid-body does not break the server (257.947556ms)
+✔ fake ingest server: option values are validated (0.747615ms)
+✔ command line: exit 0 on the real contract, 1 on a failure, 2 on a usage error (2913.967096ms)
+ℹ tests 82
+ℹ suites 0
+ℹ pass 82
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42128.342975
+=== RESULT unit-tests: PASS
+=== STEP pytest: uv run --locked --package vulnmart-api pytest -q
+node : Downloading cpython-3.14.8-linux-x86_64-gnu (download) (34.6MiB)
+At line:1 char:385
++ ... | Out-Null; node scripts/ci-linux.mjs *> docs\assets\story-1-11-revie ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Downloading cpy...load) (34.6MiB):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Downloaded cpython-3.14.8-linux-x86_64-gnu (download)
+Using CPython 3.14.8
+Creating virtual environment at: .venv
+   Building vulnmart-api @ file:///work/apps/api
+      Built vulnmart-api @ file:///work/apps/api
+Downloading pygments (1.2MiB)
+Downloading pydantic-core (2.1MiB)
+ Downloaded pygments
+ Downloaded pydantic-core
+Installed 26 packages in 160ms
+........................................................................ [ 21%]
+........................................................................ [ 42%]
+........................................................................ [ 63%]
+........................................................................ [ 85%]
+..................................................                       [100%]
+338 passed in 95.82s (0:01:35)
+=== RESULT pytest: PASS
+=== STEP contracts-check: pnpm run contracts:check
+$ node scripts/validate-contracts.mjs && node scripts/validate-events.mjs && uv run --locked --package vulnmart-api 
+python scripts/check_orchestrator_contract.py && uv run --locked --package vulnmart-api python 
+scripts/check_lab_contract.py
+schema ok: injection-document.schema.json
+schema ok: flags-file.schema.json
+schema ok: instance-template.schema.json
+contract text checked: instance-contract.md
+invalid example rejected at /flags/0/flag: examples/invalid/flags-file/bad-flag-format.json
+invalid example rejected at /instance_id: examples/invalid/flags-file/bad-instance-id.json
+invalid example rejected at /schema_version: examples/invalid/flags-file/bad-schema-version.json
+invalid example rejected at /flags/1/challenge_key: examples/invalid/flags-file/duplicate-challenge-key.json
+invalid example rejected at /event_key: examples/invalid/flags-file/extra-property.json
+invalid example rejected at /epoch: examples/invalid/flags-file/missing-epoch.json
+invalid example rejected at /flags/0/challenge_key: examples/invalid/injection-document/bad-challenge-key.json
+invalid example rejected at /decoys/0/value: examples/invalid/injection-document/bad-decoy-format.json
+invalid example rejected at /flags/0/flag: examples/invalid/injection-document/bad-flag-format.json
+invalid example rejected at /instance_id: examples/invalid/injection-document/bad-instance-id.json
+invalid example rejected at /issued_at: examples/invalid/injection-document/bad-issued-at.json
+invalid example rejected at /schema_version: examples/invalid/injection-document/bad-schema-version.json
+invalid example rejected at /decoys/2/challenge_key: examples/invalid/injection-document/decoy-challenge-not-in-flags.json
+invalid example rejected at /decoys/0/value: examples/invalid/injection-document/decoy-equals-flag.json
+invalid example rejected at /decoys/1/value: examples/invalid/injection-document/decoy-value-repeated.json
+invalid example rejected at /flags/1/challenge_key: examples/invalid/injection-document/duplicate-challenge-key.json
+invalid example rejected at /decoys/1/index: examples/invalid/injection-document/duplicate-decoy-index.json
+invalid example rejected at /flags: examples/invalid/injection-document/empty-flags.json
+invalid example rejected at /event_key: examples/invalid/injection-document/extra-property.json
+invalid example rejected at /flags/1/flag: examples/invalid/injection-document/flag-value-repeated.json
+invalid example rejected at /flags/0/flag: examples/invalid/injection-document/lowercase-flag.json
+invalid example rejected at /epoch: examples/invalid/injection-document/missing-epoch.json
+invalid example rejected at /seed: examples/invalid/injection-document/missing-seed.json
+invalid example rejected at /decoys/0/index: examples/invalid/injection-document/negative-decoy-index.json
+invalid example rejected at /epoch: examples/invalid/injection-document/non-numeric-epoch.json
+invalid example rejected at /seed: examples/invalid/injection-document/seed-bad-characters.json
+invalid example rejected at /seed: examples/invalid/injection-document/short-seed.json
+invalid example rejected at /flags: examples/invalid/injection-document/twelve-flags.json
+invalid example rejected at /epoch: examples/invalid/injection-document/zero-epoch.json
+invalid example rejected at /components/0/mounts/2/source: examples/invalid/instance-template/anonymous-volume.json
+invalid example rejected at /components/0/labels/vm.owner: examples/invalid/instance-template/bad-owner-label.json
+invalid example rejected at /schema_version: examples/invalid/instance-template/bad-schema-version.json
+invalid example rejected at /template_id: examples/invalid/instance-template/bad-template-id.json
+invalid example rejected at /components/5/mounts/1/target: examples/invalid/instance-template/bot-controller-mounts-run-import.json
+invalid example rejected at /components/0/cap_add: examples/invalid/instance-template/cap-add.json
+invalid example rejected at /components/0/cap_drop: examples/invalid/instance-template/cap-drop-empty.json
+invalid example rejected at /components/0/cap_drop: examples/invalid/instance-template/cap-drop-missing.json
+invalid example rejected at /components/0/cpu_limit: examples/invalid/instance-template/cpu-limit-zero.json
+invalid example rejected at /components/1/name: examples/invalid/instance-template/duplicate-component-name.json
+invalid example rejected at /components/0/mounts/1/target: examples/invalid/instance-template/duplicate-mount-target.json
+invalid example rejected at /components/0/ports: examples/invalid/instance-template/duplicate-port.json
+invalid example rejected at /components: examples/invalid/instance-template/duplicate-role.json
+invalid example rejected at /volumes/1/name: examples/invalid/instance-template/duplicate-volume-name.json
+invalid example rejected at /components/0/egress: examples/invalid/instance-template/egress-true.json
+invalid example rejected at /components/0/env/VM_LOG_LEVEL: examples/invalid/instance-template/env-flag-in-value.json
+invalid example rejected at /components/0/env/VM_FLAG_C01: examples/invalid/instance-template/env-flag-name.json
+invalid example rejected at /components/0/env/EVENT_KEY: examples/invalid/instance-template/env-key-suffix.json
+invalid example rejected at /components/0/env/ADMIN_PASSWORD: examples/invalid/instance-template/env-password-suffix.json
+invalid example rejected at /components/0/env/DB_SECRET: examples/invalid/instance-template/env-secret-suffix.json
+invalid example rejected at /components/0/env/API_TOKEN: examples/invalid/instance-template/env-token-suffix.json
+invalid example rejected at /components/0/env/DATABASE_URL: examples/invalid/instance-template/env-unlisted-name.json
+invalid example rejected at /components/0/env/PORT: examples/invalid/instance-template/env-value-not-string.json
+invalid example rejected at /components/0/env/VM_LOG_LEVEL: examples/invalid/instance-template/env-value-too-long.json
+invalid example rejected at /components/0/flag_delivery_env/env_name: examples/invalid/instance-template/flag-delivery-env-bad-name.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-blank-reason.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-missing-reason.json
+invalid example rejected at /components/0/flag_delivery_env/env_name: examples/invalid/instance-template/flag-delivery-env-name-mismatch.json
+invalid example rejected at /components/1/flag_delivery_env: examples/invalid/instance-template/flag-delivery-env-on-sidecar.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-short-reason.json
+invalid example rejected at /components/0/healthcheck/path: examples/invalid/instance-template/healthcheck-http-without-path.json
+invalid example rejected at /components/0/healthcheck/path: examples/invalid/instance-template/healthcheck-path-traversal.json
+invalid example rejected at /components/0/healthcheck/port: examples/invalid/instance-template/healthcheck-port-not-in-ports.json
+invalid example rejected at /components/0/healthcheck/timeout_s: examples/invalid/instance-template/healthcheck-timeout-over-interval.json
+invalid example rejected at /components/0/healthcheck/kind: examples/invalid/instance-template/healthcheck-unknown-kind.json
+invalid example rejected at /components/0/mounts/0/type: examples/invalid/instance-template/host-bind-mount.json
+invalid example rejected at /components/3/healthcheck/kind: examples/invalid/instance-template/import-service-healthcheck-http.json
+invalid example rejected at /components/3/mounts: examples/invalid/instance-template/import-service-missing-placement.json
+invalid example rejected at /components/3/mounts: examples/invalid/instance-template/import-service-missing-run-import.json
+invalid example rejected at /components/3/mounts: examples/invalid/instance-template/import-service-missing-tmp.json
+invalid example rejected at /components/3/network_mode: examples/invalid/instance-template/import-service-on-instance-network.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-placement-import.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-placement-mock.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-run-vm.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-tmp.json
+invalid example rejected at /components/2/network_mode: examples/invalid/instance-template/injector-on-instance-network.json
+invalid example rejected at /components/0/labels/vm.component: examples/invalid/instance-template/label-component-mismatch.json
+invalid example rejected at /components/0/labels/vm.expires: examples/invalid/instance-template/label-expires-bad.json
+invalid example rejected at /components/2/labels/vm.host: examples/invalid/instance-template/label-host-differs.json
+invalid example rejected at /components/1/labels/vm.instance: examples/invalid/instance-template/label-instance-differs.json
+invalid example rejected at /components/0/labels/vm.kind: examples/invalid/instance-template/label-kind-front.json
+invalid example rejected at /components/0/labels/vm.schema: examples/invalid/instance-template/label-schema-other.json
+invalid example rejected at /components/0/labels/vm.template: examples/invalid/instance-template/label-template-mismatch.json
+invalid example rejected at /components/0/memory_mb: examples/invalid/instance-template/memory-below-memory-backed-sizes.json
+invalid example rejected at /components/0/memory_mb: examples/invalid/instance-template/memory-limit-below-16.json
+invalid example rejected at /components/0/cpu_limit: examples/invalid/instance-template/missing-cpu-limit.json
+invalid example rejected at /components/0/healthcheck: examples/invalid/instance-template/missing-healthcheck.json
+invalid example rejected at /components: examples/invalid/instance-template/missing-injector-role.json
+invalid example rejected at /components/0/memory_mb: examples/invalid/instance-template/missing-memory-limit.json
+invalid example rejected at /components/0/network_mode: examples/invalid/instance-template/missing-network-mode.json
+invalid example rejected at /components/0/labels/vm.owner: examples/invalid/instance-template/missing-owner-label.json
+invalid example rejected at /components/0/pids_limit: examples/invalid/instance-template/missing-pids-limit.json
+invalid example rejected at /components/1/ports: examples/invalid/instance-template/missing-ports.json
+invalid example rejected at /components: examples/invalid/instance-template/missing-shop-role.json
+invalid example rejected at /components/4/mounts: examples/invalid/instance-template/mock-services-missing-placement.json
+invalid example rejected at /components/0/mounts/1/target: examples/invalid/instance-template/mount-traversal-target.json
+invalid example rejected at /components/0/mounts/1/target: examples/invalid/instance-template/mount-unlisted-target.json
+invalid example rejected at /components/0/no_new_privileges: examples/invalid/instance-template/no-new-privileges-false.json
+invalid example rejected at /components/0/mounts/4/target: examples/invalid/instance-template/placement-import-mounted-by-shop.json
+invalid example rejected at /components/3/mounts/2/source: examples/invalid/instance-template/placement-import-separate-volume.json
+invalid example rejected at /components/3/mounts/2/read_only: examples/invalid/instance-template/placement-import-writable.json
+invalid example rejected at /components/5/mounts/1/target: examples/invalid/instance-template/placement-mock-mounted-by-bot-controller.json
+invalid example rejected at /components/3/mounts/3/target: examples/invalid/instance-template/placement-mock-mounted-by-import-service.json
+invalid example rejected at /components/4/mounts/1/source: examples/invalid/instance-template/placement-mock-separate-volume.json
+invalid example rejected at /components/3/user: examples/invalid/instance-template/placement-reader-other-user.json
+invalid example rejected at /components/2/mounts/4/source: examples/invalid/instance-template/placement-volumes-same-source.json
+invalid example rejected at /components/0/ports/0: examples/invalid/instance-template/port-out-of-range.json
+invalid example rejected at /components/0/privileged: examples/invalid/instance-template/privileged-missing.json
+invalid example rejected at /components/0/privileged: examples/invalid/instance-template/privileged-true.json
+invalid example rejected at /components/0/read_only: examples/invalid/instance-template/read-only-false.json
+invalid example rejected at /components/3/mounts/1/source: examples/invalid/instance-template/run-import-separate-volumes.json
+invalid example rejected at /components/2/mounts/2/read_only: examples/invalid/instance-template/run-vm-injector-read-only.json
+invalid example rejected at /components/0/mounts/2/source: examples/invalid/instance-template/run-vm-separate-volumes.json
+invalid example rejected at /components/0/mounts/2/read_only: examples/invalid/instance-template/run-vm-shop-writable.json
+invalid example rejected at /components/0/healthcheck/kind: examples/invalid/instance-template/shop-healthcheck-tcp.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-data.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-run-import.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-run-vm.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-tmp.json
+invalid example rejected at /components/1/mounts/1/target: examples/invalid/instance-template/sidecar-mounts-run-vm.json
+invalid example rejected at /extra: examples/invalid/instance-template/template-extra-property.json
+invalid example rejected at /components/0/mounts/2/target: examples/invalid/instance-template/tmpfs-at-run-vm.json
+invalid example rejected at /components/0/mounts/0/read_only: examples/invalid/instance-template/tmpfs-with-read-only.json
+invalid example rejected at /components/0/mounts/2/source: examples/invalid/instance-template/unknown-volume-source.json
+invalid example rejected at /volumes/4: examples/invalid/instance-template/unused-volume.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-group-root.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-name.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-root.json
+invalid example rejected at /volumes/2: examples/invalid/instance-template/volume-at-two-targets.json
+invalid example rejected at /volumes/0/memory_backed: examples/invalid/instance-template/volume-not-memory-backed.json
+valid example ok: examples/valid/flags-file/full.json
+valid example ok: examples/valid/injection-document/full.json
+valid example ok: examples/valid/injection-document/minimal.json
+valid example ok: examples/valid/instance-template/shop-template-flag-delivery-env.json
+valid example ok: examples/valid/instance-template/shop-template.json
+checked 3 schemas, 5 valid and 129 invalid examples
+contracts: PASS
+schema ok: instance-events.schema.json
+schema ok: instance-events.posted.schema.json
+catalogue table: 29 types, schema: 29 types
+invalid example rejected at /data/route: examples/invalid/instance-events/auth-attempt-bad-route.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/bad-challenge-key.json
+invalid example rejected at /instance_id: examples/invalid/instance-events/bad-instance-id.json
+invalid example rejected at /schema_version: examples/invalid/instance-events/bad-schema-version.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/bot-source-with-player-session.json
+invalid example rejected at /source: examples/invalid/instance-events/bot-visit-from-shop.json
+invalid example rejected at /data/anomaly_score: examples/invalid/instance-events/crs-match-score-negative.json
+invalid example rejected at /data: examples/invalid/instance-events/data-not-object.json
+invalid example rejected at /data/body: examples/invalid/instance-events/evidence-body-too-long.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/evidence-missing-challenge-key.json
+invalid example rejected at /data/note: examples/invalid/instance-events/extra-data-field.json
+invalid example rejected at /actor_role: examples/invalid/instance-events/extra-envelope-field-actor-role.json
+invalid example rejected at /event_id: examples/invalid/instance-events/extra-envelope-field-event-id.json
+invalid example rejected at /data/detail_code: examples/invalid/instance-events/fault-bad-detail-code.json
+invalid example rejected at /data/kind: examples/invalid/instance-events/flag-seen-bad-kind.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/flag-seen-challenge-key-mismatch.json
+invalid example rejected at /data/challenge_key: examples/invalid/instance-events/flag-seen-foreign-with-challenge-key.json
+invalid example rejected at /data/candidate: examples/invalid/instance-events/flag-seen-raw-candidate.json
+invalid example rejected at /data/challenge_key: examples/invalid/instance-events/flag-seen-real-without-challenge-key.json
+invalid example rejected at /data/candidate_sha256: examples/invalid/instance-events/flag-seen-uppercase-hash.json
+invalid example rejected at /data/body: examples/invalid/instance-events/flag-value-in-evidence-body.json
+invalid example rejected at /data/headers_redacted/cookie: examples/invalid/instance-events/flag-value-in-header.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-in-route.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-lowercase.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-url-encoded.json
+invalid example rejected at /data/challenge_ids: examples/invalid/instance-events/flags-injected-duplicate-keys.json
+invalid example rejected at /data/challenge_ids: examples/invalid/instance-events/flags-injected-empty.json
+invalid example rejected at /source: examples/invalid/instance-events/flags-injected-from-shop.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/flags-injected-player-session.json
+invalid example rejected at /data/result: examples/invalid/instance-events/giftcard-bad-result.json
+invalid example rejected at /data/url_class: examples/invalid/instance-events/importer-bad-url-class.json
+invalid example rejected at /data/outcome: examples/invalid/instance-events/kyc-bad-outcome.json
+invalid example rejected at /data/status: examples/invalid/instance-events/missing-data-field.json
+invalid example rejected at /data: examples/invalid/instance-events/missing-data.json
+invalid example rejected at /instance_id: examples/invalid/instance-events/missing-instance-id.json
+invalid example rejected at /user_id: examples/invalid/instance-events/missing-user-id.json
+invalid example rejected at /data/amount: examples/invalid/instance-events/refund-negative-amount.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-missing.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-string.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-zero.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/session-kind-internal-from-shop.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/session-kind-internal-from-sidecar.json
+invalid example rejected at /source: examples/invalid/instance-events/source-not-allowed-for-type.json
+invalid example rejected at /data/status: examples/invalid/instance-events/status-out-of-range.json
+invalid example rejected at /ts: examples/invalid/instance-events/ts-not-a-date.json
+invalid example rejected at /ts: examples/invalid/instance-events/ts-not-utc.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/unknown-session-kind.json
+invalid example rejected at /source: examples/invalid/instance-events/unknown-source.json
+invalid example rejected at /type: examples/invalid/instance-events/unknown-type.json
+invalid example rejected at /user_id: examples/invalid/instance-events/user-id-number.json
+invalid example rejected at /data/status: examples/invalid/instance-events/wrong-data-type.json
+invalid example rejected at /data/body: examples/invalid/posted/evidence-body-over-2-kib.json
+invalid example rejected at /data/user_id: examples/invalid/posted/flag-value-in-data.json
+invalid example rejected at /instance_id: examples/invalid/posted/includes-instance-id.json
+invalid example rejected at /seq: examples/invalid/posted/includes-seq.json
+invalid example rejected at /type: examples/invalid/posted/missing-type.json
+invalid example rejected at /source: examples/invalid/posted/shop-posts-bot-visit.json
+invalid example rejected at /source: examples/invalid/posted/shop-posts-proxy-request.json
+invalid example rejected at /source: examples/invalid/posted/source-orchestrator-refused.json
+invalid example rejected at /source: examples/invalid/posted/source-sidecar-refused.json
+invalid example rejected at /type: examples/invalid/posted/unknown-type.json
+envelope example accepted (202): examples/valid/envelopes/evidence-capture.json
+envelope example accepted (202): examples/valid/envelopes/proxy-flag_seen.json
+envelope example accepted (202): examples/valid/envelopes/proxy-request.json
+valid example ok: examples/valid/instance-events/auth.attempt.json
+valid example ok: examples/valid/instance-events/auth.password_reset_completed.json
+valid example ok: examples/valid/instance-events/auth.reset_confirm_batch.json
+valid example ok: examples/valid/instance-events/auth.reset_requested.json
+valid example ok: examples/valid/instance-events/bot.visit.json
+valid example ok: examples/valid/instance-events/collector.hit.json
+valid example ok: examples/valid/instance-events/evidence.capture.json
+valid example ok: examples/valid/instance-events/gateway.ledger_entry.json
+valid example ok: examples/valid/instance-events/import.job.json
+valid example ok: examples/valid/instance-events/importer.fetch_attempt.json
+valid example ok: examples/valid/instance-events/infrastructure_fault.json
+valid example ok: examples/valid/instance-events/instance.flags_injected.json
+valid example ok: examples/valid/instance-events/kyc.result.json
+valid example ok: examples/valid/instance-events/meta.request_served.json
+valid example ok: examples/valid/instance-events/ops.page_served.json
+valid example ok: examples/valid/instance-events/order.paid.json
+valid example ok: examples/valid/instance-events/proxy.crs_match.json
+valid example ok: examples/valid/instance-events/proxy.flag_seen.json
+valid example ok: examples/valid/instance-events/proxy.request.json
+valid example ok: examples/valid/instance-events/shop.catalog_query_error.json
+valid example ok: examples/valid/instance-events/shop.cross_store_order_read.json
+valid example ok: examples/valid/instance-events/shop.giftcard_attempt.json
+valid example ok: examples/valid/instance-events/shop.refund_decision.json
+valid example ok: examples/valid/instance-events/shop.refund_invariant_broken.json
+valid example ok: examples/valid/instance-events/shop.security_event_written.json
+valid example ok: examples/valid/instance-events/shop.ticket_markup_stored.json
+valid example ok: examples/valid/instance-events/shop.verbose_error.json
+valid example ok: examples/valid/instance-events/store.approved.json
+valid example ok: examples/valid/instance-events/webhook.received.json
+valid posted body ok: examples/valid/posted/bot.visit.json
+valid posted body ok: examples/valid/posted/collector.hit.json
+valid posted body ok: examples/valid/posted/evidence.capture.json
+valid posted body ok: examples/valid/posted/import.job.json
+valid posted body ok: examples/valid/posted/shop.cross_store_order_read.json
+valid posted body ok: examples/valid/posted/shop.refund_decision.json
+fake ingest: 34 of 34 matrix checks as expected
+checked 1 schema, 29 event types, 29 valid events, 3 signed envelopes, 6 valid posted bodies and 61 invalid examples
+events: PASS
+orchestrator contract: checked 8 operations, 15 valid and 44 invalid examples
+orchestrator contract: PASS
+lab contract: checked 18 operations, 38 valid and 82 invalid examples
+lab contract: PASS
+=== RESULT contracts-check: PASS
+=== STEP uv-lock-check: uv lock --check
+Resolved 28 packages in 2ms
+=== RESULT uv-lock-check: PASS
+=== STEP e2e: node --test scripts/e2e/lab.e2e.test.mjs scripts/e2e/orchestrator.e2e.test.mjs scripts/e2e/events.e2e.test.mjs
+✔ every valid example type is accepted (202) and an identical repeat is a duplicate (200) (821.327585ms)
+✔ the same (instance_id, seq) with a different body is refused with 409 and nothing new is stored (8.869698ms)
+✔ a bad signature and a wrong instance are refused with 401 and the answer never repeats the signature (7.392298ms)
+✔ an oversize body is refused with 413 and the server keeps working (17.76967ms)
+✔ a flag-like string in data is refused with 422 in any letter case, and the answer never echoes it (11.378766ms)
+✔ an unknown type and an extra field are refused with 422 and the answer names a JSON path (8.420596ms)
+✔ GET is answered 405 and a client that aborts in the middle of a body does not stop the server (110.257896ms)
+✔ the posted-body schema accepts every valid posted example and refuses source sidecar (304.876921ms)
+✔ --write-posted leaves the committed posted schema unchanged (206.275092ms)
+✔ the startup line is printed once and unknown arguments exit 2 (411.775261ms)
+✔ an owner reads, an outsider gets the same 404 as for a missing id, and there is no session without a cookie (35.542253ms)
+✔ a POST needs the CSRF header and the dashboard origin (23.373957ms)
+✔ flag results by input, no echo, rate limit per challenge (66.997106ms)
+✔ bad bodies are 422 with a field pointer; wrong media type 415; a body where none is allowed 422 (16.07304ms)
+✔ hints off is 404, hints on unlock and repeat (13.826378ms)
+✔ an instance goes requested to ready, opens with a ticket, resets with a new epoch, stops (50.42304ms)
+✔ an instance that is not ready cannot be opened or reset (409) (8.313603ms)
+✔ start, submit and wrong states (14.30283ms)
+✔ reviewer routes: evidence, integrity flags with a decision, report, timeline paging (18.015945ms)
+✔ unknown path is 404 and a wrong method is 405 with Allow (5.598671ms)
+✔ no answer holds a flag, key, seed, owner hash, host id or stack trace (3.422919ms)
+✔ the signing rule written here reproduces the signing vector of the contract (128.421036ms)
+✔ create: 202, the instance reaches ready, a repeat is 200, another body with the same identity is 409 (121.625569ms)
+✔ no GET answer contains a flag, decoy, digest, seed or event key (36.075987ms)
+✔ owner_hash and first_seq: required and checked on create, first_seq on reset, no owner_hash in a reset, nothing returned by a GET (118.630484ms)
+✔ a body that names an image, command, volume, port or env is refused with 422 and nothing is created; an unknown template is 422 (37.492327ms)
+✔ a bad signature, a stale timestamp and a replayed nonce are refused with 401 and change nothing (18.042643ms)
+✔ access: open, frozen and closed with a growing access epoch work; an older access epoch is 409 (44.972348ms)
+✔ reset: a ready instance gets epoch + 1 and goes through resetting and provisioning back to ready; a wrong epoch is 409 (919.20626ms)
+✔ destroy: 202 then 200 on a repeat, and a destroyed id cannot be created again (409) (38.913622ms)
+✔ list: label filters, cursor paging, an unknown label is 422; host answers capacity (221.111983ms)
+✔ a host with little capacity answers 429 ORCH-BUSY with Retry-After and creates nothing (178.903901ms)
+✔ with --tls flags the fake serves HTTPS and refuses a call without a client certificate (410.080687ms)
+✔ the Python suite (protocol on both hosts, HTTP service, contract) still passes (92431.302714ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 94925.656132
+=== RESULT e2e: PASS

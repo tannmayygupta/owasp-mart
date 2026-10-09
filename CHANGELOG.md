@@ -4,6 +4,11 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+### Added and Fixed (story 1.11, review gaps of L-04, L-05 and 1.10, 2026-10-09, Tanmay)
+- CI job `e2e` runs the lab, orchestrator and events end-to-end files (the nested pytest is switched off there by `VULNMART_E2E_SKIP_NESTED_PYTEST`). `pnpm run ci:linux` (`scripts/ci-linux.mjs`) repeats the CI commands in a Linux container with Docker; all passed on Linux before the job was added.
+- Fake lab: a repeated correct flag adds nothing; a challenge stays held until no held flag is open; hint levels unlock in order (409, `field` `/level`); strict cursor; unknown or repeated query parameters on every GET are 422 (declared on every GET in the OpenAPI file); listen errors and port range exit 2; an oversize body gets its 413 before the connection closes.
+- Tests: certificate refusals (expired, not yet valid, wrong use, TLS 1.1), `CI` parsing (`true` or `1` only), missing-openssl branch, exact example counts, all declared headers, order independent lab end-to-end tests, narrowed retries, parsed leak test, negative test of the orchestrator checker. Handoff pointer P-04 lists H-84 to H-89.
+- ADR 0019 cites the sources read (RFC 9457, OpenAPI 3.1.0, OWASP CSRF, Prism) and records the developer's decisions: RFC 9457 error body in a later story (1.12, not made), signed session-bound CSRF token (text updated, mock unchanged); handoffs H-90 and H-91. Review follow-ups: 413 closes the connection, strict `--port`, stronger missing-openssl and `ci:linux` tests.
 
 ### Added (L-05 lab fragment of the platform API, IF-2, 2026-10-09, Tanmay)
 - `contracts/api/lab/`: `lab.openapi.yaml` (OpenAPI 3.1, 18 operations under `/api/v1/`), `lab-api.md` (scope, auth and cross-cutting rules, placeholder error codes, 30 open points) and 38 valid and 82 invalid examples. States, access and health are identical to IF-5.

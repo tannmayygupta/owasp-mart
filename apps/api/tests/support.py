@@ -83,6 +83,25 @@ def openssl_path() -> str | None:
     return shutil.which("openssl")
 
 
+def flag_on(value: str | None) -> bool:
+    """The rule for environment switches (twin of `flagOn` in scripts/env-flag.mjs): on only for `true` or `1`, any case.
+    `false`, `0`, empty and unset are off."""
+    return (value or "").strip().lower() in ("true", "1")
+
+
+def require_openssl(env=None) -> str:
+    """The `openssl` path. When it is missing: fail the test if CI is on (`true` or `1`), skip it otherwise."""
+    import pytest
+
+    exe = openssl_path()
+    if exe is not None:
+        return exe
+    message = "openssl is not installed, the mTLS tests cannot make certificates"
+    if flag_on((os.environ if env is None else env).get("CI")):
+        pytest.fail(message)
+    pytest.skip(message)
+
+
 class Pki:
     """Throwaway certificates for mutual TLS tests, made with the `openssl` command in a temporary folder.
 
@@ -98,6 +117,7 @@ class Pki:
         self.dir = Path(tempfile.mkdtemp(prefix="vm-mtls-"))
         try:
             self.ca_cert, ca_key = self._ca("ca", "Test CA one")
+            self._ca_key = ca_key
             self.other_ca_cert, other_key = self._ca("other-ca", "Test CA two")
             self.server_cert, self.server_key = self._leaf("server", "localhost", self.ca_cert, ca_key,
                                                            "serverAuth", "subjectAltName=DNS:localhost")
@@ -142,6 +162,27 @@ class Pki:
                   "-out", cert.name, "-days", "1", "-extfile", ext.name)
         return cert, key
 
+    def issue(self, name: str, cn: str, usage: str, san: str | None, *, valid: tuple[str, str] | None = None) -> tuple[Path, Path]:
+        """A certificate signed by the main test CA. `valid` is (start, end) as YYMMDDHHMMSSZ, for an expired or not-yet-valid one;
+        it is made with `openssl ca` (the plain `x509 -req` command cannot set the start date before OpenSSL 3.4)."""
+        if valid is None:
+            return self._leaf(name, cn, self.ca_cert, self._ca_key, usage, san)
+        key, csr, cert, ext = (self.dir / f"{name}.key", self.dir / f"{name}.csr", self.dir / f"{name}.pem", self.dir / f"{name}.ext")
+        self._run("req", "-new", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
+                  "-keyout", key.name, "-out", csr.name, "-subj", f"/CN={cn}")
+        lines = ["basicConstraints=CA:FALSE", "keyUsage=digitalSignature", f"extendedKeyUsage={usage}"]
+        if san:
+            lines.append(san)
+        ext.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        for fname, content in (("index.txt", ""), ("serial", "1000\n")):
+            if not (self.dir / fname).exists():
+                (self.dir / fname).write_text(content, encoding="utf-8")
+        (self.dir / "ca.cnf").write_text("[ca]\ndefault_ca = c\n[c]\ndatabase = index.txt\nnew_certs_dir = .\nserial = serial\n"
+                                         "default_md = sha256\npolicy = p\nunique_subject = no\n[p]\ncommonName = supplied\n", encoding="utf-8")
+        self._run("ca", "-batch", "-config", "ca.cnf", "-cert", self.ca_cert.name, "-keyfile", self._ca_key.name, "-in", csr.name,
+                  "-out", cert.name, "-startdate", valid[0], "-enddate", valid[1], "-extfile", ext.name, "-notext")
+        return cert, key
+
     def client_context(self, *, trust: Path | None = None, cert: tuple[Path, Path] | None = ...,
                        check_hostname: bool = True) -> ssl.SSLContext:
         """A client TLS context. By default it trusts the test CA and presents the good client certificate;
@@ -166,7 +207,8 @@ class ServiceProcess:
     """The fake orchestrator as a separate Node process."""
 
     def __init__(self, *, capacity_mb: int = 8192, step_delay_ms: int = 0, report_url: str | None = None,
-                 extra_args: tuple[str, ...] = (), tls: "Pki | None" = None) -> None:
+                 extra_args: tuple[str, ...] = (), tls: "Pki | None" = None,
+                 tls_server: tuple[Path, Path] | None = None) -> None:
         node = shutil.which("node")
         if node is None:
             raise RuntimeError("node is required for the fake orchestrator tests")
@@ -175,7 +217,8 @@ class ServiceProcess:
         if report_url:
             args += ["--report-url", report_url]
         if tls is not None:
-            args += ["--tls-cert", str(tls.server_cert), "--tls-key", str(tls.server_key), "--tls-ca", str(tls.ca_cert)]
+            cert, key = tls_server or (tls.server_cert, tls.server_key)  # tls_server: another server certificate, for the refusal tests
+            args += ["--tls-cert", str(cert), "--tls-key", str(key), "--tls-ca", str(tls.ca_cert)]
         if extra_args:
             args += list(extra_args)
         # stderr goes to a file, never to an undrained pipe (a full pipe would stall the service)

@@ -48,7 +48,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Covers: PB-1
   - Waits on: P-01.
   - Done when: The registry validates and a test shows an API error in the agreed format.
-  - Handoffs: H-01, H-02, H-03, H-04 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-01, H-02, H-03, H-04, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-03. Domain event schema (IF-3) with fixtures and replay script**
   - Epic: `epic-platform-baseline`
@@ -66,7 +66,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Covers: PB-3
   - Waits on: P-02, P-03, Tanmay's L-05 (lab fragment) and Sahil's T-02 (catalogue stubs).
   - Done when: The bundle validates, the mock answers every endpoint and clients are generated in CI.
-  - Handoffs: H-12, H-13, H-14, H-16, H-17, H-19, H-20, H-23 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-12, H-13, H-14, H-16, H-17, H-19, H-20, H-23, H-84, H-85, H-86, H-87, H-88, H-89, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
   - Epic: `epic-platform-baseline`
@@ -75,7 +75,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Covers: PB-4
   - Waits on: P-02, P-03.
   - Done when: Tests run against the fakes and the table-owners file validates (the CI ownership check is Tanmay's L-07).
-  - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21, H-83 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21, H-83, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-06. API skeleton: kernel and single-head migrations**
   - Epic: `epic-platform-baseline`

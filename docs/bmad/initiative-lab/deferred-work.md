@@ -9,16 +9,21 @@
   evidence: IA of the L-01 review; unverified until the pull request exists and the story's risk check is run (would be medium).
 
 ## From the L-04 follow-up review (2026-10-09)
-- Add a negative test for `scripts/check_orchestrator_contract.py` that puts `owner_hash` or `first_seq` into a GET answer schema and expects a failure (Verification Gap).
-- `first_seq`: no upper bound in the schema; the fake service accepts `1.0` while the Python host rejects it; a reset may use a lower `first_seq` than an earlier epoch (the platform alone prevents it). Decide the bound and the rule with Akshay (handoff H-59) and match both fakes.
-- `test_an_oversize_body_is_refused` retries on any `OSError`; narrow to reset and broken-pipe errors.
-- The GET leak test uses substring checks; parse the JSON keys and values instead.
-- Storing `owner_hash` as the label and passing `first_seq` to the sidecar is contract text only; verified in L-06 and L-13.
+- FIXED in story 1.11: negative test for `scripts/check_orchestrator_contract.py` with `owner_hash` and `first_seq` in a GET answer schema (fails when the two names are removed from the checker).
+- OPEN (Akshay, handoff H-59, not decided here): `first_seq` has no upper bound in the schema; the fake service accepts `1.0` while the Python host rejects it; a reset may use a lower `first_seq` than an earlier epoch (the platform alone prevents it). Decide the bound and the rule with Akshay and match both fakes.
+- FIXED in story 1.11: `test_an_oversize_body_is_refused` retries only on `ConnectionResetError` and `BrokenPipeError`.
+- FIXED in story 1.11: the GET leak test parses every answer and checks keys and values.
+- OPEN: storing `owner_hash` as the label and passing `first_seq` to the sidecar is contract text only; verified in L-06 and L-13.
 ## From story 1.10 review (2026-10-09)
-- Run the Node end-to-end tests in CI (they are not part of any CI job); plan with the contract CI story (1.6).
-- Check the Linux CI result of the mTLS tests (TLS 1.3 refusal mapping, host name check); settled by the first pull request run.
-- Add tests: missing `openssl` on CI really fails, `CI=false` handling, expired and wrong-usage certificates, TLS 1.1 refused; share the certificate helper between the Python and Node tests; look at the 38 s runtime.
+- FIXED in story 1.11: the Node end-to-end tests run in CI (job `e2e`: lab, orchestrator, events; the nested pytest is switched off there by `VULNMART_E2E_SKIP_NESTED_PYTEST=1`; `contracts.e2e` and `dev.e2e` stay out, covered by other jobs).
+- DONE on a Linux container (not yet on GitHub): the mTLS tests pass on Linux in Docker (`pnpm run ci:linux`, evidence in `docs/assets/story-1-11-review-gaps/`). The first real pull request run is still to be recorded.
+- FIXED in story 1.11: tests for a missing `openssl` (`CI` `true` or `1` fails; `false`, `0`, empty and unset skip; Python and Node, the real branch run), expired, not-yet-valid and wrong-usage certificates (client and server side) and a TLS 1.1 client.
+- OPEN: share one certificate helper between the Python and Node tests (two languages; would need a new tool or a committed fixture, a team decision); look at the 38 s runtime of the mTLS tests (the certificates are made once per module already; the remaining time is process starts).
 ## From story 1.9 review (2026-10-09)
-- Read the external sources of ADR 0019 (OpenAPI 3.1, RFC 9457, OWASP CSRF, Prism docs) before the ADR is accepted.
-- Run `scripts/e2e/lab.e2e.test.mjs` in CI and tie mock drift to `contracts:check` (story 1.6).
-- Mock hardening (low): no duplicate timeline rows on repeated correct flags; deciding one held flag must not clear others; hint levels in order; strict cursor format; reject unknown query parameters on every GET; handle listen errors; pin exact example counts in tests; assert every declared response header; make e2e tests order independent; the 413 test must not accept a reset.
+- FIXED in story 1.11: ADR 0019 now cites sources read in this session (RFC 9457, OpenAPI 3.1.0, OWASP CSRF cheat sheet, Prism). Decided by the developer 2026-10-09: M1 adopt RFC 9457, change PENDING in story 1.12 (IF-5 and IF-2 error bodies; handoff H-91); M2 signed, session-bound CSRF token plus `Sec-Fetch-Site`, text done, implementation Akshay P-05 (H-90). See the ADR.
+- OPEN (OI-38, `lab-api.md` row 31): when one of several open held flags on a challenge is accepted, are `solved` and `held` both true? Proposal: accepting any flag credits and resolves the held state; rejecting keeps it held until none is open. The mock credits and keeps held meanwhile.
+- DEFERRED (low, with reasons): the timeline is sorted by the `at` string while the cursor is an offset, and rows share timestamps (rows are appended in time order so paging is stable today; a sequence number would be the fix, when the real API exists); no examples yet for the new 422 unknown-query answer and the hint-order 409 (the placeholder codes may change with H-81 and story 1.12); the TLS 1.1 test cannot show whether the client or the server refused (the client is set to offer TLS 1.1; the server default minimum is 1.2); one certificate helper shared by Python and Node (see the story 1.10 item above).
+- NOT IN CI, by design: `scripts/e2e/contracts.e2e.test.mjs` (fresh-checkout install parity; same commands run in the job `scripts`) and `scripts/e2e/dev.e2e.test.mjs` (needs the host Docker; the job `compose` covers `dev.mjs hello`).
+- FIXED in story 1.11: the lab end-to-end test runs in CI (job `e2e`). OPEN: tie mock drift to `contracts:check` (the conformance test in `test_lab_contract.py` runs in the `scripts` job, so drift fails CI already; a separate drift check in `contracts:check` is not planned).
+- FIXED in story 1.11 (each with a test that failed on the old mock): no duplicate timeline rows on repeated correct flags; deciding one held flag does not clear others; hint levels in order; strict cursor format; unknown or repeated query parameters on every GET (and 422 declared on every GET in the OpenAPI file); listen errors and port range (exit 2); exact example counts from the manifests; every declared response header asserted; the lab end-to-end tests are order independent with an exact answer count; the 413 test sees the 413 (and a huge body is proved separately, where the contract allows a dropped connection).
+- NOT A DEFECT, test added as a guard: timeline pages were already stable when the list grows (rows are only appended); the new test passed on the old mock too.

@@ -1,0 +1,324 @@
+﻿....FFF.FFFFFFFF.FFF.F...FFFFFFF.F..                                     [100%]
+================================== FAILURES ===================================
+_____ test_a_port_out_of_range_or_not_whole_exits_2_with_a_message[65536] _____
+
+port = '65536'
+
+    @pytest.mark.parametrize("port", ["65536", "70000", "1.5", "1e3x"])
+    def test_a_port_out_of_range_or_not_whole_exits_2_with_a_message(port):
+        r = subprocess.run([shutil.which("node"), str(SERVER), "--port", port], capture_output=True, text=True, timeout=15)
+>       assert r.returncode == 2 and "--port" in r.stderr
+E       assert (1 == 2)
+E        +  where 1 = CompletedProcess(args=['C:\\Program Files\\nodejs\\node.EXE', 'C:\\Users\\tanma\\major-project\\contracts\\mocks\\fake...ryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  code: 'ERR_SOCKET_BAD_PORT'\n}\n\nNode.js v24.11.0\n").returncode
+
+apps\api\tests\test_lab_contract.py:639: AssertionError
+_____ test_a_port_out_of_range_or_not_whole_exits_2_with_a_message[70000] _____
+
+port = '70000'
+
+    @pytest.mark.parametrize("port", ["65536", "70000", "1.5", "1e3x"])
+    def test_a_port_out_of_range_or_not_whole_exits_2_with_a_message(port):
+        r = subprocess.run([shutil.which("node"), str(SERVER), "--port", port], capture_output=True, text=True, timeout=15)
+>       assert r.returncode == 2 and "--port" in r.stderr
+E       assert (1 == 2)
+E        +  where 1 = CompletedProcess(args=['C:\\Program Files\\nodejs\\node.EXE', 'C:\\Users\\tanma\\major-project\\contracts\\mocks\\fake...ryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  code: 'ERR_SOCKET_BAD_PORT'\n}\n\nNode.js v24.11.0\n").returncode
+
+apps\api\tests\test_lab_contract.py:639: AssertionError
+______ test_a_port_out_of_range_or_not_whole_exits_2_with_a_message[1.5] ______
+
+port = '1.5'
+
+    @pytest.mark.parametrize("port", ["65536", "70000", "1.5", "1e3x"])
+    def test_a_port_out_of_range_or_not_whole_exits_2_with_a_message(port):
+        r = subprocess.run([shutil.which("node"), str(SERVER), "--port", port], capture_output=True, text=True, timeout=15)
+>       assert r.returncode == 2 and "--port" in r.stderr
+E       assert (1 == 2)
+E        +  where 1 = CompletedProcess(args=['C:\\Program Files\\nodejs\\node.EXE', 'C:\\Users\\tanma\\major-project\\contracts\\mocks\\fake...ryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  code: 'ERR_SOCKET_BAD_PORT'\n}\n\nNode.js v24.11.0\n").returncode
+
+apps\api\tests\test_lab_contract.py:639: AssertionError
+_____ test_a_port_that_is_in_use_exits_2_with_a_message_and_does_not_hang _____
+
+    def test_a_port_that_is_in_use_exits_2_with_a_message_and_does_not_hang():
+        import socket
+        with socket.socket() as taken:
+            taken.bind(("127.0.0.1", 0))
+            taken.listen()
+            r = subprocess.run([shutil.which("node"), str(SERVER), "--port", str(taken.getsockname()[1])], capture_output=True, text=True, timeout=15)
+>       assert r.returncode == 2 and "cannot listen" in r.stderr and "EADDRINUSE" in r.stderr
+E       assert (1 == 2)
+E        +  where 1 = CompletedProcess(args=['C:\\Program Files\\nodejs\\node.EXE', 'C:\\Users\\tanma\\major-project\\contracts\\mocks\\fake...'EADDRINUSE',\n  errno: -4091,\n  syscall: 'listen',\n  address: '127.0.0.1',\n  port: 37828\n}\n\nNode.js v24.11.0\n").returncode
+
+apps\api\tests\test_lab_contract.py:648: AssertionError
+____ test_a_repeated_correct_flag_adds_no_second_milestone_or_timeline_row ____
+
+fresh = <function fresh.<locals>.factory at 0x000001FFFEB6D380>
+
+    def test_a_repeated_correct_flag_adds_no_second_milestone_or_timeline_row(fresh):
+        m = fresh()
+        body = {"challenge_key": "C03", "flag": flag("A")}
+        assert m.call("POST", FLAGS, "ada", body)[1]["credit"] == "credited"
+        first = _timeline(m, "ada")
+        score = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score", "ada")[1]["score"]
+        s, b, _ = m.call("POST", FLAGS, "ada", body)
+        assert s == 200 and b == {"challenge_key": "C03", "result": "correct", "credit": "credited"}
+>       assert _timeline(m, "ada") == first
+E       AssertionError: assert [{'at': '2026...': None, ...}] == [{'at': '2026...': None, ...}]
+E         
+E         Left contains 2 more items, first extra item: {'at': '2026-10-09T17:37:37Z', 'type': 'milestone.reached', 'challenge_key': 'C03', 'milestone': 'M3', ...}
+E         Use -v to get more diff
+
+apps\api\tests\test_lab_contract.py:674: AssertionError
+_ test_a_repeated_correct_flag_on_a_held_challenge_adds_no_integrity_flag_or_timeline_row _
+
+fresh = <function fresh.<locals>.factory at 0x000001FFFEB6E4B0>
+
+    def test_a_repeated_correct_flag_on_a_held_challenge_adds_no_integrity_flag_or_timeline_row(fresh):
+        m = fresh()
+        flags_before = m.call("GET", f"/api/v1/attempts/{A_CAND}/integrity-flags", "rex")[1]["items"]
+        timeline_before = _timeline(m, "rex", A_CAND)
+        for _ in range(2):
+            s, b, _ = m.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "cam", {"challenge_key": "C11", "flag": flag("A")})
+            assert s == 200 and b["credit"] == "held"
+>       assert m.call("GET", f"/api/v1/attempts/{A_CAND}/integrity-flags", "rex")[1]["items"] == flags_before
+E       AssertionError: assert [{'integrity_...eview.', ...}] == [{'integrity_...eview.', ...}]
+E         
+E         Left contains 2 more items, first extra item: {'integrity_flag_id': 'g-AAAAAAAAAAAAAE4J', 'type': 'activity', 'challenge_key': 'C11', 'explanation': 'The capture does not match the recorded activity; it is held for review.', ...}
+E         Use -v to get more diff
+
+apps\api\tests\test_lab_contract.py:686: AssertionError
+_____ test_hint_levels_unlock_in_order_and_an_early_level_unlocks_nothing _____
+
+fresh = <function fresh.<locals>.factory at 0x000001FFFEB6E770>
+
+    def test_hint_levels_unlock_in_order_and_an_early_level_unlocks_nothing(fresh):
+        m = fresh()
+        base_path = f"/api/v1/attempts/{A_LEARNER}/challenges/C04/hints"
+        s, b, _ = m.call("POST", base_path + "/3/unlock")
+>       assert s == 409 and b["code"] == "ATT-INVALID-STATE" and b["field"] == "/level"
+E       assert (200 == 409)
+
+apps\api\tests\test_lab_contract.py:694: AssertionError
+____________ test_a_cursor_that_is_not_a_plain_decimal_is_422[ 5] _____________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>, text = ' 5'
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError:  5
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+____________ test_a_cursor_that_is_not_a_plain_decimal_is_422[5 ] _____________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>, text = '5 '
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError: 5 
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+____________ test_a_cursor_that_is_not_a_plain_decimal_is_422[1e1] ____________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>, text = '1e1'
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError: 1e1
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+___________ test_a_cursor_that_is_not_a_plain_decimal_is_422[0x10] ____________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>, text = '0x10'
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError: 0x10
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+____________ test_a_cursor_that_is_not_a_plain_decimal_is_422[+1] _____________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>, text = '+1'
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError: +1
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+____________ test_a_cursor_that_is_not_a_plain_decimal_is_422[05] _____________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>, text = '05'
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError: 05
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+____________ test_a_cursor_that_is_not_a_plain_decimal_is_422[1.0] ____________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>, text = '1.0'
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError: 1.0
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+________ test_a_cursor_that_is_not_a_plain_decimal_is_422[9999999999] _________
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+text = '9999999999'
+
+    @pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
+    def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
+>       assert s == 422 and b["field"] == "/cursor", text
+E       AssertionError: 9999999999
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:713: AssertionError
+_ test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/instances/i-BBBBBBBBBBBBBBBB] _
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+path = '/api/v1/instances/i-BBBBBBBBBBBBBBBB'
+
+    @pytest.mark.parametrize("path", GET_PATHS)
+    def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+        user = "cam" if "instances" in path else "rex"
+        s, b, _ = mock.call("GET", path + "?surprise=1", user)
+>       assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:753: AssertionError
+_ test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB] _
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+path = '/api/v1/attempts/a-BBBBBBBBBBBBBBBB'
+
+    @pytest.mark.parametrize("path", GET_PATHS)
+    def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+        user = "cam" if "instances" in path else "rex"
+        s, b, _ = mock.call("GET", path + "?surprise=1", user)
+>       assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:753: AssertionError
+_ test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/score] _
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+path = '/api/v1/attempts/a-BBBBBBBBBBBBBBBB/score'
+
+    @pytest.mark.parametrize("path", GET_PATHS)
+    def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+        user = "cam" if "instances" in path else "rex"
+        s, b, _ = mock.call("GET", path + "?surprise=1", user)
+>       assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:753: AssertionError
+_ test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/challenges] _
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+path = '/api/v1/attempts/a-BBBBBBBBBBBBBBBB/challenges'
+
+    @pytest.mark.parametrize("path", GET_PATHS)
+    def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+        user = "cam" if "instances" in path else "rex"
+        s, b, _ = mock.call("GET", path + "?surprise=1", user)
+>       assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:753: AssertionError
+_ test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/evidence] _
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+path = '/api/v1/attempts/a-BBBBBBBBBBBBBBBB/evidence'
+
+    @pytest.mark.parametrize("path", GET_PATHS)
+    def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+        user = "cam" if "instances" in path else "rex"
+        s, b, _ = mock.call("GET", path + "?surprise=1", user)
+>       assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:753: AssertionError
+_ test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/integrity-flags] _
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+path = '/api/v1/attempts/a-BBBBBBBBBBBBBBBB/integrity-flags'
+
+    @pytest.mark.parametrize("path", GET_PATHS)
+    def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+        user = "cam" if "instances" in path else "rex"
+        s, b, _ = mock.call("GET", path + "?surprise=1", user)
+>       assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:753: AssertionError
+_ test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/report] _
+
+mock = <test_lab_contract.Mock object at 0x000001FFFEE3A270>
+path = '/api/v1/attempts/a-BBBBBBBBBBBBBBBB/report'
+
+    @pytest.mark.parametrize("path", GET_PATHS)
+    def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
+        user = "cam" if "instances" in path else "rex"
+        s, b, _ = mock.call("GET", path + "?surprise=1", user)
+>       assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:753: AssertionError
+_ test_the_hints_get_refuses_a_query_parameter_and_a_hostile_name_is_not_echoed _
+
+fresh = <function fresh.<locals>.factory at 0x000001FFFEC2C460>
+
+    def test_the_hints_get_refuses_a_query_parameter_and_a_hostile_name_is_not_echoed(fresh):
+        m = fresh()
+        s, b, _ = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges/C01/hints?surprise=1")
+>       assert s == 422 and b["field"] == "/surprise"
+E       assert (200 == 422)
+
+apps\api\tests\test_lab_contract.py:762: AssertionError
+=========================== short test summary info ===========================
+FAILED apps/api/tests/test_lab_contract.py::test_a_port_out_of_range_or_not_whole_exits_2_with_a_message[65536]
+FAILED apps/api/tests/test_lab_contract.py::test_a_port_out_of_range_or_not_whole_exits_2_with_a_message[70000]
+FAILED apps/api/tests/test_lab_contract.py::test_a_port_out_of_range_or_not_whole_exits_2_with_a_message[1.5]
+FAILED apps/api/tests/test_lab_contract.py::test_a_port_that_is_in_use_exits_2_with_a_message_and_does_not_hang
+FAILED apps/api/tests/test_lab_contract.py::test_a_repeated_correct_flag_adds_no_second_milestone_or_timeline_row
+FAILED apps/api/tests/test_lab_contract.py::test_a_repeated_correct_flag_on_a_held_challenge_adds_no_integrity_flag_or_timeline_row
+FAILED apps/api/tests/test_lab_contract.py::test_hint_levels_unlock_in_order_and_an_early_level_unlocks_nothing
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[ 5]
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[5 ]
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[1e1]
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[0x10]
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[+1]
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[05]
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[1.0]
+FAILED apps/api/tests/test_lab_contract.py::test_a_cursor_that_is_not_a_plain_decimal_is_422[9999999999]
+FAILED apps/api/tests/test_lab_contract.py::test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/instances/i-BBBBBBBBBBBBBBBB]
+FAILED apps/api/tests/test_lab_contract.py::test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB]
+FAILED apps/api/tests/test_lab_contract.py::test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/score]
+FAILED apps/api/tests/test_lab_contract.py::test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/challenges]
+FAILED apps/api/tests/test_lab_contract.py::test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/evidence]
+FAILED apps/api/tests/test_lab_contract.py::test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/integrity-flags]
+FAILED apps/api/tests/test_lab_contract.py::test_every_get_refuses_an_unknown_or_repeated_query_parameter[/api/v1/attempts/a-BBBBBBBBBBBBBBBB/report]
+FAILED apps/api/tests/test_lab_contract.py::test_the_hints_get_refuses_a_query_parameter_and_a_hostile_name_is_not_echoed
+23 failed, 13 passed, 78 deselected in 13.15s

@@ -1,0 +1,113 @@
+﻿✔ only true and 1 switch a flag on (3.0197ms)
+✔ a missing openssl fails the mTLS test when CI=true (635.0443ms)
+✔ a missing openssl fails the mTLS test when CI=1 (626.271ms)
+✖ a missing openssl skips the mTLS test when CI="false" (614.4423ms)
+✖ a missing openssl skips the mTLS test when CI="0" (614.7678ms)
+✔ a missing openssl skips the mTLS test when CI="" (598.1173ms)
+✔ a missing openssl skips the mTLS test when CI=undefined (607.6898ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3970.5492
+
+✖ failing tests:
+
+test at scripts\env-flag.test.mjs:34:3
+✖ a missing openssl skips the mTLS test when CI="false" (614.4423ms)
+  AssertionError [ERR_ASSERTION]: ✖ with --tls flags the fake serves HTTPS and refuses a call without a client certificate (155.0901ms)
+  ℹ tests 1
+  ℹ suites 0
+  ℹ pass 0
+  ℹ fail 1
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 497.7577
+  
+  ✖ failing tests:
+  
+  test at scripts\e2e\orchestrator.e2e.test.mjs:316:1
+  ✖ with --tls flags the fake serves HTTPS and refuses a call without a client certificate (155.0901ms)
+    AssertionError [ERR_ASSERTION]: openssl is not installed, the mTLS test cannot make certificates
+        at TestContext.<anonymous> (file:///C:/Users/tanma/major-project/scripts/e2e/orchestrator.e2e.test.mjs:319:32)
+        at Test.runInAsyncScope (node:async_hooks:214:14)
+        at Test.run (node:internal/test_runner/test:1106:25)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: undefined,
+      expected: undefined,
+      operator: 'fail',
+      diff: 'simple'
+    }
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/tanma/major-project/scripts/env-flag.test.mjs:36:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\env-flag.test.mjs:34:3
+✖ a missing openssl skips the mTLS test when CI="0" (614.7678ms)
+  AssertionError [ERR_ASSERTION]: ✖ with --tls flags the fake serves HTTPS and refuses a call without a client certificate (158.5557ms)
+  ℹ tests 1
+  ℹ suites 0
+  ℹ pass 0
+  ℹ fail 1
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 496.3756
+  
+  ✖ failing tests:
+  
+  test at scripts\e2e\orchestrator.e2e.test.mjs:316:1
+  ✖ with --tls flags the fake serves HTTPS and refuses a call without a client certificate (158.5557ms)
+    AssertionError [ERR_ASSERTION]: openssl is not installed, the mTLS test cannot make certificates
+        at TestContext.<anonymous> (file:///C:/Users/tanma/major-project/scripts/e2e/orchestrator.e2e.test.mjs:319:32)
+        at Test.runInAsyncScope (node:async_hooks:214:14)
+        at Test.run (node:internal/test_runner/test:1106:25)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: undefined,
+      expected: undefined,
+      operator: 'fail',
+      diff: 'simple'
+    }
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/tanma/major-project/scripts/env-flag.test.mjs:36:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
