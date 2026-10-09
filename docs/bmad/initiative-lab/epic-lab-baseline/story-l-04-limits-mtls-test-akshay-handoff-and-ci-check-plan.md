@@ -63,7 +63,7 @@ context: []
 - [x] `apps/api/tests/support.py` -- let `ServiceProcess` serve and report an `https` URL when TLS args are given; helper that builds the throwaway CAs and certificates with `openssl` in a temp folder and removes it afterwards -- keep certificate code out of the tests
 - [x] `apps/api/tests/test_mtls.py` -- one test per row of the matrix above (skip when `openssl` is missing and `CI` is unset) -- proves the transport behaves
 - [x] `scripts/e2e/orchestrator.e2e.test.mjs` -- one end-to-end test that starts the fake with TLS flags and checks, with Node only and its own certificates, that a call without a client certificate is refused -- independent consumer check
-- [ ] `docs/dev/HANDOFFS.md` and `docs/dev/messages/2026-10-09-akshay-orchestrator-contract.md` -- new row for Akshay (30+ open points, `apps/api` skeleton, ADR 0018, where the proposals live, what stands by default) and the ready chat message; note on H-68 that the fake now offers mTLS -- Akshay's Claude finds it at his task
+- [x] `docs/dev/HANDOFFS.md` and `docs/dev/messages/2026-10-09-akshay-orchestrator-contract.md` -- new row for Akshay (30+ open points, `apps/api` skeleton, ADR 0018, where the proposals live, what stands by default) and the ready chat message; note on H-68 that the fake now offers mTLS -- Akshay's Claude finds it at his task
 - [x] Documentation rule -- dev-log, CHANGELOG line, traceability row, evidence in `docs/assets/l-04-limits/` (real output)
 - [ ] CI check -- after the developer opens the pull request: read the result they report (screenshot or pasted log), fix failures, rerun, record the real result in the dev-log
 
