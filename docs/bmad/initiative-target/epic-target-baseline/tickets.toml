@@ -22,7 +22,6 @@ covers = ["TB-1"]
 after = []
 hitl = false
 risk = "low"
-unknown = "Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton) being merged; remove when merged."
 
 [[entry]]
 id = 3
