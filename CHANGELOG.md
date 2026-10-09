@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-03 IF-6/IF-4 consumer review, 2026-10-09, Sahil)
+- Target-stream consumer review and sign-off of the instance contract (IF-6 v0.1.0) and the instance event contract (IF-4 v0.1.0): `docs/reviews/2026-10-09-target-if6-if4-consumer-review.md`. Confirms every IF-6 open point owned by Sahil, checks IF-4 carries every shop-produced event the 11 challenges need, and raises one change request (CR-1: the `/version` env names vs the env allowlist). Covers TB-2.
+
 ### Added (T-01 shop skeleton, 2026-10-09, Sahil)
 - `apps/shop/` shop skeleton (tracer bullet): Express 5.2.1 on Node 24 answering `/healthz`, `/readyz` and `/version`, packaged as a hardened, digest-pinned container (non-root uid 65532, read-only rootfs, cap-drop ALL, no-new-privileges, 512 MB / 256 pids) with a `/readyz` healthcheck. Unit tests (5) cover the endpoint behaviour; a new CI `app tests` job runs `apps/*/test` on every pull request. Proven on Sahil's PC with `docker run` (all three endpoints 200, container healthy). Covers TB-3, TB-5.
 

@@ -50,7 +50,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: L-01.
   - Done when: All 11 stubs validate against the schema in CI.
 
-- [ ] **T-03. Review the instance contract and event schema as consumer**
+- [x] **T-03. Review the instance contract and event schema as consumer**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Review IF-6 and IF-4 against what the shop needs and file change requests through the contract rules.
