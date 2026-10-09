@@ -204,9 +204,10 @@ test('--write-posted leaves the committed posted schema unchanged', () => {
   temps.push(path.dirname(copy));
   cpSync(EVENTS, copy, { recursive: true });
   const file = 'instance-events.posted.schema.json';
-  const before = readFileSync(path.join(copy, file));
+  const lf = (buf) => Buffer.from(buf.toString('utf8').replace(/\r\n/g, '\n')); // a Windows checkout may hold CRLF
+  const before = lf(readFileSync(path.join(copy, file)));
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'validate-events.mjs'), '--dir', copy, '--write-posted'], { encoding: 'utf8', env: cleanEnv, timeout: 60000 });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.ok(Buffer.compare(before, readFileSync(path.join(copy, file))) === 0, 'regenerating the derived schema must not change it');
-  assert.ok(Buffer.compare(readFileSync(path.join(EVENTS, file)), readFileSync(path.join(copy, file))) === 0, 'and it equals the committed file');
+  assert.ok(Buffer.compare(before, lf(readFileSync(path.join(copy, file)))) === 0, 'regenerating the derived schema must not change it');
+  assert.ok(Buffer.compare(lf(readFileSync(path.join(EVENTS, file))), lf(readFileSync(path.join(copy, file)))) === 0, 'and it equals the committed file');
 });
