@@ -4,15 +4,15 @@
 |---|---|
 | Date | 2026-10-11 |
 | Developer | tannmayygupta |
-| Branch / commit | sprint-1-tanmay / not committed yet (baseline a4ef73a) |
-| Status | Partly done: everything that can be built and tested without an AWS account is done; the live apply, live checks and credit record are the developer's steps |
+| Branch / commit | sprint-1-tanmay; offline phase committed as 11daaaa, live fixes as 0ac0ac5 (baseline a4ef73a); not pushed |
+| Status | Done and closed by the developer on 2026-10-11 (L-08 ticked); built offline, applied and verified live; follow-ups still open (budget alert e-mail, other developers' keys, stop and start rehearsal, idle observation), tracked in `docs/dev/sprint-1-pr-checklist.md` |
 | Report tag | environments and deployment, hosting |
 
 ## Requirements covered
 LE-1, LE-6, LE-8 (story 2.6, task L-08); NFR-ISO-06 (metadata part), NFR-CST-01, NFR-AVL-01, R-2, OI-8; decisions D-34, D-40, D-41; ADR 0021 (superseded in part), ADR 0022; handoffs H-100, H-102, H-103.
 
 ## Summary (plain language)
-The Oracle plan could not go live (no credit card). The same hosting recipe now targets the developer's AWS Free Plan account in Sydney. Terraform builds a network, firewall groups from the one rules file and two Free Plan eligible servers with the same host baseline; budgets warn by e-mail when credit is used. All the offline checks pass. Nothing was applied: Claude has no AWS access, by design.
+The Oracle plan could not go live (no credit card). The same hosting recipe now targets the developer's AWS Free Plan account in Sydney. Terraform builds a network, firewall groups from the one rules file and two Free Plan eligible servers with the same host baseline; budgets warn by e-mail when credit is used. All the offline checks passed. Claude has no AWS access by design, so the developer applied it and ran the live checks on 2026-10-11 (see "Live verification").
 
 ## Why
 Oracle sign-up needs a credit card no developer has and Azure for Students rejected the college domain. The AWS account works but only in Sydney (D-41).
@@ -53,7 +53,7 @@ Traceability rows: LE-1, LE-6, LE-8.
 - **Batch 3 (docs):** cost arithmetic corrected (about USD 108 to 113), runbook rewritten for PowerShell (native Terraform first, Docker as an alternative, state location and copy, find leftovers by tag, what a stop does, shorter rehearsal, Part A gate, monitored root e-mail, alternate contacts, root MFA risk, accidental upgrade, plan end), budgets described as a lagging warning, deferred items recorded in `docs/bmad/initiative-lab/deferred-work.md`.
 
 ## Evidence
-`docs/assets/l-08-aws-hosts/offline-checks.txt`. Live evidence (`verify-hosts.txt`, `private-link-check.txt`) is still to be produced by the developer.
+`docs/assets/l-08-aws-hosts/offline-checks.txt` (offline), `verify-hosts.txt` and `private-link-check.txt` (live, 2026-10-11, addresses redacted).
 
 ## Problems met and how they were fixed
 - `terraform test` crashed (Terraform panic "value has marks") while printing a failed assertion on an instance whose `user_data` is sensitive; the failing assertion was an instance-profile check that cannot hold with a mocked provider (computed strings); removed it and covered "no instance profile" with a static test on `compute.tf`.
@@ -66,7 +66,7 @@ Traceability rows: LE-1, LE-6, LE-8.
 Not a vulnerable-app task. Notes on the hosts: IMDSv2 required with hop limit 1 so a container cannot read instance metadata; no instance profile; no secrets in the repository; the secret scan now looks for AWS keys and account IDs. No flag values involved.
 
 ## Limitations and follow-ups
-- **Not done (developer steps):** Part A and B of the runbook (account hardening, IAM user, apply), Part C (live `verify-hosts` and `private-link-check`, evidence), Part D (credit balance, days left, plan end date in the owner record), the stop and start rehearsal, S-11 and S-17 live fields. L-08 is **not** ticked and stories 2.1 and 2.6 are **not** marked done until those results are recorded and the developer confirms.
+- **Done since this entry was first written:** Parts A to D (account, IAM user, apply, live checks, credit balance read on 2026-10-11); the developer then closed L-08 and stories 2.1 and 2.6. **Still open:** the stop and start rehearsal, the S-11 and S-17 live field tables, the budget alert e-mail confirmation, the other developers' keys and the idle observation (see `docs/dev/sprint-1-pr-checklist.md`).
 - Unverified (marked in runbook and ADR): Sydney prices, 16 KB user data limit, whether AWS reclaims idle instances, how Budgets treats credits, Free Plan limits on instance count and disk size, completeness of the IAM policy (the first plan may show a missing action), the `python:3.12-alpine` image pull needed by the metadata check, AWS pages were not re-read in this build.
 - H-103 (Docker-published ports, container egress, VPC range) stays open for L-15 and L-29; the host firewall is only a second layer on AWS images.
 - PRD R-2 left for the developer (no conflict while keep-alive is off).
@@ -83,5 +83,5 @@ Done by the developer on the AWS Free Plan account in Sydney (ap-southeast-2); C
 - **`verify-hosts`:** `RESULT PASS (94 checks)` with two warnings (the cloud-init note on each host). Key-only login works; password and root login refused; only 22, 80 and 443 answer from the developer's address and every other probed port is closed; the baseline marker and the seven baseline files match the repository; Docker 29.9.0 is installed; a container cannot read the instance metadata while the host can (IMDSv2, hop limit 1, with controls).
 - **`private-link-check`:** `RESULT PASS (22 checks)`. Mutual TLS 1.3 works both ways (9443 and 9444); median connect about 0.44 ms; a client without a certificate is refused; wrong direction and an unlisted port are dropped; no certificate left on either host.
 - **Evidence:** `docs/assets/l-08-aws-hosts/verify-hosts.txt` and `private-link-check.txt` (addresses redacted; the secret scan passes).
-- **Still open before the story closes:** credit balance, days left and plan end date read from the Billing console (Part D); the budget alert e-mail confirmed; the stop and start rehearsal of the labs host (Part C6); Akshay's and Sahil's public keys added (only Tanmay's key is installed); idle reclaim by AWS to be observed for a week; root MFA skipped by choice (recorded risk).
+- **Still open after the story was closed:** the budget alert e-mail confirmed; the stop and start rehearsal of the labs host (Part C6); Akshay's and Sahil's public keys added (only Tanmay's key is installed); idle reclaim by AWS to be observed for a week; root MFA skipped by choice (recorded risk).
 - **Credits (read by the developer from the Billing console, 2026-10-11):** balance USD 120 (the sign-up credit plus the credit earned by one AWS activity), plan end April 2027 (the console showed 11 April 2027 earlier). At about USD 108 to 113 per month with both hosts running, the balance covers about one month; with the labs host stopped when not testing it lasts several months.

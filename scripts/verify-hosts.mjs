@@ -1,6 +1,6 @@
 // Live check of the two cloud hosts, run by the developer after `terraform apply` (runbook Part C).
 // From outside: only 22, 80 and 443 respond. Over ssh: key login works, password and root login are refused,
-// the host firewall has each rule, the baseline marker says ok, and every baseline file on each host has the same
+// the host firewall has each placeholder rule (ACCEPT rules on a chain whose policy is ACCEPT: they filter nothing, the security groups are the perimeter), the baseline marker says ok, and every baseline file on each host has the same
 // hash as the file in this repository (this also detects drift, because Terraform ignores later startup-file changes).
 // It also proves that instance metadata (IMDSv2, hop limit 1) is reachable from the host but not from a container.
 // Usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts <file>] [--user ubuntu]
@@ -135,7 +135,7 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
       const ciRepaired = /error/.test(ci) && kv.marker === 'ok';
       add(`${vm} cloud-init finished`, /done/.test(ci) || ciRepaired, ciRepaired ? 'cloud-init recorded an error from an earlier run; the baseline marker is ok (repaired and rerun by hand)' : ci, ciRepaired);
       add(`${vm} baseline marker says ok`, kv.marker === 'ok', kv.marker);
-      for (const p of [...open, ...privatePortsFor(rules, vm)]) add(`${vm} host firewall accepts port ${p}`, kv[`fw_${p}`] === 'yes', kv[`fw_${p}`] ?? 'no answer');
+      for (const p of [...open, ...privatePortsFor(rules, vm)]) add(`${vm} host firewall placeholder rule for port ${p} present`, kv[`fw_${p}`] === 'yes', kv[`fw_${p}`] ?? 'no answer');
       const remote = parseShas(login.stdout);
       for (const f of BASELINE_FILES) {
         const got = remote[f.remote];

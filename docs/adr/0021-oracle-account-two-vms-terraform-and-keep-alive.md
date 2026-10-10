@@ -36,3 +36,11 @@ Read 2026-10-10:
 - Docker install page for Ubuntu (docs.docker.com/engine/install/ubuntu): apt repository steps; the page states no key fingerprint. The fingerprint in the script was read from the key itself with gpg and equals the long-published Docker value (still UNVERIFIED against a current Docker page).
 - hashicorp/setup-terraform latest release v4.0.1 (not used; the Docker image digest is pinned instead).
 - Unverified: Pay As You Go effect on reclaim, home region permanence, public IP counts, console menu names, alarm query.
+
+## Sources
+Links recorded from the pages named under Evidence (not re-read when added, 2026-10-11).
+- Oracle Always Free Resources: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
+- Terraform provider `oracle/oci`: https://registry.terraform.io/providers/oracle/oci/latest and https://github.com/oracle/terraform-provider-oci/releases
+- Docker Engine install on Ubuntu: https://docs.docker.com/engine/install/ubuntu/
+- setup-terraform action: https://github.com/hashicorp/setup-terraform/releases
+- Superseded for the provider by ADR 0022 (AWS sources are listed there).

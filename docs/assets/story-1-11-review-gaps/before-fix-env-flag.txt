@@ -1,4 +1,4 @@
-﻿✔ only true and 1 switch a flag on (3.0197ms)
+✔ only true and 1 switch a flag on (3.0197ms)
 ✔ a missing openssl fails the mTLS test when CI=true (635.0443ms)
 ✔ a missing openssl fails the mTLS test when CI=1 (626.271ms)
 ✖ a missing openssl skips the mTLS test when CI="false" (614.4423ms)

@@ -1,4 +1,4 @@
-﻿contracts/api/lab/examples/invalid/flag-result-echo-flag.json:5:  "flag": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"
+contracts/api/lab/examples/invalid/flag-result-echo-flag.json:5:  "flag": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"
 contracts/api/lab/examples/valid/flags.request.json:3:  "flag": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"
 contracts/mocks/fake-lab/server.mjs:14:// Test flags: correct, decoy, other_instance and stale_epoch are "VM{" + 24 times A, B, C 
 contracts/mocks/fake-lab/server.mjs:34:const FAKE = (c) => 'VM{' + c.repeat(24) + '}';

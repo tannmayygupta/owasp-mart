@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-09 |
 | Developer | tannmayygupta |
-| Branch / commit | sprint-1-tanmay, started from HEAD 3a08d3a (the plan's `baseline_revision` is f76f76d, an earlier commit made before the plan was approved); not committed and not pushed when this entry was written |
-| Status | Done in code and tests; not closed: the developer has not yet confirmed, L-05 is not ticked in `dev1-tanmay.md`, the story is not marked done, and the CI run on GitHub has not happened |
+| Branch / commit | sprint-1-tanmay, started from HEAD 3a08d3a (the plan's `baseline_revision` is f76f76d, an earlier commit made before the plan was approved); committed as 84d5da2, not pushed |
+| Status | Done: code and tests; L-05 closed and ticked by the developer on 2026-10-09 (commit 77fc089). Waived by D-37 and still open: Akshay's consumer review (H-84 to H-89). The CI run on GitHub has not happened |
 | Report tag | contracts, IF-2, OpenAPI, mock, handoff, sprint 1 |
 
 ## Requirements covered

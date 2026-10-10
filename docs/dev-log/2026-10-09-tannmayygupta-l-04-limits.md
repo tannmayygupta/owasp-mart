@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-09 |
 | Developer | tannmayygupta |
-| Branch / commit | sprint-1-tanmay, based on 3180e58; not committed and not pushed when this entry was written |
-| Status | Partly done: mTLS test and Akshay handoff done and tested; the CI check on GitHub is still open (it needs the developer to open the pull request) |
+| Branch / commit | sprint-1-tanmay, based on 3180e58; committed as 6aeceb2, not pushed |
+| Status | Done: mTLS test and Akshay handoff done and tested; story 1.10 marked done with the GitHub CI check still open (it needs the pull request) |
 | Report tag | contracts, IF-5, mTLS, handoff, sprint 1 |
 
 ## Requirements covered

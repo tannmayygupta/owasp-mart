@@ -43,12 +43,7 @@
                                          "ec2:ImportKeyPair",
                                          "ec2:CreateKeyPair",
                                          "ec2:DeleteKeyPair",
-                                         "ec2:TerminateInstances",
-                                         "ec2:StartInstances",
-                                         "ec2:StopInstances",
                                          "ec2:RebootInstances",
-                                         "ec2:ModifyInstanceAttribute",
-                                         "ec2:ModifyInstanceMetadataOptions",
                                          "ec2:AllocateAddress",
                                          "ec2:ReleaseAddress",
                                          "ec2:AssociateAddress",
@@ -60,6 +55,24 @@
                           "Condition":  {
                                             "StringEquals":  {
                                                                  "aws:RequestedRegion":  "ap-southeast-2"
+                                                             }
+                                        }
+                      },
+                      {
+                          "Sid":  "ManageTaggedVulnMartInstances",
+                          "Effect":  "Allow",
+                          "Action":  [
+                                         "ec2:TerminateInstances",
+                                         "ec2:StartInstances",
+                                         "ec2:StopInstances",
+                                         "ec2:ModifyInstanceAttribute",
+                                         "ec2:ModifyInstanceMetadataOptions"
+                                     ],
+                          "Resource":  "arn:aws:ec2:ap-southeast-2:*:instance/*",
+                          "Condition":  {
+                                            "StringEquals":  {
+                                                                 "aws:RequestedRegion":  "ap-southeast-2",
+                                                                 "aws:ResourceTag/Project":  "vulnmart"
                                                              }
                                         }
                       },

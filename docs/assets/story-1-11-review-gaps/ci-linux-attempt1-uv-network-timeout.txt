@@ -1,4 +1,4 @@
-﻿sha256:97c262196c9e6ae4a53ace1b66c7648fb9ca85d8f06b10eb61adac4c0b1051d7
+sha256:97c262196c9e6ae4a53ace1b66c7648fb9ca85d8f06b10eb61adac4c0b1051d7
 === STEP skills: node scripts/verify-skills.mjs
 OK: all 217 installed skill files match the manifest.
 === RESULT skills: PASS

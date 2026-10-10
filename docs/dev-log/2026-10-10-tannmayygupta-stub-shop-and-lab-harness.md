@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-10 |
 | Developer | tannmayygupta |
-| Branch / commit | sprint-1-tanmay, uncommitted at the time of writing (base 2f98d34) |
-| Status | Built and tested; not closed. L-06 is not ticked and the story is not marked done until the developer confirms. The CI job `compose` has not run yet |
+| Branch / commit | sprint-1-tanmay, committed as a292571 (base 2f98d34); not pushed |
+| Status | Done: built and tested; L-06 closed and ticked by the developer on 2026-10-10 (met on one PC). The CI job `compose` has never run on GitHub (tracked in `docs/dev/sprint-1-pr-checklist.md`) |
 | Report tag | testing and quality; instance contract; lab harness |
 
 ## Requirements covered

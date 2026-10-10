@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-08 |
 | Developer | tannmayygupta |
-| Branch / commit | shared-L-03 (base 2a05992; early pull request, not yet opened) |
-| Status | Built, reviewed (thorough, one round with four reviewers) and tested; waiting for the pull request and CI. Event names and open points are to be confirmed by Sahil and Akshay in the team chat (D-37) |
+| Branch / commit | shared-L-03 (base 2a05992), committed as f083c94 and merged into sprint-1-tanmay by b696416; the early pull request from `shared-L-03` was never opened |
+| Status | Done: built, reviewed (thorough, one round with four reviewers) and tested; L-03 closed and ticked 2026-10-09; the GitHub CI run has not happened. Event names and open points are to be confirmed by Sahil and Akshay in the team chat (D-37) |
 | Report tag | contracts, IF-4, sprint zero |
 
 ## Requirements covered

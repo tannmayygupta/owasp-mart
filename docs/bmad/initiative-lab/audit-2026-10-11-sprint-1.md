@@ -40,3 +40,6 @@ L-02 "Sahil has approved"; L-05 "Akshay reviewed"; L-06 "serves a planted flag",
 
 ## What the audit found nothing wrong with
 `.gitignore` for secrets; no tfstate, tfvars, keys, account IDs, access key ids or public addresses tracked or in any of the 43 commits (searched with pattern searches over the history); pinned tool versions; CI top-level permissions; ADR numbering 0001 to 0022 contiguous; the signing rule (constant-time compare, body hash over raw bytes, method, target, timestamp and nonce bound, 60 s skew); relative markdown links all resolve.
+
+## Added after the full test run
+- The AWS Terraform tests are not hermetic: a developer's local, git-ignored 	erraform.tfvars leaks into 	erraform test (29 of 30 on the developer's checkout, 30 of 30 on a clean copy). Fix: set every variable explicitly in each run block or run the tests with -var-file of an empty file.

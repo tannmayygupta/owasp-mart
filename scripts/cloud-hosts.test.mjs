@@ -98,9 +98,9 @@ test('verify-hosts passes on a healthy pair of hosts', async () => {
   const checks = await verify();
   assert.deepEqual(failed(checks), []);
   assert.ok(checks.some((c) => c.name === 'vm-p port 9443 closed from outside'));
-  assert.ok(checks.some((c) => c.name === 'vm-i host firewall accepts port 9443'));
-  assert.ok(checks.some((c) => c.name === 'vm-p host firewall accepts port 9444'));
-  assert.ok(!checks.some((c) => c.name === 'vm-p host firewall accepts port 9443'), 'only the private ports addressed to that host');
+  assert.ok(checks.some((c) => c.name === 'vm-i host firewall placeholder rule for port 9443 present'));
+  assert.ok(checks.some((c) => c.name === 'vm-p host firewall placeholder rule for port 9444 present'));
+  assert.ok(!checks.some((c) => c.name === 'vm-p host firewall placeholder rule for port 9443 present'), 'only the private ports addressed to that host');
 });
 
 test('the remote command uses pipefail and one iptables -C check per port, not a line count', () => {
@@ -122,7 +122,7 @@ test('refused on 80 or 443 passes only when that host firewall rule exists; a ti
   assert.deepEqual(failed(await verify({ tcpProbe: refused })), []);
   const noRule = fakeSsh({ out: (vm) => baselineOutput(vm, { fw: { 80: 'no' } }) });
   const f = failed(await verify({ tcpProbe: refused, ssh: noRule }));
-  assert.ok(f.includes('vm-p host firewall accepts port 80'));
+  assert.ok(f.includes('vm-p host firewall placeholder rule for port 80 present'));
   assert.ok(f.includes('vm-p port 80 reachable from outside'), 'refused without the host rule is not a pass');
   assert.ok((await verify({ tcpProbe: refused, requireListener: true })).some((c) => !c.ok && c.name.includes('port 80')));
   assert.ok((await verify({ tcpProbe: probeFor({ 443: 'timeout' }) })).some((c) => !c.ok && c.name.includes('port 443')));
@@ -154,8 +154,8 @@ test('a listener that cannot be started is a named failure and nothing is stoppe
 test('a missing host firewall rule for the private port fails', async () => {
   const ssh = fakeSsh({ out: (vm) => baselineOutput(vm, { fw: { 9443: 'no', 9444: 'no' } }) });
   const f = failed(await verify({ ssh }));
-  assert.ok(f.includes('vm-i host firewall accepts port 9443'));
-  assert.ok(f.includes('vm-p host firewall accepts port 9444'));
+  assert.ok(f.includes('vm-i host firewall placeholder rule for port 9443 present'));
+  assert.ok(f.includes('vm-p host firewall placeholder rule for port 9444 present'));
 });
 
 test('verify-hosts fails when passwords or root are accepted, or ssh key login fails', async () => {

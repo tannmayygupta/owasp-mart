@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-10 |
 | Developer | tannmayygupta |
-| Branch / commit | sprint-1-tanmay, not committed yet (work tree on top of b0a55cd) |
-| Status | Partly done: built and tested locally and in the Linux container; the first GitHub run of job `contract-rules` has not happened; L-07 is not ticked (waits for the developer) |
+| Branch / commit | sprint-1-tanmay, committed as dc5c8bd (work started on top of b0a55cd); not pushed |
+| Status | Done: built and tested locally and in the Linux container; L-07 closed and ticked by the developer on 2026-10-11; the first GitHub run of job `contract-rules` has not happened (tracked in `docs/dev/sprint-1-pr-checklist.md`) |
 | Report tag | contract rules, CI, breaking-change check |
 
 ## Requirements covered
@@ -73,6 +73,6 @@ No vulnerable part. The oasdiff binary is run only after its sha256 matches the 
 - CI and docs: job `contract-rules` installs pnpm packages; `ci:linux` fails early without a real `.git` or `origin/main`; ADR 0012, handoffs and deferred-work updated; the registry fields, the waiver form, removed-file-is-breaking, the COMPAT.md format and the bundle command are written as proposals awaiting confirmation.
 
 ## Late verification notes (2026-10-10)
-- A full pytest run started while other agents were running took 39 minutes and failed one test, 	est_the_full_lifecycle_works_over_mtls; the same test passes alone (27 of 27 in 	est_mtls.py, 65 s) and the full suite passes on a quiet machine (393 passed, 170 s). Treated as a load-induced timing flake; if it recurs on CI it becomes a bug story.
+- A full pytest run started while other agents were running took 39 minutes and failed one test, test_the_full_lifecycle_works_over_mtls; the same test passes alone (27 of 27 in test_mtls.py, 65 s) and the full suite passes on a quiet machine (393 passed, 170 s). Treated as a load-induced timing flake; if it recurs on CI it becomes a bug story.
 - Real run against the merged IF-6 v0 (--base 16ae8aa, the merge of pull request 2): exit 0 (eal-diff-vs-merged-v0.txt); against origin/main: 17 PASS, 0 FAIL, 4 NOT-APPLICABLE.
 - End-to-end files: 61 of 61 pass.

@@ -8,6 +8,9 @@
   summary: Confirm CI green on a real pull request, and `node scripts/dev.mjs hello` on Akshay's Mac and Sahil's PC.
   evidence: IA of the L-01 review; unverified until the pull request exists and the story's risk check is run (would be medium).
 
+## Sprint 1 audit (2026-10-11)
+- The brutal audit of sprint 1 and its prioritised backlog (IF-4 sequence and epoch rules, event key lifecycle, IF-6 schema holes, IF-5 and IF-2 gaps, stub conformance, rules engine, host security, process) is in `docs/bmad/initiative-lab/audit-2026-10-11-sprint-1.md`; story 1.13 fixed the documents and CI settings, the rest becomes bug or contract stories.
+
 ## From the L-04 follow-up review (2026-10-09)
 - FIXED in story 1.11: negative test for `scripts/check_orchestrator_contract.py` with `owner_hash` and `first_seq` in a GET answer schema (fails when the two names are removed from the checker).
 - OPEN (Akshay, handoff H-59, not decided here): `first_seq` has no upper bound in the schema; the fake service accepts `1.0` while the Python host rejects it; a reset may use a lower `first_seq` than an earlier epoch (the platform alone prevents it). Decide the bound and the rule with Akshay and match both fakes.

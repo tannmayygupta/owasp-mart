@@ -4,7 +4,7 @@
 |---|---|
 | Date | 2026-10-09 |
 | Developer | tannmayygupta |
-| Branch / commit | sprint-1-tanmay, uncommitted at the time of writing (base f4fad33) |
+| Branch / commit | sprint-1-tanmay, committed as d44313c (base f4fad33); not pushed |
 | Status | Done for this story; story 1.12 (RFC 9457 error body) is pending by the developer's decision |
 | Report tag | testing and quality; CI |
 

@@ -1,4 +1,4 @@
-﻿....FFF.FFFFFFFF.FFF.F...FFFFFFF.F..                                     [100%]
+....FFF.FFFFFFFF.FFF.F...FFFFFFF.F..                                     [100%]
 ================================== FAILURES ===================================
 _____ test_a_port_out_of_range_or_not_whole_exits_2_with_a_message[65536] _____
 

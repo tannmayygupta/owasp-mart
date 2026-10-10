@@ -1,6 +1,6 @@
 # Developer 1: Tanmay, Lab stream
 
-Tanmay owns the instance plane and the assessment engine: contracts and the lab harness, the two Oracle VMs, the orchestrator, isolation, the edge and gate, flags, detection, attempts, scoring and anti-cheat, and the final end-to-end checks.
+Tanmay owns the instance plane and the assessment engine: contracts and the lab harness, the two cloud VMs (AWS Sydney, D-41), the orchestrator, isolation, the edge and gate, flags, detection, attempts, scoring and anti-cheat, and the final end-to-end checks.
 
 | | |
 |---|---|
@@ -24,14 +24,14 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 | Sprint | Dates | Goal | Tasks |
 |---|---|---|---|
-| 1 | 8 Oct to 14 Oct 2026 | Contracts v1, the lab harness and the two Oracle VMs exist, so the other two streams can build against stable contracts and fakes. | L-01 to L-08 (8) |
+| 1 | 8 Oct to 14 Oct 2026 | Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosting moved from Oracle, see D-41), so the other two streams can build against stable contracts and fakes. | L-01 to L-08 (8) |
 | 2 | 15 Oct to 21 Oct 2026 | Instances start, reset, tear down and are isolated; the deployment pipeline works (Vercel, certificates, image builds). | L-09 to L-16 (8) |
 | 3 | 22 Oct to 28 Oct 2026 | The edge and gate, event relay, flags, the detection sidecar, the attempt engine and scoring work end to end. | L-17 to L-24 (8) |
 | 4 | 29 Oct to 4 Nov 2026 | Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load check and the demo rehearsal. | L-25 to L-31 (7) |
 
 ## Sprint 1 (8 Oct to 14 Oct 2026)
 
-Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other two streams can build against stable contracts and fakes.
+Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosting moved from Oracle, see D-41), so the other two streams can build against stable contracts and fakes.
 
 - [x] **L-01. Repository skeleton and tooling run end to end (tracer bullet)**
   - Epic: `epic-lab-baseline`
@@ -50,6 +50,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-3
   - Waits on: L-01.
   - Done when: The contract validates and Sahil has approved it as consumer.
+  - Closed with (2026-10-11): the contract validates; "Sahil has approved it" was waived by D-37 (review optional during initial development) and is not met; handoffs H-24 to H-35 are open.
 
 - [x] **L-03. Instance event schema (IF-4), app-event names and fake ingest**
   - Epic: `epic-lab-baseline`
@@ -68,6 +69,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-5
   - Waits on: L-01.
   - Done when: A client built from the contract creates, resets and destroys instances against the fake, and the fake host passes the protocol tests the real one must pass later.
+  - Closed with (2026-10-11): met locally with a hand-written client (not generated); the GitHub CI run of the new jobs has never happened; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **L-05. Lab fragment of the platform API (IF-2) with a mock**
@@ -78,6 +80,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-9
   - Waits on: L-01.
   - Done when: The fragment validates, the mock answers every endpoint and Akshay has reviewed it as consumer.
+  - Closed with (2026-10-11): the fragment validates and the mock answers every endpoint; "Akshay has reviewed it as consumer" was waived by D-37 and is not met; handoffs H-84 to H-89 are open; ADR 0019 is still Proposed.
   - Handoffs: H-78 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **L-06. Stub shop, fake ingest and lab harness**
@@ -88,6 +91,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-6
   - Waits on: L-02, L-03, L-04.
   - Done when: One command starts a full stub instance on a laptop: it answers health, becomes ready only after the injection marker, serves a planted flag, emits one app event the fake ingest validates, and passes the contract conformance check.
+  - Closed with (2026-10-11): met locally on one PC; the GitHub CI run of the `compose` job has never happened; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-74 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **L-07. Contract checks live in CI**
@@ -97,15 +101,17 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Covers: LB-7
   - Waits on: L-02, L-03, L-04.
   - Done when: A deliberately breaking contract change fails CI and a valid one passes.
+  - Closed with (2026-10-11): proven by the local tests and a Linux container run; job `contract-rules` has never run as a pull request on GitHub; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-73 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [x] **L-08. Oracle account, two VMs, private link and firewall**
+- [x] **L-08. AWS account (Sydney), two VMs, private link and firewall** (was Oracle; see D-41)
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Create VM-P and VM-I, a private link between them, key-only SSH and only ports 80 and 443 public; keep-alive and budget alert; send the Oracle terms-of-service email.
   - Covers: LE-1, LE-6; spikes S-11, S-17
   - Waits on: Decision on who owns the Oracle account (Q-32).
   - Done when: Both VMs are reachable by key-only SSH, only 80, 443 and SSH are open, the private link works, and the account owner, budget alert and keep-alive routine are written down.
+  - Closed with (2026-10-11): the hosts were built and checked live (verify-hosts 94 checks, private-link-check 22); open: budget alert e-mail unconfirmed, only one developer key installed, stop and start rehearsal and idle observation not done; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-68 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 2 (15 Oct to 21 Oct 2026)

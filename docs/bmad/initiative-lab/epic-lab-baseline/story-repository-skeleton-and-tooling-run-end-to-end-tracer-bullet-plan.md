@@ -17,7 +17,7 @@ context:
 assignee: "tannmayygupta"
 ---
 
-<frozen-after-approval reason="human-owned intent â€” do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
 ## Intent
 

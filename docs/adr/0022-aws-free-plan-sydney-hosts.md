@@ -1,6 +1,6 @@
 # 0022. Hosts on the AWS Free Plan in Sydney (supersedes the provider part of ADR 0021)
 
-- **Status:** Accepted for the provider, region, tooling and sizing (confirmed by the developer on 2026-10-11 as decision D-41); Proposed for the private ports 9443 and 9444, the instance sizes (a variable, to be revisited when the credit balance is known) and the host isolation. Nothing has been applied yet.
+- **Status:** Accepted for the provider, region, tooling and sizing (confirmed by the developer on 2026-10-11 as decision D-41); Proposed for the private ports 9443 and 9444, the instance sizes (a variable, to be revisited when the credit balance is known) and the host isolation. Applied and verified live by the developer on 2026-10-11: `terraform apply` created 28 resources on the first run, `verify-hosts` RESULT PASS (94 checks) and `private-link-check` RESULT PASS (22 checks); `terraform test` now 30 of 30 (aws) and 10 of 10 (oci). Not yet proven: the budget alert e-mail, the stop and start path, idle reclaim by AWS, GitHub CI.
 - **Date:** 2026-10-11
 - **Deciders:** Tanmay
 - **Requirements:** LE-1, LE-6, LE-8, NFR-AVL-01, NFR-CST-01, NFR-ISO-06, R-1, R-2, R-4, OI-8, S-11, S-17, D-34, D-40, D-41, ADR 0007, ADR 0021
@@ -37,4 +37,15 @@ ADR 0021 chose Oracle Always Free in Mumbai. The live phase cannot start: the Or
 ## Evidence
 Read on 2026-10-11 while planning story 2.6 (AWS pages; not re-read in the build, so they stay marked for re-check in the runbook): Free Plan duration and credit, eligible EC2 types, no Organizations or Control Tower, EC2 security testing policy, abuse-report forwarding, public IPv4 and NAT gateway prices, free outbound data.
 Real in the build (2026-10-11): `terraform init` in the pinned Terraform 1.16.5 image resolved `hashicorp/aws` 6.68.0 under the constraint `~> 6.68` and `terraform providers lock` wrote hashes for five platforms; `terraform validate` accepted the configuration including the `insecure_value` attribute of the SSM parameter data source; `terraform test` 19 of 19 and a deliberate swap of a rule direction made it fail.
-Unverified: Sydney prices, the 16 KB user data limit, idle reclaim by AWS, Budgets treatment of credits, Free Plan limits on instance count and disk size, console menu names, completeness of the IAM policy.
+Live results (2026-10-11, `docs/assets/l-08-aws-hosts/`): both hosts accepted at the chosen sizes in Sydney; the first boot failed in the baseline for three reasons only a real host shows, fixed with regression tests (commit 0ac0ac5); the IAM policy needed no added action for plan and apply.
+Unverified: Sydney prices, the 16 KB user data limit, idle reclaim by AWS, Budgets treatment of credits, Free Plan limits on instance count and disk size, console menu names.
+
+## Sources
+Pages named in the Evidence section above; the links are recorded here from those pages and were not re-read when the links were added (2026-10-11), so re-check them before the final report.
+- AWS Free Tier plans: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html
+- EC2 Free Plan usage: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-free-tier-usage.html
+- AWS penetration testing policy: https://aws.amazon.com/security/penetration-testing/
+- AWS acceptable use policy: https://aws.amazon.com/aup/
+- Amazon VPC pricing (public IPv4, NAT gateway): https://aws.amazon.com/vpc/pricing/
+- Instance metadata options (IMDSv2, hop limit): https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html
+- Terraform AWS provider releases: https://github.com/hashicorp/terraform-provider-aws/releases and https://registry.terraform.io/providers/hashicorp/aws/latest

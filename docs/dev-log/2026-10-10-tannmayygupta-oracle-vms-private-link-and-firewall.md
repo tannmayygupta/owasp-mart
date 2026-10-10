@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-10 |
 | Developer | tannmayygupta |
-| Branch / commit | sprint-1-tanmay; nothing committed yet (working tree on top of e4492b7, the HEAD when the work started) |
-| Status | Partly done: Phase 1 (offline build) done and tested; Phase 2 (account, apply, live checks, terms e-mail) not started. L-08 is not ticked and the story is not marked done |
+| Branch / commit | sprint-1-tanmay; phase 1 committed as 7c54650 (work started on top of e4492b7); not pushed |
+| Status | Phase 1 (offline build) done and tested. Phase 2 never happened on Oracle (sign-up blocked, hosting moved to AWS Sydney, D-41); the live work and the closing of L-08 are recorded in `2026-10-11-tannmayygupta-aws-free-plan-sydney-hosts.md`. This Oracle code stays as an unused option |
 | Report tag | infrastructure; deployment; network isolation; cost and availability |
 
 ## Requirements covered
@@ -61,10 +61,10 @@ A review of the first build found problems; each fix has a test where a test is 
 - Real results after the fixes: `node --test` on `oracle-hosts`, `check-network-rules`, `scan-secrets` and `ci-linux` tests: 67 of 67 pass (one test runs the keep-alive script with Python 3); `terraform test` in the pinned image: 10 of 10 pass; `terraform fmt -check -recursive` exit 0; `terraform validate` valid; `scan-secrets` and `check-network-rules` PASS; `sh -n` on the three host scripts passes; the loopback run of the Python helpers (probe, mTLS) gave the expected answers. The full `ci:linux` was not rerun for these fixes.
 
 ## Live verification
-Not done yet. To be filled by the developer after runbook Parts A to D: outputs of `verify-hosts` and `private-link-check` (redacted evidence in `docs/assets/l-08-oracle-hosts/`), the capacity result (S-11), latency (S-17), the alarm test, date the terms e-mail was sent and replied.
+Never done on Oracle: the sign-up was blocked (see "Oracle sign-up blocked" below) and the live checks were done on AWS instead (`2026-10-11-tannmayygupta-aws-free-plan-sydney-hosts.md`, evidence in `docs/assets/l-08-aws-hosts/`).
 
 ## Evidence
-`docs/assets/l-08-oracle-hosts/`.
+`docs/assets/l-08-oracle-hosts/` (offline phase only).
 
 ## Problems met and how they were fixed
 - The first draft of the policy test counted `user_data` twice (the Terraform local and the instance); the check now matches the use in the instance.
@@ -80,11 +80,11 @@ Not a vulnerable component. Security controls: closed default security list, key
 - Unverified Oracle facts: Pay As You Go and reclaim, home region permanence, public IP counts, console menu names; the alarm query is checked live.
 - Docker key fingerprint is read from the key and a pinned constant, not from a current Docker page.
 - The CI job `terraform` has not run on GitHub; it uses a pinned Docker image instead of an action pinned by SHA.
-- The developer must do Parts A to D, then confirm before L-08 is ticked and the story marked done; remind to set Done = Yes in the Excel sheet.
+- Superseded: the live parts were done on AWS (D-41) and L-08 was closed on 2026-10-11 (see the AWS dev-log).
 
 
 ## Verification note (2026-10-10)
-After the review patches: unit tests 393 of 393, 	erraform fmt, init -lockfile=readonly, alidate and 	erraform test (10 of 10) pass in the pinned image, network-rule and secret-scan checks pass, contract rules unchanged (17 PASS, 4 NOT-APPLICABLE). The Linux proof (pnpm run ci:linux) passed before the review patches; the re-run after them was stopped by the system for low memory and is still to be repeated.
+After the review patches: unit tests 393 of 393, terraform fmt, init -lockfile=readonly, validate and terraform test (10 of 10) pass in the pinned image, network-rule and secret-scan checks pass, contract rules unchanged (17 PASS, 4 NOT-APPLICABLE). The Linux proof (pnpm run ci:linux) passed before the review patches; the re-run after them was stopped by the system for low memory; no later single re-run of this step is recorded here (the developer reruns the full battery before the pull request, story 1.13).
 
 
 ## Oracle sign-up blocked (2026-10-10)

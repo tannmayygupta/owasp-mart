@@ -371,6 +371,20 @@ test('aws: RunInstances is limited to the eligible instance types by an ec2:Inst
   assert.ok(!pol.Statement.some((s) => !runs.includes(s) && [].concat(s.Action).includes('ec2:RunInstances')));
 });
 
+test('aws: start, stop, terminate and the two modify actions are limited to instances tagged Project=vulnmart (and Sydney), never granted on all resources', () => {
+  const pol = POLICY();
+  const TAGGED = ['ec2:TerminateInstances', 'ec2:StartInstances', 'ec2:StopInstances', 'ec2:ModifyInstanceAttribute', 'ec2:ModifyInstanceMetadataOptions'];
+  const stmts = pol.Statement.filter((s) => TAGGED.some((a) => [].concat(s.Action).includes(a)));
+  assert.equal(stmts.length, 1, 'the five actions sit in exactly one statement');
+  const s = stmts[0];
+  assert.deepEqual([].concat(s.Action).sort(), [...TAGGED].sort(), 'that statement holds only those five actions');
+  assert.equal(s.Effect, 'Allow');
+  assert.equal(s.Resource, 'arn:aws:ec2:ap-southeast-2:*:instance/*');
+  assert.equal(s.Condition.StringEquals['aws:ResourceTag/Project'], 'vulnmart');
+  assert.equal(s.Condition.StringEquals['aws:RequestedRegion'], 'ap-southeast-2');
+  assert.match(aws('versions.tf'), /Project\s*=\s*"vulnmart"/, 'the tag the condition needs is applied by default_tags');
+});
+
 test('rule file: 80 and 443 use the web token, a literal 0.0.0.0/0 there fails, the web token on another port fails, duplicate names fail', () => {
   const r = rules();
   for (const p of [80, 443]) assert.deepEqual(r.public_ingress.find((x) => x.port === p).sources, ['$public_web_cidrs']);

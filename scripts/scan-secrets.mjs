@@ -1,6 +1,7 @@
 // Scans the tracked files for things that must never be committed for the cloud hosts (AWS, and the unused Oracle option):
 // AWS access key ids, secret access keys, AWS account ids (in ARNs and next to the words account id), OCIDs, private
 // key blocks, API key fingerprints, local Terraform and credential files, and public IPv4 addresses
+// AWS console URLs with an account id, png/jpg files outside docs/assets, and public IPv4 addresses
 // (the address scan covers infra/, docs/runbooks, docs/assets, docs/dev-log and the study notes only).
 // Usage: node scripts/scan-secrets.mjs   (exit 1 with the file and line of each hit; the matched value is never printed)
 import { execFileSync } from 'node:child_process';
@@ -12,7 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OCID = /ocid1\.[a-z0-9_]+\.oc[0-9]\.[a-z0-9-]*\.[a-z0-9]{20,}/i;
 const AWS_KEY_ID = /\b(?:AKIA|ASIA|AIDA|AROA|ANPA|AGPA|ASCA|ABIA)[0-9A-Z]{16}\b/;
 const AWS_SECRET = /(?:aws_secret_access_key|secret_?access_?key)["']?\s*[=:]\s*["']?[A-Za-z0-9/+=]{30,}/i;
-const AWS_ACCOUNT = /arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:\d{12}:|account[ _-]?id["' ]*[:=]?["' ]*\d{12}\b|\b\d{12}\.signin\.aws\.amazon\.com/i;
+const AWS_ACCOUNT = /arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:\d{12}:|account[ _-]?id["' ]*[:=]?["' ]*\d{12}\b|\b\d{12}\.signin\.aws\.amazon\.com|\b\d{12}-[0-9a-f]{6,}\.[a-z0-9-]+\.console\.aws\.amazon\.com/i;
 const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 const FINGERPRINT = /\b(?:[0-9a-f]{2}:){15}[0-9a-f]{2}\b/i;
 const IPV4 = /(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.]*\d)(?!\.\d)/g;
@@ -22,6 +23,12 @@ const BAD_NAMES = [
 ];
 const SKIP_CONTENT = /(^|\/)(pnpm-lock\.yaml|uv\.lock|\.terraform\.lock\.hcl|package-lock\.json)$|\.(xlsx|png|jpg|jpeg|gif|ico|pdf|woff2?|zip|gz)$/i;
 const IP_SCOPE = [/^infra\//, /^docs\/runbooks\//, /^docs\/assets\//, /^docs\/dev-log\//, /^docs\/research\/s-1[17]/, /^docs\/adr\/002[12]/];
+
+// Screenshots may carry an account id: no png, jpg or jpeg in the repository root or outside docs/assets.
+const IMAGE_FILE = /\.(png|jpe?g)$/i;
+export function imageOutsideAssets(f) {
+  return IMAGE_FILE.test(f) && !f.startsWith('docs/assets/');
+}
 
 // Test files that write a fake key header on purpose (to prove the contract validator rejects it).
 const KEY_BLOCK_FIXTURES = new Set(['scripts/validate-contracts.test.mjs']);
@@ -63,6 +70,7 @@ export function scanFiles(files, read = (f) => readFileSync(path.join(ROOT, f), 
   const hits = [];
   for (const f of files) {
     if (BAD_NAMES.some((re) => re.test(f))) hits.push({ file: f, line: 0, kind: 'file that must stay local' });
+    if (imageOutsideAssets(f)) hits.push({ file: f, line: 0, kind: 'image outside docs/assets (may show an account id)' });
     if (SKIP_CONTENT.test(f)) continue;
     try {
       if (size(f) > 2_000_000) continue;

@@ -2,7 +2,7 @@
 // so this file itself never contains one).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scanText, scanFiles, trackedFiles, isPublicIPv4 } from './scan-secrets.mjs';
+import { scanText, scanFiles, trackedFiles, isPublicIPv4, imageOutsideAssets } from './scan-secrets.mjs';
 
 const ocid = ['ocid1', 'instance', 'oc1', 'ap-mumbai-1', 'a'.repeat(30)].join('.');
 const pem = ['-----BEGIN', 'RSA PRIVATE KEY-----'].join(' ');
@@ -74,6 +74,19 @@ test('AWS placeholders and wildcard ARNs are not flagged, and the hit never cont
 test('AWS credential files are caught by name', () => {
   const bad = ['home/.aws/credentials', 'home/.aws/config', 'x/credentials.csv', 'x/terraform_accessKeys.csv'];
   assert.deepEqual(scanFiles(bad, () => '', () => 0).map((h) => h.file), bad);
+});
+
+test('a png, jpg or jpeg in the root or outside docs/assets is caught; under docs/assets it is not', () => {
+  const bad = ['image.png', 'x/shot.JPG', 'docs/other/a.jpeg'];
+  assert.deepEqual(scanFiles(bad, () => '', () => 0).map((h) => h.file), bad);
+  assert.equal(imageOutsideAssets('docs/assets/l-08/a.png'), false);
+  assert.deepEqual(scanFiles(['docs/assets/l-08/a.png'], () => '', () => 0), []);
+});
+
+test('the console URL form with an account id is caught (built at test time)', () => {
+  const url = `https://${'2'.repeat(12)}-${'abcdef0123'}.ap-southeast-2.console.aws.amazon.com/ec2`;
+  assert.equal(scanText('a.md', url)[0].kind, 'AWS account id');
+  assert.deepEqual(scanText('a.md', 'https://ap-southeast-2.console.aws.amazon.com/ec2'), []);
 });
 
 test('the SecretAccessKey JSON form, more id prefixes and a CSV row are caught (values built at test time)', () => {

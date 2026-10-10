@@ -78,7 +78,7 @@ assignee: "tannmayygupta"
 
 ## Implementation Notes
 
-2026-10-10, Phase 1 (offline) built. Deviations: CI job 	erraform runs the Terraform Docker image pinned by digest (Terraform 1.16.5) instead of an action pinned by SHA; extra Terraform file alarms.tf (idle alarm and e-mail topic); the VCN default security list is replaced by a closed one; private ports 9443 and 9444 are proposals. Decision number is D-40, handoffs H-100 to H-102 (H-68 answered, status open). Phase 2 (account, apply, live checks, terms e-mail, owner record) is pending; the story is not done and L-08 is not ticked. Real test results are in the dev-log.
+2026-10-10, Phase 1 (offline) built. Deviations: CI job terraform runs the Terraform Docker image pinned by digest (Terraform 1.16.5) instead of an action pinned by SHA; extra Terraform file alarms.tf (idle alarm and e-mail topic); the VCN default security list is replaced by a closed one; private ports 9443 and 9444 are proposals. Decision number is D-40, handoffs H-100 to H-102 (H-68 answered, status open). Phase 2 (account, apply, live checks, terms e-mail, owner record) is pending; the story is not done and L-08 is not ticked. Real test results are in the dev-log.
 
 ## Plan Change Log
 

@@ -1,4 +1,4 @@
-﻿FF                                                                       [100%]
+FF                                                                       [100%]
 ================================== FAILURES ===================================
 _ test_check_fails_when_owner_hash_or_first_seq_is_in_a_get_answer_schema[owner_hash] _
 
