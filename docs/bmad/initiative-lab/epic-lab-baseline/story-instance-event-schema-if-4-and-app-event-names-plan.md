@@ -3,7 +3,7 @@ title: 'Instance event schema (IF-4) and app-event names'
 type: 'feature'
 ticket: '3'
 created: '2026-10-08'
-status: 'built'
+status: done
 baseline_revision: '2a059929a24a91ce5c86fa9f8a93dcccd7ea8565'
 route: 'full'
 route_source: 'pinned'
@@ -19,6 +19,7 @@ context:
   - '{project-root}/docs/architecture/06-security.md'
   - '{project-root}/docs/design/challenge-specs.md'
   - '{project-root}/contracts/instance/instance-contract.md'
+assignee: "tannmayygupta"
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">

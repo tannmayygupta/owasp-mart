@@ -51,7 +51,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Waits on: L-01.
   - Done when: The contract validates and Sahil has approved it as consumer.
 
-- [ ] **L-03. Instance event schema (IF-4), app-event names and fake ingest**
+- [x] **L-03. Instance event schema (IF-4), app-event names and fake ingest**
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. T-03 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -80,7 +80,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Done when: The fragment validates, the mock answers every endpoint and Akshay has reviewed it as consumer.
   - Handoffs: H-78 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **L-06. Stub shop, fake ingest and lab harness**
+- [x] **L-06. Stub shop, fake ingest and lab harness**
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. T-04 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
