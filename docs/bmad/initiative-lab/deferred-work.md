@@ -27,3 +27,13 @@
 - FIXED in story 1.11: the lab end-to-end test runs in CI (job `e2e`). OPEN: tie mock drift to `contracts:check` (the conformance test in `test_lab_contract.py` runs in the `scripts` job, so drift fails CI already; a separate drift check in `contracts:check` is not planned).
 - FIXED in story 1.11 (each with a test that failed on the old mock): no duplicate timeline rows on repeated correct flags; deciding one held flag does not clear others; hint levels in order; strict cursor format; unknown or repeated query parameters on every GET (and 422 declared on every GET in the OpenAPI file); listen errors and port range (exit 2); exact example counts from the manifests; every declared response header asserted; the lab end-to-end tests are order independent with an exact answer count; the 413 test sees the 413 (and a huge body is proved separately, where the contract allows a dropped connection).
 - NOT A DEFECT, test added as a guard: timeline pages were already stable when the list grows (rows are only appended); the new test passed on the old mock too.
+## From story 1.5 (L-06 stub shop and lab harness, 2026-10-10)
+- DEFERRED (low, with reasons): the test-only routes `/_stub/*` of the stub shop are reachable on the player port (the harness binds 127.0.0.1 only and the flag is a fresh fake one; block `/_stub/` at the stub gate later, when a harness user needs it).
+- DEFERRED (L-12): the stub image build is not reproducible (npm resolves the transitive dependencies of Ajv at build time, no lockfile in the image build); pin them with the image build pipeline.
+- DEFERRED (low): sidecar buffer-overflow statistics edge case (an overflow while an event is in flight can count a delivered event as dropped).
+- DEFERRED (documented): the injector leaves partial files after exit 12 or 13; the volumes are discarded with the failed instance, so nothing reads them.
+- DEFERRED: the healthchecks of sidecar, gate and edge are TCP only, and `depends_on` does not order them against each other (the harness waits for health itself); real health paths belong to L-13 and L-17.
+- DEFERRED: CI runs the harness twice (job `compose`: `dev.mjs harness` and the harness end-to-end file) and without a Docker layer cache; cut one run or add caching if the job gets slow.
+- DEFERRED: the conformance check does not compare the pins of the Dockerfile (Ajv versions) with `package.json`.
+- DEFERRED (weak): the injector test asserts the order flags file before marker by file modification time only; the exit 13 marker-failure test proves the order directly.
+- OPEN: the first CI run of job `compose` (harness on a Linux host) is still to be recorded; so far the harness has only run against the Docker Desktop Linux engine on Windows.

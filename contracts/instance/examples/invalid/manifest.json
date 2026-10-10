@@ -514,5 +514,101 @@
   "instance-template/placement-reader-other-user.json": {
     "path": "/components/3/user",
     "rule": "readers run as the injector user (semantic)"
+  },
+  "sidecar-start/bad-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is the constant 0.1"
+  },
+  "sidecar-start/bad-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance id is i- plus 16 Base32 characters"
+  },
+  "sidecar-start/zero-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch starts at 1"
+  },
+  "sidecar-start/first-seq-zero.json": {
+    "path": "/first_seq",
+    "rule": "first_seq is at least 1"
+  },
+  "sidecar-start/first-seq-string.json": {
+    "path": "/first_seq",
+    "rule": "first_seq is an integer"
+  },
+  "sidecar-start/missing-event-key.json": {
+    "path": "/event_key",
+    "rule": "event_key is required"
+  },
+  "sidecar-start/short-event-key.json": {
+    "path": "/event_key",
+    "rule": "event_key has 32 to 128 characters"
+  },
+  "sidecar-start/event-key-with-space.json": {
+    "path": "/event_key",
+    "rule": "event_key is printable ASCII without spaces"
+  },
+  "sidecar-start/missing-flag-digests.json": {
+    "path": "/flag_digests",
+    "rule": "flag_digests is required"
+  },
+  "sidecar-start/empty-flag-digests.json": {
+    "path": "/flag_digests",
+    "rule": "flag_digests has at least one item"
+  },
+  "sidecar-start/digest-not-hex.json": {
+    "path": "/flag_digests/0/sha256",
+    "rule": "digest is 64 lowercase hex characters"
+  },
+  "sidecar-start/digest-uppercase.json": {
+    "path": "/flag_digests/0/sha256",
+    "rule": "digest is lowercase hex"
+  },
+  "sidecar-start/digest-bad-kind.json": {
+    "path": "/flag_digests/0/kind",
+    "rule": "kind is real or decoy"
+  },
+  "sidecar-start/digest-bad-challenge-key.json": {
+    "path": "/flag_digests/0/challenge_key",
+    "rule": "challenge key is C01 to C11"
+  },
+  "sidecar-start/digest-repeated.json": {
+    "path": "/flag_digests/1/sha256",
+    "rule": "a digest appears once"
+  },
+  "sidecar-start/digest-key-and-kind-repeated.json": {
+    "path": "/flag_digests/1/challenge_key",
+    "rule": "one real digest per challenge key (semantic rule)"
+  },
+  "sidecar-start/extra-property.json": {
+    "path": "/seed",
+    "rule": "no extra fields; the seed never goes to the sidecar"
+  },
+  "sidecar-start/event-key-too-long.json": {
+    "path": "/event_key",
+    "rule": "event_key has at most 128 characters"
+  },
+  "sidecar-start/event-key-non-ascii.json": {
+    "path": "/event_key",
+    "rule": "event_key is printable ASCII"
+  },
+  "sidecar-start/too-many-flag-digests.json": {
+    "path": "/flag_digests",
+    "rule": "flag_digests has at most 64 items"
+  },
+  "sidecar-start/missing-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance_id is required"
+  },
+  "sidecar-start/missing-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "sidecar-start/missing-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is required"
+  },
+  "sidecar-start/digest-lowercase-challenge-key.json": {
+    "path": "/flag_digests/0/challenge_key",
+    "rule": "challenge key is uppercase C01 to C11"
   }
 }

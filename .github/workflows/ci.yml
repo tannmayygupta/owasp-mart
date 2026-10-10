@@ -36,6 +36,7 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: node --test "scripts/*.test.mjs"
+      - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: 0.12.23
@@ -69,6 +70,8 @@ jobs:
           node-version-file: .node-version
       - run: docker compose -f infra/compose/compose.yaml config -q
       - run: node scripts/dev.mjs hello
+      - run: node scripts/dev.mjs harness
+      - run: node --test scripts/e2e/harness.e2e.test.mjs
   e2e:
     name: end-to-end tests (lab, orchestrator, events)
     timeout-minutes: 15

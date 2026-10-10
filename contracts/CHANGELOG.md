@@ -25,6 +25,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ### 0.1.2 (2026-10-09, Tanmay, story L-04 follow-up)
 - Additive, no schema change: section 4 notes that the `vm.owner` label value comes from the required `owner_hash` of the IF-5 create body (handoff H-20); section 6 says the orchestrator gives the sidecar the event key, flag digests and `first_seq` on standard input at start (handoff H-59); open points 23 updated and 35 added (sidecar start input).
 
+### 0.1.3 (2026-10-10, Tanmay, story L-06)
+- Additive: new schema `sidecar-start.schema.json` (the start document of the sidecar: `schema_version`, `instance_id`, `epoch`, `first_seq`, `event_key`, `flag_digests`), 2 valid and 24 invalid examples, one semantic rule in `contracts/mocks/stub-instance/semantic.mjs`, shared by `scripts/validate-contracts.mjs` and the stub (no repeated digest, one real digest per challenge key). Section 6 describes it; open point 35 is now a proposal with a shape (handoff H-59, for L-13 and L-20). Decided by Tanmay on 2026-10-10 as a proposal; Akshay and the orchestrator story confirm it.
+- Additive note in section 7 and new open point 36: a Docker tmpfs volume is lost when its last container stops, so something must keep the four volumes mounted while the injector exits and the shop starts (found while building the L-06 harness).
+- No change to the other three schemas, to IF-4, IF-5, IF-1 or IF-2.
+
 ## Lab API (IF-2), `contracts/api/lab/`
 
 ### 0.1.0 (2026-10-09, Tanmay, story L-05)

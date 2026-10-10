@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 3,
+  "first_seq": 4821,
+  "event_key": "FAKE-EVENT-KEY-NOT-REAL-0000000000000000",
+  "flag_digests": [
+    {
+      "challenge_key": "C01",
+      "kind": "real",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "challenge_key": "C01",
+      "kind": "decoy",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000002"
+    },
+    {
+      "challenge_key": "C02",
+      "kind": "real",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000003"
+    }
+  ]
+}

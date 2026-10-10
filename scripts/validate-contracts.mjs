@@ -7,10 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
+import { dupes, semanticInjection, semanticSidecarStart } from '../contracts/mocks/stub-instance/semantic.mjs';
+
+export { semanticInjection, semanticSidecarStart };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_DIR = path.join(ROOT, 'contracts', 'instance');
-export const SCHEMAS = ['injection-document', 'flags-file', 'instance-template'];
+export const SCHEMAS = ['injection-document', 'flags-file', 'instance-template', 'sidecar-start'];
 export const CONTRACT_MD = 'instance-contract.md';
 export const HELP = `Validate the instance contract (IF-6)
 Usage: node scripts/validate-contracts.mjs [--dir <contracts/instance folder>] [--help]
@@ -32,32 +35,6 @@ export function errorPath(e) {
 }
 
 // ---- semantic rules (what JSON Schema cannot compare) ----
-function dupes(arr, key, base, label, out) {
-  const seen = new Set();
-  arr.forEach((x, i) => {
-    const v = key(x);
-    if (seen.has(v)) out.push({ path: `${base}/${i}${label}`, message: `duplicate ${v}` });
-    seen.add(v);
-  });
-}
-
-export function semanticInjection(d) {
-  const out = [];
-  dupes(d.flags, (f) => f.challenge_key, '/flags', '/challenge_key', out);
-  const flagValues = new Set(d.flags.map((f) => f.flag));
-  d.decoys.forEach((x, i) => {
-    if (flagValues.has(x.value)) out.push({ path: `/decoys/${i}/value`, message: 'a decoy must not equal a real flag' });
-  });
-  dupes(d.decoys, (x) => `${x.challenge_key}#${x.index}`, '/decoys', '/index', out);
-  dupes(d.flags, (f) => f.flag, '/flags', '/flag', out);
-  dupes(d.decoys, (x) => x.value, '/decoys', '/value', out);
-  const keys = new Set(d.flags.map((f) => f.challenge_key));
-  d.decoys.forEach((x, i) => {
-    if (!keys.has(x.challenge_key)) out.push({ path: `/decoys/${i}/challenge_key`, message: 'a decoy needs a flag for the same challenge key' });
-  });
-  return out;
-}
-
 export function semanticFlagsFile(d) {
   const out = [];
   dupes(d.flags, (f) => f.challenge_key, '/flags', '/challenge_key', out);
@@ -195,6 +172,7 @@ const SEMANTIC = {
   'injection-document': semanticInjection,
   'flags-file': semanticFlagsFile,
   'instance-template': semanticTemplate,
+  'sidecar-start': semanticSidecarStart,
 };
 
 // ---- helpers ----

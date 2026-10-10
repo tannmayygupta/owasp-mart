@@ -1,0 +1,27 @@
+Recorded results, 2026-10-10, Docker 29.6.2 (Docker Desktop, Linux engine) on Windows, Node 24.11.0 on the host.
+Copied from the real runs of this task; nothing here is a flag, a seed or a key.
+
+node --test "scripts/*.test.mjs" "contracts/mocks/stub-instance/**/*.test.mjs"
+  tests 197, pass 197, fail 0
+
+node --test contracts/mocks/stub-instance/**/*.test.mjs   (stub only)
+  tests 32, pass 32, fail 0
+
+node --test scripts/e2e/harness.e2e.test.mjs
+  tests 8, pass 8, fail 0   (about 68 s)
+
+node --test scripts/e2e/dev.e2e.test.mjs scripts/e2e/contracts.e2e.test.mjs
+  tests 19, pass 19, fail 0
+
+pnpm run contracts:check
+  instance: checked 4 schemas, 7 valid and 153 invalid examples, PASS
+  events: PASS; orchestrator contract: PASS; lab contract: PASS
+
+pnpm run ci:linux   (CI commands in a Linux container)
+  RESULT skills PASS; pnpm-install PASS; unit-tests PASS; stub-instance-tests PASS; pytest PASS;
+  contracts-check PASS; uv-lock-check PASS; e2e PASS
+
+node scripts/dev.mjs harness
+  exit 0, "harness: PASS"; see harness-run.txt
+
+Not run: the harness on a Linux host (CI job "compose").

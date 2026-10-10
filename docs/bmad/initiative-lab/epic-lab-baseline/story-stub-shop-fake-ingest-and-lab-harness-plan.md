@@ -3,14 +3,14 @@ title: 'Stub shop, fake ingest and lab harness'
 type: 'feature'
 ticket: '5'
 created: '2026-10-10'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '32324a541e77561faa2a239ed26455b4f9783472'
 route: 'full'
 route_source: 'pinned'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'thorough'
+review_source: 'pinned'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
 ---
@@ -81,10 +81,30 @@ context: []
 
 ## Implementation Notes
 
+Built 2026-10-10 (see `docs/dev-log/2026-10-10-tannmayygupta-stub-shop-and-lab-harness.md`, ADR 0020). Not closed: the task is not ticked and the story state is not changed until the developer confirms. Differences from this plan, for the developer to confirm: (1) a sixth stub command `ingest` (harness only) reads the key from standard input instead of `--key`, so the key is not in a command line or `docker inspect`; (2) a `volume-keeper` helper container keeps the tmpfs volumes mounted (Docker destroys a tmpfs volume when its last container stops; IF-6 OP 36, H-93); (3) the stub reads its standard input until the first complete JSON object (Compose containers have no `StdinOnce`). The `context:` list in the frontmatter was empty, so nothing extra was loaded beyond the Code Map files.
+
 ## Plan Change Log
 
 ## Review Triage Log
 
+Pass 1 (2026-10-10, thorough, four lenses). About 55 findings. Verdict counts: high 1, medium 12, low 17, false 2, maybe-false 0. No intent_gap or bad_plan.
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| Open point 35 corrupted by a form-feed escape: `first_seq` and `flag_digests` lost letters, control character in the contract (Blind, Edge, Verification) | high | patch | Confirmed in the file; the row is the proposal others confirm. All new files scanned for control characters. |
+| Stub sidecar, ingest wrapper and injector accept documents the validator calls bad (repeated digest, two real digests, duplicate decoys) although the contract says a bad document exits 2 (Blind, Edge, Verification) | medium | patch | Rules exist only in `validate-contracts.mjs`; now one shared function plus parity tests. |
+| Start document reader: data after the first object dropped, array or number hangs, no read deadline; exit 2 on a bad document tested only on the reader, not on `main` (Blind, Edge, Verification) | medium | patch | Compose never closes stdin, so a stall waits forever; tests added through `main`. |
+| Shop crashes on an unparsable URL; read-only copy blocks the DB retry; pass-through hangs after an upstream error mid-body (Edge) | medium | patch | Unhandled throw and EACCES confirmed by reading the code. |
+| Conformance rules skipped for unlabelled services, unknown kinds, implicit networks, host or container network modes; docker missing gives a TypeError (Blind, Edge) | medium | patch | Rules apply only to `vm.kind=inst`; now every service unless on a helper allowlist. |
+| Harness: crashed container waits 90 s, failed teardown still exits 0, failed feeder ignored, a second run silently removes a kept instance (Blind, Edge) | medium | patch | Each confirmed in `harness.mjs`; teardown failure contradicts the no-leftovers criterion. |
+| Schema description says stdin is closed; contract text says it never is (Blind, Edge) | medium | patch | Wording aligned with section 6. |
+| ADR 0020 Accepted without the Docker documentation read; five versus six commands (Blind, Intent) | medium | patch | Docs read and cited in the patch; status stays Proposed for what they do not confirm. |
+| Handoff statuses inconsistent (`done`, `changed`) (Blind) | low | patch | Aligned with the vocabulary of the other rows. |
+| Section 7 list split; dev-log branch field; missing invalid examples for the start schema (Blind) | low | patch | Real documentation and coverage gaps; examples added. |
+| Test-only `/_stub/*` routes reachable on the player port; image not reproducible (transitive dependencies unpinned); partial files after exit 12 or 13; TCP-only healthchecks and no depends_on ordering; harness run twice in CI without a layer cache; Dockerfile pins not compared; mtime ordering assertion; buffer-overflow statistics; first CI run not recorded (Blind, Edge) | low | defer | Loopback-only fake-flag stub or later stories (L-12); recorded in deferred work. |
+| Conformance tool targets the repo's own harness, not an arbitrary instance (Intent reading B) | low | none | Plan scope is the reference stack; Sahil's later use is a follow-up, recorded in handoff H-92. |
+| Event path verified by code shared with the ingest (Intent) | low | none | Stated in ADR 0020; an independent check comes with the real sidecar (L-20). |
+| Sixth command `ingest`, volume keeper and the stdin read rule differ from the plan (Intent, Blind) | medium | decided | Confirmed or changed by the developer after this review. |
 ## Design Notes
 
 Chain: player to edge (127.0.0.1) to gate (allow) to sidecar 8080 to shop 3000. Events: shop to sidecar 9000 at `/v1/events`, then the sidecar signs and posts to the edge relay `:8081/internal/v1/events`, which forwards to the fake ingest. The stub sidecar and the harness receive key, digests and first_seq at start only on standard input; the fake ingest takes the same test key through its `--key` option, which exists only in the harness. The planted flag is served by a clearly marked test route that is not part of IF-6 and exists only so the conformance check can see it.

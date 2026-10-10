@@ -24,6 +24,7 @@ export const STEPS = [
   ['skills', 'node scripts/verify-skills.mjs'],
   ['pnpm-install', 'pnpm install --frozen-lockfile'],
   ['unit-tests', 'node --test "scripts/*.test.mjs"'],
+  ['stub-instance-tests', 'node --test "contracts/mocks/stub-instance/**/*.test.mjs"'],
   ['pytest', 'uv run --locked --package vulnmart-api pytest -q'],
   ['contracts-check', 'pnpm run contracts:check'],
   ['uv-lock-check', 'uv lock --check'],
@@ -31,7 +32,7 @@ export const STEPS = [
 ];
 
 // Steps that need the packages installed by `pnpm-install` (ajv for the validators and end-to-end tests). With `--only`, the install runs first for them.
-export const NEEDS_INSTALL = new Set(['unit-tests', 'pytest', 'contracts-check', 'e2e']);
+export const NEEDS_INSTALL = new Set(['unit-tests', 'stub-instance-tests', 'pytest', 'contracts-check', 'e2e']);
 
 export const dockerfile = () => `FROM ${UV_IMAGE} AS uv
 FROM ${NODE_IMAGE}

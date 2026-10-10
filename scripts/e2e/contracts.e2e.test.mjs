@@ -59,7 +59,7 @@ test('fresh checkout parity: install with a frozen lockfile, then the CI scripts
   assert.match(py.stdout, /\d+ passed/);
   const check = run('pnpm', ['run', 'contracts:check'], { cwd: copy });
   assert.equal(check.status, 0, check.stdout + check.stderr);
-  assert.match(check.stdout, /checked 3 schemas, \d+ valid and \d+ invalid examples/);
+  assert.match(check.stdout, /checked 4 schemas, \d+ valid and \d+ invalid examples/);
   assert.match(check.stdout, /contracts: PASS/);
   assert.match(check.stdout, /orchestrator contract: checked 8 operations, \d+ valid and \d+ invalid examples/);
   assert.match(check.stdout, /orchestrator contract: PASS/);
@@ -71,7 +71,7 @@ test('fresh checkout parity: install with a frozen lockfile, then the CI scripts
 test('pnpm run contracts:check passes in the real repository and prints the counts of both contracts', () => {
   const r = run('pnpm', ['run', 'contracts:check'], { cwd: ROOT });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /checked 3 schemas, \d+ valid and \d+ invalid examples/);
+  assert.match(r.stdout, /checked 4 schemas, \d+ valid and \d+ invalid examples/);
   assert.match(r.stdout, /contracts: PASS/);
   assert.match(r.stdout, /orchestrator contract: PASS/);
   assert.match(r.stdout, /checked 1 schema, 29 event types, 29 valid events, \d+ signed envelopes, \d+ valid posted bodies and \d+ invalid examples/);

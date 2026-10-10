@@ -28,7 +28,7 @@ test('the real contract validates: exit 0, every schema and example counted', ()
   const res = validateContracts();
   assert.deepEqual(res.errors, []);
   assert.equal(res.ok, true);
-  assert.ok(res.lines.some((l) => /checked 3 schemas, \d+ valid and \d+ invalid examples/.test(l)));
+  assert.ok(res.lines.some((l) => /checked 4 schemas, \d+ valid and \d+ invalid examples/.test(l)));
   for (const s of SCHEMAS) assert.ok(res.lines.includes(`schema ok: ${s}.schema.json`), s);
 });
 
