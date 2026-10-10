@@ -44,4 +44,5 @@ How the shop and its services live inside an instance. Not the shop's business f
 ## Notes
 
 - Unknown: Chromium memory per instance (S-5), shop cold start (S-4); if the bot is too heavy, one shared bot browser per host replaces it.
+- Incepted 2026-10-09 (approved by Sahil): seven stories (2.1–2.7) from the T-stream task file (T-08..T-13 plus a refactor sweep). Coverage matches the epic FR set; validation clean. Only 2.1 (T-08, snapshot seeding) is ready now; 2.2–2.6 carry unknowns on Tanmay's harness/contracts (L-13, L-03) and on T-04.
 - Draft written 2026-10-08 by Claude Code for the user to approve; not yet confirmed.

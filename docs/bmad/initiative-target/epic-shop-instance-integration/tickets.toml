@@ -1,0 +1,84 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-09 from the T-stream task file (docs/dev/dev3-sahil.md); one
+# story per task (T-08..T-13) plus a refactor sweep. Many entries wait on
+# Tanmay's lab harness/contracts and carry that as an unknown.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Snapshot seeding mechanism"
+description = "Build a seeded, deterministic snapshot in CI and a per-epic seed-data mechanism so later epics add seed data without editing shared files. The world is identical across instances; only flags/secrets differ (injected later)."
+verify = "A fresh database built from the snapshot holds the deterministic seed data; the build/seed time is measured."
+covers = ["FR-SHP-12"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-06 (epic-shop-core-and-roles 3.1, the data model), which is done.
+
+[[entry]]
+id = 2
+type = "story"
+title = "Health, readiness after the injector marker and runtime profile"
+description = "Health endpoints, ready only after the injector writes the marker, running non-root with a read-only filesystem and no egress."
+verify = "The shop is never ready before the marker and runs under the runtime profile in the harness."
+covers = ["FR-SHP-15"]
+after = [1]
+hitl = false
+risk = "medium"
+unknown = "Waits on T-04 (epic-target-baseline 1.4) and Tanmay's start-order L-13; remove when both are ready."
+
+[[entry]]
+id = 3
+type = "story"
+title = "Shop boundaries and signed app events"
+description = "The shop has no route to the platform database, Valkey, the orchestrator or other instances, and sends signed app events through the sidecar."
+verify = "Boundary tests pass and the fake ingest accepts the shop's events."
+covers = ["FR-SHP-14"]
+after = [2]
+hitl = false
+risk = "medium"
+unknown = "Waits on Tanmay's instance event schema IF-4 (L-03) being merged; it is open for review now."
+
+[[entry]]
+id = 4
+type = "story"
+title = "Mock services container"
+description = "Combined mock services: payment, KYC, metadata and the XSS collector, reachable only inside the instance network."
+verify = "Each mock answers inside the instance and is unreachable from outside."
+covers = ["FR-SHP-13"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Isolated import service"
+description = "An import service that runs a fresh process per job with no network and no database access."
+verify = "A job runs in a fresh process and cannot reach the network or the database."
+covers = ["FR-SHP-13"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Support-agent bot"
+description = "The bot controller that opens only pages of its own instance for a fixed time."
+verify = "The bot visits an allowed page, refuses others and its memory per instance is measured (S-5)."
+covers = ["FR-SHP-11"]
+after = [4]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what this epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3, 4, 5, 6]
+hitl = false
+risk = "low"
