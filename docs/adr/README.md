@@ -19,5 +19,6 @@
 | 0015 | [Laptop fallback and developer engine](0015-laptop-fallback-engine.md) | Proposed |
 | 0016 | [Per-consumer flag file delivery and injector network](0016-per-consumer-flag-file-delivery-and-injector-network.md) | Accepted (D-36) |
 | 0017 | [Shop SQLite driver: Node built-in node:sqlite](0017-shop-sqlite-driver.md) | Accepted |
+| 0018 | [Shop password hashing: Node built-in scrypt](0018-shop-password-hashing.md) | Accepted |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

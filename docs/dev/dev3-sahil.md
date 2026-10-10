@@ -82,7 +82,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: T-01.
   - Done when: Migrations run on SQLite and state transitions are tested.
 
-- [ ] **T-07. Shop identity, six roles, permissions and strong hashing**
+- [x] **T-07. Shop identity, six roles, permissions and strong hashing**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Neutral marketplace look, accounts, six roles with the permission matrix, strong password hashing.

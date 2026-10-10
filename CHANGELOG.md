@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-07 shop identity, roles, permissions and hashing, 2026-10-09, Sahil)
+- `apps/shop/` identity and authorization: scrypt password hashing (`src/identity/password.mjs`, salted, timing-safe, param floor, PHC-style, no MD5/unsalted — ADR 0018), an accounts service (`src/identity/accounts.mjs`, create/authenticate over `users`, normalized email, no hash leak), the six roles and the RS-G 1.2 permission matrix with a scoped `can(role, action, ctx)` guard (`src/domain/roles.mjs`, `permissions.mjs`), and neutral branding (`src/identity/branding.mjs`). 48 tests. Covers FR-SHP-01, FR-SHP-03, FR-SHP-09.
+
 ### Added (T-06 shop data model and seven state machines, 2026-10-09, Sahil)
 - `apps/shop/` data layer: 23-table SQLite schema (`migrations/0001_init.sql`, the RS-G 1.1 marketplace model plus the thin audit log and the C09 security-events/alerts tables, integer `*_cents` money, status CHECKs mirroring the state machines), an idempotent migration runner + CLI (`src/db/migrate.mjs`, `migrate` script), and the seven state machines (`src/domain/state-machines.mjs`: seller approval, product, checkout, fulfilment, refund, dispute, payout) as pure guarded transition logic. On Node 24's built-in `node:sqlite` (ADR 0017). 21 tests. Covers FR-SHP-02, FR-SHP-04.
 
