@@ -63,14 +63,14 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `contracts/mocks/stub-instance/` -- `shop` (health, readiness, version, planted-flag test route, event trigger), `inject` (stdin document, snapshot, flags file, marker, exit codes), `sidecar` (9000 events, 8080 pass-through to the shop, signing, seq, retry and drop rules), `edge` (relay 8081 and pass-through), `gate` (always allow); node:test unit tests per command -- the stub instance
-- [ ] `contracts/mocks/stub-instance/Dockerfile` and `infra/compose/harness.yaml` (or a profile in `compose.yaml`) -- pinned image, full instance with the fake ingest, networks, volumes, start order, healthchecks, runtime profile -- the harness
-- [ ] `contracts/instance/sidecar-start.schema.json`, examples and `instance-contract.md` s6 and open point 35, `contracts/CHANGELOG.md` (decided 2026-10-10) -- the sidecar input
-- [ ] `scripts/dev.mjs` (+ tests, e2e) -- `harness` and `harness down`; fresh random fake test values per run
-- [ ] `scripts/check-instance-conformance.mjs` (+ tests) -- live probes for the done-when and static checks of the resolved compose config against the runtime profile
-- [ ] `.github/workflows/ci.yml` -- run the harness in job `compose`
-- [ ] `docs/dev/HANDOFFS.md` -- answer H-74, H-56, H-59, H-26 to H-28, H-60, H-62, H-75, H-76; add a row for Sahil (how to run the harness and what the stub offers) and rows for L-13 and L-20 (sidecar start document)
-- [ ] Documentation rule -- dev-log, CHANGELOG, traceability LB-6, ADR for the sidecar input and the stub design, evidence in `docs/assets/l-06-stub-harness/`; tick L-06 only after the developer confirms
+- [x] `contracts/mocks/stub-instance/` -- `shop` (health, readiness, version, planted-flag test route, event trigger), `inject` (stdin document, snapshot, flags file, marker, exit codes), `sidecar` (9000 events, 8080 pass-through to the shop, signing, seq, retry and drop rules), `edge` (relay 8081 and pass-through), `gate` (always allow); node:test unit tests per command -- the stub instance
+- [x] `contracts/mocks/stub-instance/Dockerfile` and `infra/compose/harness.yaml` (or a profile in `compose.yaml`) -- pinned image, full instance with the fake ingest, networks, volumes, start order, healthchecks, runtime profile -- the harness
+- [x] `contracts/instance/sidecar-start.schema.json`, examples and `instance-contract.md` s6 and open point 35, `contracts/CHANGELOG.md` (decided 2026-10-10) -- the sidecar input
+- [x] `scripts/dev.mjs` (+ tests, e2e) -- `harness` and `harness down`; fresh random fake test values per run
+- [x] `scripts/check-instance-conformance.mjs` (+ tests) -- live probes for the done-when and static checks of the resolved compose config against the runtime profile
+- [x] `.github/workflows/ci.yml` -- run the harness in job `compose`
+- [x] `docs/dev/HANDOFFS.md` -- answer H-74, H-56, H-59, H-26 to H-28, H-60, H-62, H-75, H-76; add a row for Sahil (how to run the harness and what the stub offers) and rows for L-13 and L-20 (sidecar start document)
+- [x] Documentation rule -- dev-log, CHANGELOG, traceability LB-6, ADR for the sidecar input and the stub design, evidence in `docs/assets/l-06-stub-harness/`; tick L-06 only after the developer confirms
 
 **Acceptance Criteria:**
 - Given a clean machine with Docker, when `node scripts/dev.mjs harness` runs, then it starts one full stub instance, answers health, becomes ready only after the marker, serves the planted flag, delivers one event that the fake ingest accepts and verifies, passes the conformance check and exits 0.
