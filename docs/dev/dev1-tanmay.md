@@ -99,7 +99,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Done when: A deliberately breaking contract change fails CI and a valid one passes.
   - Handoffs: H-73 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **L-08. Oracle account, two VMs, private link and firewall**
+- [x] **L-08. Oracle account, two VMs, private link and firewall**
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Create VM-P and VM-I, a private link between them, key-only SSH and only ports 80 and 443 public; keep-alive and budget alert; send the Oracle terms-of-service email.

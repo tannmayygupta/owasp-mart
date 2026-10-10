@@ -3,7 +3,7 @@ title: 'Host the two VMs on the AWS Free Plan (Sydney)'
 type: 'feature'
 ticket: '6'
 created: '2026-10-11'
-status: 'in-progress'
+status: done
 baseline_revision: 'a4ef73af94b9b94342c41c91e61afb59414f7977'
 route: 'full'
 route_source: 'pinned'
@@ -13,6 +13,7 @@ review_source: 'pinned'
 lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
+assignee: "tannmayygupta"
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">

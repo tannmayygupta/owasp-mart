@@ -18,3 +18,10 @@ These checks were never run on GitHub; their stories were marked done on 2026-10
 ## Tell the team
 - [ ] Akshay: message in `docs/dev/messages/2026-10-09-akshay-orchestrator-contract.md`; handoffs H-83 to H-94; IF-2 ready for P-04; RFC 9457 and signed CSRF decisions.
 - [ ] Sahil: harness and stub for T-03 and T-04 (handoff H-92).
+
+## L-08 follow-ups (L-08 was marked done on 2026-10-11 by the developer; these stay open)
+- [ ] Budget alert: confirm the AWS subscription e-mail in the inbox and check that the alert arrives.
+- [ ] Akshay's and Sahil's public SSH keys added to both hosts (runbook Part G, push over SSH).
+- [ ] Start rehearsal of the labs host: set `vm_i_running = true`, apply, run `verify-hosts` again (the stop was applied on 2026-10-11).
+- [ ] After one week: record whether AWS reclaimed an idle instance (keep-alive is off); weekly credit check (balance USD 120 on 2026-10-11, plan end April 2027).
+- [ ] Root MFA (skipped by choice, recorded risk).

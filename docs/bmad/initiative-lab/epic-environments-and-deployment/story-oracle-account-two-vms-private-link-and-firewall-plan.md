@@ -3,7 +3,7 @@ title: 'Oracle account, two VMs, private link and firewall'
 type: 'feature'
 ticket: '1'
 created: '2026-10-10'
-status: 'built'
+status: done
 baseline_revision: 'dc5c8bdbd50448d97eed5f97cdea9ebd6599f61a'
 route: 'full'
 route_source: 'pinned'
@@ -13,6 +13,7 @@ review_source: 'pinned'
 lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
+assignee: "tannmayygupta"
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
