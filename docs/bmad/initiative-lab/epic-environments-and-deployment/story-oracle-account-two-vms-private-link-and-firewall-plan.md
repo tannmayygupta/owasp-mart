@@ -81,6 +81,8 @@ context: []
 
 ## Plan Change Log
 
+- 2026-10-11 (developer decision): the Oracle live phase is superseded. Oracle sign-up needs a credit card that no developer has; Azure for Students rejected the college domain; the developer's new AWS Free Plan account works (Sydney only, Mumbai is denied). The live phase and the provider-specific parts move to story 2.6. This story's offline work (host baseline, verification scripts, policy and secret scans, runbook structure, handoffs) is kept and reused. The frozen intent above is left unchanged as the historical record.
+
 ## Review Triage Log
 
 Pass 1 (2026-10-10, thorough, four lenses). About 70 findings. Verdict counts: high 4, medium 14, low 18, false 1, maybe-false 2. No intent_gap or bad_plan.
