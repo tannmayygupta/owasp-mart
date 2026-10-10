@@ -1,0 +1,13 @@
+# Local only: credentials, state and address files. Never commit these.
+*.tfvars
+!terraform.tfvars.example
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+hosts.local.json
+*.local.json
+tfplan*
+*.tfvars.json
+*.tfstate.backup
+*.tfplan

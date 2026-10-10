@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "note": "One source for network rules. Read by Terraform (network.tf) and by scripts/check-network-rules.mjs. Add a public port here only with a decision record.",
+  "vcn_cidr": "10.0.0.0/16",
+  "subnet_cidr": "10.0.0.0/24",
+  "public_ingress": [
+    { "name": "ssh", "protocol": "tcp", "port": 22, "sources": ["$ssh_source_cidrs"], "description": "SSH, key-only, from the listed source addresses" },
+    { "name": "http", "protocol": "tcp", "port": 80, "sources": ["0.0.0.0/0"], "description": "Certificate challenge and redirect" },
+    { "name": "https", "protocol": "tcp", "port": 443, "sources": ["0.0.0.0/0"], "description": "Public HTTPS" }
+  ],
+  "icmp_ingress": [
+    { "name": "path-mtu", "type": 3, "code": 4, "description": "Path MTU discovery (ICMP type 3 code 4); not a port" }
+  ],
+  "private_ingress": [
+    { "name": "orchestrator-mtls", "protocol": "tcp", "port": 9443, "from": "vm-p", "to": "vm-i", "proposal": true, "description": "Platform calls the orchestrator (architecture 02, F-07); proposal until S-17 and L-13 confirm" },
+    { "name": "ingest-internal", "protocol": "tcp", "port": 9444, "from": "vm-i", "to": "vm-p", "proposal": true, "description": "Orchestrator reports and relayed events to the ingest internal listener (F-08, F-13); port is a proposal until IF-4 confirms" }
+  ]
+}
+

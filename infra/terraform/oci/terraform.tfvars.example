@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Values here are placeholders, not real.
+region           = "ap-mumbai-1"
+tenancy_ocid     = "PASTE-FROM-OCI-CONSOLE"
+user_ocid        = "PASTE-FROM-OCI-CONSOLE"
+fingerprint      = "PASTE-API-KEY-FINGERPRINT"
+private_key_path = "C:/Users/you/.oci/oci_api_key.pem"
+compartment_ocid = "PASTE-FROM-OCI-CONSOLE"
+
+# Addresses allowed to reach SSH (port 22), for example your own /32. Never 0.0.0.0/0.
+ssh_source_cidrs = ["PASTE-YOUR-ADDRESS/32"]
+
+# Public keys of Tanmay, Akshay and Sahil (public halves only).
+ssh_public_keys = [
+  "ssh-ed25519 AAAA... tanmay",
+  "ssh-ed25519 AAAA... akshay",
+  "ssh-ed25519 AAAA... sahil",
+]
+
+alarm_email = "owner@example.invalid"
+
+# Change when Arm capacity is refused (runbook, "Arm capacity refused").
+availability_domain_index = 0

@@ -1,0 +1,56 @@
+#cloud-config
+# Identical for VM-P and VM-I (one baseline). Rendered by Terraform; files are base64 from infra/hosts/.
+package_update: true
+package_upgrade: true
+packages:
+  - iptables-persistent
+  - netfilter-persistent
+  - unattended-upgrades
+  - ca-certificates
+  - curl
+  - gnupg
+  - python3
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/00-vulnmart.conf
+    encoding: b64
+    permissions: "0644"
+    content: ${sshd_conf}
+  - path: /usr/local/sbin/vulnmart-firewall.sh
+    encoding: b64
+    permissions: "0755"
+    content: ${firewall_sh}
+  - path: /usr/local/sbin/vulnmart-install-docker.sh
+    encoding: b64
+    permissions: "0755"
+    content: ${docker_sh}
+  - path: /usr/local/sbin/vulnmart-baseline.sh
+    encoding: b64
+    permissions: "0755"
+    content: ${baseline_sh}
+  - path: /etc/docker/daemon.json
+    encoding: b64
+    permissions: "0644"
+    content: ${docker_daemon}
+  - path: /usr/local/sbin/vulnmart-keepalive.py
+    encoding: b64
+    permissions: "0755"
+    content: ${keepalive_py}
+  - path: /etc/systemd/system/vulnmart-keepalive.service
+    encoding: b64
+    permissions: "0644"
+    content: ${keepalive_unit}
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+  - path: /etc/systemd/timesyncd.conf.d/oci.conf
+    permissions: "0644"
+    content: |
+      [Time]
+      NTP=169.254.169.254
+
+# One script: stops at the first failure and writes /var/lib/vulnmart/baseline-ok or baseline-failed (names the step).
+runcmd:
+  - [/usr/local/sbin/vulnmart-baseline.sh, "${private_cidr}"]

@@ -3,14 +3,14 @@ title: 'Oracle account, two VMs, private link and firewall'
 type: 'feature'
 ticket: '1'
 created: '2026-10-10'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'dc5c8bdbd50448d97eed5f97cdea9ebd6599f61a'
 route: 'full'
 route_source: 'pinned'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'thorough'
+review_source: 'pinned'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
 ---
@@ -60,13 +60,13 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `infra/terraform/oci/` -- VCN, internet gateway, subnet, NSGs from `network-rules.json`, two instances (Ubuntu 24.04 aarch64, 1 OCPU, 6 GB, 50 GB boot), instance metadata with the three developers' public keys and the cloud-init baseline; variables for region, compartment, source CIDRs; pinned Terraform and provider (re-verify versions); outputs for addresses written only to a git-ignored file
-- [ ] `infra/hosts/` -- cloud-init baseline (SSH key-only, no root, iptables ACCEPT for 22, 80, 443 and the private ports persisted, time sync, automatic security updates, Docker from the official repository with a verified key, `/opt/vulnmart/secrets` mode 0700), keep-alive systemd service holding a bounded share of memory with an alarm design
-- [ ] tests -- policy test for `network-rules.json`, a secret and address scan test over the tree, unit tests of the verification scripts with injected network and ssh runners; `terraform fmt -check` and `terraform validate` locally (Docker image if Terraform is not installed)
-- [ ] `scripts/verify-hosts.mjs`, `scripts/private-link-check.mjs` -- outside probes, SSH checks, private-link TCP and mutual-TLS handshake with throwaway certificates, latency, clean-up
-- [ ] `docs/runbooks/oracle-account-and-vms.md`, `docs/runbooks/oracle-tos-email.md` -- Part A manual (sign-up with MFA, Mumbai, budget and alert, API key for Terraform, owner record, send the email), Part B apply, Part C verify, Part D keep-alive and alarm, Part E rebuild, Part F owner, alert and routine record
-- [ ] CI job `terraform`; handoffs: answer H-68 (host and link level), rows for Akshay and Sahil (their public keys, the host names, ports, how access works), for L-10, L-12 and L-13 (addresses, Docker, arm64), and the S-11 and S-17 record
-- [ ] `initial.md` decision (owner, region, image, Terraform, keep-alive; Q-32 and OI-8 closed), ADR 0021 with research sources, dev-log, CHANGELOG, traceability LE-1, LE-6, LE-8; tick L-08 only after the live results are recorded and the developer confirms
+- [x] `infra/terraform/oci/` -- VCN, internet gateway, subnet, NSGs from `network-rules.json`, two instances (Ubuntu 24.04 aarch64, 1 OCPU, 6 GB, 50 GB boot), instance metadata with the three developers' public keys and the cloud-init baseline; variables for region, compartment, source CIDRs; pinned Terraform and provider (re-verify versions); outputs for addresses written only to a git-ignored file
+- [x] `infra/hosts/` -- cloud-init baseline (SSH key-only, no root, iptables ACCEPT for 22, 80, 443 and the private ports persisted, time sync, automatic security updates, Docker from the official repository with a verified key, `/opt/vulnmart/secrets` mode 0700), keep-alive systemd service holding a bounded share of memory with an alarm design
+- [x] tests -- policy test for `network-rules.json`, a secret and address scan test over the tree, unit tests of the verification scripts with injected network and ssh runners; `terraform fmt -check` and `terraform validate` locally (Docker image if Terraform is not installed)
+- [x] `scripts/verify-hosts.mjs`, `scripts/private-link-check.mjs` -- outside probes, SSH checks, private-link TCP and mutual-TLS handshake with throwaway certificates, latency, clean-up
+- [x] `docs/runbooks/oracle-account-and-vms.md`, `docs/runbooks/oracle-tos-email.md` -- Part A manual (sign-up with MFA, Mumbai, budget and alert, API key for Terraform, owner record, send the email), Part B apply, Part C verify, Part D keep-alive and alarm, Part E rebuild, Part F owner, alert and routine record
+- [x] CI job `terraform`; handoffs: answer H-68 (host and link level), rows for Akshay and Sahil (their public keys, the host names, ports, how access works), for L-10, L-12 and L-13 (addresses, Docker, arm64), and the S-11 and S-17 record
+- [x] `initial.md` decision (owner, region, image, Terraform, keep-alive; Q-32 and OI-8 closed), ADR 0021 with research sources, dev-log, CHANGELOG, traceability LE-1, LE-6, LE-8; tick L-08 only after the live results are recorded and the developer confirms
 
 **Acceptance Criteria:**
 - Given the repository, when the tests and the Terraform checks run, then they pass, and a changed rule file that opens another public port fails the policy test.
@@ -77,10 +77,32 @@ context: []
 
 ## Implementation Notes
 
+2026-10-10, Phase 1 (offline) built. Deviations: CI job 	erraform runs the Terraform Docker image pinned by digest (Terraform 1.16.5) instead of an action pinned by SHA; extra Terraform file alarms.tf (idle alarm and e-mail topic); the VCN default security list is replaced by a closed one; private ports 9443 and 9444 are proposals. Decision number is D-40, handoffs H-100 to H-102 (H-68 answered, status open). Phase 2 (account, apply, live checks, terms e-mail, owner record) is pending; the story is not done and L-08 is not ticked. Real test results are in the dev-log.
+
 ## Plan Change Log
 
 ## Review Triage Log
 
+Pass 1 (2026-10-10, thorough, four lenses). About 70 findings. Verdict counts: high 4, medium 14, low 18, false 1, maybe-false 2. No intent_gap or bad_plan.
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| Changing `user_data` or the SSH keys in Terraform forces replacement of a running VM; keys and host files added later never reach running hosts (Blind, Edge) | high | patch | Only `source_id` is ignored; cloud-init runs once. Metadata ignored, two documented ways to change a host. |
+| The private-link cleanup `pkill -f <dir>` kills its own shell, so certificates stay in `/dev/shm` and the check fails (Verification, Edge) | high | patch | Command shape confirmed by reading it; fake runners cannot show it. |
+| The firewall verification passes 'refused' on 80 and 443 and counts lines instead of checking each port, so a missing ACCEPT rule passes (Edge) | high | patch | Refusal from the image's default REJECT looks the same as no listener. |
+| SSH source and key validation accept `0.0.0.0/1`, `::/0`, placeholders and one key (Edge) | high | patch | Only the exact string `0.0.0.0/0` is refused; a placeholder key passes `ssh-` prefix. |
+| Idle alarm silent when the metric disappears; keep-alive crash loop on a bad value and OOM at its own maximum; no cloud-init success marker; Docker install without lock timeout or retry (Blind, Edge) | medium | patch | Each confirmed in code or unit file. |
+| Terraform wiring (rule direction, SSH token expansion, from and to) verified only by text patterns (Verification) | medium | patch | Fixed by cause with `terraform test` and a mock provider. |
+| Baseline 'same on both hosts' compares hosts to each other and tolerates a missing file; negative probes for the private link are absent; refused client proves any failure (Edge) | medium | patch | Compare against the repo files; add wrong-direction probes. |
+| Host firewall does not filter Docker-published ports; VM-I containers can reach VM-P and the metadata address (Blind, Edge) | medium | defer | Isolation belongs to L-15 and L-29 (NFR-ISO-06); claims corrected now and handoff H-103 added. |
+| Lock file generated for Linux only; no `-lockfile=readonly`; CI container runs as root (Blind, Edge) | medium | patch | Windows or macOS `init` would fail the checksum. |
+| Terms-of-service email misdescribes the product and omits that hostile traffic comes from the instances (Blind) | medium | patch | Draft must be truthful before the developer sends it. |
+| Contradictory documents: NAT gateway, duplicate key handoffs, SSH wording, two ADR statuses; runbook gaps for state, key rotation, teardown, lockout and a changed home address (Blind) | low | patch | Corrected and added. |
+| `.gitignore` and secret scan miss `*.tfvars.json`, plan files and SSH key names; policy test crashes on a null rule and accepts `::/0` (Edge) | low | patch | Added with tests. |
+| Redaction without address boundaries; argument parsing; server lifetime (Edge) | low | patch | Fixed with tests. |
+| iptables rule order tested only live; fail2ban; IPv6; static Terraform scanner; ports generated into cloud-init (Blind, Verification, Edge) | low | defer | Recorded in deferred work. |
+| Intent: tooling is tested, the live hosts are not (Intent) | low | none | Stated in the plan and dev-log; Phase 2 is the developer's live run. |
+| Keep-alive load versus PRD risk R-2 wording | medium | decided | Developer decision needed on whether to reword R-2; flagged. |
 ## Design Notes
 
 Phase 1 (offline, Claude): everything above except the live runs; the plan status becomes built. Phase 2 (live, developer): Part A to D with Claude helping read outputs; the live results go into the dev-log section "Live verification" and the story is marked done only then. Keep-alive logic: the idle rule needs all three measures under 20 percent, so one measure above is enough; holding a modest share of memory (about 25 percent of 6 GB) is cheap and harmless, CPU load is the fallback; confirm against the OCI metrics after a week.

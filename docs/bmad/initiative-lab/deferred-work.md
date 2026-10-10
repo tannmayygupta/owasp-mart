@@ -45,3 +45,12 @@
 - DEFERRED (cost): `pnpm run ci:linux` copies `.git` into the container (about 4 MB today) so the contract rules can compare with `origin/main`; revisit if the repository grows. It stops early when `.git` is a file (a worktree) or `origin/main` is missing.
 - BY DESIGN: examples and Markdown files of a contract are not compared for breaking changes (only the registered schema and OpenAPI files); a Markdown change needs a changelog entry but no mock change, and Markdown, test files and whitespace-only edits under a mock path do not count as a mock change.
 - DEFERRED: a check that a migration touches only the tables of its own module, apply-from-empty migrations, and a consumer test against the mock (architecture 07 section 5) are not built.
+## From story 2.1 (L-08 Oracle hosts) review (2026-10-10)
+- OPEN (handoff H-103 to L-15 and L-29): the host firewall covers the INPUT chain only, so Docker-published container ports bypass it; containers can reach the VCN private range and the metadata address 169.254.169.254; no egress control on VM-I; one subnet for both VMs (NFR-ISO-06). Not implemented in L-08 by design.
+- DEFERRED: iptables rule ordering (the allow rules go before the vendor REJECT) is tested only live, in `verify-hosts` (per-port `iptables -C`); reason: needs a real Oracle Ubuntu image.
+- DEFERRED: fail2ban or similar for SSH; reason: SSH is key-only and limited by the network group to listed addresses, and a lockout tool adds risk for two hosts.
+- DEFERRED: IPv6 rules; reason: the VCN has no IPv6, the validated inputs reject `::/0`, and the address redaction handles IPv6 text.
+- DEFERRED: a static Terraform security scan (tfsec or checkov); reason: a new tool needs the team's agreement (CLAUDE.md), the native tests and the policy test cover the firewall rules.
+- DEFERRED: generate the ports in the cloud-init template and the firewall script from `network-rules.json` (today a test ties the script's ports to the file); reason: more template code for two ports.
+- DEFERRED: a remote Terraform backend with locking and state encryption; reason: one operator, local state with encrypted backup is written in the runbook.
+- OPEN: all live results (account, apply, `verify-hosts`, `private-link-check`, alarm queries, capacity, latency, terms e-mail reply); the story stays open until they are recorded.

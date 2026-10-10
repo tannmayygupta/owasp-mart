@@ -32,3 +32,19 @@ _bmad/render/
 
 # oasdiff binary fetched by scripts/oasdiff.mjs (checksum verified, never committed)
 tools/.bin/
+
+# Terraform: local state, plans, variable files and crash logs (the example file is tracked)
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+*.tfvars.json
+tfplan*
+*.tfplan
+crash.log
+
+# SSH private keys
+id_rsa
+id_ed25519
+id_ecdsa
