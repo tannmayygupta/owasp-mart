@@ -70,7 +70,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Done when: A client built from the contract creates, resets and destroys instances against the fake, and the fake host passes the protocol tests the real one must pass later.
   - Handoffs: H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **L-05. Lab fragment of the platform API (IF-2) with a mock**
+- [x] **L-05. Lab fragment of the platform API (IF-2) with a mock**
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.9` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. P-04 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.

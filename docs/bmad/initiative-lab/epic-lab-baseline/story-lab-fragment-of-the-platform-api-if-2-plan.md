@@ -3,7 +3,7 @@ title: 'Lab fragment of the platform API (IF-2)'
 type: 'feature'
 ticket: '9'
 created: '2026-10-09'
-status: 'built'
+status: done
 baseline_revision: 'f76f76d53d6ee614946a3dfaf8c66e579f04a8e6'
 route: 'full'
 route_source: 'pinned'
@@ -13,6 +13,7 @@ review_source: 'pinned'
 lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
+assignee: "tannmayygupta"
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
