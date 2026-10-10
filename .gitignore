@@ -29,3 +29,6 @@ _bmad/render/
 
 # Office lock files (a workbook open in Excel)
 ~$*
+
+# oasdiff binary fetched by scripts/oasdiff.mjs (checksum verified, never committed)
+tools/.bin/

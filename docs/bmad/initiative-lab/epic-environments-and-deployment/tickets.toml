@@ -1,0 +1,56 @@
+# Breakdown of epic-environments-and-deployment, incepted 2026-10-10 from docs/dev/dev1-tanmay.md (L-08, L-10, L-11, L-12, L-24). Approved by the developer.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Oracle account, two VMs, private link and firewall"
+description = "Creates the Oracle Cloud account owned by Tanmay, the two VMs (VM-P and VM-I) in one VCN with a private link, key-only SSH with all three developers' keys, only ports 80 and 443 public, a budget alert, a keep-alive routine, and sends the Oracle terms-of-service email. Records spikes S-11 (shape and capacity) and S-17 (private link) and the account owner, alert and routine. A person does the account and console steps; scripts and a runbook make host hardening and the checks repeatable."
+verify = "Both VMs are reachable by key-only SSH; only 80, 443 and SSH are open from the internet; the private link works between the VMs; the owner, budget alert and keep-alive routine are written down; the terms-of-service email is sent and its reply kept."
+covers = ["LE-1", "LE-6", "LE-8"]
+after = ["1.1"]
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "DuckDNS names and certificates"
+description = "Registers the platform and labs DuckDNS names, issues a certificate for the platform host and a wildcard certificate for the labs name by DNS-01, with automatic renewal. Records spike S-16 (wildcard resolution)."
+verify = "Real certificates are issued and renew automatically; the S-16 result is recorded."
+covers = ["LE-2", "LE-8"]
+after = [1]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Vercel project, same-origin rewrite and live-stream check"
+description = "Creates the Vercel project with the rewrite configuration from Akshay, the origin secret and the origin-secret check in the platform Caddy, and runs the SSE-through-rewrite test on the real VM (spike S-14). Also waits on Akshay's dashboards skeleton (P-07)."
+verify = "The Vercel site reaches the API through /api/*, direct access to the VM without the secret is refused, and the S-14 result is recorded."
+covers = ["LE-3"]
+after = [2]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Image builds for amd64 and arm64 and deploy pipelines"
+description = "CI builds images for amd64 and natively for arm64 on the VM, and a deploy step puts them on both VMs."
+verify = "A hello stack from CI runs on both VMs and on the laptop."
+covers = ["LE-4"]
+after = [1, "1.6"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Backups, laptop fallback and remaining spikes"
+description = "Encrypted backups to Oracle Object Storage with a restore test, the laptop fallback start procedure, and the remaining spike write-ups (S-1). Also waits on the database from Akshay (P-06)."
+verify = "A restore test succeeds and the laptop fallback is tested on Tanmay's PC."
+covers = ["LE-5", "LE-7", "LE-8"]
+after = [4]
+hitl = false
+risk = "medium"

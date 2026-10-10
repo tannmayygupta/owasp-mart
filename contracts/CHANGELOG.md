@@ -8,6 +8,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Additive change (new optional field, new endpoint, new event type, new error code, new allowed value): **minor** bump.
 - Rename, removal, retyping, or making an optional field required: **breaking**. It needs approval from every consumer and an expand-then-contract path. Before v1.0.0 it bumps the minor number and is marked BREAKING here; from v1.0.0 it is a major bump.
 - Tags are `contracts-vX.Y.Z`.
+- CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change needs a line marked BREAKING and a raised version in the same section; a new folder under `contracts/` needs a registry entry.
 
 ## Instance contract (IF-6), `contracts/instance/`
 
@@ -70,3 +71,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - The challenge specs' `event_id` is dropped; `proxy.flag_seen` carries `kind` and `challenge_key`; `source` has seven values (decisions of 2026-10-08).
 - Pointer changes in `contracts/instance/instance-contract.md` (see the IF-6 section above, 0.1.1).
 - Status: names and open points await Sahil's review (optional under D-37) and Akshay's note on the `EVT-*` placeholders.
+
+## Table owners (DB), `contracts/db/`
+
+### 0.1.0 (2026-10-10, Tanmay, story L-07)
+- First draft, a proposal for Akshay to confirm (tasks P-05 and P-06): `table-owners.schema.json`, the shape of `contracts/db/table-owners.yaml` (a `tables` list of `table` and `owner`, the owner being a module folder of `apps/api/src/vulnmart/` named in CODEOWNERS). The YAML file itself is Akshay's and does not exist yet; `scripts/check_table_owners.py` reports NOT-APPLICABLE until it does, then checks shape, owner names and duplicate tables.
+- The registry has no mock for this contract (`no mock change: nothing runs against it`).

@@ -3,14 +3,14 @@ title: 'Contract checks live in CI'
 type: 'feature'
 ticket: '6'
 created: '2026-10-10'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'ca98486d52274b16b9180b20a3d4b95eb5304e64'
 route: 'full'
 route_source: 'pinned'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'thorough'
+review_source: 'pinned'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
 ---
@@ -68,14 +68,14 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tools/oasdiff.json`, `scripts/oasdiff.mjs` -- download the pinned release for the platform, verify sha256 against the pinned value and the release's checksums.txt, run with the fixed flags; test the failure paths; re-verify v1.33.0 facts and the 3.1 behaviour on copies of our own files first
-- [ ] `contracts/registry.json`, `scripts/check-contract-rules.mjs` -- rules: changelog updated, mock updated or waived, breaking declared, unregistered contract, new files skipped; base ref logic
-- [ ] `scripts/schema-diff.mjs` -- JSON Schema breaking-change diff with the CHANGELOG rule
+- [x] `tools/oasdiff.json`, `scripts/oasdiff.mjs` -- download the pinned release for the platform, verify sha256 against the pinned value and the release's checksums.txt, run with the fixed flags; test the failure paths; re-verify v1.33.0 facts and the 3.1 behaviour on copies of our own files first
+- [x] `contracts/registry.json`, `scripts/check-contract-rules.mjs` -- rules: changelog updated, mock updated or waived, breaking declared, unregistered contract, new files skipped; base ref logic
+- [x] `scripts/schema-diff.mjs` -- JSON Schema breaking-change diff with the CHANGELOG rule
 - [ ] table ownership, Alembic head, COMPAT.md and bundle checks with proposed formats, fixtures and the PASS, FAIL and NOT-APPLICABLE logic
 - [ ] tests and fixtures: temporary git repositories that commit a base and a changed contract, one case per matrix row; run the real sprint diff
-- [ ] `.github/workflows/ci.yml`, `scripts/ci-linux.mjs`, `scripts/ci-linux.test.mjs`, `package.json` -- job `contract-rules` (full history, pull requests only) and the fixture tests in `scripts`; STEPS mirror
-- [ ] `docs/adr/0012-...md` (verified facts with URLs, status), `docs/dev/HANDOFFS.md` (answer H-73; rows for Akshay: table-owners format, Alembic layout, bundle command, registry entry for IF-1; row for Sahil: registry and the mock rule), `contracts/CHANGELOG.md` note
-- [ ] Documentation rule -- dev-log, CHANGELOG, traceability LB-7, evidence in `docs/assets/l-07-contract-checks/`; tick L-07 only after the developer confirms
+- [x] `.github/workflows/ci.yml`, `scripts/ci-linux.mjs`, `scripts/ci-linux.test.mjs`, `package.json` -- job `contract-rules` (full history, pull requests only) and the fixture tests in `scripts`; STEPS mirror
+- [x] `docs/adr/0012-...md` (verified facts with URLs, status), `docs/dev/HANDOFFS.md` (answer H-73; rows for Akshay: table-owners format, Alembic layout, bundle command, registry entry for IF-1; row for Sahil: registry and the mock rule), `contracts/CHANGELOG.md` note
+- [x] Documentation rule -- dev-log, CHANGELOG, traceability LB-7, evidence in `docs/assets/l-07-contract-checks/`; tick L-07 only after the developer confirms
 
 **Acceptance Criteria:**
 - Given a pull request with a breaking change to any registered contract, when CI runs, then job `contract-rules` fails and names the file and the change; with a valid additive change and a changelog and mock update it passes.
@@ -90,6 +90,28 @@ context: []
 
 ## Review Triage Log
 
+Pass 1 (2026-10-10, thorough, four lenses). About 70 findings. Verdict counts: high 3, medium 14, low 22, false 2, maybe-false 1. No intent_gap or bad_plan.
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| The rule engine fails open: a failed `git diff`, `git ls-files` or `git merge-base` gives an empty set and a PASS, or compares against the wrong base (Blind, Edge) | high | patch | Confirmed by reading the helpers (`allowFail` returns null, merge-base falls back to the tip); contradicts "never a silent skip". |
+| Renames hide the old path; a schema deleted together with its registry line escapes; a registry entry can be dropped (Edge, Blind) | high | patch | Diff runs with rename detection; breaking checks iterate only the head registry. |
+| Unlisted `*.schema.json` or OpenAPI files under a registered folder get no breaking or mock check; registry shape not validated (Verification, Edge) | high | patch | Real repo is fully listed today, but nothing enforces it; missing fields crash with a TypeError. |
+| With a tag present every pull request is compared with the tag, so a changelog line from an earlier merge satisfies the rule (Blind, Verification, Edge) | medium | patch | Per-PR rules use the PR base; the tag baseline is a second, version-bump check. |
+| Changelog detection is loose: any added line, renamed heading bypass, BREAKING anywhere in the section (Blind, Edge) | medium | patch | Rule now needs a new entry heading and finds the marker in that entry. |
+| Mock rule satisfied by any whitespace or test edit under the mock path; extension-based dispatch; DB NOT-APPLICABLE claim wrong (Blind, Edge) | medium | patch | Counting only non-test, non-markdown files; dispatch by registry list. |
+| NOT-APPLICABLE becomes a permanent bypass when an input is deleted (Blind) | medium | patch | FAIL when the input existed in the base and is gone. |
+| Alembic check reports a merged history as a branch; `__init__.py` and syntax errors crash it (Edge, Blind) | medium | patch | Merge revision joins two children of one parent; the test only checked the "heads" text. |
+| Table-owners: slash-less CODEOWNERS paths, missing directory, duplicate YAML keys, missing CODEOWNERS or uv (Blind, Edge) | medium | patch | Each fails confusingly or passes wrongly. |
+| Missing tests: version raise at 1.x, deleted schema, malformed JSON (Verification) | medium | patch | Greps show only 0.x bases and no deletion test. |
+| No timeouts; oasdiff download without timeout or retry; parallel tests can read a partial binary; non-array output crashes (Blind, Edge) | medium | patch | `node --test` runs files in parallel and all call the installer. |
+| oasdiff at ERR misses a removed optional response property although the CHANGELOG rule counts it (Intent, Edge) | medium | patch | Fixed by cause with a severity file, not by lowering the fail level. |
+| COMPAT.md header and markdown cells; bundle check run through a shell with no install in the job (Blind, Edge) | medium | patch | Header equal to `contract` only; job has no pnpm install. |
+| Schema diff flags loosening as breaking, `{}` versus `true`, `if` direction, duplicated condition (Blind, Edge) | low | patch | False positives train people to over-declare. |
+| ADR, dev-log and handoffs state proposals as decided; hardcoded module list; trailing newlines; ci-linux worktree message (Blind) | low | patch | Wording and a clear error. |
+| Registry and rules script can switch off their own rules; oneOf branch semantics; no cache or mirror for the 19 MB download; `.git` copy in ci-linux; examples and markdown not compared; no push-to-main run or required status check; real CI run (Blind, Intent, Verification) | medium | defer | Needs the L-09 approvals check, CODEOWNERS or GitHub settings; recorded in deferred work. |
+| The real run against `origin/main` compares few files because most contracts are new there (Intent) | low | none | Nothing older exists; an extra real run against the merged v0 of IF-6 is added as evidence. |
+| Merge-ref base availability in the real pull request checkout (Verification) | low | defer | The first real pull request is the check. |
 ## Design Notes
 
 Why two diff engines: oasdiff covers OpenAPI deeply and is the industry tool; it does not read bare JSON Schemas (IF-4, IF-6), so the schema diff is ours. Why NOT-APPLICABLE is explicit: a skipped check that prints nothing looks green; naming the missing input keeps the gap visible until Akshay's files land. The mock rule uses one waiver form, a line `no mock change: <reason>` in the changelog entry.

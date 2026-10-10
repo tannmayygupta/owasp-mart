@@ -37,3 +37,11 @@
 - DEFERRED: the conformance check does not compare the pins of the Dockerfile (Ajv versions) with `package.json`.
 - DEFERRED (weak): the injector test asserts the order flags file before marker by file modification time only; the exit 13 marker-failure test proves the order directly.
 - OPEN: the first CI run of job `compose` (harness on a Linux host) is still to be recorded; so far the harness has only run against the Docker Desktop Linux engine on Windows.
+## From story 1.6 (L-07 contract checks live in CI, 2026-10-10)
+- DEFERRED (L-09 or a CODEOWNERS and approvals check): the registry and `scripts/check-contract-rules.mjs` can switch off their own rules in the same pull request (edit the registry, the script, `ci.yml` or the pinned oasdiff list). Only a required reviewer on `contracts/registry.json`, `scripts/` and `.github/` (CODEOWNERS or the approvals check of L-09, EF-30) closes it.
+- NOT SET UP: the job `contract-rules` runs on pull requests only. There is no run on push to `main` and no required status check; both need a decision (branch protection on a private personal repository is UNVERIFIED, architecture 07 section 2).
+- DEFERRED: `oneOf` and `anyOf` branches of the JSON Schema diff are matched by deep equality (then by position); a branch that moved and changed is reported as removed or changed. Written in ADR 0012.
+- DEFERRED: the oasdiff download has no cache and no mirror (a GitHub outage fails the job; 60 s limit and two retries only). Add `actions/cache` on `tools/.bin` or a mirror if it becomes a problem.
+- DEFERRED (cost): `pnpm run ci:linux` copies `.git` into the container (about 4 MB today) so the contract rules can compare with `origin/main`; revisit if the repository grows. It stops early when `.git` is a file (a worktree) or `origin/main` is missing.
+- BY DESIGN: examples and Markdown files of a contract are not compared for breaking changes (only the registered schema and OpenAPI files); a Markdown change needs a changelog entry but no mock change, and Markdown, test files and whitespace-only edits under a mock path do not count as a mock change.
+- DEFERRED: a check that a migration touches only the tables of its own module, apply-from-empty migrations, and a consumer test against the mock (architecture 07 section 5) are not built.

@@ -5,14 +5,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { STEPS, NEEDS_INSTALL, NESTED_PYTEST_SWITCH, containerScript, dockerfile, NODE_IMAGE, UV_IMAGE, PNPM_VERSION } from './ci-linux.mjs';
+import { preflight, STEPS, NEEDS_INSTALL, NESTED_PYTEST_SWITCH, containerScript, dockerfile, NODE_IMAGE, UV_IMAGE, PNPM_VERSION } from './ci-linux.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ci = readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8').replace(/\r\n/g, '\n');
 // The text of each job, cut at the next job key (a line of two spaces and a name ending in a colon).
 const jobsText = ci.split(/^jobs:\n/m)[1];
 const jobs = Object.fromEntries(jobsText.split(/^(?=  [a-z0-9_-]+:\n)/m).map((block) => [block.match(/^  ([a-z0-9_-]+):/)[1], block]));
-const MIRRORED = ['skills', 'scripts', 'installs', 'e2e'];
+const MIRRORED = ['skills', 'scripts', 'installs', 'contract-rules', 'e2e'];
 const runsOf = (job) => [...job.matchAll(/^\s+- run: (.*)$/gm)].map((m) => m[1].trim());
 
 test('every command ci:linux runs is a run line of ci.yml', () => {
@@ -47,6 +47,26 @@ test('the e2e job runs the three files and switches off the nested pytest', () =
   assert.ok(!job.includes('contracts.e2e') && !job.includes('dev.e2e'));
 });
 
+test('the job contract-rules checks out the full history, runs on pull requests only, and ci:linux keeps .git for it', () => {
+  const job = jobs['contract-rules'];
+  assert.ok(job, 'job contract-rules exists');
+  assert.match(job, /fetch-depth: 0/);
+  assert.match(job, /if: github\.event_name == 'pull_request'/);
+  assert.ok(job.indexOf('pnpm install --frozen-lockfile') < job.indexOf('node scripts/check-contract-rules.mjs'));
+  assert.ok(job.includes('pnpm/action-setup'));
+  assert.deepEqual(runsOf(job), ['pnpm install --frozen-lockfile', 'node scripts/check-contract-rules.mjs']);
+  const script = containerScript();
+  assert.ok(!script.includes('--exclude=.git '), '.git is copied into the container');
+  assert.ok(script.includes('--exclude=tools/.bin'), 'a host oasdiff binary is never copied into the container');
+  assert.ok(script.includes('=== STEP contract-rules'));
+  assert.ok(NEEDS_INSTALL.has('contract-rules'), 'the bundle check needs the installed packages');
+});
+
+test('the job scripts installs uv before the unit tests (the contract rule tests run the Python checks through uv)', () => {
+  const text = jobs.scripts;
+  assert.ok(text.indexOf('setup-uv') < text.indexOf('node --test "scripts/*.test.mjs"'));
+});
+
 test('the tool versions of the image match the repository', () => {
   assert.ok(NODE_IMAGE.includes(readFileSync(path.join(ROOT, '.node-version'), 'utf8').trim()));
   assert.ok(UV_IMAGE.endsWith(ci.match(/version: (\d+\.\d+\.\d+)/)[1]));
@@ -56,4 +76,21 @@ test('the tool versions of the image match the repository', () => {
 
 test('every action in ci.yml is pinned by commit SHA', () => {
   for (const m of ci.matchAll(/uses: (\S+)/g)) assert.match(m[1], /@[0-9a-f]{40}$/, m[1]);
+});
+
+test('preflight: no .git, a .git file (worktree) and a missing origin/main fail early with a clear message', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-pre-'));
+  try {
+    assert.match(preflight(dir), /there is no \.git/);
+    fs.writeFileSync(path.join(dir, '.git'), 'gitdir: /elsewhere\n');
+    assert.match(preflight(dir), /\.git is a file/);
+    fs.rmSync(path.join(dir, '.git'));
+    fs.mkdirSync(path.join(dir, '.git'));
+    assert.match(preflight(dir, { gitRunner: () => ({ status: 1 }) }), /needs the ref origin\/main/);
+    assert.equal(preflight(dir, { gitRunner: () => ({ status: 0 }) }), null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
