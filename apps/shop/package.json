@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node src/server.mjs",
     "migrate": "node src/db/migrate.mjs",
+    "snapshot": "node seed/build-snapshot.mjs",
     "test": "node --test"
   },
   "dependencies": {

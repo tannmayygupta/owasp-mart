@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-08 snapshot seeding mechanism, 2026-10-09, Sahil)
+- `apps/shop/seed/`: a per-epic seed registry that discovers `contributions/NNN-*.mjs` in numeric order and runs them in one transaction, a deterministic baseline world (users, stores, categories, products with fixed timestamps), and a `build-snapshot` CLI (`pnpm run snapshot`) that migrates a fresh SQLite db, seeds it, and reports dynamic row counts and build time (~320 ms). Later epics add seed data by dropping a file, no shared-file edits. Snapshot is a gitignored CI artifact. 7 tests. Covers FR-SHP-12.
+
 ### Added (T-07 shop identity, roles, permissions and hashing, 2026-10-09, Sahil)
 - `apps/shop/` identity and authorization: scrypt password hashing (`src/identity/password.mjs`, salted, timing-safe, param floor, PHC-style, no MD5/unsalted — ADR 0018), an accounts service (`src/identity/accounts.mjs`, create/authenticate over `users`, normalized email, no hash leak), the six roles and the RS-G 1.2 permission matrix with a scoped `can(role, action, ctx)` guard (`src/domain/roles.mjs`, `permissions.mjs`), and neutral branding (`src/identity/branding.mjs`). 48 tests. Covers FR-SHP-01, FR-SHP-03, FR-SHP-09.
 

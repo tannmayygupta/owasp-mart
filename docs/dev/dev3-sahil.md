@@ -90,7 +90,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: T-06.
   - Done when: Role permissions are tested and no MD5 or unsalted hash exists in the shop.
 
-- [ ] **T-08. Snapshot seeding mechanism**
+- [x] **T-08. Snapshot seeding mechanism**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Build a seeded snapshot in CI and a per-epic seed-data mechanism so later work adds seed data without editing shared files.
