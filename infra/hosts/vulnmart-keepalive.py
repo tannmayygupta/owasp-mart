@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep-alive load for an Oracle Always Free Arm VM.
+"""Optional keep-alive load for a VM on a provider that reclaims idle VMs (written for Oracle Always Free Arm; off by default on AWS).
 
 Oracle treats a VM as idle when CPU (95th percentile), network and (Arm only) memory are all under 20 percent
 for 7 days. One measure above 20 percent is enough, so this holds a modest, bounded amount of memory

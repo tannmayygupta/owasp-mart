@@ -1,12 +1,12 @@
-// Unit tests of the host checks with injected network and ssh runners (no network, no Oracle account).
+// Unit tests of the host checks with injected network and ssh runners (no network, no cloud account).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseHosts, redact, parseKeyValues, parseArgs, printChecks } from './oracle-hosts.mjs';
-import { verifyHosts, remoteBaseline, BASELINE_FILES, localBaselineHashes } from './verify-hosts.mjs';
+import { parseHosts, redact, parseKeyValues, parseArgs, printChecks, resolveHostsFile, loadHosts, PROVIDER_HOSTS_FILES } from './cloud-hosts.mjs';
+import { verifyHosts, remoteBaseline, BASELINE_FILES, localBaselineHashes, metadataCommand, pullCommand, verifyOptions, IMDS_PY, IMDS_IMAGE } from './verify-hosts.mjs';
 import { checkPrivateLink, unlistedPort, SERVER_PY, CLIENT_PY, SERVER_SECONDS, CLIENT_STEPS_PER_LINK, SECONDS_PER_STEP } from './private-link-check.mjs';
 import { RULES_FILE } from './check-network-rules.mjs';
 
@@ -60,19 +60,21 @@ test('printChecks returns false when a check fails', () => {
 // ---- verify-hosts ----
 const fakeHashes = Object.fromEntries(BASELINE_FILES.map((f) => [f.remote, f.remote.length.toString(16).padStart(2, '0').repeat(32)]));
 
-function baselineOutput(vm, { fw = {}, marker = 'ok', hashes = fakeHashes, os = '24.04', sshd } = {}) {
+function baselineOutput(vm, { fw = {}, marker = 'ok', hashes = fakeHashes, os = '24.04', sshd, keepalive = 'inactive', arch = 'x86_64', reboot = 'no' } = {}) {
   const wanted = [...rules.public_ingress.map((r) => r.port), ...rules.private_ingress.filter((r) => r.to === vm).map((r) => r.port)];
   const lines = [
-    'arch=aarch64', `os=${os}`,
+    `arch=${arch}`, `os=${os}`,
     `sshd=${sshd ?? 'authenticationmethods:publickey,kbdinteractiveauthentication:no,passwordauthentication:no,permitrootlogin:no,'}`,
-    'secrets=700:root', 'docker=Docker_version_27', 'keepalive=active', 'cloudinit=status:_done', `marker=${marker}`,
+    'secrets=700:root', 'docker=Docker_version_27', `keepalive=${keepalive}`, `reboot=${reboot}`, 'cloudinit=status:_done', `marker=${marker}`,
     ...wanted.map((p) => `fw_${p}=${fw[p] ?? 'yes'}`),
     ...Object.entries(hashes).map(([p, h]) => (h === 'MISSING' ? `sha MISSING  ${p}` : `sha ${h}  ${p}`)),
   ];
   return `${lines.join('\n')}\n`;
 }
 
-function fakeSsh({ keyLogin = true, passwordRefused = true, rootRefused = true, out = baselineOutput } = {}) {
+const GOOD_IMDS = 'host_imds=reachable\nhost_control=reachable\ncontainer_imds=blocked:TimeoutError\ncontainer_control=reachable\n';
+
+function fakeSsh({ keyLogin = true, passwordRefused = true, rootRefused = true, out = baselineOutput, imds = GOOD_IMDS, pull = { code: 0, stdout: '', stderr: '' } } = {}) {
   const calls = [];
   const fn = async (a) => {
     calls.push(a);
@@ -80,6 +82,8 @@ function fakeSsh({ keyLogin = true, passwordRefused = true, rootRefused = true, 
     if (a.user === 'root') return rootRefused ? { code: 255, stdout: '', stderr: 'root@h: Permission denied (publickey).' } : { code: 0, stdout: '', stderr: '' };
     if (a.options?.includes('PubkeyAuthentication=no')) return passwordRefused ? { code: 255, stdout: '', stderr: 'ubuntu@h: Permission denied (publickey).' } : { code: 255, stdout: '', stderr: 'Permission denied (publickey,password).' };
     if (a.command?.startsWith('set -o pipefail')) return keyLogin ? { code: 0, stdout: out(vm), stderr: '' } : { code: 255, stdout: '', stderr: 'Permission denied (publickey).' };
+    if (a.command?.startsWith('sudo -n docker pull')) return pull;
+    if (a.command?.includes('169.254.169.254')) return { code: 0, stdout: imds, stderr: '' };
     throw new Error(`unexpected ssh ${a.command}`);
   };
   fn.calls = calls;
@@ -304,4 +308,95 @@ test('keep-alive --check clamps huge, negative and non-numeric values and never 
     assert.ok(r.stdout.includes(expected), `${JSON.stringify(env)} -> ${r.stdout}`);
   }
   assert.match(run({ KEEPALIVE_MEM_MB: 'lots' }).stderr, /warning: KEEPALIVE_MEM_MB='lots' is not a whole number/);
+});
+
+test('the metadata check needs a working container control: reachable metadata, a container without network, a broken host control and no answer all fail', async () => {
+  const name = 'a container cannot read instance metadata (IMDSv2, hop limit 1)';
+  assert.deepEqual(failed(await verify({ ssh: fakeSsh({ imds: 'host_imds=reachable\ncontainer_imds=reachable\ncontainer_control=reachable\n' }) })), [`vm-p ${name}`, `vm-i ${name}`]);
+  // blocked only because the container has no network: not accepted
+  const dead = failed(await verify({ ssh: fakeSsh({ imds: 'host_imds=reachable\ncontainer_imds=blocked:URLError\ncontainer_control=failed:URLError\n' }) }));
+  assert.deepEqual(dead, ['vm-p a container has network access (control)', `vm-p ${name}`, 'vm-i a container has network access (control)', `vm-i ${name}`]);
+  assert.deepEqual(failed(await verify({ ssh: fakeSsh({ imds: 'host_imds=blocked:URLError\ncontainer_imds=blocked:URLError\ncontainer_control=reachable\n' }) })), ['vm-p instance metadata is reachable from the host (control)', 'vm-i instance metadata is reachable from the host (control)']);
+  assert.equal(failed(await verify({ ssh: fakeSsh({ imds: '' }) })).length, 6);
+  assert.deepEqual(failed(await verify({ checkMetadata: false, ssh: fakeSsh({ imds: '' }) })), []);
+  const ok = await verify();
+  assert.ok(ok.some((c) => c.name.endsWith(name) && c.detail === 'blocked:TimeoutError'), 'the exception class is printed');
+});
+
+test('a failed image pull is reported as an image pull failure, not as a metadata result', async () => {
+  const bad = fakeSsh({ pull: { code: 1, stdout: '', stderr: 'toomanyrequests: rate limit' } });
+  const checks = await verify({ ssh: bad });
+  assert.deepEqual(failed(checks), ['vm-p metadata probe image pulled (pinned by digest)', 'vm-i metadata probe image pulled (pinned by digest)']);
+  assert.match(checks.find((c) => !c.ok).detail, /^image pull failed/);
+  assert.ok(!checks.some((c) => c.name.includes('a container cannot read')), 'no metadata verdict without the image');
+});
+
+test('the probe image is pinned by digest, the command pulls and runs that image, and no role credentials are requested', () => {
+  assert.match(IMDS_IMAGE, /^python:3\.12-alpine@sha256:[0-9a-f]{64}$/);
+  assert.equal(pullCommand(), `sudo -n docker pull ${IMDS_IMAGE}`);
+  const c = metadataCommand();
+  assert.ok(c.includes(`docker run --rm ${IMDS_IMAGE} python3 -c`));
+  assert.match(c, /sed 's\/\^\/host_\/'/);
+  assert.match(c, /sed 's\/\^\/container_\/'/);
+  assert.match(IMDS_PY, /method="PUT"/);
+  assert.match(IMDS_PY, /X-aws-ec2-metadata-token-ttl-seconds/);
+  assert.match(IMDS_PY, /type\(e\)\.__name__/);
+  assert.ok(!/security-credentials/.test(c));
+});
+
+test('keep-alive off requires inactive, failed or unknown and fails on missing data; on requires active; x86_64 and aarch64 pass; a pending reboot is a warning', async () => {
+  assert.deepEqual(failed(await verify()), []);
+  for (const state of ['active', 'activating', null]) {
+    const bad = fakeSsh({ out: (vm) => baselineOutput(vm, { keepalive: state }).replace(/^keepalive=null\n/m, '') });
+    assert.ok((await verify({ ssh: bad })).some((c) => !c.ok && c.name.includes('keep-alive service off')), String(state));
+  }
+  for (const state of ['inactive', 'failed', 'unknown']) assert.deepEqual(failed(await verify({ ssh: fakeSsh({ out: (vm) => baselineOutput(vm, { keepalive: state }) }) })), [], state);
+  const on = fakeSsh({ out: (vm) => baselineOutput(vm, { keepalive: 'active', arch: 'aarch64' }) });
+  assert.deepEqual(failed(await verify({ ssh: on, keepalive: true })), []);
+  const odd = fakeSsh({ out: (vm) => baselineOutput(vm, { arch: 'riscv64' }) });
+  assert.ok((await verify({ ssh: odd })).some((c) => !c.ok && c.name.includes('Ubuntu 24.04')));
+  const pending = await verify({ ssh: fakeSsh({ out: (vm) => baselineOutput(vm, { reboot: 'required' }) }) });
+  assert.deepEqual(failed(pending), []);
+  const w = pending.find((c) => c.name.includes('a reboot is pending'));
+  assert.ok(w.ok && w.warn && /reboot this host once/.test(w.detail));
+  const lines = [];
+  assert.equal(printChecks([w], (l) => lines.push(l)), true);
+  assert.match(lines[0], /^WARN /);
+  assert.match(remoteBaseline(rules, 'vm-p'), /reboot-required/);
+});
+
+test('verifyOptions maps the command line flags (--keepalive, --skip-metadata, --require-listener)', () => {
+  assert.deepEqual(verifyOptions({ _: [] }), { requireListener: false, keepalive: false, checkMetadata: true });
+  assert.deepEqual(verifyOptions(parseArgs(['--keepalive', '--skip-metadata', '--require-listener'])), { requireListener: true, keepalive: true, checkMetadata: false });
+  assert.deepEqual(verifyOptions(parseArgs(['--identity', 'k', '--skip-metadata'], { values: ['identity'] })), { requireListener: false, keepalive: false, checkMetadata: false });
+});
+
+test('the address file is never guessed: --hosts, then --provider, then the only file that exists, else an error naming the choice', () => {
+  const none = () => false;
+  const both = () => true;
+  const only = (f) => f === PROVIDER_HOSTS_FILES.aws;
+  assert.equal(resolveHostsFile({ hosts: 'x.json' }, both), 'x.json');
+  assert.equal(resolveHostsFile({ provider: 'oci' }, none), PROVIDER_HOSTS_FILES.oci);
+  assert.equal(resolveHostsFile({ provider: 'aws' }, both), PROVIDER_HOSTS_FILES.aws);
+  assert.equal(resolveHostsFile({}, only), PROVIDER_HOSTS_FILES.aws);
+  assert.throws(() => resolveHostsFile({}, both), /two address files exist.*--provider/);
+  assert.throws(() => resolveHostsFile({}, none), /no address file found.*--provider/);
+  assert.throws(() => resolveHostsFile({ provider: 'gcp' }, none), /--provider must be one of/);
+  assert.throws(() => loadHosts(undefined), /no address file/);
+  assert.throws(() => loadHosts('does-not-exist.json'), /Terraform folder of your provider/);
+  for (const f of ['verify-hosts.mjs', 'private-link-check.mjs']) assert.match(readFileSync(path.join(ROOT, 'scripts', f), 'utf8'), /loadHosts\(resolveHostsFile\(opts\)\)/);
+});
+
+test('baseline.sh refuses a keep-alive argument other than yes or no (exit 2, before touching anything) and records a pending reboot', () => {
+  const sh = readFileSync(path.join(ROOT, 'infra', 'hosts', 'vulnmart-baseline.sh'), 'utf8');
+  assert.match(sh, /yes\|no\) ;;/);
+  assert.match(sh, /exit 2/);
+  assert.ok(sh.indexOf('exit 2') < sh.indexOf('mkdir -p'), 'validation comes before any change');
+  assert.match(sh, /\/var\/run\/reboot-required.*reboot-required.*baseline-ok/);
+  const probe = spawnSync('sh', ['-c', 'echo ok']);
+  if (probe.status === 0) {
+    const r = spawnSync('sh', [path.join(ROOT, 'infra', 'hosts', 'vulnmart-baseline.sh'), '10.0.0.0/24', 'maybe'], { encoding: 'utf8' });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /must be yes or no, got: maybe/);
+  }
 });

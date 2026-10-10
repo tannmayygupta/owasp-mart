@@ -52,3 +52,35 @@ test('the matched value is never part of a hit', () => {
   const hit = scanText('a.md', `x ${ocid}`)[0];
   assert.ok(!JSON.stringify(hit).includes('aaaaaaaaaa'));
 });
+
+// Fixtures are built at run time so this file never contains a real-looking key.
+const keyId = ['AKIA', 'ABCDEFGHIJKLMNOP'].join('');
+const acct = '1'.repeat(12);
+
+test('an AWS access key id, a secret access key and an account id are caught', () => {
+  assert.equal(scanText('a.md', `key ${keyId}`)[0].kind, 'AWS access key id');
+  assert.equal(scanText('a.md', `aws_secret_access_key = ${'a'.repeat(40)}`)[0].kind, 'AWS secret access key');
+  assert.equal(scanText('a.md', `arn:aws:iam::${acct}:user/x`)[0].kind, 'AWS account id');
+  assert.equal(scanText('a.md', `account id: ${acct}`)[0].kind, 'AWS account id');
+  assert.equal(scanText('a.md', `https://${acct}.signin.aws.amazon.com/console`)[0].kind, 'AWS account id');
+});
+
+test('AWS placeholders and wildcard ARNs are not flagged, and the hit never contains the value', () => {
+  assert.deepEqual(scanText('a.md', 'arn:aws:budgets::*:budget/vulnmart-* and account id <redacted> and AKIA...'), []);
+  assert.deepEqual(scanText('a.md', 'aws_secret_access_key = <your secret>'), []);
+  assert.ok(!JSON.stringify(scanText('a.md', `key ${keyId}`)[0]).includes('ABCDEFGH'));
+});
+
+test('AWS credential files are caught by name', () => {
+  const bad = ['home/.aws/credentials', 'home/.aws/config', 'x/credentials.csv', 'x/terraform_accessKeys.csv'];
+  assert.deepEqual(scanFiles(bad, () => '', () => 0).map((h) => h.file), bad);
+});
+
+test('the SecretAccessKey JSON form, more id prefixes and a CSV row are caught (values built at test time)', () => {
+  const secret = 'b'.repeat(40);
+  assert.equal(scanText('a.md', `{"SecretAccessKey": "${secret}"}`)[0].kind, 'AWS secret access key');
+  assert.equal(scanText('a.md', `secret_access_key: ${secret}`)[0].kind, 'AWS secret access key');
+  for (const prefix of ['ANPA', 'AGPA', 'ASCA', 'ABIA', 'AIDA', 'AROA', 'ASIA']) assert.equal(scanText('a.md', `id ${prefix}${'Q'.repeat(16)}`)[0].kind, 'AWS access key id', prefix);
+  assert.equal(scanText('a.md', `${keyId},${secret}`)[0].kind, 'AWS access key id');
+  assert.deepEqual(scanText('a.md', '"SecretAccessKey": "<redacted>"'), []);
+});

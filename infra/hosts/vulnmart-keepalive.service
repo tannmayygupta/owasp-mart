@@ -1,5 +1,5 @@
 [Unit]
-Description=VulnMart keep-alive load (keeps an Always Free VM above the idle thresholds)
+Description=VulnMart keep-alive load (optional: keeps a VM above the idle thresholds of a provider that reclaims idle VMs; off by default on AWS)
 After=network.target
 
 [Service]

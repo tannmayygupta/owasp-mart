@@ -23,5 +23,6 @@
 | 0019 | [Lab API conventions: route prefix, Node mock, scope](0019-lab-api-conventions.md) | Proposed (D-39) |
 | 0020 | [Stub instance, lab harness and sidecar start input](0020-stub-instance-harness-and-sidecar-start-input.md) | Accepted (stub design, sidecar input); Proposed (volume keeper, stdin rule) |
 | 0021 | [Oracle account, two Arm VMs, Terraform and keep-alive](0021-oracle-account-two-vms-terraform-and-keep-alive.md) | Accepted (owner, region, image, tooling); Proposed (private ports, keep-alive share, alarm query) |
+| 0022 | [Hosts on the AWS Free Plan in Sydney (supersedes the provider part of 0021)](0022-aws-free-plan-sydney-hosts.md) | Accepted (provider, region, tooling, sizing); Proposed (private ports, sizes, isolation) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

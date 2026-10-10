@@ -64,18 +64,22 @@ jobs:
       - run: node scripts/check-contract-rules.mjs
   terraform:
     name: terraform fmt and validate
-    # No credentials: init downloads only the pinned provider, validate does not contact Oracle.
-    timeout-minutes: 10
+    # No credentials: init downloads only the pinned provider, validate and test do not contact any cloud (the tests mock the provider).
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
     env:
       TF_IMAGE: hashicorp/terraform@sha256:c7926feace05d0f7e73542842bf3945924e955a1f782cf000ccbb8d18fa42d77 # Terraform 1.16.5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Run as the runner's user so nothing root-owned lands in the checkout; .terraform/ is git-ignored and the lock file is read-only here.
+      # Run as the runner's user so nothing root-owned lands in the checkout; .terraform/ is git-ignored and the lock files are read-only here.
       - run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/infra:/infra" "$TF_IMAGE" fmt -check -recursive /infra/terraform
-      - run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/infra:/infra" -w /infra/terraform/oci "$TF_IMAGE" init -backend=false -input=false -lockfile=readonly
-      - run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/infra:/infra" -w /infra/terraform/oci "$TF_IMAGE" validate
-      - run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/infra:/infra" -w /infra/terraform/oci "$TF_IMAGE" test
+      # AWS (the hosts in use) and Oracle (kept as an unused option): the same four checks for each folder.
+      - run: |
+          for d in aws oci; do
+            docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/infra:/infra" -w "/infra/terraform/$d" "$TF_IMAGE" init -backend=false -input=false -lockfile=readonly
+            docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/infra:/infra" -w "/infra/terraform/$d" "$TF_IMAGE" validate
+            docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/infra:/infra" -w "/infra/terraform/$d" "$TF_IMAGE" test
+          done
       - run: git status --porcelain infra | (! grep .)
   installs:
     name: frozen lockfile installs

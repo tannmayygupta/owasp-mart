@@ -54,3 +54,26 @@
 - DEFERRED: generate the ports in the cloud-init template and the firewall script from `network-rules.json` (today a test ties the script's ports to the file); reason: more template code for two ports.
 - DEFERRED: a remote Terraform backend with locking and state encryption; reason: one operator, local state with encrypted backup is written in the runbook.
 - OPEN: all live results (account, apply, `verify-hosts`, `private-link-check`, alarm queries, capacity, latency, terms e-mail reply); the story stays open until they are recorded.
+
+## From story 2.6 (L-08 AWS Free Plan hosts, offline phase and its review, 2026-10-11)
+- source_plan: `docs/bmad/initiative-lab/epic-environments-and-deployment/story-host-the-two-vms-on-the-aws-free-plan-sydney-plan.md`
+  summary: Single subnet for both hosts and unrestricted egress (also from `vm-i`). On AWS the security groups are the only perimeter; the host firewall filters nothing (INPUT policy ACCEPT).
+  evidence: handoff H-103 (L-15 and L-29); deferred because the isolation design (DOCKER-USER policy, egress control, one subnet or two) is the job of those tasks, not of hosting.
+- source_plan: same
+  summary: Terraform state backend (S3 with locking) and termination protection / `prevent_destroy` on the hosts.
+  evidence: local state is copied by hand after every apply (runbook Part B); a remote backend and protection are more setup than the first live run needs; revisit before the evaluation week.
+- source_plan: same
+  summary: Kernel update reboot policy. No automatic reboot is configured; `verify-hosts` warns when a reboot is pending and the runbook says to reboot once.
+  evidence: an automatic reboot would kill lab instances on `vm-i`; a maintenance window needs the orchestrator (L-10 onwards).
+- source_plan: same
+  summary: NTP fallback. Hosts use the Amazon Time Sync address only (169.254.169.123); no public NTP fallback is configured.
+  evidence: not verified live; check `timedatectl timesync-status` in the live run and add a fallback if the address is unreachable.
+- source_plan: same
+  summary: `verify-hosts` CLI flag wiring (`--keepalive`, `--skip-metadata`, `--require-listener`) is covered by a unit test of the options mapping only, not by running the command line against hosts.
+  evidence: needs the live run (runbook Part C).
+- source_plan: same
+  summary: Oracle drop-in cleanup. `infra/terraform/oci/`, `docs/runbooks/oracle-account-and-vms.md`, the Oracle terms e-mail and `s-11-oracle-shape.md` stay as an unused option; decide later whether to delete them.
+  evidence: D-41 (Oracle dropped for now); keep until the AWS live phase has succeeded.
+- source_plan: same
+  summary: Free Plan limits (instance count, disk size, eligible types in Sydney, zone availability) and the 16384-byte user data limit are unverified; so are Budgets' treatment of credits, idle reclaim by AWS and the completeness of `iam-policy.json`.
+  evidence: AWS pages were read only while planning (2026-10-11), not in the build; record the real answers in `docs/research/s-11-aws-hosts.md` after the first apply.

@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "note": "One source for network rules. Read by Terraform (network.tf) and by scripts/check-network-rules.mjs. Add a public port here only with a decision record.",
+  "note": "One source for network rules. Read by Terraform (network.tf) and by scripts/check-network-rules.mjs. Add a public port here only with a decision record. Token $ssh_source_cidrs = the SSH source list; token $public_web_cidrs = the web source list (default: the same as SSH; 0.0.0.0/0 only when set on purpose).",
   "vcn_cidr": "10.0.0.0/16",
   "subnet_cidr": "10.0.0.0/24",
   "public_ingress": [
     { "name": "ssh", "protocol": "tcp", "port": 22, "sources": ["$ssh_source_cidrs"], "description": "SSH, key-only, from the listed source addresses" },
-    { "name": "http", "protocol": "tcp", "port": 80, "sources": ["0.0.0.0/0"], "description": "Certificate challenge and redirect" },
-    { "name": "https", "protocol": "tcp", "port": 443, "sources": ["0.0.0.0/0"], "description": "Public HTTPS" }
+    { "name": "http", "protocol": "tcp", "port": 80, "sources": ["$public_web_cidrs"], "description": "Certificate challenge and redirect" },
+    { "name": "https", "protocol": "tcp", "port": 443, "sources": ["$public_web_cidrs"], "description": "Public HTTPS" }
   ],
   "icmp_ingress": [
     { "name": "path-mtu", "type": 3, "code": 4, "description": "Path MTU discovery (ICMP type 3 code 4); not a port" }

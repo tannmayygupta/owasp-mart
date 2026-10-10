@@ -1,6 +1,7 @@
-// Scans the tracked files for things that must never be committed for the Oracle setup:
-// OCIDs, private key blocks, API key fingerprints, local Terraform files, and public IPv4 addresses
-// (the address scan covers infra/, docs/runbooks, docs/assets, docs/dev-log and the Oracle study notes only).
+// Scans the tracked files for things that must never be committed for the cloud hosts (AWS, and the unused Oracle option):
+// AWS access key ids, secret access keys, AWS account ids (in ARNs and next to the words account id), OCIDs, private
+// key blocks, API key fingerprints, local Terraform and credential files, and public IPv4 addresses
+// (the address scan covers infra/, docs/runbooks, docs/assets, docs/dev-log and the study notes only).
 // Usage: node scripts/scan-secrets.mjs   (exit 1 with the file and line of each hit; the matched value is never printed)
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -9,15 +10,18 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OCID = /ocid1\.[a-z0-9_]+\.oc[0-9]\.[a-z0-9-]*\.[a-z0-9]{20,}/i;
+const AWS_KEY_ID = /\b(?:AKIA|ASIA|AIDA|AROA|ANPA|AGPA|ASCA|ABIA)[0-9A-Z]{16}\b/;
+const AWS_SECRET = /(?:aws_secret_access_key|secret_?access_?key)["']?\s*[=:]\s*["']?[A-Za-z0-9/+=]{30,}/i;
+const AWS_ACCOUNT = /arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:\d{12}:|account[ _-]?id["' ]*[:=]?["' ]*\d{12}\b|\b\d{12}\.signin\.aws\.amazon\.com/i;
 const PRIVATE_KEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 const FINGERPRINT = /\b(?:[0-9a-f]{2}:){15}[0-9a-f]{2}\b/i;
 const IPV4 = /(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.]*\d)(?!\.\d)/g;
 const BAD_NAMES = [
   /\.pem$/i, /\.key$/i, /\.tfstate(\.|$)/i, /\.tfvars$/i, /\.tfvars\.json$/i, /(^|\/)tfplan[^/]*$/i, /\.tfplan$/i,
-  /\.local\.json$/i, /(^|\/)\.oci\//, /(^|\/)id_(rsa|ed25519|ecdsa|dsa)$/,
+  /\.local\.json$/i, /(^|\/)\.oci\//, /(^|\/)\.aws\/(credentials|config)$/, /(^|\/)credentials\.csv$/i, /accessKeys\.csv$/i, /(^|\/)id_(rsa|ed25519|ecdsa|dsa)$/,
 ];
 const SKIP_CONTENT = /(^|\/)(pnpm-lock\.yaml|uv\.lock|\.terraform\.lock\.hcl|package-lock\.json)$|\.(xlsx|png|jpg|jpeg|gif|ico|pdf|woff2?|zip|gz)$/i;
-const IP_SCOPE = [/^infra\//, /^docs\/runbooks\//, /^docs\/assets\//, /^docs\/dev-log\//, /^docs\/research\/s-1[17]/, /^docs\/adr\/0021/];
+const IP_SCOPE = [/^infra\//, /^docs\/runbooks\//, /^docs\/assets\//, /^docs\/dev-log\//, /^docs\/research\/s-1[17]/, /^docs\/adr\/002[12]/];
 
 // Test files that write a fake key header on purpose (to prove the contract validator rejects it).
 const KEY_BLOCK_FIXTURES = new Set(['scripts/validate-contracts.test.mjs']);
@@ -43,6 +47,9 @@ export function scanText(file, text, { ips = IP_SCOPE.some((re) => re.test(file)
   text.split(/\r?\n/).forEach((line, i) => {
     const hit = (kind) => hits.push({ file, line: i + 1, kind });
     if (OCID.test(line)) hit('OCID');
+    if (AWS_KEY_ID.test(line)) hit('AWS access key id');
+    if (AWS_SECRET.test(line)) hit('AWS secret access key');
+    if (AWS_ACCOUNT.test(line)) hit('AWS account id');
     if (PRIVATE_KEY.test(line) && !KEY_BLOCK_FIXTURES.has(file)) hit('private key block');
     if (FINGERPRINT.test(line)) hit('API key fingerprint');
     if (ips) {
@@ -78,5 +85,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     for (const h of hits) console.error(`FAIL ${h.file}:${h.line} ${h.kind}`);
     process.exit(1);
   }
-  console.log('PASS no OCID, key, fingerprint, local file or public address in the tree');
+  console.log('PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree');
 }

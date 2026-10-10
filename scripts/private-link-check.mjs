@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadHosts, redact, tcpProbe as realProbe, sshRun, printChecks, parseArgs } from './oracle-hosts.mjs';
+import { loadHosts, resolveHostsFile, redact, tcpProbe as realProbe, sshRun, printChecks, parseArgs } from './cloud-hosts.mjs';
 import { RULES_FILE } from './check-network-rules.mjs';
 
 export const SERVER_PY = `import socket, ssl, sys, time
@@ -188,7 +188,7 @@ export async function checkPrivateLink({ hosts, rules, ssh, tcpProbe, identity, 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let opts;
   try {
-    opts = parseArgs(process.argv.slice(2), { values: ['identity', 'hosts', 'user', 'evidence'] });
+    opts = parseArgs(process.argv.slice(2), { values: ['identity', 'hosts', 'provider', 'user', 'evidence'] });
   } catch (e) {
     console.error(e.message);
     process.exit(2);
@@ -197,7 +197,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error('usage: node scripts/private-link-check.mjs --identity <ssh-private-key-path> [--hosts file] [--user ubuntu] [--evidence file]');
     process.exit(2);
   }
-  const hosts = loadHosts(opts.hosts);
+  const hosts = loadHosts(resolveHostsFile(opts));
   const rules = JSON.parse(readFileSync(RULES_FILE, 'utf8'));
   const checks = await checkPrivateLink({ hosts, rules, ssh: sshRun, tcpProbe: realProbe, identity: opts.identity, user: opts.user ?? 'ubuntu' });
   const lines = [];

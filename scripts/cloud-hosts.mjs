@@ -2,12 +2,30 @@
 // redacting addresses from evidence, and the real network and ssh runners (tests inject fakes instead).
 import net from 'node:net';
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const DEFAULT_HOSTS_FILE = path.join(ROOT, 'infra', 'terraform', 'oci', 'hosts.local.json');
+export const PROVIDER_HOSTS_FILES = {
+  aws: path.join(ROOT, 'infra', 'terraform', 'aws', 'hosts.local.json'),
+  oci: path.join(ROOT, 'infra', 'terraform', 'oci', 'hosts.local.json'),
+};
+
+/**
+ * Which address file to read: --hosts wins; else --provider (aws or oci); else the only hosts.local.json that exists.
+ * With none or with both present the choice is not guessed: the person must say which.
+ */
+export function resolveHostsFile(opts = {}, exists = existsSync) {
+  if (opts.hosts) return opts.hosts;
+  if (opts.provider) {
+    if (!PROVIDER_HOSTS_FILES[opts.provider]) throw new Error(`--provider must be one of: ${Object.keys(PROVIDER_HOSTS_FILES).join(', ')}`);
+    return PROVIDER_HOSTS_FILES[opts.provider];
+  }
+  const found = Object.values(PROVIDER_HOSTS_FILES).filter((f) => exists(f));
+  if (found.length === 1) return found[0];
+  throw new Error(found.length === 0 ? 'no address file found: run terraform output -json > hosts.local.json in the Terraform folder of your provider, then pass --provider aws|oci or --hosts <file>' : 'two address files exist (aws and oci): say which one with --provider aws|oci or --hosts <file>');
+}
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 const IPV4_ANY = /(?<![\d.])\d{1,3}(?:\.\d{1,3}){3}(?![\d.]*\d)/g;
 
@@ -25,12 +43,13 @@ export function parseHosts(json) {
   };
 }
 
-export function loadHosts(file = DEFAULT_HOSTS_FILE) {
+export function loadHosts(file) {
+  if (!file) throw new Error('no address file given: use resolveHostsFile');
   let text;
   try {
     text = readFileSync(file, 'utf8');
   } catch {
-    throw new Error(`cannot read the address file ${file}: after "terraform apply" run: terraform output -json > hosts.local.json (in infra/terraform/oci)`);
+    throw new Error(`cannot read the address file ${file}: after "terraform apply" run: terraform output -json > hosts.local.json (in the Terraform folder of your provider, infra/terraform/aws or infra/terraform/oci)`);
   }
   return parseHosts(JSON.parse(text.replace(/^﻿/, '')));
 }
@@ -97,7 +116,7 @@ export function parseKeyValues(text) {
 }
 
 export function printChecks(checks, log = console.log) {
-  for (const c of checks) log(`${c.ok ? 'PASS' : 'FAIL'} ${c.name}${c.detail ? ` - ${c.detail}` : ''}`);
+  for (const c of checks) log(`${c.ok ? (c.warn ? 'WARN' : 'PASS') : 'FAIL'} ${c.name}${c.detail ? ` - ${c.detail}` : ''}`);
   const failed = checks.filter((c) => !c.ok).length;
   log(failed ? `RESULT FAIL (${failed} of ${checks.length} checks failed)` : `RESULT PASS (${checks.length} checks)`);
   return failed === 0;

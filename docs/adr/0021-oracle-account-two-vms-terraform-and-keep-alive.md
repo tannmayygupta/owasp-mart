@@ -1,6 +1,6 @@
 # 0021. Oracle account, two Arm VMs, Terraform and keep-alive
 
-- **Status:** Proposed (the owner, region, image and tooling were confirmed by the developer on 2026-10-10 as decision D-40; the private ports 9443 and 9444, the keep-alive memory share, the alarm queries and the host isolation are not settled, and nothing has been applied yet)
+- **Status:** Superseded in part by [ADR 0022](0022-aws-free-plan-sydney-hosts.md) on 2026-10-11 (provider, region, shape, keep-alive and alarm; Oracle is an unused option). Original status: Proposed (the owner, region, image and tooling were confirmed by the developer on 2026-10-10 as decision D-40; the private ports 9443 and 9444, the keep-alive memory share, the alarm queries and the host isolation are not settled, and nothing has been applied yet)
 - **Date:** 2026-10-10
 - **Deciders:** Tanmay
 - **Requirements:** LE-1, LE-6, LE-8, NFR-AVL-01, NFR-CST-01, NFR-ISO-06, R-1, R-2, R-4, OI-8, Q-32, S-11, S-17, D-34, D-40, ADR 0007

@@ -1,10 +1,10 @@
 locals {
-  rules = jsondecode(file("${path.module}/network-rules.json"))
+  rules = jsondecode(file("${path.module}/../../network-rules.json"))
 
   # One flat entry per (rule, source address). "$ssh_source_cidrs" expands to the variable.
   public_flat = flatten([
     for r in local.rules.public_ingress : [
-      for s in flatten([for x in r.sources : x == "$ssh_source_cidrs" ? var.ssh_source_cidrs : [x]]) : {
+      for s in flatten([for x in r.sources : x == "$ssh_source_cidrs" ? var.ssh_source_cidrs : (x == "$public_web_cidrs" ? var.public_web_cidrs : [x])]) : {
         name   = r.name
         port   = r.port
         source = s

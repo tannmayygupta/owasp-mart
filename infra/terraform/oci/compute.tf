@@ -16,14 +16,17 @@ locals {
   # One cloud-init for both hosts: the same baseline by construction.
   hosts_dir = "${path.module}/../../hosts"
   user_data = base64encode(templatefile("${local.hosts_dir}/cloud-init.yaml.tftpl", {
-    sshd_conf      = base64encode(file("${local.hosts_dir}/sshd-hardening.conf"))
-    firewall_sh    = base64encode(file("${local.hosts_dir}/vulnmart-firewall.sh"))
-    docker_sh      = base64encode(file("${local.hosts_dir}/vulnmart-install-docker.sh"))
-    baseline_sh    = base64encode(file("${local.hosts_dir}/vulnmart-baseline.sh"))
-    docker_daemon  = base64encode(file("${local.hosts_dir}/docker-daemon.json"))
-    keepalive_py   = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.py"))
-    keepalive_unit = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.service"))
-    private_cidr   = local.rules.subnet_cidr
+    sshd_conf         = base64encode(file("${local.hosts_dir}/sshd-hardening.conf"))
+    firewall_sh       = base64encode(file("${local.hosts_dir}/vulnmart-firewall.sh"))
+    docker_sh         = base64encode(file("${local.hosts_dir}/vulnmart-install-docker.sh"))
+    baseline_sh       = base64encode(file("${local.hosts_dir}/vulnmart-baseline.sh"))
+    docker_daemon     = base64encode(file("${local.hosts_dir}/docker-daemon.json"))
+    keepalive_py      = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.py"))
+    keepalive_unit    = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.service"))
+    private_cidr      = local.rules.subnet_cidr
+    ntp_server        = "169.254.169.254"
+    ssh_keys_json     = jsonencode([])
+    keepalive_enabled = "yes"
   }))
   ssh_keys = join("\n", var.ssh_public_keys)
 }

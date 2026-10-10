@@ -6,9 +6,9 @@ Status: **template; live fields empty until `node scripts/private-link-check.mjs
 Do the two VMs reach each other over their private addresses on the named ports, with mutual TLS, and how fast?
 
 ## Design (from the code, read 2026-10-10)
-- One VCN, one subnet, one network security group per VM. Private ingress rules are in `infra/terraform/oci/network-rules.json`: from `vm-p` to `vm-i` on 9443 (orchestrator, architecture 02 F-07) and from `vm-i` to `vm-p` on 9444 (ingest internal listener, F-08 and F-13). Both ports are **proposals**; production certificates and rotation stay open (handoff H-68).
+- Retargeted to AWS on 2026-10-11 (D-41, story 2.6): one VPC, one subnet, one security group per host (the Oracle text "VCN" and "network security group" below means the same on AWS). Private ingress rules are in `infra/network-rules.json`: from `vm-p` to `vm-i` on 9443 (orchestrator, architecture 02 F-07) and from `vm-i` to `vm-p` on 9444 (ingest internal listener, F-08 and F-13). Both ports are **proposals**; production certificates and rotation stay open (handoff H-68).
 - The check generates a throwaway CA and one node certificate on VM-P (both private addresses as names, client and server use), copies them to a `0700` folder in `/dev/shm` on VM-I, starts a TLS server bound to the private address (certificate required), connects with a client certificate (must succeed), connects without one (must be refused), measures 20 TCP connect times, then deletes the folder on both hosts and checks it is gone.
-- The helper programs were run locally on loopback in a container on 2026-10-10 (`docs/assets/l-08-oracle-hosts/local-mtls-helper-check.txt`); that is not a result for the Oracle hosts.
+- The helper programs were run locally on loopback in a container on 2026-10-10 (`docs/assets/l-08-oracle-hosts/local-mtls-helper-check.txt`); that is not a result for the real hosts. Evidence of the live run goes to `docs/assets/l-08-aws-hosts/`.
 
 ## Fields to fill from the live run
 | Field | VM-P to VM-I (9443) | VM-I to VM-P (9444) |

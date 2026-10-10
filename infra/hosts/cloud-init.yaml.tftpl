@@ -1,5 +1,5 @@
 #cloud-config
-# Identical for VM-P and VM-I (one baseline). Rendered by Terraform; files are base64 from infra/hosts/.
+# Identical for VM-P and VM-I (one baseline). Rendered by Terraform (AWS or Oracle); files are base64 from infra/hosts/.
 package_update: true
 package_upgrade: true
 packages:
@@ -10,6 +10,9 @@ packages:
   - curl
   - gnupg
   - python3
+
+# Keys of the developers (empty list where the cloud injects them itself, as Oracle does).
+ssh_authorized_keys: ${ssh_keys_json}
 
 write_files:
   - path: /etc/ssh/sshd_config.d/00-vulnmart.conf
@@ -45,12 +48,12 @@ write_files:
     content: |
       APT::Periodic::Update-Package-Lists "1";
       APT::Periodic::Unattended-Upgrade "1";
-  - path: /etc/systemd/timesyncd.conf.d/oci.conf
+  - path: /etc/systemd/timesyncd.conf.d/vulnmart.conf
     permissions: "0644"
     content: |
       [Time]
-      NTP=169.254.169.254
+      NTP=${ntp_server}
 
 # One script: stops at the first failure and writes /var/lib/vulnmart/baseline-ok or baseline-failed (names the step).
 runcmd:
-  - [/usr/local/sbin/vulnmart-baseline.sh, "${private_cidr}"]
+  - [/usr/local/sbin/vulnmart-baseline.sh, "${private_cidr}", "${keepalive_enabled}"]

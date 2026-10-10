@@ -1,14 +1,15 @@
-// Live check of the two Oracle hosts, run by the developer after `terraform apply` (runbook Part C).
+// Live check of the two cloud hosts, run by the developer after `terraform apply` (runbook Part C).
 // From outside: only 22, 80 and 443 respond. Over ssh: key login works, password and root login are refused,
 // the host firewall has each rule, the baseline marker says ok, and every baseline file on each host has the same
 // hash as the file in this repository (this also detects drift, because Terraform ignores later startup-file changes).
+// It also proves that instance metadata (IMDSv2, hop limit 1) is reachable from the host but not from a container.
 // Usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts <file>] [--user ubuntu]
-//        [--evidence <file>] [--require-listener]
+//        [--evidence <file>] [--require-listener] [--keepalive] [--skip-metadata]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadHosts, redact, tcpProbe as realProbe, sshRun, parseKeyValues, printChecks, parseArgs } from './oracle-hosts.mjs';
+import { loadHosts, resolveHostsFile, redact, tcpProbe as realProbe, sshRun, parseKeyValues, printChecks, parseArgs } from './cloud-hosts.mjs';
 import { RULES_FILE } from './check-network-rules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +36,35 @@ export function localBaselineHashes(root = ROOT) {
   return out;
 }
 
+/**
+ * Probe program, run on the host and in a container. Prints two lines:
+ *   imds=reachable | imds=blocked:<ExceptionClass>      (a PUT for an IMDSv2 token)
+ *   control=reachable | control=failed:<ExceptionClass> (an HTTPS request to a public site the hosts already use)
+ * A container is only "blocked" if its control request works, so a container without network is not mistaken for blocked.
+ */
+export const IMDS_PY = [
+  'import urllib.request as u',
+  'def go(r):',
+  ' try:',
+  '  u.urlopen(r,timeout=4)',
+  '  return None',
+  ' except Exception as e:',
+  '  return type(e).__name__',
+  'x=go(u.Request("http://169.254.169.254/latest/api/token",method="PUT",headers={"X-aws-ec2-metadata-token-ttl-seconds":"60"}))',
+  'print("imds=reachable" if x is None else "imds=blocked:"+x)',
+  'y=go(u.Request("https://download.docker.com/linux/ubuntu/gpg",method="HEAD"))',
+  'print("control=reachable" if y is None else "control=failed:"+y)',
+].join('\n');
+// Pinned by digest (the index digest of python:3.12-alpine, read with docker inspect on 2026-10-11; re-pin on purpose).
+export const IMDS_IMAGE = 'python:3.12-alpine@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4';
+export const pullCommand = () => `sudo -n docker pull ${IMDS_IMAGE}`;
+export const metadataCommand = () =>
+  [`python3 -c '${IMDS_PY}' | sed 's/^/host_/'`, `sudo -n docker run --rm ${IMDS_IMAGE} python3 -c '${IMDS_PY}' | sed 's/^/container_/'`].join('; ');
+
+/** The command-line options as the verification takes them (exported so a test covers the wiring). */
+export function verifyOptions(opts) {
+  return { requireListener: !!opts['require-listener'], keepalive: !!opts.keepalive, checkMetadata: !opts['skip-metadata'] };
+}
 const subnetOf = (rules) => rules.subnet_cidr;
 const publicPorts = (rules) => rules.public_ingress.map((r) => r.port);
 /** Private ports addressed to this host (rules from the other VM), checked with the subnet source. */
@@ -53,7 +83,8 @@ export function remoteBaseline(rules, vm) {
     "echo sshd=$(sudo -n sshd -T | grep -E '^(passwordauthentication|permitrootlogin|kbdinteractiveauthentication|authenticationmethods) ' | sort | tr ' ' ':' | tr '\\n' ',')",
     "echo secrets=$(sudo -n stat -c '%a:%U' /opt/vulnmart/secrets)",
     "echo docker=$(sudo -n docker --version | cut -d, -f1 | tr ' ' '_')",
-    'echo keepalive=$(systemctl is-active vulnmart-keepalive)',
+    'echo keepalive=$(systemctl is-active vulnmart-keepalive || true)',
+    'echo reboot=$(if [ -f /var/run/reboot-required ]; then echo required; else echo no; fi)',
     "echo cloudinit=$(cloud-init status 2>/dev/null | head -1 | tr ' ' '_')",
     'if sudo -n test -f /var/lib/vulnmart/baseline-ok; then echo marker=ok; elif sudo -n test -f /var/lib/vulnmart/baseline-failed; then echo "marker=failed:$(sudo -n cat /var/lib/vulnmart/baseline-failed | tr \' \' _)"; else echo marker=missing; fi',
     ...fw,
@@ -70,9 +101,9 @@ function parseShas(text) {
   return out;
 }
 
-export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
+export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, keepalive = false, checkMetadata = true, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
   const checks = [];
-  const add = (name, ok, detail = '') => checks.push({ name, ok, detail });
+  const add = (name, ok, detail = '', warn = false) => checks.push({ name, ok, detail, warn });
   const open = publicPorts(rules);
 
   for (const [vm, a] of Object.entries(hosts)) {
@@ -81,14 +112,16 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
     add(`${vm} key login works`, login.code === 0, login.code === 0 ? '' : `exit ${login.code}: ${login.stderr.trim().split('\n').pop()}`);
     const kv = login.code === 0 ? parseKeyValues(login.stdout) : {};
     if (login.code === 0) {
-      add(`${vm} Ubuntu 24.04 on aarch64`, kv.os === '24.04' && kv.arch === 'aarch64', `os=${kv.os} arch=${kv.arch}`);
+      add(`${vm} Ubuntu 24.04 (x86_64 or aarch64)`, kv.os === '24.04' && ['x86_64', 'aarch64'].includes(kv.arch), `os=${kv.os} arch=${kv.arch}`);
       const sshd = kv.sshd ?? '';
       add(`${vm} sshd refuses passwords`, sshd.includes('passwordauthentication:no'), sshd);
       add(`${vm} sshd refuses root login`, sshd.includes('permitrootlogin:no'), '');
       add(`${vm} sshd allows only public keys`, sshd.includes('authenticationmethods:publickey') && sshd.includes('kbdinteractiveauthentication:no'), '');
       add(`${vm} secrets folder is 700 and owned by root`, kv.secrets === '700:root', kv.secrets);
       add(`${vm} Docker installed`, /^Docker_version/.test(kv.docker ?? ''), kv.docker);
-      add(`${vm} keep-alive service active`, kv.keepalive === 'active', kv.keepalive);
+      // Off means the unit is not running: inactive, failed or unknown. Missing data is a failure, not a pass.
+      add(keepalive ? `${vm} keep-alive service active` : `${vm} keep-alive service off (as configured)`, keepalive ? kv.keepalive === 'active' : ['inactive', 'failed', 'unknown'].includes(kv.keepalive), kv.keepalive ?? 'no answer');
+      if (kv.reboot === 'required') add(`${vm} a reboot is pending`, true, 'WARNING: updates were installed that need a reboot and no automatic reboot is configured: reboot this host once in a quiet moment (the stop and start rehearsal covers it), then run verify-hosts again', true);
       add(`${vm} cloud-init finished`, /done/.test(kv.cloudinit ?? ''), kv.cloudinit);
       add(`${vm} baseline marker says ok`, kv.marker === 'ok', kv.marker);
       for (const p of [...open, ...privatePortsFor(rules, vm)]) add(`${vm} host firewall accepts port ${p}`, kv[`fw_${p}`] === 'yes', kv[`fw_${p}`] ?? 'no answer');
@@ -98,7 +131,18 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
         add(`${vm} ${f.remote} matches the repository file`, !!got && got !== 'MISSING' && got === localHashes[f.remote], got === 'MISSING' || !got ? 'missing on the host' : got === localHashes[f.remote] ? '' : 'differs (drift)');
       }
     }
-    // 2. Public ports, from outside.
+    if (login.code === 0 && checkMetadata) {
+      // The probe image is pulled in its own step, so a failed pull is reported as such and not as a metadata result.
+      const pull = await ssh({ host: a.pub, user, identity, command: pullCommand(), timeoutMs: 240000 });
+      add(`${vm} metadata probe image pulled (pinned by digest)`, pull.code === 0, pull.code === 0 ? '' : `image pull failed (exit ${pull.code}): ${pull.stderr.trim().split('\n').pop()}`);
+      if (pull.code === 0) {
+        const m = await ssh({ host: a.pub, user, identity, command: metadataCommand(), timeoutMs: 120000 });
+        const mk = parseKeyValues(m.stdout);
+        add(`${vm} instance metadata is reachable from the host (control)`, mk.host_imds === 'reachable', mk.host_imds ?? `no answer (exit ${m.code})`);
+        add(`${vm} a container has network access (control)`, mk.container_control === 'reachable', mk.container_control ?? `no answer (exit ${m.code})`);
+        add(`${vm} a container cannot read instance metadata (IMDSv2, hop limit 1)`, mk.container_control === 'reachable' && (mk.container_imds ?? '').startsWith('blocked'), mk.container_imds ?? `no answer (exit ${m.code})`);
+      }
+    }    // 2. Public ports, from outside.
     const probes = await Promise.all([...open, ...closedPorts.filter((p) => !open.includes(p))].map(async (p) => [p, await tcpProbe(a.pub, p)]));
     for (const [port, state] of probes) {
       if (open.includes(port)) {
@@ -123,18 +167,18 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let opts;
   try {
-    opts = parseArgs(process.argv.slice(2), { values: ['identity', 'hosts', 'user', 'evidence'] });
+    opts = parseArgs(process.argv.slice(2), { values: ['identity', 'hosts', 'provider', 'user', 'evidence'] });
   } catch (e) {
     console.error(e.message);
     process.exit(2);
   }
   if (!opts.identity) {
-    console.error('usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts file] [--user ubuntu] [--evidence file] [--require-listener]');
+    console.error('usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts file | --provider aws|oci] [--user ubuntu] [--evidence file] [--require-listener] [--keepalive] [--skip-metadata]');
     process.exit(2);
   }
-  const hosts = loadHosts(opts.hosts);
+  const hosts = loadHosts(resolveHostsFile(opts));
   const rules = JSON.parse(readFileSync(RULES_FILE, 'utf8'));
-  const checks = await verifyHosts({ hosts, tcpProbe: realProbe, ssh: sshRun, identity: opts.identity, user: opts.user ?? 'ubuntu', rules, requireListener: !!opts['require-listener'] });
+  const checks = await verifyHosts({ hosts, tcpProbe: realProbe, ssh: sshRun, identity: opts.identity, user: opts.user ?? 'ubuntu', rules, ...verifyOptions(opts) });
   const lines = [];
   const ok = printChecks(checks, (l) => {
     const r = redact(l, hosts);

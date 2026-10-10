@@ -1,8 +1,12 @@
 #!/bin/sh
-# Opens the host firewall for the VulnMart ports and saves the rules. Safe to run again.
+# Adds ACCEPT rules for the VulnMart ports to the host INPUT chain and saves them. Safe to run again.
+# On the AWS Ubuntu image the INPUT policy is ACCEPT and these are only ACCEPT rules, so this script filters NOTHING
+# today: the AWS security groups are the only perimeter. The rules are a placeholder for a later default-drop policy
+# (handoff H-103, tasks L-15 and L-29). On an Oracle image the chain ends in a REJECT, so there they matter.
 # Usage: vulnmart-firewall.sh <private-subnet-cidr>
-# Oracle Ubuntu images ship an iptables INPUT chain that ends in a REJECT; allow rules must sit before it.
-# The cloud network groups are the real filter; this is the second layer on the host.
+# Some cloud Ubuntu images (Oracle) ship an iptables INPUT chain that ends in a REJECT; allow rules must sit before it.
+# Others (AWS) have an empty INPUT chain with policy ACCEPT: the rules are then added at the end and the cloud security groups do the filtering.
+# The cloud network groups are the real filter.
 set -eu
 PRIVATE_CIDR="${1:?private subnet cidr required}"
 PUBLIC_PORTS="22 80 443"

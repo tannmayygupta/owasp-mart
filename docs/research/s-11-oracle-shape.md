@@ -1,6 +1,6 @@
 # S-11: Oracle shape and capacity (spike record)
 
-Status: **template; the live fields are empty until the developer applies Terraform** (runbook Part B). Do not write addresses, OCIDs or account details here.
+Status: **superseded by `s-11-aws-hosts.md` on 2026-10-11 (D-41); not filled in.** Original status: template; the live fields are empty until the developer applies Terraform** (runbook Part B). Do not write addresses, OCIDs or account details here.
 
 ## Question
 Can two `VM.Standard.A1.Flex` instances with 1 OCPU and 6 GB each be created in the Mumbai home region, and do they stay alive?

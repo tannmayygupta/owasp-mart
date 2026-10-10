@@ -108,3 +108,9 @@ variable "boot_volume_gbs" {
   type        = number
   default     = 50
 }
+
+variable "public_web_cidrs" {
+  description = "Source addresses for ports 80 and 443 (Oracle option, unused). Open to the internet by default, as before."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

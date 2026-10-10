@@ -8,9 +8,9 @@ baseline_revision: 'a4ef73af94b9b94342c41c91e61afb59414f7977'
 route: 'full'
 route_source: 'pinned'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'thorough'
+review_source: 'pinned'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
 ---
@@ -78,13 +78,33 @@ context: []
 
 ## Implementation Notes
 
+Offline phase built 2026-10-11 (not committed yet). Done: `infra/terraform/aws/` with `iam-policy.json`, 19 mocked-provider tests, shared rule file at `infra/network-rules.json`, cloud-neutral baseline (keep-alive flag, off), `scripts/cloud-hosts.mjs`, metadata check in `verify-hosts`, AWS patterns in `scan-secrets`, CI job for both folders, runbook, D-41, ADR 0022, handoffs, dev-log, changelog, traceability. Real results: see the dev-log. Review fixes (batches 1 to 3, 2026-10-11): IAM policy completed and limited to eligible instance types, web ports closed by default (`public_web_cidrs`), monthly budgets and `vm_i_running`, probe controls and digest pin in `verify-hosts`, explicit address file choice, runbook rewritten for PowerShell, records corrected. Open, developer steps: runbook Parts A to D (account, apply, `verify-hosts`, `private-link-check`, credit record, stop and start rehearsal). L-08 is not ticked and stories 2.1 and 2.6 are not closed until those results are recorded and the developer confirms. AWS pages were not re-read in the build; facts stay marked unverified in the runbook and ADR.
+
 ## Plan Change Log
 
 ## Review Triage Log
 
+Pass 1 (2026-10-11, thorough, four lenses). About 55 findings. Verdict counts: high 3, medium 14, low 14, false 0, maybe-false 1. No intent_gap or bad_plan.
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| The IAM policy omits `budgets:TagResource`, `UntagResource` and `ListTagsForResource` although `default_tags` tag the budgets; the first apply may fail after the EC2 resources exist (Blind, Edge, Verification) | high | patch | Read in the configuration; a partial apply is the worst case for a first-time user. |
+| The policy allows `RunInstances` on any type, so a leaked long-lived key could start costly instances (Blind) | high | patch | Region condition only; instance-type condition added. |
+| Ports 80 and 443 open to the whole internet at the first apply, against the written acceptable-use position (PRD R-4) (Blind) | high | patch | Nothing listens there until stories 2.2 to 2.4; a `public_web_cidrs` variable defaults to the SSH sources. |
+| The host firewall adds only ACCEPT rules to a chain whose policy is ACCEPT, so it filters nothing on AWS, yet docs call it a second layer (Blind, Edge, Intent) | medium | patch | Claims corrected; security groups are the only perimeter; H-103 stays open. |
+| Budgets only e-mail, lag by a day, and the annual credit budget alerts only when the money is nearly gone; no stop switch for the labs host (Blind) | medium | patch | Monthly budgets, a `vm_i_running` switch and the weekly credit check in the runbook. |
+| Cost arithmetic (108 to 113, not 105) and a contradictory Part D about what a stop of the labs host destroys (Blind) | medium | patch | Lab instances are not restarted automatically (the instance contract sets no restart policy). |
+| Nothing asserts that all developers' SSH keys and the time server reach the hosts; only the first key is registered as a key pair (Verification) | medium | patch | A copy of the Oracle line would lock out two developers; tests added. |
+| The container metadata probe prints 'blocked' on any failure, so a failed pull or no egress looks like a pass (Edge) | medium | patch | Needs a control that must succeed inside the container. |
+| SSH CIDR rules accept IPv6-only lists, non-canonical blocks and duplicates; rules keyed by name collide; the policy check strips every `cidr_ipv4 0.0.0.0/0` (Edge, Blind) | medium | patch | Each confirmed in the Terraform or script text. |
+| User data size counted in characters, key pair name fixed, keep-alive argument unchecked, keep-alive-off check passes on missing data (Edge) | low | patch | Small guards. |
+| Secret scan misses the JSON form of a secret key and some IAM id prefixes (Edge) | low | patch | Patterns extended. |
+| Runbook for a Windows PowerShell user, state file backup, leftover lookup by tag, account hardening, kernel reboot marker (Blind) | medium | patch | Docs and a marker field. |
+| Single subnet and open egress, state backend and termination protection, NTP fallback, Free Plan limits, CLI flag wiring test (Blind, Verification) | low | defer | Recorded in deferred work; H-103 covers isolation. |
+| Intent: the live account and hosts are not exercised by the offline tests (Intent) | low | none | Stated in the plan and dev-log; the developer's live run is the proof. |
 ## Design Notes
 
-Sizing (to confirm by the developer): the developer wants the labs to run smoothly without lag, so the labs host gets the memory: m7i-flex.large (2 vCPU, 8 GB) holds about six lab instances (the shop container is limited to 512 MB), the platform host t3.small (2 vCPU, 2 GB) runs the API and database. Both are x86, which avoids the Arm build matrix (amd64 images only). Estimated cost in Sydney, to verify against AWS pages: platform host about USD 20, labs host about USD 75 to 80 per month while running, plus about USD 13 for disks and public addresses, so about USD 105 per month with both running 24 hours: the USD 100 credit alone covers about one month, and the extra credit of up to USD 100 earned through AWS activities roughly doubles it. The runbook therefore has a stop and start routine for the labs host (a stopped instance costs only its disk and address) and a plan: run the labs host while building and testing the orchestrator and for the evaluation week, stop it otherwise. If the credits run low the sizes change by one variable (for example t4g.small and t3.small). Online latency stays at Sydney levels (about 150 to 250 ms from India); the laptop fallback (D-35) is the zero-latency demo. Region reasons: Sydney is the only region this account can use; latency from India is higher (about 150 to 250 ms) than Mumbai. IMDSv2 with hop limit 1 keeps containers from reading instance metadata; the hosts carry no instance profile.
+Sizing (to confirm by the developer): the developer wants the labs to run smoothly without lag, so the labs host gets the memory: m7i-flex.large (2 vCPU, 8 GB) holds about six lab instances (the shop container is limited to 512 MB), the platform host t3.small (2 vCPU, 2 GB) runs the API and database. Both are x86, which avoids the Arm build matrix (amd64 images only). Estimated cost in Sydney, to verify against AWS pages: platform host about USD 20, labs host about USD 75 to 80 per month while running, plus about USD 13 for disks and public addresses, so about USD 108 to 113 per month with both running 24 hours (20 + 75 to 80 + 13; corrected in review): the USD 100 credit alone covers about one month, and the extra credit of up to USD 100 earned through AWS activities roughly doubles it. The runbook therefore has a stop and start routine for the labs host (a stopped instance costs only its disk and address) and a plan: run the labs host while building and testing the orchestrator and for the evaluation week, stop it otherwise. If the credits run low the sizes change by one variable (for example t4g.small and t3.small). Online latency stays at Sydney levels (about 150 to 250 ms from India); the laptop fallback (D-35) is the zero-latency demo. Region reasons: Sydney is the only region this account can use; latency from India is higher (about 150 to 250 ms) than Mumbai. IMDSv2 with hop limit 1 keeps containers from reading instance metadata; the hosts carry no instance profile.
 
 ## Verification
 
