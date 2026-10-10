@@ -60,3 +60,7 @@ None. The fake orchestrator is a test aid. Certificates and keys are throwaway a
 - CI check not done: the developer opens the pull request on GitHub; then the result (screenshot or pasted log) is read, failures fixed and the real result added here.
 - Production certificates, their rotation and the private CA stay open (H-68, L-08, L-13).
 - The wrong-host test relies on the Python client's host name check being on; the Windows run proves it, the Linux CI run is still to be seen.
+
+
+## Close-out note (2026-10-10)
+The story was marked done by the developer with the GitHub CI result pending: the pull request is raised after all sprint 1 tasks. The first real CI result is to be recorded in docs/dev/sprint-1-pr-checklist.md and here; a failure becomes a bug story.

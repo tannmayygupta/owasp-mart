@@ -65,3 +65,7 @@ Traceability: row LB-10.
 - Review follow-ups done: 413 now has `Connection: close` and the socket is destroyed when the drain ends, at the cap or after the stall time (unit tests with raw sockets); `--port` accepts only 1 to 5 digits; the missing-openssl tests use an empty PATH and prove openssl is absent first; `ci-linux.test.mjs` checks both directions with `ci.yml`; `--only` runs the install first when needed.
 - Not done (reasons in `deferred-work.md`): one certificate helper shared by Python and Node; runtime of the mTLS tests; `first_seq` bound (H-59); error codes (H-81); Windows CI job; pnpm supply-chain settings; OI-xx.
 - The first run on GitHub is still to be recorded.
+
+
+## Close-out note (2026-10-10)
+The story was marked done by the developer with the GitHub CI result pending: the pull request is raised after all sprint 1 tasks. The first real CI result is to be recorded in docs/dev/sprint-1-pr-checklist.md and here; a failure becomes a bug story.

@@ -77,3 +77,7 @@ Fixed after review: corrupted open point 35 row (form-feed escapes) and a BOM in
 - Proposals (a) to (c) above need the developer's decision; ADR 0020 status for them is Proposed. Docker documentation for tmpfs volumes and Compose `stdin_open` was not read in this task (experiment only).
 - Not covered by design: the stub has no import service, mock-services or bot controller, so the two placement volumes and `/run/import` have no consumers; the instance id, labels (nine) and per-instance limits are the template's example values or are not applied.
 - Handoffs H-92 to H-94 are for Sahil, L-13 and L-20; H-59 is only partly closed (the reserved `seq` range is still a proposal).
+
+
+## Close-out note (2026-10-10)
+The story was marked done by the developer with the GitHub CI result pending: the pull request is raised after all sprint 1 tasks. The first real CI result is to be recorded in docs/dev/sprint-1-pr-checklist.md and here; a failure becomes a bug story.
