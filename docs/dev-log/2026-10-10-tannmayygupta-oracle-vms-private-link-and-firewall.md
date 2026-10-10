@@ -85,3 +85,7 @@ Not a vulnerable component. Security controls: closed default security list, key
 
 ## Verification note (2026-10-10)
 After the review patches: unit tests 393 of 393, 	erraform fmt, init -lockfile=readonly, alidate and 	erraform test (10 of 10) pass in the pinned image, network-rule and secret-scan checks pass, contract rules unchanged (17 PASS, 4 NOT-APPLICABLE). The Linux proof (pnpm run ci:linux) passed before the review patches; the re-run after them was stopped by the system for low memory and is still to be repeated.
+
+
+## Oracle sign-up blocked (2026-10-10)
+The developer tried the Oracle Cloud sign-up in the Mumbai region: the payment step offers only 'Credit Card' and none of the three developers has one. Research the same day (summaries of Microsoft, AWS, GitHub, Oracle and other pages, mostly secondary sources): Oracle accepts credit cards and debit cards that work like credit cards, not prepaid, virtual or RuPay-only cards, and no UPI; AWS needs a payment method too; Azure for Students needs no card (USD 100 credit for 12 months, free hours of small VMs) but the college domain may not be accepted. The developer chose to try Azure for Students first (college email, GitHub Student Developer Pack as the backup route). The Terraform for Oracle stays in the repository until the provider decision is recorded (planned D-41); only the provider-specific parts (Terraform, console steps in the runbook) would change. The live phase of this story is blocked until a provider account exists.
