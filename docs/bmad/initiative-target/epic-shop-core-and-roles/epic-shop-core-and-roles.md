@@ -44,4 +44,6 @@ Shop core and roles. Not the seller and money flows and not the challenge weakne
 ## Notes
 
 - Handoff: the correct behavior is built first; weaknesses are added by the challenge epics as separate, isolated paths (challenge specs).
+- Incepted 2026-10-09 (approved by Sahil): six stories (3.1–3.6) from the T-stream task file, one per task (T-06, T-07, T-14, T-15, T-16) plus a refactor sweep. Coverage matches the epic FR set; validation clean.
+- Open ordering note: the initiative lists this epic `after` epic 2 (instance integration), but only stories 3.3 (customer flows) and 3.5 (seeded accounts) need epic 2 (T-08 seeding). 3.1 and 3.2 depend only on T-01 (done) and start in Sprint 1. Pin the epic-2 dependency onto 3.3 and 3.5 when epic 2 is incepted (`unpinned_after` until then).
 - Draft written 2026-10-08 by Claude Code for the user to approve; not yet confirmed.
