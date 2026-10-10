@@ -74,7 +74,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: T-01.
   - Done when: A trivial test passes on the vulnerable stub and fails on the fixed stub in CI.
 
-- [ ] **T-06. Shop data model and seven state machines**
+- [x] **T-06. Shop data model and seven state machines**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: About 20 tables with migrations and the seven state machines.

@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-06 shop data model and seven state machines, 2026-10-09, Sahil)
+- `apps/shop/` data layer: 23-table SQLite schema (`migrations/0001_init.sql`, the RS-G 1.1 marketplace model plus the thin audit log and the C09 security-events/alerts tables, integer `*_cents` money, status CHECKs mirroring the state machines), an idempotent migration runner + CLI (`src/db/migrate.mjs`, `migrate` script), and the seven state machines (`src/domain/state-machines.mjs`: seller approval, product, checkout, fulfilment, refund, dispute, payout) as pure guarded transition logic. On Node 24's built-in `node:sqlite` (ADR 0017). 21 tests. Covers FR-SHP-02, FR-SHP-04.
+
 ### Added (T-05 exploit test runner skeleton, 2026-10-09, Sahil)
 - `challenges/tests/runner/` exploit test runner: runs an exploit test against any instance URL and reports passed (vulnerable) / failed (fixed) / errored (could not run), as a library and a CLI (exit 0/1/3, 2 on usage). Ships a tiny vulnerable/fixed stub and a demo exploit under `challenges/tests/_example/`, a self-test (6 cases) proving pass-on-vulnerable and fail-on-fixed, and a CI `exploit runner` job that fails if no exploit tests are found. Node built-ins only. Covers TB-4.
 
