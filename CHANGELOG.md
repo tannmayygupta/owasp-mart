@@ -4,6 +4,9 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+
+### Fixed (live verification of the AWS hosts, L-08 / story 2.6, 2026-10-11, Tanmay)
+- The two AWS hosts are built and verified live (erify-hosts 94 checks and private-link-check 22 checks pass). Three defects found only on a real host are fixed with regression tests: the baseline sshd -t step creates /run/sshd first; the time-sync step restarts chrony when systemd-timesyncd does not exist; the private-link check keeps its certificates under /run (made and removed with sudo) because /dev/shm is wiped by systemd-logind between ssh sessions. erify-hosts also starts a short bare TCP listener on the web ports (AWS drops closed-port connections silently) and reports a repaired cloud-init error as a warning.
 ### Added (story 2.6, L-08 hosts on the AWS Free Plan in Sydney, offline phase, 2026-10-11, Tanmay)
 - `infra/terraform/aws/` (provider `hashicorp/aws` `~> 6.68`, lock file for five platforms): VPC, one public subnet, security groups built from the shared rule file, two Free Plan eligible EC2 hosts (default platform t3.small and labs m7i-flex.large, x86, 30 GB encrypted gp3, IMDSv2 required with hop limit 1, no instance profile, Elastic IP each, no NAT gateway), zero-spend and monthly-use budgets by e-mail, `vm_i_running` to stop the labs host, web ports closed by default (`public_web_cidrs`), `iam-policy.json` for a limited Terraform IAM user, 30 native `terraform test` runs with a mocked provider.
 - Runbook `docs/runbooks/aws-account-and-vms.md` (account, apply, verify, credits, stop and start, rebuild, acceptable-use note), decision D-41, ADR 0022, study note S-11 for AWS.

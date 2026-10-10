@@ -63,9 +63,17 @@ export const metadataCommand = () =>
 
 /** The command-line options as the verification takes them (exported so a test covers the wiring). */
 export function verifyOptions(opts) {
-  return { requireListener: !!opts['require-listener'], keepalive: !!opts.keepalive, checkMetadata: !opts['skip-metadata'] };
+  return { requireListener: !!opts['require-listener'], keepalive: !!opts.keepalive, checkMetadata: !opts['skip-metadata'], tempListener: !opts['no-temp-listener'] };
 }
-const subnetOf = (rules) => rules.subnet_cidr;
+// AWS drops (does not refuse) a connection to a closed port, so "reachable" cannot be shown before a web server exists. The check starts a bare TCP
+// listener on the web ports for a short time (it accepts and closes, it serves nothing), probes, and stops it again. A port that already has a listener is left alone.
+const LISTENER_CODE = 'import socket,sys;s=socket.socket();s.setsockopt(1,2,1);s.bind(("0.0.0.0",int(sys.argv[1])));s.listen(5);exec("while 1: s.accept()[0].close()")';
+export function tempListenerStart(ports) {
+  return `${ports.map((p) => `{ ss -tln | grep -q ':${p} ' || sudo -n systemd-run --collect --quiet --unit=vulnmart-verify-${p} --property=RuntimeMaxSec=120 /usr/bin/python3 -c '${LISTENER_CODE}' ${p}; }`).join(' && ')} && sleep 1`;
+}
+export function tempListenerStop(ports) {
+  return `sudo -n systemctl stop ${ports.map((p) => `vulnmart-verify-${p}`).join(' ')} 2>/dev/null; true`;
+}const subnetOf = (rules) => rules.subnet_cidr;
 const publicPorts = (rules) => rules.public_ingress.map((r) => r.port);
 /** Private ports addressed to this host (rules from the other VM), checked with the subnet source. */
 const privatePortsFor = (rules, vm) => rules.private_ingress.filter((r) => r.to === vm).map((r) => r.port);
@@ -101,7 +109,7 @@ function parseShas(text) {
   return out;
 }
 
-export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, keepalive = false, checkMetadata = true, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
+export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, keepalive = false, checkMetadata = true, tempListener = false, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
   const checks = [];
   const add = (name, ok, detail = '', warn = false) => checks.push({ name, ok, detail, warn });
   const open = publicPorts(rules);
@@ -122,7 +130,10 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
       // Off means the unit is not running: inactive, failed or unknown. Missing data is a failure, not a pass.
       add(keepalive ? `${vm} keep-alive service active` : `${vm} keep-alive service off (as configured)`, keepalive ? kv.keepalive === 'active' : ['inactive', 'failed', 'unknown'].includes(kv.keepalive), kv.keepalive ?? 'no answer');
       if (kv.reboot === 'required') add(`${vm} a reboot is pending`, true, 'WARNING: updates were installed that need a reboot and no automatic reboot is configured: reboot this host once in a quiet moment (the stop and start rehearsal covers it), then run verify-hosts again', true);
-      add(`${vm} cloud-init finished`, /done/.test(kv.cloudinit ?? ''), kv.cloudinit);
+      // cloud-init keeps an 'error' status after a failed first run even when the baseline was repaired and rerun by hand: accept that only with an ok marker, and say so.
+      const ci = kv.cloudinit ?? '';
+      const ciRepaired = /error/.test(ci) && kv.marker === 'ok';
+      add(`${vm} cloud-init finished`, /done/.test(ci) || ciRepaired, ciRepaired ? 'cloud-init recorded an error from an earlier run; the baseline marker is ok (repaired and rerun by hand)' : ci, ciRepaired);
       add(`${vm} baseline marker says ok`, kv.marker === 'ok', kv.marker);
       for (const p of [...open, ...privatePortsFor(rules, vm)]) add(`${vm} host firewall accepts port ${p}`, kv[`fw_${p}`] === 'yes', kv[`fw_${p}`] ?? 'no answer');
       const remote = parseShas(login.stdout);
@@ -142,18 +153,27 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
         add(`${vm} a container has network access (control)`, mk.container_control === 'reachable', mk.container_control ?? `no answer (exit ${m.code})`);
         add(`${vm} a container cannot read instance metadata (IMDSv2, hop limit 1)`, mk.container_control === 'reachable' && (mk.container_imds ?? '').startsWith('blocked'), mk.container_imds ?? `no answer (exit ${m.code})`);
       }
-    }    // 2. Public ports, from outside.
+    }
+    // 2. Public ports, from outside. With the temporary listener the web ports must really answer.
+    const webPorts = open.filter((p) => p !== 22);
+    let listening = false;
+    if (tempListener && login.code === 0 && webPorts.length) {
+      const st = await ssh({ host: a.pub, user, identity, command: tempListenerStart(webPorts), timeoutMs: 60000 });
+      listening = st.code === 0;
+      add(`${vm} temporary listener on ${webPorts.join(' and ')} started (serves nothing, stopped after the probes)`, listening, listening ? '' : `exit ${st.code}: ${(st.stderr || '').trim().split('\n').pop()}`);
+    }
     const probes = await Promise.all([...open, ...closedPorts.filter((p) => !open.includes(p))].map(async (p) => [p, await tcpProbe(a.pub, p)]));
     for (const [port, state] of probes) {
       if (open.includes(port)) {
         // 22 must accept. 80 and 443 accept once Caddy runs; "refused" proves the path only while the host rule exists.
         const hostRule = kv[`fw_${port}`] === 'yes';
-        const ok = port === 22 ? state === 'open' : requireListener ? state === 'open' : state === 'open' || (state === 'refused' && hostRule);
+        const ok = port === 22 ? state === 'open' : (requireListener || listening) ? state === 'open' : state === 'open' || (state === 'refused' && hostRule);
         add(`${vm} port ${port} reachable from outside`, ok, state === 'refused' ? (hostRule ? 'refused by the host: no listener yet, path is open' : 'refused and no host firewall rule seen') : state);
       } else {
         add(`${vm} port ${port} closed from outside`, state !== 'open', state);
       }
     }
+    if (listening) await ssh({ host: a.pub, user, identity, command: tempListenerStop(webPorts), timeoutMs: 60000 });
     // 3. Password and root login attempts must be refused (an answer of "Permission denied" with no password method offered).
     const pw = await ssh({ host: a.pub, user, options: ['-o', 'PreferredAuthentications=password', '-o', 'PubkeyAuthentication=no', '-o', 'NumberOfPasswordPrompts=0'] });
     const offered = (pw.stderr.match(/Permission denied \(([^)]*)\)/) ?? [])[1] ?? '';
@@ -173,7 +193,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exit(2);
   }
   if (!opts.identity) {
-    console.error('usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts file | --provider aws|oci] [--user ubuntu] [--evidence file] [--require-listener] [--keepalive] [--skip-metadata]');
+    console.error('usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts file | --provider aws|oci] [--user ubuntu] [--evidence file] [--require-listener] [--no-temp-listener] [--keepalive] [--skip-metadata]');
     process.exit(2);
   }
   const hosts = loadHosts(resolveHostsFile(opts));

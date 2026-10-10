@@ -115,7 +115,8 @@ test('cloud-init runs one baseline script that stops at the first failure and wr
   assert.deepEqual(steps, ['lock-root', 'sshd-config-test', 'restart-ssh', 'firewall', 'docker', 'secrets-dir', 'time-sync', 'keepalive', 'unattended-upgrades']);
   assert.match(b, /passwd -l root/);
   assert.match(b, /install -d -m 0700 -o root -g root \/opt\/vulnmart \/opt\/vulnmart\/secrets/);
-  assert.match(b, /sshd -t/);
+  assert.match(b, /install -d -m 0755 \/run\/sshd && sshd -t/, "sshd -t needs /run/sshd, which is missing before the first ssh start on Ubuntu 24.04");
+  assert.match(b, /systemd-timesyncd\.service[\s\S]*chrony\.service[\s\S]*no time sync service/, "time-sync must handle chrony (AWS Ubuntu image) as well as systemd-timesyncd and fail when neither exists");
 });
 
 test('docker daemon has log rotation and live-restore, sshd allows 6 tries', () => {

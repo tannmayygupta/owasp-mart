@@ -1,7 +1,7 @@
 // Live check of the private link between VM-P and VM-I (spike S-17, runbook Part C).
 // For each direction named in network-rules.json (private_ingress) it proves: TCP connects, a mutual-TLS handshake
 // succeeds with throwaway certificates, a client without a certificate is refused, and records the connect latency.
-// Also proves the link ports are closed from the internet. Certificates live only in a 0700 folder in /dev/shm on the
+// Also proves the link ports are closed from the internet. Certificates live only in a 0700 folder in /run (memory-backed) on the
 // hosts and are removed at the end (checked). Usage: node scripts/private-link-check.mjs --identity <key> [--hosts file]
 // [--user ubuntu] [--evidence file]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -102,7 +102,7 @@ export function unlistedPort(rules) {
 export async function checkPrivateLink({ hosts, rules, ssh, tcpProbe, identity, user = 'ubuntu', dirName = `vm-link-${randomBytes(6).toString('hex')}` }) {
   const checks = [];
   const add = (name, ok, detail = '') => checks.push({ name, ok, detail });
-  const dir = `/dev/shm/${dirName}`;
+  const dir = `/run/${dirName}`; // the folder is made with sudo inside root-owned /run, so removing it needs sudo too (rm without it leaves the empty folder) // /run is memory-backed and root-owned; /dev/shm is wiped by systemd-logind (RemoveIPC) when an ssh session ends, which removed the folder between steps
   const run = (vm, command, input) => ssh({ host: hosts[vm].pub, user, identity, command, input });
   const links = rules.private_ingress;
   const pids = { 'vm-p': [], 'vm-i': [] }; // saved process ids of the servers this run started
@@ -117,7 +117,7 @@ export async function checkPrivateLink({ hosts, rules, ssh, tcpProbe, identity, 
 
   try {
     for (const vm of ['vm-p', 'vm-i']) {
-      const r = await run(vm, `umask 077; mkdir -m 700 ${dir} && command -v python3 >/dev/null && echo ready`);
+      const r = await run(vm, `sudo -n install -d -m 0700 -o "$(id -un)" -g "$(id -gn)" ${dir} && command -v python3 >/dev/null && echo ready`);
       add(`${vm} work folder created and python3 present`, r.code === 0 && /ready/.test(r.stdout), r.code === 0 ? '' : r.stderr.trim());
       if (r.code !== 0) return checks;
     }
@@ -177,7 +177,7 @@ export async function checkPrivateLink({ hosts, rules, ssh, tcpProbe, identity, 
     // Stop only the servers this run started (saved ids), then remove the folder, then check it is gone. No pattern kill.
     for (const vm of ['vm-p', 'vm-i']) {
       const kills = pids[vm].filter((p) => /^\d+$/.test(p)).map((p) => `kill ${p} 2>/dev/null`).join('; ');
-      await run(vm, `${kills ? `${kills}; ` : ''}rm -rf ${dir}; true`);
+      await run(vm, `${kills ? `${kills}; ` : ''}sudo -n rm -rf ${dir}; true`);
       const left = await run(vm, `test ! -e ${dir} && echo clean || echo left`);
       add(`${vm} no certificate or key left on the host`, /clean/.test(left.stdout), left.stdout.trim());
     }

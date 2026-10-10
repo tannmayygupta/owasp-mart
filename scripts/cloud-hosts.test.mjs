@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHosts, redact, parseKeyValues, parseArgs, printChecks, resolveHostsFile, loadHosts, PROVIDER_HOSTS_FILES } from './cloud-hosts.mjs';
-import { verifyHosts, remoteBaseline, BASELINE_FILES, localBaselineHashes, metadataCommand, pullCommand, verifyOptions, IMDS_PY, IMDS_IMAGE } from './verify-hosts.mjs';
+import { verifyHosts, remoteBaseline, BASELINE_FILES, localBaselineHashes, metadataCommand, pullCommand, verifyOptions, tempListenerStart, IMDS_PY, IMDS_IMAGE } from './verify-hosts.mjs';
 import { checkPrivateLink, unlistedPort, SERVER_PY, CLIENT_PY, SERVER_SECONDS, CLIENT_STEPS_PER_LINK, SECONDS_PER_STEP } from './private-link-check.mjs';
 import { RULES_FILE } from './check-network-rules.mjs';
 
@@ -60,12 +60,12 @@ test('printChecks returns false when a check fails', () => {
 // ---- verify-hosts ----
 const fakeHashes = Object.fromEntries(BASELINE_FILES.map((f) => [f.remote, f.remote.length.toString(16).padStart(2, '0').repeat(32)]));
 
-function baselineOutput(vm, { fw = {}, marker = 'ok', hashes = fakeHashes, os = '24.04', sshd, keepalive = 'inactive', arch = 'x86_64', reboot = 'no' } = {}) {
+function baselineOutput(vm, { fw = {}, marker = 'ok', hashes = fakeHashes, os = '24.04', sshd, keepalive = 'inactive', arch = 'x86_64', reboot = 'no', cloudinit = 'status:_done' } = {}) {
   const wanted = [...rules.public_ingress.map((r) => r.port), ...rules.private_ingress.filter((r) => r.to === vm).map((r) => r.port)];
   const lines = [
     `arch=${arch}`, `os=${os}`,
     `sshd=${sshd ?? 'authenticationmethods:publickey,kbdinteractiveauthentication:no,passwordauthentication:no,permitrootlogin:no,'}`,
-    'secrets=700:root', 'docker=Docker_version_27', `keepalive=${keepalive}`, `reboot=${reboot}`, 'cloudinit=status:_done', `marker=${marker}`,
+    'secrets=700:root', 'docker=Docker_version_27', `keepalive=${keepalive}`, `reboot=${reboot}`, `cloudinit=${cloudinit}`, `marker=${marker}`,
     ...wanted.map((p) => `fw_${p}=${fw[p] ?? 'yes'}`),
     ...Object.entries(hashes).map(([p, h]) => (h === 'MISSING' ? `sha MISSING  ${p}` : `sha ${h}  ${p}`)),
   ];
@@ -74,7 +74,7 @@ function baselineOutput(vm, { fw = {}, marker = 'ok', hashes = fakeHashes, os = 
 
 const GOOD_IMDS = 'host_imds=reachable\nhost_control=reachable\ncontainer_imds=blocked:TimeoutError\ncontainer_control=reachable\n';
 
-function fakeSsh({ keyLogin = true, passwordRefused = true, rootRefused = true, out = baselineOutput, imds = GOOD_IMDS, pull = { code: 0, stdout: '', stderr: '' } } = {}) {
+function fakeSsh({ keyLogin = true, passwordRefused = true, rootRefused = true, out = baselineOutput, imds = GOOD_IMDS, pull = { code: 0, stdout: '', stderr: '' }, listener = { code: 0, stdout: '', stderr: '' } } = {}) {
   const calls = [];
   const fn = async (a) => {
     calls.push(a);
@@ -83,6 +83,7 @@ function fakeSsh({ keyLogin = true, passwordRefused = true, rootRefused = true, 
     if (a.options?.includes('PubkeyAuthentication=no')) return passwordRefused ? { code: 255, stdout: '', stderr: 'ubuntu@h: Permission denied (publickey).' } : { code: 255, stdout: '', stderr: 'Permission denied (publickey,password).' };
     if (a.command?.startsWith('set -o pipefail')) return keyLogin ? { code: 0, stdout: out(vm), stderr: '' } : { code: 255, stdout: '', stderr: 'Permission denied (publickey).' };
     if (a.command?.startsWith('sudo -n docker pull')) return pull;
+    if (a.command?.includes('vulnmart-verify')) return a.command.startsWith('sudo -n systemctl stop') ? { code: 0, stdout: '', stderr: '' } : listener;
     if (a.command?.includes('169.254.169.254')) return { code: 0, stdout: imds, stderr: '' };
     throw new Error(`unexpected ssh ${a.command}`);
   };
@@ -127,6 +128,29 @@ test('refused on 80 or 443 passes only when that host firewall rule exists; a ti
   assert.ok((await verify({ tcpProbe: probeFor({ 443: 'timeout' }) })).some((c) => !c.ok && c.name.includes('port 443')));
 });
 
+test('with the temporary listener the web ports must really answer: refused or a timeout fails, and the listener is stopped again', async () => {
+  const ssh = fakeSsh();
+  const ok = await verify({ ssh, tempListener: true });
+  assert.deepEqual(failed(ok), []);
+  assert.ok(ok.some((c) => c.name.includes('temporary listener on 80 and 443 started')));
+  const cmds = ssh.calls.map((c) => c.command ?? '');
+  const start = cmds.findIndex((c) => c.includes('vulnmart-verify-80') && !c.startsWith('sudo -n systemctl stop'));
+  const stop = cmds.findIndex((c) => c.startsWith('sudo -n systemctl stop'));
+  assert.ok(start >= 0 && stop > start, 'start before stop');
+  assert.ok(cmds[start].includes('vulnmart-verify-443') && cmds[start].includes("ss -tln | grep -q ':80 '"));
+  assert.ok((await verify({ ssh: fakeSsh(), tempListener: true, tcpProbe: probeFor({ 80: 'refused' }) })).some((c) => !c.ok && c.name === 'vm-p port 80 reachable from outside'));
+  assert.ok((await verify({ ssh: fakeSsh(), tempListener: true, tcpProbe: probeFor({ 443: 'timeout' }) })).some((c) => !c.ok && c.name === 'vm-i port 443 reachable from outside'));
+});
+
+test('a listener that cannot be started is a named failure and nothing is stopped; the python code has no single quote', async () => {
+  const ssh = fakeSsh({ listener: { code: 1, stdout: '', stderr: 'Failed to start transient service' } });
+  const f = await verify({ ssh, tempListener: true });
+  assert.ok(f.some((c) => !c.ok && c.name.includes('temporary listener') && c.detail.includes('Failed to start')));
+  assert.ok(!ssh.calls.some((c) => (c.command ?? '').startsWith('sudo -n systemctl stop')));
+  assert.ok(!tempListenerStart([80]).slice(tempListenerStart([80]).indexOf("-c '") + 4).split("' ")[0].includes("'"));
+  assert.deepEqual(verifyOptions({}).tempListener, true);
+  assert.deepEqual(verifyOptions({ 'no-temp-listener': true }).tempListener, false);
+});
 test('a missing host firewall rule for the private port fails', async () => {
   const ssh = fakeSsh({ out: (vm) => baselineOutput(vm, { fw: { 9443: 'no', 9444: 'no' } }) });
   const f = failed(await verify({ ssh }));
@@ -149,6 +173,15 @@ test('verify-hosts fails on a bad sshd setting and on a baseline marker that is 
   assert.ok((await verify({ ssh: fakeSsh({ out: (vm) => baselineOutput(vm, { marker: 'missing' }) }) })).some((c) => !c.ok && c.name.includes('baseline marker')));
 });
 
+test('cloud-init error is accepted only with an ok baseline marker (repaired by hand) and is flagged as a warning', async () => {
+  const repaired = await verify({ ssh: fakeSsh({ out: (vm) => baselineOutput(vm, { cloudinit: 'status:_error', marker: 'ok' }) }) });
+  const ok = repaired.find((c) => c.name.includes('cloud-init finished'));
+  assert.ok(ok.ok && ok.warn && /repaired and rerun by hand/.test(ok.detail));
+  const broken = await verify({ ssh: fakeSsh({ out: (vm) => baselineOutput(vm, { cloudinit: 'status:_error', marker: 'failed:step=docker_exit=1' }) }) });
+  assert.ok(broken.some((c) => !c.ok && c.name.includes('cloud-init finished')));
+  const none = await verify({ ssh: fakeSsh({ out: (vm) => baselineOutput(vm, { cloudinit: 'status:_running', marker: 'ok' }) }) });
+  assert.ok(none.some((c) => !c.ok && c.name.includes('cloud-init finished')));
+});
 test('verify-hosts detects drift: a host file that differs from the repository file, or is missing, fails', async () => {
   const some = BASELINE_FILES[1].remote;
   const drift = fakeSsh({ out: (vm) => baselineOutput(vm, { hashes: { ...fakeHashes, [some]: 'f'.repeat(64) } }) });
@@ -175,7 +208,7 @@ function linkSsh({ mtls = true, nocert = '{"ok": false, "error": "SSLError"}', t
     log.push(a);
     const c = a.command ?? '';
     const out = (stdout, code = 0) => ({ code, stdout, stderr: '' });
-    if (c.includes('mkdir -m 700')) return out('ready');
+    if (c.includes('install -d -m 0700')) return out('ready');
     if (c.includes('tar c ca.crt')) return out('A'.repeat(200));
     if (c.includes('base64 -d | tar x')) return out('');
     if (c.includes('cat > ')) return out('');
@@ -204,7 +237,7 @@ test('private-link-check passes: ports closed outside, mTLS works both ways, no-
   assert.ok(checks.some((c) => /median 0\.5/.test(c.detail)), 'latency is recorded');
   assert.ok(checks.some((c) => c.name === 'vm-i -> vm-p :9443 (wrong direction) is dropped'));
   assert.ok(checks.some((c) => c.name === `vm-p -> vm-i :${unlistedPort(rules)} (port not in the rules) is dropped`));
-  const servers = ssh.log.filter((a) => a.command?.includes('server.py /dev/shm'));
+  const servers = ssh.log.filter((a) => a.command?.includes('server.py /run'));
   assert.ok(servers.every((a) => /10\.0\.0\.1[12] 944[34] /.test(a.command)), 'bound to the private address of the server host');
 });
 
@@ -212,13 +245,21 @@ test('the server lifetime comes from the step budget, and clean-up never uses a 
   assert.equal(SERVER_SECONDS, CLIENT_STEPS_PER_LINK * SECONDS_PER_STEP + 20);
   const ssh = linkSsh();
   await link({ ssh });
-  assert.ok(ssh.log.filter((a) => a.command?.includes('server.py /dev/shm')).every((a) => a.command.includes(` ${SERVER_SECONDS} >`)));
+  assert.ok(ssh.log.filter((a) => a.command?.includes('server.py /run')).every((a) => a.command.includes(` ${SERVER_SECONDS} >`)));
   assert.ok(ssh.log.every((a) => !/pkill|killall/.test(a.command ?? '')), 'no pkill');
-  const cleanup = ssh.log.filter((a) => /rm -rf \/dev\/shm\/vm-link-test/.test(a.command ?? ''));
+  const cleanup = ssh.log.filter((a) => /sudo -n rm -rf \/run\/vm-link-test/.test(a.command ?? ''));
   assert.equal(cleanup.length, 2, 'one clean-up per host');
-  assert.ok(cleanup.every((a) => a.command.includes('/dev/shm/vm-link-test')));
+  assert.ok(cleanup.every((a) => a.command.includes('/run/vm-link-test')));
 });
 
+test('the work folder is under /run (memory-backed, root-owned and made with sudo), not /dev/shm which logind wipes when an ssh session ends', async () => {
+  const log = [];
+  const ssh = async (a) => { log.push(a.command ?? ''); return { code: 0, stdout: 'ready', stderr: '' }; };
+  await checkPrivateLink({ hosts, rules, ssh, tcpProbe: async () => 'timeout', identity: 'k', dirName: 'vm-link-x' }).catch(() => {});
+  const make = log.find((c) => c.includes('install -d'));
+  assert.ok(make && make.includes('/run/vm-link-x') && make.startsWith('sudo -n install -d -m 0700'), make);
+  assert.ok(!log.some((c) => c.includes('/dev/shm')));
+});
 test('a running server that was not killed in its step is killed by saved id in the clean-up', async () => {
   const ssh = linkSsh();
   // The first link fails early after the server started: simulate by throwing at the nocert client of the first link.
@@ -231,7 +272,7 @@ test('a running server that was not killed in its step is killed by saved id in 
     return ssh(a);
   };
   await assert.rejects(() => link({ ssh: wrapped }), /ssh died/);
-  const cleanup = ssh.log.filter((a) => /rm -rf \/dev\/shm\/vm-link-test/.test(a.command ?? ''));
+  const cleanup = ssh.log.filter((a) => /sudo -n rm -rf \/run\/vm-link-test/.test(a.command ?? ''));
   assert.equal(cleanup.length, 2);
   assert.ok(cleanup.some((a) => a.command.startsWith('kill 4242')), 'the saved pid is killed first');
 });
@@ -266,12 +307,12 @@ test('private-link-check fails when a certificate is left on a host, and still c
   const log = [];
   const ssh = async (a) => {
     log.push(a.command);
-    if (a.command.includes('mkdir -m 700')) return { code: 1, stdout: '', stderr: 'boom' };
+    if (a.command.includes('install -d -m 0700')) return { code: 1, stdout: '', stderr: 'boom' };
     return { code: 0, stdout: 'clean', stderr: '' };
   };
   const early = await link({ ssh, dirName: 'd' });
   assert.ok(early.some((c) => !c.ok));
-  assert.ok(log.some((c) => c.includes('rm -rf /dev/shm/d')));
+  assert.ok(log.some((c) => c.includes('sudo -n rm -rf /run/d')));
 });
 
 test('the python helpers require a client certificate, bind privately and classify probes', () => {
@@ -366,9 +407,9 @@ test('keep-alive off requires inactive, failed or unknown and fails on missing d
 });
 
 test('verifyOptions maps the command line flags (--keepalive, --skip-metadata, --require-listener)', () => {
-  assert.deepEqual(verifyOptions({ _: [] }), { requireListener: false, keepalive: false, checkMetadata: true });
-  assert.deepEqual(verifyOptions(parseArgs(['--keepalive', '--skip-metadata', '--require-listener'])), { requireListener: true, keepalive: true, checkMetadata: false });
-  assert.deepEqual(verifyOptions(parseArgs(['--identity', 'k', '--skip-metadata'], { values: ['identity'] })), { requireListener: false, keepalive: false, checkMetadata: false });
+  assert.deepEqual(verifyOptions({ _: [] }), { requireListener: false, keepalive: false, checkMetadata: true, tempListener: true });
+  assert.deepEqual(verifyOptions(parseArgs(['--keepalive', '--skip-metadata', '--require-listener'])), { requireListener: true, keepalive: true, checkMetadata: false, tempListener: true });
+  assert.deepEqual(verifyOptions(parseArgs(['--identity', 'k', '--skip-metadata'], { values: ['identity'] })), { requireListener: false, keepalive: false, checkMetadata: false, tempListener: true });
 });
 
 test('the address file is never guessed: --hosts, then --provider, then the only file that exists, else an error naming the choice', () => {
