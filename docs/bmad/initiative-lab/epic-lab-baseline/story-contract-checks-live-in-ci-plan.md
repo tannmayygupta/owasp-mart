@@ -3,7 +3,7 @@ title: 'Contract checks live in CI'
 type: 'feature'
 ticket: '6'
 created: '2026-10-10'
-status: 'built'
+status: done
 baseline_revision: 'ca98486d52274b16b9180b20a3d4b95eb5304e64'
 route: 'full'
 route_source: 'pinned'
@@ -13,6 +13,7 @@ review_source: 'pinned'
 lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
 review_loop_iteration: 0
 context: []
+assignee: "tannmayygupta"
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">

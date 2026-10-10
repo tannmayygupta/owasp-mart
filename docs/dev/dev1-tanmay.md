@@ -90,7 +90,7 @@ Goal: Contracts v1, the lab harness and the two Oracle VMs exist, so the other t
   - Done when: One command starts a full stub instance on a laptop: it answers health, becomes ready only after the injection marker, serves a planted flag, emits one app event the fake ingest validates, and passes the contract conformance check.
   - Handoffs: H-74 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **L-07. Contract checks live in CI**
+- [x] **L-07. Contract checks live in CI**
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.6` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - Build: Add the contract checks to CI (schema validity, breaking change, bundle current, mock validity, provider conformance, migrations, table ownership, compatibility file), including the ownership and single-Alembic-head checks the other streams rely on.
