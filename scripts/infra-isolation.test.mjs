@@ -341,3 +341,12 @@ test('verify-hosts isolation probes: containers cannot reach metadata or vm-p:44
   assert.equal((await failing({ bridge_internet443: 'timeout' })).length, 1);
   assert.deepEqual(BASELINE_FILES.filter((f) => f.remote.includes('egress')).map((f) => f.local), ['infra/hosts/vulnmart-egress.sh', 'infra/hosts/vulnmart-egress.service']);
 });
+
+test('iam-policy.json: every statement ID is letters and digits only and unique (the AWS console refuses an underscore)', () => {
+  const pol = JSON.parse(read('infra', 'terraform', 'aws', 'iam-policy.json'));
+  const sids = pol.Statement.map((s) => s.Sid);
+  for (const sid of sids) assert.match(sid, /^[A-Za-z0-9]+$/, `statement ID ${sid}`);
+  assert.equal(new Set(sids).size, sids.length, 'duplicate statement ID');
+  // the console counts characters without whitespace against a 6144 limit for a managed policy
+  assert.ok(JSON.stringify(pol).replace(/\s/g, '').length < 6144, 'policy too large for one managed policy');
+});

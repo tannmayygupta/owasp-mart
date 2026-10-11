@@ -184,7 +184,7 @@
             "Resource": "arn:aws:s3:::vulnmart-tfstate-REPLACE-WITH-YOUR-BUCKET/*"
         },
         {
-            "Sid": "BootstrapStateBucketOnce_RemoveAfterwards",
+            "Sid": "BootstrapStateBucketOnceRemoveAfterwards",
             "Effect": "Allow",
             "Action": [
                 "s3:CreateBucket",

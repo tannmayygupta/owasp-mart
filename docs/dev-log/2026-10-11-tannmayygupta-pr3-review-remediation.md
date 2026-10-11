@@ -54,6 +54,8 @@ Command output as above; no screenshots.
 - The fresh-checkout parity test timed out after 5 minutes on the Python step; the step timeouts are now 15 minutes.
 - The first draft of the labs egress script had a public IPv4 address on one line while it was being written; the secret scan caught it and the final tree passes the scan.
 
+- The AWS console refused the new IAM policy: the statement ID `BootstrapStateBucketOnce_RemoveAfterwards` had an underscore (IDs allow letters and digits only). Found when the developer pasted the policy; renamed `BootstrapStateBucketOnceRemoveAfterwards`; a test now checks every ID and the size limit (`node --test scripts/infra-isolation.test.mjs`: 13 of 13 pass).
+
 ## Security notes (vulnerable parts only)
 No flag values or secrets were written. The event key vector uses a fake master marked as a test value.
 

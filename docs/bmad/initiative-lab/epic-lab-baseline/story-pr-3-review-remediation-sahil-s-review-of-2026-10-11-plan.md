@@ -56,7 +56,7 @@ contracts/ (events, orchestrator, instance, lab-api, mocks, registry.json, CHANG
 
 ## Implementation Notes
 
-Built 2026-10-11: part A (merge) by the developer's Claude session; B1 IF-4, B2 IF-6, B3 IF-5, B4 IF-2, C rules engine, D infrastructure by helper agents, verified by the session. Real results are in `docs/dev-log/2026-10-11-tannmayygupta-pr3-review-remediation.md`: unit 515/515, pytest 640, e2e 72/72 after the fix (71/72 first), harness PASS, contract rules 18 PASS. Not done or not proven: the trusted checker has not run on GitHub; infrastructure is not applied; `terraform plan` not run; conformance vs template schema, IF-2 evidence cursor and duplicate-key rejection are open (H-110). Decisions D-42 to D-46 are Proposed (taken on the developer's delegation) and are not in initial.md Section 15 until the developer confirms.
+Built 2026-10-11: part A (merge) by the developer's Claude session; B1 IF-4, B2 IF-6, B3 IF-5, B4 IF-2, C rules engine, D infrastructure by helper agents, verified by the session. Real results are in `docs/dev-log/2026-10-11-tannmayygupta-pr3-review-remediation.md`: unit 515/515, pytest 640, e2e 72/72 after the fix (71/72 first), harness PASS, contract rules 18 PASS. Not done or not proven: the trusted checker has not run on GitHub; infrastructure is not applied; `terraform plan` not run; conformance vs template schema, IF-2 evidence cursor and duplicate-key rejection are open (H-110). Follow-up 2026-10-11: the AWS console refused the pasted policy because of an underscore in a statement ID; fixed with a test. Decisions D-42 to D-46 are Proposed (taken on the developer's delegation) and are not in initial.md Section 15 until the developer confirms.
 
 ## Plan Change Log
 

@@ -12,6 +12,7 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 - IF-5 0.3.0: required `transition` on StateReport, strict integers on the wire, RFC 9457 problem details with an open schema, `ssl_context` must verify (ADR 0028).
 - IF-2 0.2.0: stable `(epoch, seq)` cursor, `has_more` and `limit`, RFC 9457 problems, flag answer only `correct` or `incorrect`, role table, 410 for withdrawn and cancelled reads.
 - Contract rules engine: trusted base checker, whole-contract deletion is breaking, exact `BREAKING:` marker, `oneOf` branch removal and unlisted artefacts are compared, `.github/CODEOWNERS` for the checker paths (ADR 0026). The workflow has not run on GitHub yet.
+- Fixed after the first paste into the AWS console: an IAM statement ID with an underscore is refused; the ID is renamed and a test checks all IDs.
 - Infrastructure as code (nothing applied): two subnets, labs egress allowlist, network ACL, DOCKER-USER and metadata rules, compose lint, IAM policy without `ModifyInstanceAttribute` and with an instance-type deny, S3 backend example and bootstrap script, Terraform 1.11 minimum (ADR 0027).
 
 ### Added (progress page for the guide meeting, story 1.14, 2026-10-11, Tanmay)
