@@ -144,8 +144,13 @@ test('an exploit_test path for the wrong key fails', () => {
 test('hints out of order fail the schema', () => {
   const tmp = makeTempCatalog();
   const p = path.join(tmp, 'c01.yaml');
-  // Swap level 1 and 3 by renumbering the first and third hint.
-  const text = fs.readFileSync(p, 'utf8').replace('  - level: 1\n    text: null', '  - level: 3\n    text: null').replace('  - level: 3\n    text: null\nexploit_test', '  - level: 1\n    text: null\nexploit_test');
+  // Swap level 1 and 3 by renumbering the first and third hint. Normalize line
+  // endings first so the multi-line replace works on a CRLF (Windows) checkout.
+  const text = fs
+    .readFileSync(p, 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace('  - level: 1\n    text: null', '  - level: 3\n    text: null')
+    .replace('  - level: 3\n    text: null\nexploit_test', '  - level: 1\n    text: null\nexploit_test');
   fs.writeFileSync(p, text);
   const { ok } = validateCatalog({ dir: tmp, schemaPath: DEFAULT_SCHEMA });
   assert.equal(ok, false);
