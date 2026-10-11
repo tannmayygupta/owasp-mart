@@ -1,6 +1,6 @@
 # 0027. Labs host isolation, IAM guard and remote state (decisions D-43, D-44, D-45)
 
-- **Status:** Proposed (decided on the developer's delegation 2026-10-11, story 1.15; nothing applied). **Nothing in this record has been applied to AWS.** The developer must run `terraform plan`, read it, and apply. The earlier live results (`verify-hosts` 94 checks, `private-link-check` 22 checks, ADR 0022) were measured on the OLD network (one subnet, all outbound traffic allowed) and must be measured again after the apply.
+- **Status:** Proposed (decided on the developer's delegation 2026-10-11, story 1.15). **Applied by the developer and verified live on 2026-10-11** for the network, the egress allowlists, the network ACLs, the host egress rules and the IAM policy: `verify-hosts` RESULT PASS (107 checks, one WARN for the known root host-network residual risk) and `private-link-check` RESULT PASS (22 checks); evidence files were not saved on that run. The S3 state backend is prepared but NOT migrated. Live findings: a host created while switched off never finishes its first boot (runbook rule, handoff H-111); the metadata rule blocks non-root host processes.
 - **Date:** 2026-10-11
 - **Deciders:** Tanmay (delegated to the coding agent for this story; to be confirmed by the developer)
 - **Requirements:** NFR-ISO-06, R-1, R-4, D-41, D-43, D-44, D-45, review finding H-103 (PR 3 review), ADR 0022

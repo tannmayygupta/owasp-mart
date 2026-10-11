@@ -378,6 +378,7 @@ test('the probe image is pinned by digest, the command pulls and runs that image
   const c = metadataCommand();
   assert.ok(c.includes(`docker run --rm ${IMDS_IMAGE} python3 -c`));
   assert.match(c, /sed 's\/\^\/host_\/'/);
+  assert.match(c, /^sudo -n python3 -c /, 'the host control runs as root: the metadata rule of ADR 0027 drops non-root processes (found live 2026-10-11)');
   assert.match(c, /sed 's\/\^\/container_\/'/);
   assert.match(IMDS_PY, /method="PUT"/);
   assert.match(IMDS_PY, /X-aws-ec2-metadata-token-ttl-seconds/);

@@ -5,7 +5,7 @@
 | Date | 2026-10-11 |
 | Developer | tannmayygupta |
 | Branch / commit | sprint-1-tanmay (merge of origin/main, then the story changes; see git log) |
-| Status | Built and tested locally; the infrastructure is NOT applied; the trusted checker has not run on GitHub; waiting for the reviewer |
+| Status | Built and tested; the infrastructure was applied by the developer and verified live on 2026-10-11; the trusted checker has not run on GitHub; waiting for the reviewer |
 | Report tag | Lab stream, Sprint 1, review remediation |
 
 ## Requirements covered
@@ -42,6 +42,7 @@ ADRs 0025, 0026, 0027, 0028 (all Proposed, decided on the developer's delegation
 - `node scripts/check-contract-rules.mjs`: 18 PASS, 0 FAIL, 4 NOT-APPLICABLE. `node scripts/validate-contracts.mjs` and `node scripts/validate-events.mjs`: PASS. `node scripts/check-text-files.mjs` and `node scripts/scan-secrets.mjs`: PASS.
 - Terraform on a clean copy (run by the infra helper): `fmt -check`, `validate` pass; `terraform test` aws 37 of 37, oci 10 of 10.
 - `node scripts/dev.mjs harness` (Docker engine 29.6.2): exit 0, `conformance: PASS (20 rules)`, `harness: PASS`, all `live-*` checks PASS.
+- Live (applied by the developer, 2026-10-11, Sydney): the plan showed only `vm-i` replaced; the first `verify-hosts` failed on `vm-i` (baseline marker `failed: step=firewall exit=127`, Docker missing) because the host had been created stopped and its first boot was cut off; after replacing `vm-i` with the host kept running and replacing `vm-p` (so it has the new scripts), the final run gave `verify-hosts` RESULT PASS (107 checks; one WARN: a root host-network container can reach instance metadata, the known residual risk of ADR 0027) and `private-link-check` RESULT PASS (22 checks, TLS 1.3 both ways). These numbers are from the developer's terminal output; the evidence files were not saved on that run. The labs host is stopped again (`vm_i_running = false`).
 - Not run: `ci:linux` (killed for low memory earlier, not repeated), the workflow on GitHub, `terraform plan` or `apply`, anything on AWS.
 
 ## Evidence
@@ -49,6 +50,8 @@ Command output as above; no screenshots.
 
 ## Problems met and how they were fixed
 - Several tests were written together with the code, so they were not all shown failing first: B1, B2, B3 (transition and problem details), B4 said so in their reports. B3's wire-rule tests were shown failing on the old code (66 failed, 47 passed).
+- Live finding: a host created while `vm_i_running = false` is stopped during its first boot and never finishes setup (runbook rule added; follow-up H-111).
+- Live finding: the new metadata rule blocks non-root host processes, so the `verify-hosts` metadata control ran as `ubuntu` and failed; it now runs under `sudo` (test in `scripts/cloud-hosts.test.mjs`).
 - A helper deleted some valid IF-5 examples through a PowerShell alias and restored them from git; the intended deletions are the old `first_seq` examples and the old oracle examples.
 - The `ci:linux` mirror tests assumed the old `contract-rules` job; updated.
 - The fresh-checkout parity test timed out after 5 minutes on the Python step; the step timeouts are now 15 minutes.

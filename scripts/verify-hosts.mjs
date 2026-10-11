@@ -62,7 +62,8 @@ export const IMDS_PY = [
 export const IMDS_IMAGE = 'python:3.12-alpine@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4';
 export const pullCommand = () => `sudo -n docker pull ${IMDS_IMAGE}`;
 export const metadataCommand = () =>
-  [`python3 -c '${IMDS_PY}' | sed 's/^/host_/'`, `sudo -n docker run --rm ${IMDS_IMAGE} python3 -c '${IMDS_PY}' | sed 's/^/container_/'`].join('; ');
+  // The host control runs as root: the host rule of story 1.15 (ADR 0027) drops metadata for every non-root process (that is what protects it from host-network containers).
+  [`sudo -n python3 -c '${IMDS_PY}' | sed 's/^/host_/'`,`sudo -n docker run --rm ${IMDS_IMAGE} python3 -c '${IMDS_PY}' | sed 's/^/container_/'`].join('; ');
 
 /** The command-line options as the verification takes them (exported so a test covers the wiring). */
 export function verifyOptions(opts) {
