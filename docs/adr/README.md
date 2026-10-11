@@ -20,5 +20,15 @@
 | 0016 | [Per-consumer flag file delivery and injector network](0016-per-consumer-flag-file-delivery-and-injector-network.md) | Accepted (D-36) |
 | 0017 | [Shop SQLite driver: Node built-in node:sqlite](0017-shop-sqlite-driver.md) | Accepted |
 | 0018 | [Shop password hashing: Node built-in scrypt](0018-shop-password-hashing.md) | Accepted |
+| 0019 | [Lab API conventions: route prefix, Node mock, scope](0019-lab-api-conventions.md) | Proposed (D-39) |
+| 0020 | [Stub instance, lab harness and sidecar start input](0020-stub-instance-harness-and-sidecar-start-input.md) | Accepted (stub design, sidecar input); Proposed (volume keeper, stdin rule) |
+| 0021 | [Oracle account, two Arm VMs, Terraform and keep-alive](0021-oracle-account-two-vms-terraform-and-keep-alive.md) | Superseded in part by 0022 (2026-10-11): provider, region, shape, keep-alive and alarm; Oracle kept as an unused option |
+| 0022 | [Hosts on the AWS Free Plan in Sydney (supersedes the provider part of 0021)](0022-aws-free-plan-sydney-hosts.md) | Accepted (provider, region, tooling, sizing; applied and verified live 2026-10-11); Proposed (private ports, sizes, isolation) |
+| 0023 | [Instance event contract: identity, signing, sources](0023-instance-event-contract-identity-signing-source.md) | Accepted (D-38) |
+| 0024 | [Signing of platform-to-orchestrator requests](0024-orchestrator-request-signing.md) | Proposed |
+| 0025 | [IF-4 event identity with epoch, seq lanes and per-epoch event keys](0025-if4-epoch-seq-lanes-and-event-keys.md) | Accepted (D-42) |
+| 0026 | [Trusted base checker for the contract rules](0026-trusted-base-checker-for-contract-rules.md) | Accepted (D-46); not yet proven on GitHub |
+| 0027 | [Labs host isolation, IAM guard and remote state](0027-labs-host-isolation-iam-guard-and-remote-state.md) | Accepted (D-43, D-44; applied and verified live); S3 state prepared (D-45) |
+| 0028 | [IF-5 problem details, state report transition number, strict integers](0028-if5-problem-details-state-report-and-strict-seq.md) | Accepted (D-47) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

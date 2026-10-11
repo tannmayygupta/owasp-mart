@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "evidence_id": "e-AAAAAAAAAAAAAAAA",
+      "challenge_key": "C01",
+      "captured_at": "2026-10-09T12:00:00Z",
+      "method": "GET",
+      "path": "/api/orders/1001",
+      "body": null,
+      "body_truncated": false
+    }
+  ],
+  "has_more": false
+}

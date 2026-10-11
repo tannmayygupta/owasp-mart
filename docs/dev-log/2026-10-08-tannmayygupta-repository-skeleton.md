@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-08 |
 | Developer | tannmayygupta |
-| Branch / commit | shared-L-01 / local commit, not pushed (early pull request branch) |
-| Status | Done, except one open item: CI not yet seen green on a real pull request (branch pushed, pull request not yet opened) |
+| Branch / commit | shared-L-01, pull request #1 merged into main as b5778d5 (early pull request) |
+| Status | Done. CI was green on pull request #1; only the story's risk check on Akshay's and Sahil's machines is still open |
 | Report tag | tooling, tracer bullet, BMAD cycle |
 
 ## Requirements covered
@@ -38,7 +38,8 @@ All on Tanmay's PC, Docker 29.6.2, outputs in `docs/assets/l-01-repository-skele
 - `node scripts/dev.mjs hello`: prints `hello`, exit 0, 0 containers left (`hello-2026-10-08.txt`).
 - `docker inspect` of the running container: user 65532, read-only root, `CapDrop=[ALL]`, no-new-privileges, no binds, port 127.0.0.1:18080, 64 MB, 64 pids, healthy (`hello-hardening-2026-10-08.txt`).
 - `pnpm install --frozen-lockfile`, `uv lock --check`, `docker compose ... config -q`: exit 0. `node scripts/verify-skills.mjs`: OK, 217 files.
-- NOT run: CI on a pull request, macOS, Linux, Sahil's PC.
+- CI on pull request #1: all 4 jobs (verify skills, script tests, frozen lockfile installs, compose and hello) passed, shown as 4/4 green checks on the pull request head 858582a and on the merge commit b5778d5 in a screenshot Tanmay supplied (the screenshot is not stored because it shows browser tabs).
+- NOT run: macOS, Linux other than the CI runner, Sahil's PC.
 
 ## Evidence
 `docs/assets/l-01-repository-skeleton/`; screenshot of the original WSL error is `image.png` (not committed). Review log: Review Triage Log in the plan file; deferred items in `docs/bmad/initiative-lab/deferred-work.md`; QA summary in `docs/bmad/initiative-lab/test-summary-l-01-dev-command/`.
@@ -56,7 +57,7 @@ All on Tanmay's PC, Docker 29.6.2, outputs in `docs/assets/l-01-repository-skele
 None; no vulnerable code. No secrets in any file.
 
 ## Limitations and follow-ups
-- Branch `shared-L-01` is pushed. Open the pull request and confirm CI is green; the `compose` job runs `hello` on the GitHub runner and has not been seen yet.
+- Nothing left for CI: pull request #1 is merged with all 4 jobs green. Remaining: the story's risk check on Akshay's Mac and Sahil's PC.
 - Docker's data (4.8 GB) was moved to `D:\docker-data\wsl` and `%LOCALAPPDATA%\Docker\wsl` is now a junction to it (copy verified byte for byte, then Docker restarted: the n8n image and its volume are still there and `hello` passes). The old copy is kept as `%LOCALAPPDATA%\Docker\wsl.old-backup` (5 GB on C:) until Tanmay confirms it can be deleted.
 - Story risk check: after the merge, Akshay (Mac) and Sahil (Windows) run `node scripts/dev.mjs hello` on their machines and report.
 - Deferred (see deferred-work.md): a Windows CI job, pnpm supply-chain settings, CI green and the other machines.

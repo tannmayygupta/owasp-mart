@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "at": "2026-10-09T12:00:00Z",
+      "type": "attempt.started",
+      "challenge_key": null,
+      "milestone": null,
+      "result": null
+    }
+  ],
+  "has_more": false,
+  "next_cursor": null
+}

@@ -1,0 +1,83 @@
+{
+  "$comment": "Contract registry read by scripts/check-contract-rules.mjs (story L-07). One entry per contract. `folders`: every file under them belongs to the contract (a change needs an entry in contracts/CHANGELOG.md under `changelog`). `schemas` and `openapi`: the machine-readable files, compared for breaking changes; a change to one of them needs a change under one of `mocks` or a line `no mock change: <reason>` in the changelog entry. `reserved`: folders without a contract yet; any file other than .gitkeep in one needs a registry entry first. `containers`: folders whose child folders are the contracts (contracts/api/lab, contracts/api/platform). `generated`: output of a bundler, not a contract.",
+  "version": 1,
+  "containers": ["api"],
+  "reserved": ["contracts/api/platform", "contracts/errors"],
+  "generated": ["contracts/api/bundle"],
+  "mockRoot": "contracts/mocks",
+  "contracts": [
+    {
+      "id": "IF-6",
+      "name": "Instance contract",
+      "owner": "L",
+      "folders": ["contracts/instance"],
+      "schemas": [
+        "contracts/instance/injection-document.schema.json",
+        "contracts/instance/flags-file.schema.json",
+        "contracts/instance/instance-template.schema.json",
+        "contracts/instance/sidecar-start.schema.json"
+      ],
+      "openapi": [],
+      "changelog": "Instance contract (IF-6), `contracts/instance/`",
+      "mocks": ["contracts/mocks/stub-instance"],
+      "conformance": ["scripts/validate-contracts.mjs", "scripts/check-instance-conformance.mjs"]
+    },
+    {
+      "id": "IF-4",
+      "name": "Instance events",
+      "owner": "L",
+      "folders": ["contracts/events"],
+      "schemas": ["contracts/events/instance-events.schema.json", "contracts/events/instance-events.posted.schema.json"],
+      "openapi": [],
+      "changelog": "Instance events (IF-4), `contracts/events/`",
+      "mocks": ["contracts/mocks/fake-ingest", "contracts/mocks/stub-instance"],
+      "conformance": ["scripts/validate-events.mjs", "scripts/e2e/events.e2e.test.mjs"]
+    },
+    {
+      "id": "IF-5",
+      "name": "Orchestrator API",
+      "owner": "L",
+      "folders": ["contracts/orchestrator"],
+      "schemas": [],
+      "openapi": ["contracts/orchestrator/orchestrator.openapi.yaml"],
+      "changelog": "Orchestrator API (IF-5), `contracts/orchestrator/`",
+      "mocks": ["contracts/mocks/fake-orchestrator"],
+      "conformance": ["scripts/check_orchestrator_contract.py", "apps/api/tests/test_contract.py"]
+    },
+    {
+      "id": "IF-2",
+      "name": "Lab API",
+      "owner": "L",
+      "folders": ["contracts/api/lab"],
+      "schemas": [],
+      "openapi": ["contracts/api/lab/lab.openapi.yaml"],
+      "changelog": "Lab API (IF-2), `contracts/api/lab/`",
+      "mocks": ["contracts/mocks/fake-lab"],
+      "conformance": ["scripts/check_lab_contract.py", "apps/api/tests/test_lab_contract.py"]
+    },
+    {
+      "id": "DB",
+      "name": "Table owners",
+      "owner": "P",
+      "folders": ["contracts/db"],
+      "schemas": ["contracts/db/table-owners.schema.json"],
+      "openapi": [],
+      "changelog": "Table owners (DB), `contracts/db/`",
+      "mocks": [],
+      "noMock": "no mock by design: the table-owners list is read by CI only, nothing runs against it",
+      "conformance": ["scripts/check_table_owners.py"]
+    },
+    {
+      "id": "IF-7",
+      "name": "Challenge catalogue",
+      "owner": "T",
+      "folders": ["contracts/catalog"],
+      "schemas": ["contracts/catalog/challenge.schema.json"],
+      "openapi": [],
+      "changelog": "Challenge catalogue (IF-7), `contracts/catalog/` and `challenges/catalog/`",
+      "mocks": [],
+      "noMock": "no mock by design: the catalogue is data read by validators, nothing runs against it",
+      "conformance": ["scripts/validate-catalog.mjs"]
+    }
+  ]
+}

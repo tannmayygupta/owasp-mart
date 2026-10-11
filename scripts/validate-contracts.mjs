@@ -7,10 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
+import { dupes, semanticInjection, semanticSidecarStart } from '../contracts/mocks/stub-instance/semantic.mjs';
+
+export { semanticInjection, semanticSidecarStart };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_DIR = path.join(ROOT, 'contracts', 'instance');
-export const SCHEMAS = ['injection-document', 'flags-file', 'instance-template'];
+export const SCHEMAS = ['injection-document', 'flags-file', 'instance-template', 'sidecar-start'];
 export const CONTRACT_MD = 'instance-contract.md';
 export const HELP = `Validate the instance contract (IF-6)
 Usage: node scripts/validate-contracts.mjs [--dir <contracts/instance folder>] [--help]
@@ -32,32 +35,6 @@ export function errorPath(e) {
 }
 
 // ---- semantic rules (what JSON Schema cannot compare) ----
-function dupes(arr, key, base, label, out) {
-  const seen = new Set();
-  arr.forEach((x, i) => {
-    const v = key(x);
-    if (seen.has(v)) out.push({ path: `${base}/${i}${label}`, message: `duplicate ${v}` });
-    seen.add(v);
-  });
-}
-
-export function semanticInjection(d) {
-  const out = [];
-  dupes(d.flags, (f) => f.challenge_key, '/flags', '/challenge_key', out);
-  const flagValues = new Set(d.flags.map((f) => f.flag));
-  d.decoys.forEach((x, i) => {
-    if (flagValues.has(x.value)) out.push({ path: `/decoys/${i}/value`, message: 'a decoy must not equal a real flag' });
-  });
-  dupes(d.decoys, (x) => `${x.challenge_key}#${x.index}`, '/decoys', '/index', out);
-  dupes(d.flags, (f) => f.flag, '/flags', '/flag', out);
-  dupes(d.decoys, (x) => x.value, '/decoys', '/value', out);
-  const keys = new Set(d.flags.map((f) => f.challenge_key));
-  d.decoys.forEach((x, i) => {
-    if (!keys.has(x.challenge_key)) out.push({ path: `/decoys/${i}/challenge_key`, message: 'a decoy needs a flag for the same challenge key' });
-  });
-  return out;
-}
-
 export function semanticFlagsFile(d) {
   const out = [];
   dupes(d.flags, (f) => f.challenge_key, '/flags', '/challenge_key', out);
@@ -88,6 +65,18 @@ export function semanticTemplate(d) {
     if (c.labels['vm.template'] !== d.template_id) add(`${base}/labels/vm.template`, 'vm.template must equal template_id');
     if (c.flag_delivery_env && c.flag_delivery_env.env_name !== `VM_FLAG_${c.flag_delivery_env.challenge_key}`) {
       add(`${base}/flag_delivery_env/env_name`, 'env_name must be VM_FLAG_ plus challenge_key');
+    }
+    // A reason is a sentence, not padding: at least 8 different letters or digits (the schema pattern covers runs and word count).
+    if (c.flag_delivery_env && new Set(c.flag_delivery_env.reason.toLowerCase().replace(/[^a-z0-9]/g, '')).size < 8) {
+      add(`${base}/flag_delivery_env/reason`, 'reason must use at least 8 different letters or digits');
+    }
+    // PORT, when set, is one of the declared ports.
+    if (c.env.PORT !== undefined && !(c.ports || []).includes(Number(c.env.PORT))) add(`${base}/env/PORT`, 'PORT must be one of the ports');
+    // vm.expires, when not the token, is a real calendar date and time.
+    const exp = c.labels['vm.expires'];
+    if (exp !== '{expires}') {
+      const t = new Date(exp);
+      if (Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== exp.slice(0, 10)) add(`${base}/labels/vm.expires`, 'vm.expires must be a real calendar date');
     }
   });
 
@@ -195,6 +184,7 @@ const SEMANTIC = {
   'injection-document': semanticInjection,
   'flags-file': semanticFlagsFile,
   'instance-template': semanticTemplate,
+  'sidecar-start': semanticSidecarStart,
 };
 
 // ---- helpers ----
@@ -219,7 +209,7 @@ function walkFiles(dir) {
   return out;
 }
 
-function scanSecrets(text, rel, errors) {
+export function scanSecrets(text, rel, errors) {
   for (const m of text.match(FLAG_LIKE) || []) {
     if (!FAKE_FLAG.test(m)) errors.push(`${rel}: flag-like value ${m} is not an obviously fake flag (one repeated letter)`);
   }

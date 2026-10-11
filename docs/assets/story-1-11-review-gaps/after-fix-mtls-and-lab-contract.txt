@@ -1,0 +1,13 @@
+........................................................................ [ 51%]
+....................................................................     [100%]
+============================== warnings summary ===============================
+apps/api/tests/test_mtls.py::test_a_tls_1_1_client_is_refused
+  C:\Users\tanma\major-project\apps\api\tests\test_mtls.py:155: DeprecationWarning: ssl.TLSVersion.TLSv1 is deprecated
+    ctx.minimum_version = ssl.TLSVersion.TLSv1
+
+apps/api/tests/test_mtls.py::test_a_tls_1_1_client_is_refused
+  C:\Users\tanma\major-project\apps\api\tests\test_mtls.py:156: DeprecationWarning: ssl.TLSVersion.TLSv1_1 is deprecated
+    ctx.maximum_version = ssl.TLSVersion.TLSv1_1
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+140 passed, 2 warnings in 131.67s (0:02:11)

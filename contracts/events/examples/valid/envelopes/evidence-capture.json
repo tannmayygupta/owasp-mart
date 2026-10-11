@@ -1,0 +1,11 @@
+{
+  "description": "A evidence.capture request as the sidecar sends it, signed with the fake test key (see app-events.md section 4). body is the exact text that was signed.",
+  "method": "POST",
+  "path": "/internal/v1/events",
+  "headers": {
+    "content-type": "application/json",
+    "x-vm-signature": "v1=2eeade3c1783dd17db7b935da6a1f9ebd403bd774bdb2d9c7cb0a8a5e1e14651"
+  },
+  "body": "{\"schema_version\":\"0.1\",\"instance_id\":\"i-AAAAAAAAAAAAAAAA\",\"epoch\":1,\"seq\":4,\"type\":\"evidence.capture\",\"source\":\"sidecar\",\"session_kind\":\"player\",\"user_id\":null,\"ts\":\"2026-01-01T00:00:03Z\",\"challenge_key\":\"C01\",\"data\":{\"request_ref\":\"req-0001\",\"body\":\"GET /api/seller/orders/VM-100201 HTTP/1.1\",\"headers_redacted\":{\"host\":\"fake.localhost\",\"authorization\":\"[redacted]\"}}}",
+  "expect_status": 202
+}

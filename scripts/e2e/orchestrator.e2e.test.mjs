@@ -1,0 +1,532 @@
+// Black-box end-to-end tests for the orchestrator contract (IF-5), written as an independent consumer: the fake orchestrator runs
+// as a separate process, requests are signed by an own implementation of the rule in orchestrator-api.md section 4 (checked first
+// against examples/signing-vector.json), and answers are checked by hand against the OpenAPI schemas. The Python client and the
+// repository's signing helpers are NOT used. Run: node --test "scripts/e2e/orchestrator.e2e.test.mjs"
+// Node built-ins only. The Python suite is run once at the end (needs uv).
+import test, { before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import http from 'node:http';
+import https from 'node:https';
+import { fileURLToPath } from 'node:url';
+import { flagOn } from '../env-flag.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SERVER = path.join(ROOT, 'contracts', 'mocks', 'fake-orchestrator', 'server.mjs');
+const EXAMPLES = path.join(ROOT, 'contracts', 'orchestrator', 'examples');
+const KEY = 'E2E-OWN-PLATFORM-KEY-NOT-REAL-000000'; // a throwaway key for this test only (36 characters)
+const ORCH_KEY = 'E2E-OWN-ORCHESTRATOR-KEY-NOT-REAL-00'; // the key the fake signs its state reports with in this test
+const STATES = ['requested', 'provisioning', 'starting', 'ready', 'active', 'idle', 'resetting', 'stopping', 'destroyed', 'failed'];
+const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'NODE_TEST_CONTEXT'));
+const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const createExample = readJson(path.join(EXAMPLES, 'valid', 'create.request.json'));
+const resetExample = readJson(path.join(EXAMPLES, 'valid', 'reset.request.json'));
+const children = [];
+
+// ---- the signing rule, written independently (orchestrator-api.md section 4) ----
+const sha256hex = (data) => crypto.createHash('sha256').update(data).digest('hex');
+const signingString = (method, target, ts, nonce, body) => ['v1', method.toUpperCase(), target, ts, nonce, sha256hex(body)].join('\n');
+const sign = (key, method, target, ts, nonce, body) => 'v1=' + crypto.createHmac('sha256', key).update(signingString(method, target, ts, nonce, body)).digest('hex');
+const nowTs = (offsetSeconds = 0) => new Date(Date.now() + offsetSeconds * 1000).toISOString().slice(0, 19) + 'Z';
+const newNonce = () => crypto.randomBytes(16).toString('hex');
+let counter = 0;
+// A fresh, well-formed instance id: "i-" plus 16 Base32 characters.
+const newId = () => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let n = ++counter + 1000;
+  let s = '';
+  for (let i = 0; i < 16; i++) { s = alphabet[n % 32] + s; n = Math.floor(n / 32); }
+  return 'i-' + s;
+};
+async function startServer(...extra) {
+  const child = spawn(process.execPath, [SERVER, '--port', '0', '--key', KEY, ...extra], { cwd: ROOT, env: cleanEnv, stdio: ['ignore', 'pipe', 'ignore'] });
+  children.push(child);
+  const port = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('the fake orchestrator did not start')), 15000);
+    let out = '';
+    child.stdout.on('data', (c) => {
+      out += c;
+      const line = out.split('\n').find((l) => l.includes('listening'));
+      if (line) { clearTimeout(timer); resolve(JSON.parse(line).port); }
+    });
+    child.once('exit', (code) => reject(new Error(`the fake orchestrator exited early with code ${code}`)));
+  });
+  return `http://127.0.0.1:${port}`;
+}
+
+// One signed call. `bodyObj` undefined means no body; `opt.rawBody` is the exact text to send (to write `1.0` or `1e0`, which
+// JSON.stringify cannot); `opt.contentType` overrides the media type. Returns { status, json, text, headers }.
+async function call(base, method, target, bodyObj, opt = {}) {
+  const body = opt.rawBody !== undefined ? opt.rawBody : bodyObj === undefined ? '' : JSON.stringify(bodyObj);
+  const ts = opt.ts ?? nowTs();
+  const nonce = opt.nonce ?? newNonce();
+  let signature = opt.signature ?? sign(opt.key ?? KEY, method, target, ts, nonce, body);
+  const res = await fetch(base + target, {
+    method,
+    headers: { 'content-type': opt.contentType ?? 'application/json', 'x-vm-timestamp': ts, 'x-vm-nonce': nonce, 'x-vm-signature': signature },
+    body: method === 'GET' ? undefined : body,
+  });
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { json = undefined; }
+  return { status: res.status, json, text, headers: res.headers, sent: { ts, nonce, signature, body } };
+}
+
+async function waitFor(base, id, predicate, ms = 8000) {
+  const end = Date.now() + ms;
+  let last;
+  while (Date.now() < end) {
+    last = await call(base, 'GET', `/v1/instances/${id}`);
+    if (last.status === 200 && predicate(last.json)) return last.json;
+    await new Promise((r) => setTimeout(r, 15));
+  }
+  assert.fail(`the instance did not reach the expected state in time; last answer: ${last && last.text}`);
+}
+
+// ---- hand-written checks of the answer schemas (OpenAPI components) ----
+const isTs = (v) => typeof v === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(v);
+function assertStatus(o, where = 'status') {
+  const keys = ['instance_id', 'template_id', 'epoch', 'state', 'access', 'access_epoch', 'health', 'error_code', 'host_id', 'hostname', 'created_at', 'updated_at'];
+  assert.deepEqual(Object.keys(o).sort(), [...keys].sort(), `${where}: exactly the documented fields`);
+  assert.match(o.instance_id, /^i-[A-Z2-7]{16}$/);
+  assert.ok(Number.isInteger(o.epoch) && o.epoch >= 1);
+  assert.ok(STATES.includes(o.state), o.state);
+  assert.ok(['open', 'frozen', 'closed'].includes(o.access));
+  assert.ok(Number.isInteger(o.access_epoch) && o.access_epoch >= 0);
+  assert.equal(typeof o.health, 'string');
+  assert.ok(o.error_code === null || typeof o.error_code === 'string');
+  assert.ok(isTs(o.created_at) && isTs(o.updated_at));
+}
+// RFC 9457 problem details (ADR 0028): standard members type, title, status, detail, instance; extension members code, request_id, field.
+function assertProblem(r, status, code) {
+  assert.equal(r.status, status, r.text);
+  assert.equal(r.headers.get('content-type'), 'application/problem+json');
+  const j = r.json;
+  assert.equal(j.code, code, r.text);
+  assert.equal(j.status, status, 'the status member equals the HTTP status');
+  assert.equal(j.type, 'https://vulnmart.invalid/problems/' + code.toLowerCase());
+  assert.ok(typeof j.title === 'string' && j.title.length > 0);
+  assert.equal(typeof j.detail, 'string');
+  assert.match(j.request_id, /^[A-Za-z0-9-]{8,64}$/);
+  assert.equal(j.instance, 'urn:vulnmart:request:' + j.request_id);
+  assert.ok(!('message' in j), 'the old-style message member is gone');
+  for (const k of Object.keys(j)) assert.ok(['type', 'title', 'status', 'detail', 'instance', 'code', 'request_id', 'field'].includes(k), `unexpected key ${k}`);
+}
+const secretMarkers = [createExample.event_key, createExample.seed, 'VM{', createExample.flag_digests[0].sha256];
+
+let base;
+before(async () => { base = await startServer(); });
+after(() => { for (const c of children) if (c.exitCode === null) c.kill(); });
+
+test('the signing rule written here reproduces the signing vector of the contract', () => {
+  const v = readJson(path.join(EXAMPLES, 'signing-vector.json'));
+  assert.equal(sha256hex(v.body), v.body_sha256);
+  assert.equal(signingString(v.method, v.target, v.timestamp, v.nonce, v.body), v.signing_string);
+  assert.equal(sign(v.key, v.method, v.target, v.timestamp, v.nonce, v.body), v.signature);
+});
+
+test('create: 202, the instance reaches ready, a repeat is 200, another body with the same identity is 409', async () => {
+  const id = newId();
+  const body = { ...clone(createExample), instance_id: id };
+  const first = await call(base, 'POST', '/v1/instances', body);
+  assert.equal(first.status, 202, first.text);
+  assertStatus(first.json, 'create answer');
+  assert.equal(first.json.instance_id, id);
+  assert.equal(first.json.epoch, 1);
+  const ready = await waitFor(base, id, (s) => s.state === 'ready');
+  assertStatus(ready, 'get answer');
+  assert.equal(ready.health, 'healthy');
+  const again = await call(base, 'POST', '/v1/instances', body);
+  assert.equal(again.status, 200, again.text);
+  assertStatus(again.json);
+  const other = { ...clone(body), seed: 'ANOTHER-FAKE-SEED-NOT-REAL-0000000' };
+  assertProblem(await call(base, 'POST', '/v1/instances', other), 409, 'ORCH-REQUEST-MISMATCH');
+});
+
+test('no GET answer contains a flag, decoy, digest, seed or event key', async () => {
+  const id = newId();
+  await call(base, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id });
+  await waitFor(base, id, (s) => s.state === 'ready');
+  const answers = [await call(base, 'GET', `/v1/instances/${id}`), await call(base, 'GET', '/v1/instances'), await call(base, 'GET', '/v1/host')];
+  for (const a of answers) {
+    assert.equal(a.status, 200);
+    for (const marker of secretMarkers) assert.ok(!a.text.includes(marker), `a GET answer holds ${marker.slice(0, 12)}...`);
+    for (const word of ['"flags"', '"decoys"', '"flag_digests"', '"seed"', '"event_key"']) assert.ok(!a.text.includes(word), `a GET answer names ${word}`);
+  }
+});
+
+test('owner_hash required and checked on create, no first_seq anywhere (D-42), no owner_hash in a reset, nothing returned by a GET', async () => {
+  for (const [mutate, field] of [
+    [(b) => { delete b.owner_hash; }, '/owner_hash'], [(b) => { b.owner_hash = 'F'.repeat(64); }, '/owner_hash'],
+    [(b) => { b.owner_hash = 'a'.repeat(63); }, '/owner_hash'], [(b) => { b.first_seq = 1; }, '/first_seq'],
+  ]) {
+    const id = newId();
+    const body = { ...clone(createExample), instance_id: id };
+    mutate(body);
+    const r = await call(base, 'POST', '/v1/instances', body);
+    assertProblem(r, 422, 'ORCH-VALIDATION');
+    assert.equal(r.json.field, field);
+    assertProblem(await call(base, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+  }
+  const id = newId();
+  const body = { ...clone(createExample), instance_id: id };
+  assert.equal((await call(base, 'POST', '/v1/instances', body)).status, 202);
+  await waitFor(base, id, (s) => s.state === 'ready');
+  // owner_hash is part of the identity of a request
+  assertProblem(await call(base, 'POST', '/v1/instances', { ...clone(body), owner_hash: 'b'.repeat(64) }), 409, 'ORCH-REQUEST-MISMATCH');
+  assert.equal(resetExample.first_seq, undefined, 'the reset example has no first_seq');
+  const r1 = await call(base, 'POST', `/v1/instances/${id}/reset`, { ...clone(resetExample), first_seq: 41 });
+  assertProblem(r1, 422, 'ORCH-VALIDATION');
+  assert.equal(r1.json.field, '/first_seq');
+  const r2 = await call(base, 'POST', `/v1/instances/${id}/reset`, { ...clone(resetExample), owner_hash: body.owner_hash });
+  assertProblem(r2, 422, 'ORCH-VALIDATION');
+  assert.equal(r2.json.field, '/owner_hash');
+  assert.equal((await call(base, 'POST', `/v1/instances/${id}/reset`, clone(resetExample))).status, 202);
+  await waitFor(base, id, (s) => s.state === 'ready' && s.epoch === 2);
+  for (const a of [await call(base, 'GET', `/v1/instances/${id}`), await call(base, 'GET', '/v1/instances'), await call(base, 'GET', '/v1/host')]) {
+    assert.equal(a.status, 200);
+    for (const marker of [body.owner_hash, 'owner', 'first_seq']) assert.ok(!a.text.includes(marker), `a GET answer holds ${marker}`);
+  }
+});
+
+test('a body that names an image, command, volume, port or env is refused with 422 and nothing is created; an unknown template is 422', async () => {
+  for (const [name, value] of [['image', 'evil:latest'], ['command', 'sh'], ['volumes', ['/:/host']], ['ports', [22]], ['env', { A: 'b' }]]) {
+    const id = newId();
+    const r = await call(base, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id, [name]: value });
+    assertProblem(r, 422, 'ORCH-FIELD-FORBIDDEN');
+    assert.equal(r.json.field, name);
+    assertProblem(await call(base, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+  }
+  const id = newId();
+  assertProblem(await call(base, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id, template_id: 'no-such-template' }), 422, 'ORCH-TEMPLATE-UNKNOWN');
+  assertProblem(await call(base, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+});
+
+test('a bad signature, a stale timestamp and a replayed nonce are refused with 401 and change nothing', async () => {
+  const id = newId();
+  const body = { ...clone(createExample), instance_id: id };
+  const good = sign(KEY, 'POST', '/v1/instances', nowTs(), 'a'.repeat(32), JSON.stringify(body));
+  const flipped = good.slice(0, -1) + (good.endsWith('0') ? '1' : '0');
+  assertProblem(await call(base, 'POST', '/v1/instances', body, { signature: flipped }), 401, 'ORCH-BAD-SIGNATURE');
+  assertProblem(await call(base, 'POST', '/v1/instances', body, { ts: nowTs(-300) }), 401, 'ORCH-BAD-SIGNATURE');
+  assertProblem(await call(base, 'POST', '/v1/instances', body, { key: KEY + 'x' }), 401, 'ORCH-BAD-SIGNATURE');
+  const nonce = newNonce();
+  const first = await call(base, 'GET', '/v1/host', undefined, { nonce });
+  assert.equal(first.status, 200);
+  const replay = await call(base, 'GET', '/v1/host', undefined, { nonce, ts: first.sent.ts, signature: first.sent.signature });
+  assertProblem(replay, 401, 'ORCH-BAD-SIGNATURE');
+  assertProblem(await call(base, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+});
+
+test('access: open, frozen and closed with a growing access epoch work; an older access epoch is 409', async () => {
+  const id = newId();
+  await call(base, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id });
+  await waitFor(base, id, (s) => s.state === 'ready');
+  for (const [access, epoch] of [['open', 1], ['frozen', 2], ['closed', 3]]) {
+    const r = await call(base, 'POST', `/v1/instances/${id}/access`, { access, access_epoch: epoch });
+    assert.equal(r.status, 200, r.text);
+    assertStatus(r.json);
+    assert.equal(r.json.access, access);
+    assert.equal(r.json.access_epoch, epoch);
+  }
+  assertProblem(await call(base, 'POST', `/v1/instances/${id}/access`, { access: 'open', access_epoch: 2 }), 409, 'ORCH-STALE-ACCESS-EPOCH');
+  assert.equal((await call(base, 'GET', `/v1/instances/${id}`)).json.access, 'closed');
+});
+
+test('reset: a ready instance gets epoch + 1 and goes through resetting and provisioning back to ready; a wrong epoch is 409', async () => {
+  const slow = await startServer('--step-delay-ms', '120');
+  const id = newId();
+  assert.equal((await call(slow, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id })).status, 202);
+  await waitFor(slow, id, (s) => s.state === 'ready', 15000);
+  assertProblem(await call(slow, 'POST', `/v1/instances/${id}/reset`, { ...clone(resetExample), epoch: 5 }), 409, 'ORCH-STALE-EPOCH');
+  const r = await call(slow, 'POST', `/v1/instances/${id}/reset`, { ...clone(resetExample), epoch: 2 });
+  assert.equal(r.status, 202, r.text);
+  assert.equal(r.json.epoch, 2);
+  const seen = new Set([r.json.state]);
+  const end = Date.now() + 15000;
+  let last;
+  while (Date.now() < end) {
+    last = (await call(slow, 'GET', `/v1/instances/${id}`)).json;
+    seen.add(last.state);
+    if (last.state === 'ready' && last.epoch === 2) break;
+    await new Promise((x) => setTimeout(x, 10));
+  }
+  assert.equal(last.state, 'ready');
+  assert.equal(last.epoch, 2);
+  assert.ok(seen.has('resetting') || seen.has('provisioning'), `states seen: ${[...seen].join(', ')}`);
+  for (const s of seen) assert.ok(STATES.includes(s));
+  assert.equal((await call(slow, 'POST', `/v1/instances/${id}/reset`, { ...clone(resetExample), epoch: 2 })).status, 200, 'the same reset again is a repeat');
+});
+
+test('destroy: 202 then 200 on a repeat, and a destroyed id cannot be created again (409)', async () => {
+  const id = newId();
+  const body = { ...clone(createExample), instance_id: id };
+  await call(base, 'POST', '/v1/instances', body);
+  await waitFor(base, id, (s) => s.state === 'ready');
+  const first = await call(base, 'POST', `/v1/instances/${id}/destroy`);
+  assert.ok([200, 202].includes(first.status), first.text);
+  const gone = await waitFor(base, id, (s) => s.state === 'destroyed');
+  assertStatus(gone);
+  const second = await call(base, 'POST', `/v1/instances/${id}/destroy`);
+  assert.equal(second.status, 200, second.text);
+  assertProblem(await call(base, 'POST', '/v1/instances', body), 409, 'ORCH-INSTANCE-EXISTS');
+});
+
+test('list: label filters, cursor paging, an unknown label is 422; host answers capacity', async () => {
+  const lbase = await startServer();
+  const ids = [newId(), newId(), newId()];
+  for (const id of ids) {
+    assert.equal((await call(lbase, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id })).status, 202);
+  }
+  const page1 = await call(lbase, 'GET', '/v1/instances?limit=2');
+  assert.equal(page1.status, 200, page1.text);
+  assert.equal(page1.json.items.length, 2);
+  assert.equal(typeof page1.json.next_cursor, 'string');
+  for (const it of page1.json.items) assertStatus(it, 'list item');
+  const page2 = await call(lbase, 'GET', `/v1/instances?limit=2&cursor=${encodeURIComponent(page1.json.next_cursor)}`);
+  assert.equal(page2.status, 200, page2.text);
+  assert.equal(page2.json.items.length, 1);
+  assert.equal(page2.json.next_cursor, null);
+  assert.deepEqual([...page1.json.items, ...page2.json.items].map((i) => i.instance_id), [...ids].sort(), 'ordered by instance id, no gaps');
+  const one = await call(lbase, 'GET', `/v1/instances?instance=${ids[0]}`);
+  assert.equal(one.status, 200);
+  assert.deepEqual(one.json.items.map((i) => i.instance_id), [ids[0]]);
+  const byTemplate = await call(lbase, 'GET', '/v1/instances?template=shop-v0');
+  assert.equal(byTemplate.json.items.length, 3);
+  assertProblem(await call(lbase, 'GET', '/v1/instances?bogus=1'), 422, 'ORCH-LABEL-UNKNOWN');
+  assertProblem(await call(lbase, 'GET', '/v1/instances?limit=0'), 422, 'ORCH-VALIDATION');
+  const host = await call(lbase, 'GET', '/v1/host');
+  assert.equal(host.status, 200);
+  for (const k of ['host_id', 'kind', 'capacity_memory_mb', 'used_memory_mb', 'instances', 'health']) assert.ok(k in host.json, `host answer lacks ${k}`);
+  assert.equal(host.json.instances, 3);
+  assert.equal(host.json.used_memory_mb, 3 * createExample.limits.memory_mb);
+  assert.ok(host.json.used_memory_mb <= host.json.capacity_memory_mb);
+});
+
+test('a host with little capacity answers 429 ORCH-BUSY with Retry-After and creates nothing', async () => {
+  const small = await startServer('--capacity-mb', String(createExample.limits.memory_mb + 100));
+  assert.equal((await call(small, 'POST', '/v1/instances', { ...clone(createExample), instance_id: newId() })).status, 202);
+  const id = newId();
+  const busy = await call(small, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id });
+  assertProblem(busy, 429, 'ORCH-BUSY');
+  assert.ok(busy.headers.get('retry-after'), 'Retry-After is present');
+  assertProblem(await call(small, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+});
+
+// ---- story 1.15, ADR 0028: strict integers, RFC 9457, order of checks, cursor, transition numbers ----
+const bodyText = (obj) => JSON.stringify(obj);
+
+test('an integer must be an integer token: 1.0, 1e0, a boolean and a number above 2^53 - 1 are 422 on create, reset and access', async () => {
+  const id = newId();
+  const good = bodyText({ ...clone(createExample), instance_id: id });
+  assert.ok(good.includes('"epoch":1,') && good.includes('"memory_mb":1024'));
+  for (const [old, now, field] of [
+    ['"epoch":1,', '"epoch":1.0,', '/epoch'], ['"epoch":1,', '"epoch":1e0,', '/epoch'], ['"epoch":1,', '"epoch":1E0,', '/epoch'],
+    ['"epoch":1,', '"epoch":true,', '/epoch'], ['"epoch":1,', '"epoch":9007199254740993,', '/epoch'],
+    ['"epoch":1,', '"epoch":9007199254740992,', '/epoch'], ['"memory_mb":1024', '"memory_mb":1024.0', '/limits/memory_mb'],
+    ['"index":0', '"index":0.0', '/decoys/0/index'], ['"epoch":1,', '"epoch":NaN,', '/'], ['"epoch":1,', '"epoch":01,', '/'],
+  ]) {
+    const r = await call(base, 'POST', '/v1/instances', undefined, { rawBody: good.replace(old, now) });
+    assertProblem(r, 422, 'ORCH-VALIDATION');
+    if (field !== '/') assert.equal(r.json.field, field, `${now}`);
+    assertProblem(await call(base, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+  }
+  assert.equal((await call(base, 'POST', '/v1/instances', undefined, { rawBody: good })).status, 202, 'the same body with integer tokens is fine');
+  await waitFor(base, id, (s) => s.state === 'ready');
+  const reset = bodyText(clone(resetExample));
+  for (const now of ['"epoch":2.0', '"epoch":2e0', '"epoch":true']) {
+    const r = await call(base, 'POST', `/v1/instances/${id}/reset`, undefined, { rawBody: reset.replace('"epoch":2', now) });
+    assertProblem(r, 422, 'ORCH-VALIDATION');
+    assert.equal(r.json.field, '/epoch');
+  }
+  for (const token of ['1.0', '1e0', 'true', '9007199254740993']) {
+    const r = await call(base, 'POST', `/v1/instances/${id}/access`, undefined, { rawBody: `{"access":"open","access_epoch":${token}}` });
+    assertProblem(r, 422, 'ORCH-VALIDATION');
+    assert.equal(r.json.field, '/access_epoch');
+  }
+  assert.equal((await call(base, 'GET', `/v1/instances/${id}`)).json.epoch, 1, 'nothing changed');
+  const largest = await call(base, 'POST', `/v1/instances/${id}/access`, undefined, { rawBody: '{"access":"open","access_epoch":9007199254740991}' });
+  assert.equal(largest.status, 200, 'the largest integer of the contract is accepted');
+});
+
+test('cpu_limit is the one non-integer number and is compared by value: 2 and 2.0 are one request, 1.5 another', async () => {
+  const id = newId();
+  const text = (token) => bodyText({ ...clone(createExample), instance_id: id }).replace('"cpu_limit":1.5', `"cpu_limit":${token}`);
+  assert.equal((await call(base, 'POST', '/v1/instances', undefined, { rawBody: text('2') })).status, 202);
+  for (const token of ['2', '2.0', '2e0', '20e-1']) assert.equal((await call(base, 'POST', '/v1/instances', undefined, { rawBody: text(token) })).status, 200, token);
+  assertProblem(await call(base, 'POST', '/v1/instances', undefined, { rawBody: text('1.5') }), 409, 'ORCH-REQUEST-MISMATCH');
+  assertProblem(await call(base, 'POST', '/v1/instances', undefined, { rawBody: text('true') }), 422, 'ORCH-VALIDATION');
+});
+
+test('order of checks: signature, call exists, media type (415), shape (422), existence (404); 415 comes before 404', async () => {
+  const unknown = newId(); // never created
+  const access = '{"access":"open","access_epoch":1}';
+  assertProblem(await call(base, 'POST', `/v1/instances/${unknown}/access`, undefined, { rawBody: access, contentType: 'text/plain' }), 415, 'ORCH-UNSUPPORTED-MEDIA-TYPE');
+  assertProblem(await call(base, 'POST', `/v1/instances/${unknown}/access`, undefined, { rawBody: access }), 404, 'ORCH-INSTANCE-NOT-FOUND');
+  assertProblem(await call(base, 'POST', `/v1/instances/${unknown}/access`, undefined, { rawBody: '{"access":"ajar","access_epoch":1}' }), 422, 'ORCH-VALIDATION');
+  assertProblem(await call(base, 'POST', `/v1/instances/${unknown}/reset`, undefined, { rawBody: '{nope' }), 422, 'ORCH-VALIDATION');
+  assertProblem(await call(base, 'POST', '/v1/instances', clone(createExample), { contentType: 'application/x-www-form-urlencoded' }), 415, 'ORCH-UNSUPPORTED-MEDIA-TYPE');
+  assertProblem(await call(base, 'POST', '/v1/instances', clone(createExample), { contentType: 'text/plain', key: KEY + 'x' }), 401, 'ORCH-BAD-SIGNATURE');
+  assertProblem(await call(base, 'POST', '/v1/nothing', undefined, { rawBody: 'x', contentType: 'text/plain' }), 404, 'ORCH-ROUTE-UNKNOWN');
+  assert.equal((await call(base, 'POST', `/v1/instances/${unknown}/destroy`)).status, 404, 'an empty POST needs no media type');
+  const ok = await call(base, 'POST', '/v1/instances', { ...clone(createExample), instance_id: newId() }, { contentType: 'application/json; charset=utf-8' });
+  assert.equal(ok.status, 202, 'parameters on application/json are fine');
+});
+
+test('a cursor that this orchestrator did not hand out is 422 ORCH-CURSOR-INVALID; a real cursor still works', async () => {
+  const lbase = await startServer();
+  const ids = [newId(), newId(), newId()];
+  for (const id of ids) await call(lbase, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id });
+  for (const cursor of ['!!', 'AAAA', 'x'.repeat(200), '', 'a'.repeat(23), 'a'.repeat(25), 'AAAAAAAAAAAAAAAAAAAAAAAA', Buffer.from('not-an-instance-id').toString('base64url')]) {
+    const r = await call(lbase, 'GET', `/v1/instances?cursor=${encodeURIComponent(cursor)}`);
+    assertProblem(r, 422, 'ORCH-CURSOR-INVALID');
+    assert.equal(r.json.field, 'cursor');
+  }
+  const page = await call(lbase, 'GET', '/v1/instances?limit=2');
+  assert.equal(page.json.next_cursor.length, 24);
+  assert.equal((await call(lbase, 'GET', `/v1/instances?limit=2&cursor=${page.json.next_cursor}`)).json.items.length, 1);
+});
+
+test('every error answer is RFC 9457 problem details and nothing in it is a stack trace', async () => {
+  const unknown = newId();
+  assertProblem(await call(base, 'GET', `/v1/instances/${unknown}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
+  assertProblem(await call(base, 'DELETE', '/v1/host'), 405, 'ORCH-METHOD-NOT-ALLOWED');
+  assertProblem(await call(base, 'GET', '/v1/nothing'), 404, 'ORCH-ROUTE-UNKNOWN');
+  assertProblem(await call(base, 'GET', '/v1/instances?colour=red'), 422, 'ORCH-LABEL-UNKNOWN');
+  const a = await call(base, 'GET', `/v1/instances/${unknown}`);
+  const b = await call(base, 'GET', `/v1/instances/${unknown}`);
+  assert.equal(a.json.title, b.json.title, 'the title is the same for every answer with this code');
+  assert.notEqual(a.json.request_id, b.json.request_id);
+  assert.ok(!/at |Traceback|\.mjs/.test(a.text), 'no stack trace');
+});
+
+// A stand-in for the platform API, written here: checks the signature of every report with the orchestrator key and applies the
+// dedup rule of the contract (section 8): new 204, identical repeat 200, other body for the same identity 409, lower number is history.
+function startReceiver() {
+  const store = { reports: [], byKey: new Map(), current: new Map() };
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8');
+      const expected = sign(ORCH_KEY, 'POST', req.url, req.headers['x-vm-timestamp'], req.headers['x-vm-nonce'], body);
+      if (expected !== req.headers['x-vm-signature']) { res.writeHead(401); res.end(); return; }
+      store.reports.push(body);
+      const r = JSON.parse(body);
+      const key = `${r.instance_id}|${r.epoch}|${r.transition}`;
+      let status = 204;
+      if (store.byKey.has(key)) status = store.byKey.get(key) === body ? 200 : 409;
+      else {
+        store.byKey.set(key, body);
+        const top = store.current.get(r.instance_id);
+        if (!top || r.epoch > top.epoch || (r.epoch === top.epoch && r.transition > top.transition)) store.current.set(r.instance_id, r);
+      }
+      res.writeHead(status);
+      res.end();
+    });
+  });
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, store, url: `http://127.0.0.1:${server.address().port}` })));
+}
+
+test('state reports carry a transition number per (instance, epoch); the platform dedups on it; a re-entrant change is not a duplicate', async () => {
+  const rx = await startReceiver();
+  try {
+    const rbase = await startServer('--report-url', rx.url, '--report-key', ORCH_KEY);
+    const id = newId();
+    assert.equal((await call(rbase, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id })).status, 202);
+    await waitFor(rbase, id, (s) => s.state === 'ready');
+    assert.equal((await call(rbase, 'POST', `/v1/instances/${id}/reset`, clone(resetExample))).status, 202);
+    await waitFor(rbase, id, (s) => s.state === 'ready' && s.epoch === 2);
+    for (const state of ['active', 'idle', 'active', 'idle']) {
+      const r = await fetch(`${rbase}/_fake/v1/instances/${id}/activity`, { method: 'POST', body: JSON.stringify({ state }) });
+      assert.equal(r.status, 200);
+    }
+    const end = Date.now() + 8000;
+    while (rx.store.reports.length < 12 && Date.now() < end) await new Promise((x) => setTimeout(x, 20));
+    const reports = rx.store.reports.map((b) => JSON.parse(b));
+    assert.equal(reports.length, 12, 'four changes of the first epoch, four of the reset, four of activity');
+    for (const r of reports) {
+      assert.deepEqual(Object.keys(r).sort(), ['at', 'epoch', 'error_code', 'from_state', 'health', 'instance_id', 'reason', 'to_state', 'transition']);
+      assert.ok(Number.isSafeInteger(r.transition) && r.transition >= 1 && Number.isSafeInteger(r.epoch));
+    }
+    assert.deepEqual(reports.map((r) => [r.epoch, r.transition]), [[1, 1], [1, 2], [1, 3], [1, 4], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [2, 8]]);
+    assert.deepEqual(reports.slice(8).map((r) => [r.from_state, r.to_state]), [['ready', 'active'], ['active', 'idle'], ['idle', 'active'], ['active', 'idle']]);
+    assert.ok(new Set(reports.map((r) => r.at)).size < reports.length, 'several changes share the same second, so `at` cannot order them');
+    // the platform side: every report was new (204) because none was taken for a repeat of another
+    assert.equal(rx.store.byKey.size, 12);
+    assert.equal(rx.store.current.get(id).transition, 8);
+    const post = async (body) => {
+      const target = '/internal/v1/orch/state';
+      const ts = nowTs();
+      const nonce = newNonce();
+      return (await fetch(rx.url + target, { method: 'POST', body, headers: { 'content-type': 'application/json', 'x-vm-timestamp': ts, 'x-vm-nonce': nonce, 'x-vm-signature': sign(ORCH_KEY, 'POST', target, ts, nonce, body) } })).status;
+    };
+    assert.equal(await post(rx.store.reports[3]), 200, 'the same report again');
+    assert.equal(await post(JSON.stringify({ ...reports[3], reason: 'another body' })), 409, 'another body for the same identity');
+    assert.equal(rx.store.current.get(id).transition, 8, 'a late report does not move the state back');
+  } finally {
+    rx.server.close();
+  }
+});
+
+// Mutual TLS (deployment matter, outside the OpenAPI file): the fake with --tls-* flags serves HTTPS and refuses a caller without a
+// client certificate. Certificates are throwaway, made with the openssl command in a temporary folder that is removed afterwards.
+test('with --tls flags the fake serves HTTPS and refuses a call without a client certificate', async (t) => {
+  const probe = spawnSync('openssl', ['version'], { encoding: 'utf8' });
+  if (probe.error || probe.status !== 0) {
+    if (flagOn(process.env.CI)) assert.fail('openssl is not installed, the mTLS test cannot make certificates');
+    t.skip('openssl is not installed');
+    return;
+  }
+  const dir = mkdtempSync(path.join(tmpdir(), 'vm-e2e-mtls-'));
+  try {
+    const conf = path.join(dir, 'openssl.cnf');
+    writeFileSync(conf, '[req]\ndistinguished_name = dn\n[dn]\n');
+    const env = { ...cleanEnv, OPENSSL_CONF: conf };
+    const ossl = (...args) => {
+      const r = spawnSync('openssl', args, { cwd: dir, env, encoding: 'utf8' });
+      assert.equal(r.status, 0, `openssl ${args[0]} failed: ${r.stderr}`);
+    };
+    const ec = ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes'];
+    ossl('req', '-x509', ...ec, '-keyout', 'ca.key', '-out', 'ca.pem', '-days', '1', '-subj', '/CN=E2E CA', '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'keyUsage=critical,keyCertSign,cRLSign');
+    const leaf = (name, usage, san) => {
+      ossl('req', '-new', ...ec, '-keyout', `${name}.key`, '-out', `${name}.csr`, '-subj', `/CN=${name}`);
+      writeFileSync(path.join(dir, `${name}.ext`), `basicConstraints=CA:FALSE\nkeyUsage=digitalSignature\nextendedKeyUsage=${usage}\n${san}\n`);
+      ossl('x509', '-req', '-in', `${name}.csr`, '-CA', 'ca.pem', '-CAkey', 'ca.key', '-CAcreateserial', '-out', `${name}.pem`, '-days', '1', '-extfile', `${name}.ext`);
+    };
+    leaf('server', 'serverAuth', 'subjectAltName=DNS:localhost');
+    leaf('client', 'clientAuth', '');
+    const p = (f) => path.join(dir, f);
+    const httpsBase = (await startServer('--tls-cert', p('server.pem'), '--tls-key', p('server.key'), '--tls-ca', p('ca.pem'))).replace('http://127.0.0.1', 'https://localhost');
+    const ca = readFileSync(p('ca.pem'));
+    const get = (extra) => new Promise((resolve, reject) => {
+      const target = '/v1/host';
+      const ts = nowTs();
+      const nonce = newNonce();
+      const req = https.request(httpsBase + target, {
+        method: 'GET', ca, ...extra,
+        headers: { 'x-vm-timestamp': ts, 'x-vm-nonce': nonce, 'x-vm-signature': sign(KEY, 'GET', target, ts, nonce, '') },
+      }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.equal(await get({ cert: readFileSync(p('client.pem')), key: readFileSync(p('client.key')) }), 200, 'with a client certificate the call works');
+    await assert.rejects(get({}), (e) => /ECONNRESET|socket hang up|alert|certificate|handshake/i.test(`${e.code} ${e.message}`), 'without a client certificate the handshake is refused (not a refused connection or a timeout)');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The nested Python run is kept for local use. The CI job `e2e` switches it off with VULNMART_E2E_SKIP_NESTED_PYTEST=1 (or `true`), because the
+// CI job `scripts` already runs pytest; running it a second time would only double the minutes (see docs/dev-log, story 1.11).
+const skipNested = flagOn(process.env.VULNMART_E2E_SKIP_NESTED_PYTEST);
+test('the Python suite (protocol on both hosts, HTTP service, contract) still passes', { timeout: 600000, skip: skipNested ? 'VULNMART_E2E_SKIP_NESTED_PYTEST is set (the CI job scripts runs pytest)' : false }, () => {
+  const r = spawnSync('uv', ['run', '--locked', '--package', 'vulnmart-api', 'pytest', '-q'], { cwd: ROOT, env: cleanEnv, encoding: 'utf8', timeout: 540000 });
+  assert.equal(r.status, 0, (r.stdout || '').slice(-3000) + (r.stderr || '').slice(-1000));
+  assert.match(r.stdout, /\d+ passed/);
+});

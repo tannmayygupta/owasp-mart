@@ -1,0 +1,32 @@
+== unit
+
+ℹ tests 95
+ℹ pass 95
+ℹ fail 0
+ℹ skipped 0
+
+
+== pytest
+........................................................................ [ 74%]
+........................................................................ [ 93%]
+...........................                                              [100%]
+387 passed in 174.66s (0:02:54)
+== contracts:check
+
+invalid example rejected at /components/0/env/ADMIN_PASSWORD: 
+examples/invalid/instance-template/env-password-suffix.json
+contracts: PASS
+valid example ok: examples/valid/instance-events/auth.password_reset_completed.json
+events: PASS
+orchestrator contract: PASS
+lab contract: PASS
+
+
+== e2e (four files, nested pytest on)
+
+ℹ tests 43
+ℹ pass 43
+ℹ fail 0
+ℹ skipped 0
+
+

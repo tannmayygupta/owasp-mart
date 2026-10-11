@@ -1,0 +1,217 @@
+# VulnMart lab harness (story L-06): one full STUB instance plus the fake ingest, for tests only.
+# Start it with:  node scripts/dev.mjs harness        (never call this file by hand: the harness feeds the start documents on standard input)
+# Remove it with: node scripts/dev.mjs harness down
+#
+# Every instance container follows the instance runtime profile of IF-6 (contracts/instance/instance-contract.md section 7):
+# user 65532, read-only root, no-new-privileges, cap_drop ALL, no privileged, tmpfs only at /tmp and /data, the four named memory-backed
+# volumes, no bind mounts, ports published only on 127.0.0.1, the injector with network_mode none, the injector first, no flag, seed or key
+# in an environment variable, a compose file or an image. scripts/check-instance-conformance.mjs checks these rules on the resolved file.
+#
+# Two services are not instance roles and are labelled vm.kind=harness: "ingest" (the fake platform ingest) and "volume-keeper" (see below).
+# Numbers (memory, CPU, pids, sizes) are the example numbers of the shop template; they are placeholders until spikes S-4 and S-5.
+name: vulnmart-harness
+
+x-instance: &instance
+  # Built by the harness from contracts/mocks/stub-instance/Dockerfile (node 24.21.0 Alpine, pinned by digest there).
+  image: vulnmart-stub-instance:local
+  user: "65532:65532"
+  read_only: true
+  privileged: false
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  restart: "no"
+
+x-tcp-8080: &tcp-8080
+  test: ["CMD", "node", "-e", "require('net').connect(8080,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+  interval: 2s
+  timeout: 2s
+  retries: 15
+  start_period: 1s
+
+services:
+  # A Docker memory-backed (tmpfs) volume is unmounted, and its content lost, when the last container that mounts it stops. The injector
+  # exits before the shop starts, so without a holder the flags file and the marker would vanish. This container only keeps the four
+  # volumes mounted (read-only, no network, does nothing). It is a harness helper, not an instance role; L-13 needs an equivalent.
+  volume-keeper:
+    <<: *instance
+    container_name: vulnmart-harness-volume-keeper
+    labels: { vm.kind: harness, vm.component: volume-keeper }
+    entrypoint: ["node", "-e", "setInterval(()=>{},1<<30)"]
+    network_mode: none
+    mem_limit: 64m
+    cpus: 0.5
+    pids_limit: 32
+    stop_grace_period: 1s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1m,uid=65532,gid=65532,mode=1777
+    volumes:
+      - { type: volume, source: vm-run, target: /run/vm, read_only: true }
+      - { type: volume, source: vm-import, target: /run/import, read_only: true }
+      - { type: volume, source: vm-placement-import, target: /run/placement/import, read_only: true }
+      - { type: volume, source: vm-placement-mock, target: /run/placement/mock, read_only: true }
+
+  # The fake platform ingest (contracts/mocks/fake-ingest). Reads the same start document as the sidecar on standard input (instance id and test key).
+  ingest:
+    <<: *instance
+    container_name: vulnmart-harness-ingest
+    labels: { vm.kind: harness, vm.component: ingest }
+    command: ["ingest"]
+    stdin_open: true
+    networks: [link]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    stop_grace_period: 1s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=1777
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/_fake/events"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 1s
+
+  # One-shot. No network. Reads the injection document on standard input, exits 0 after writing the marker last (IF-6 section 5).
+  injector:
+    <<: *instance
+    container_name: vulnmart-harness-injector
+    labels: { vm.kind: inst, vm.component: injector }
+    command: ["inject"]
+    stdin_open: true
+    network_mode: none
+    environment:
+      VM_SNAPSHOT_PATH: /run/vm/snapshot.db
+      VM_FLAGS_PATH: /run/vm/flags.json
+      TZ: UTC
+      VM_LOG_LEVEL: info
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    stop_grace_period: 1s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=1777
+      - /data:rw,noexec,nosuid,size=64m,uid=65532,gid=65532,mode=0700
+    volumes:
+      - { type: volume, source: vm-run, target: /run/vm }
+      - { type: volume, source: vm-placement-import, target: /run/placement/import }
+      - { type: volume, source: vm-placement-mock, target: /run/placement/mock }
+
+  shop:
+    <<: *instance
+    build:
+      context: ../..
+      dockerfile: contracts/mocks/stub-instance/Dockerfile
+    container_name: vulnmart-harness-shop
+    labels: { vm.kind: inst, vm.component: shop }
+    command: ["shop"]
+    networks: [inst]
+    environment:
+      PORT: "3000"
+      VM_DB_PATH: /data/shop.db
+      VM_SNAPSHOT_PATH: /run/vm/snapshot.db
+      VM_FLAGS_PATH: /run/vm/flags.json
+      VM_SIDECAR_EVENTS_URL: http://sidecar:9000
+      TZ: UTC
+      VM_LOG_LEVEL: info
+    depends_on:
+      injector:
+        condition: service_completed_successfully
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 256
+    stop_grace_period: 1s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=65532,gid=65532,mode=1777
+      - /data:rw,noexec,nosuid,size=256m,uid=65532,gid=65532,mode=0700
+    volumes:
+      - { type: volume, source: vm-run, target: /run/vm, read_only: true }
+      - { type: volume, source: vm-import, target: /run/import }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/readyz"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 1s
+
+  # Reads its start document (event key, epoch, flag digests) on standard input at start, once.
+  sidecar:
+    <<: *instance
+    container_name: vulnmart-harness-sidecar
+    labels: { vm.kind: inst, vm.component: sidecar }
+    command: ["sidecar", "--relay", "http://edge:8081/internal/v1/events", "--upstream", "http://shop:3000"]
+    stdin_open: true
+    networks: [inst]
+    environment:
+      TZ: UTC
+      VM_LOG_LEVEL: info
+    depends_on:
+      injector:
+        condition: service_completed_successfully
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    stop_grace_period: 1s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=1777
+    healthcheck: *tcp-8080
+
+  gate:
+    <<: *instance
+    container_name: vulnmart-harness-gate
+    labels: { vm.kind: inst, vm.component: gate }
+    command: ["gate", "--upstream", "http://sidecar:8080"]
+    networks: [inst]
+    depends_on:
+      injector:
+        condition: service_completed_successfully
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    stop_grace_period: 1s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=1777
+    healthcheck: *tcp-8080
+
+  # Player port 8080 (published on loopback only) and the relay port 8081 to the ingest (instance and link networks, never published).
+  edge:
+    <<: *instance
+    container_name: vulnmart-harness-edge
+    labels: { vm.kind: inst, vm.component: edge }
+    command: ["edge", "--gate", "http://gate:8080", "--ingest", "http://ingest:8081"]
+    networks: [inst, link, front]
+    ports:
+      - "127.0.0.1:${HARNESS_EDGE_PORT:-18090}:8080"
+    depends_on:
+      injector:
+        condition: service_completed_successfully
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    stop_grace_period: 1s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=65532,gid=65532,mode=1777
+    healthcheck: *tcp-8080
+
+networks:
+  inst: # shop, sidecar, gate, edge; no outside access
+    internal: true
+  link: # edge to ingest (the private link of ADR 0005); no outside access
+    internal: true
+  front: # only the edge; carries the loopback-published player port
+    driver: bridge
+
+volumes:
+  vm-run:
+    driver: local
+    driver_opts: { type: tmpfs, device: tmpfs, o: "size=16m,uid=65532,gid=65532,mode=0750" }
+  vm-import:
+    driver: local
+    driver_opts: { type: tmpfs, device: tmpfs, o: "size=8m,uid=65532,gid=65532,mode=0750" }
+  vm-placement-import:
+    driver: local
+    driver_opts: { type: tmpfs, device: tmpfs, o: "size=2m,uid=65532,gid=65532,mode=0750" }
+  vm-placement-mock:
+    driver: local
+    driver_opts: { type: tmpfs, device: tmpfs, o: "size=2m,uid=65532,gid=65532,mode=0750" }

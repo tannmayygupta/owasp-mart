@@ -1,0 +1,27 @@
+[Unit]
+Description=VulnMart keep-alive load (optional: keeps a VM above the idle thresholds of a provider that reclaims idle VMs; off by default on AWS)
+After=network.target
+
+[Service]
+Type=simple
+Environment=KEEPALIVE_MEM_MB=1536
+Environment=KEEPALIVE_CPU_PERCENT=0
+ExecStart=/usr/bin/python3 -I /usr/local/sbin/vulnmart-keepalive.py
+Restart=always
+RestartSec=10
+# Hard limits: the service can never take more than this, whatever the script does.
+MemoryMax=2200M
+MemorySwapMax=0
+CPUQuota=50%
+TasksMax=4
+Nice=19
+OOMScoreAdjust=1000
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+# Copy this file to backend.tf ONLY when you are ready to move the state to S3 (runbook, "Move the state to S3").
+# It is kept as an example so that the plain `terraform init` with local state keeps working until you migrate.
+# The settings (bucket, key, region) come from backend.hcl (git-ignored; template: backend.hcl.example):
+#   terraform init -migrate-state -backend-config=backend.hcl
+# `terraform init -backend=false` (used by the tests and CI) ignores this block.
+terraform {
+  backend "s3" {}
+}

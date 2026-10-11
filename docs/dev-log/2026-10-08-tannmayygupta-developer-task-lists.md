@@ -5,7 +5,7 @@
 | Date | 2026-10-08 |
 | Developer | tannmayygupta |
 | Branch / commit | main / (local commit, not pushed) |
-| Status | Partly done: draft plan, waiting for team approval |
+| Status | Done as a draft plan (committed as 4291c23); the lists have been used for all work since; a recorded approval by the team is not in the repository |
 | Report tag | lifecycle, planning |
 
 ## Requirements covered

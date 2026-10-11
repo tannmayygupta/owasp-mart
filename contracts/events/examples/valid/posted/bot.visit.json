@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "type": "bot.visit",
+  "source": "bot",
+  "session_kind": "bot",
+  "user_id": null,
+  "ts": "2026-01-01T00:00:08Z",
+  "data": {
+    "visit_id": "v-01",
+    "ticket_id": "t-01",
+    "phase": "end",
+    "duration_ms": 1200
+  }
+}

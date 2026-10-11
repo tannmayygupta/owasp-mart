@@ -5,7 +5,7 @@
 | Date | 2026-10-08 |
 | Developer | tannmayygupta |
 | Branch / commit | main / (local commit, not pushed) |
-| Status | Partly done: drafts written and mechanically checked; the user has not yet approved the trees |
+| Status | Done as drafts, mechanically checked (committed as b525141); the trees have been used for all work since (stories 1.1 to 2.6); a recorded approval by the team is not in the repository |
 | Report tag | lifecycle, tracking |
 
 ## Requirements covered

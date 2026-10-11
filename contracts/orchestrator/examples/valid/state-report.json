@@ -1,0 +1,11 @@
+{
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
+  "transition": 4,
+  "from_state": "starting",
+  "to_state": "ready",
+  "at": "2026-10-09T12:00:09Z",
+  "reason": "health ok and flags injected",
+  "error_code": null,
+  "health": "healthy"
+}

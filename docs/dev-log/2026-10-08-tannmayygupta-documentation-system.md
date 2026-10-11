@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-08 |
 | Developer | tannmayygupta (with Claude Code) |
-| Branch / commit | `main`, not committed yet |
-| Status | Done, one check still pending (see Limitations) |
+| Branch / commit | `main`, committed as 87558da (initial commit) with later fixes 5c0e951, 4323d61 and 7efdbaa |
+| Status | Done; the live re-check of the Claude Code hook after the matcher fix is listed under Limitations |
 | Report tag | Process / documentation (college report template pending) |
 
 ## Requirements covered

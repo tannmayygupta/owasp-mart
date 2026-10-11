@@ -1,0 +1,24 @@
+private-link-check 2026-10-10T21:42:38.019Z
+PASS orchestrator-mtls port 9443 closed on vm-p public address - timeout
+PASS orchestrator-mtls port 9443 closed on vm-i public address - timeout
+PASS ingest-internal port 9444 closed on vm-p public address - timeout
+PASS ingest-internal port 9444 closed on vm-i public address - timeout
+PASS vm-p work folder created and python3 present
+PASS vm-i work folder created and python3 present
+PASS throwaway certificates generated on vm-p
+PASS throwaway certificates copied to vm-i
+PASS vm-p -> vm-i :9443 server listening on the private address
+PASS vm-p -> vm-i :9443 TCP connects over the private address - connect ms min 0.38 median 0.44 p95 0.68 max 1.79 (n=20)
+PASS vm-p -> vm-i :9443 mutual-TLS handshake succeeds - TLSv1.3 tcp 2.61 ms handshake 2.43 ms
+PASS vm-p -> vm-i :9443 client without a certificate is refused - client error SSLError; server log shows the rejection
+PASS vm-i -> vm-p :9443 (wrong direction) is dropped - timeout
+PASS vm-p -> vm-i :9445 (port not in the rules) is dropped - timeout
+PASS vm-i -> vm-p :9444 server listening on the private address
+PASS vm-i -> vm-p :9444 TCP connects over the private address - connect ms min 0.41 median 0.44 p95 0.7 max 1.25 (n=20)
+PASS vm-i -> vm-p :9444 mutual-TLS handshake succeeds - TLSv1.3 tcp 1.31 ms handshake 2.15 ms
+PASS vm-i -> vm-p :9444 client without a certificate is refused - client error SSLError; server log shows the rejection
+PASS vm-p -> vm-i :9444 (wrong direction) is dropped - timeout
+PASS vm-i -> vm-p :9445 (port not in the rules) is dropped - timeout
+PASS vm-p no certificate or key left on the host - clean
+PASS vm-i no certificate or key left on the host - clean
+RESULT PASS (22 checks)

@@ -7,9 +7,9 @@
 
 Plain terms: an **instance** is one private copy of the shop with its helper containers. This document says what every container in an instance must look like, so the orchestrator (L) and the shop and services (T) can be built separately. Words in **bold "to confirm"** are values the architecture does not fix; every one is listed in the table at the end ("Open points (to confirm)") for Sahil and Akshay.
 
-What this contract does not cover: the body and names of events (IF-4, story L-03), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are placeholders until the registry is merged.
+What this contract does not cover: the body and names of events (IF-4, `contracts/events/app-events.md`), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are placeholders until the registry is merged.
 
-Machine-checkable parts: [injection-document.schema.json](injection-document.schema.json), [flags-file.schema.json](flags-file.schema.json), [instance-template.schema.json](instance-template.schema.json) (JSON Schema 2020-12), with valid and invalid examples in `examples/`. Rules that compare two fields (for example "the injector and the shop share one `/run/vm` volume") are checked by `scripts/validate-contracts.mjs`.
+Machine-checkable parts: [injection-document.schema.json](injection-document.schema.json), [flags-file.schema.json](flags-file.schema.json), [instance-template.schema.json](instance-template.schema.json), [sidecar-start.schema.json](sidecar-start.schema.json) (JSON Schema 2020-12), with valid and invalid examples in `examples/`. Rules that compare two fields (for example "the injector and the shop share one `/run/vm` volume") are checked by `scripts/validate-contracts.mjs`.
 
 ## 1. Containers and roles
 
@@ -55,10 +55,10 @@ Other rules: a value is a string of at most 512 characters and never contains th
 A challenge whose catalogue entry says `flag_delivery: env` may receive its flag in the environment of the **shop** only. The template declares it in a separate field `flag_delivery_env` (not in `env`):
 
 ```
-"flag_delivery_env": { "challenge_key": "C05", "env_name": "VM_FLAG_C05", "reason": "<at least 20 characters, not blank>" }
+"flag_delivery_env": { "challenge_key": "C05", "env_name": "VM_FLAG_C05", "reason": "<20 to 300 characters, a real sentence>" }
 ```
 
-Rules: `env_name` is exactly `VM_FLAG_` plus `challenge_key`; `reason` is written down and non-blank; only the `shop` role may have it. Mechanism: when the orchestrator creates the shop container it reads the flag for `challenge_key` from the injection document and sets that one variable. The value is then visible to `docker inspect`. This is accepted for that challenge and is the reason the field must explain why the path needs it. No other variable ever carries a flag.
+Rules: `env_name` is exactly `VM_FLAG_` plus `challenge_key`; `reason` is written down as a real sentence (20 to 300 characters, no run of four equal characters, no double whitespace, at least three words, at least 8 different letters or digits); only the `shop` role may have it. Mechanism: when the orchestrator creates the shop container it reads the flag for `challenge_key` from the injection document and sets that one variable. The value is then visible to `docker inspect`. This is accepted for that challenge and is the reason the field must explain why the path needs it. No other variable ever carries a flag.
 
 ## 3. Health
 
@@ -85,6 +85,8 @@ Every container and network carries nine labels. A template holds placeholders; 
 | `vm.host` | `{host}` | public host name |
 | `vm.kind` | `inst` | `inst` for instance containers (`front` is used by edge containers, not by templates) |
 | `vm.owner` | `{owner_hash}` | 64 lowercase hex characters, an opaque hash, **never an email** (FR-INS-05) |
+
+The `{owner_hash}` value comes from the required field `owner_hash` of the create body of the orchestrator API (IF-5, [orchestrator-api.md](../orchestrator/orchestrator-api.md) section 2). The platform computes it (the orchestrator never sees a user id), the orchestrator applies it as the `vm.owner` label and never returns it. A reset keeps the owner of the instance.
 
 ## 5. Flag injection
 
@@ -125,7 +127,9 @@ The size limit and the UTF-8 handling of the document on standard input are for 
 
 ## 6. Event emission
 
-Out of scope in v0 (IF-4, story L-03). The contract only fixes the path: the shop sends events to the sidecar's event endpoint on the instance network, port 9000, base URL in `VM_SIDECAR_EVENTS_URL`. Body, event names, signing and size caps are defined in `contracts/events/` by L-03. Events carry no secrets.
+Defined by IF-4 in [../events/app-events.md](../events/app-events.md) (story L-03). The path stays as fixed here: the shop sends events to the sidecar's event endpoint on the instance network, port 9000, base URL in `VM_SIDECAR_EVENTS_URL`; IF-4 adds the path `/v1/events` (POST only), the body, the event names, the signing and the size caps. Events carry no secrets. At start the orchestrator gives the sidecar, on its standard input, the event key, the epoch and the flag digests (IF-4 sections 4 and 6). The platform derives the event key per `(instance, epoch)`, so a reset brings a new one; the sidecar restarts its sequence counter at 1 in every epoch (there is no `first_seq` any more, removed in 0.2.0, decision D-42).
+
+**Sidecar start document (proposal, story L-06, 2026-10-10; open point 35).** One JSON document, UTF-8, at most 64 KiB, written once to one sidecar and read once at start, following [sidecar-start.schema.json](sidecar-start.schema.json): `schema_version` (`"0.1"`), `instance_id`, `epoch`, `event_key` (32 to 128 printable ASCII characters; 43 base64url characters from the derivation) and `flag_digests` (a list of `{ challenge_key, kind: real | decoy, sha256 }`, one real digest per challenge key, no repeated digest). The sidecar keeps the key in memory only; it never goes in an environment variable, a label, a log line or an event. The document ends at the end of the input or as soon as one complete JSON object has arrived (a container made by Compose has no "stdin once" flag, so Docker does not close its input when the writer is done; the orchestrator, which creates containers through the Docker API, should set `StdinOnce`). Data after that object, a top-level value that is not an object, and input that does not complete within 10 seconds are bad documents. A bad document makes the sidecar exit 2 without starting a listener and without printing any part of the document. **Sequence counter state (D-42).** The sidecar keeps its counter in a small file in its own memory-backed `/tmp` (`/tmp/vm-sidecar-seq.json`: instance id, epoch, next value), saved before each event is queued, so a restart of the sidecar process inside one epoch continues without reusing a number. No new mount or volume is added: `/tmp` is already in the template. A lost container loses the file (IF-4 open point 32).
 
 ## 7. Runtime profile
 
@@ -135,11 +139,13 @@ Every component, without exception (the schema rejects anything else):
 - `read_only: true` root filesystem; `no_new_privileges: true`; `privileged: false`; `cap_drop: ["ALL"]` and no added capabilities; `egress: false`.
 - Writable places are only memory-backed: `tmpfs` mounts at `/tmp` and `/data` (one per component, not shared) and the four shared named volumes at `/run/vm`, `/run/import`, `/run/placement/import` and `/run/placement/mock`. Mount targets are exactly these six and unique per component. No bind mounts, no host paths, no anonymous volumes.
 - Every volume in the template is `memory_backed` and has a `size_mb`; every mounted volume must be declared.
-- `memory_mb`, `cpu_limit` (CPUs, for example 0.5) and `pids_limit` are required. The example numbers are placeholders until spikes S-4 and S-5 (to confirm).
+- `memory_mb`, `cpu_limit` (CPUs, for example 0.5) and `pids_limit` are required and bounded by the schema: `memory_mb` 16 to 1024, `cpu_limit` above 0 and at most 2, `pids_limit` 1 to 512 (about twice the largest example; the schema maxima are story 1.15 decisions, to confirm). Volume `size_mb` is at most 64 and a tmpfs mount at most 512. The example numbers are placeholders until spikes S-4 and S-5 (to confirm).
+- Each role is pinned by the schema (story 1.15): the component `name` equals its `role` (one of the six); `image` is exactly `{image:<role>}` (a role never uses another role's image); `network_mode` is `instance` for the shop, sidecar, mock-services and bot controller and `none` for the injector and import service; the injector has no `ports` and no `healthcheck`; the shop healthcheck path is `/readyz`; `user` is exactly `65532:65532`.
+- Environment values are constrained per name (story 1.15): `VM_SIDECAR_EVENTS_URL` is `http://sidecar:9000`, `VM_MOCK_URL` is `http://mock-services` (optional port 9100 to 9199), `VM_IMPORT_SOCKET` is `/run/import/import.sock`, `VM_DB_PATH` and `VM_CATALOG_DB_PATH` are `.db` files directly under `/data`, `VM_SNAPSHOT_PATH` is `/run/vm/snapshot.db`, `VM_FLAGS_PATH` is `/run/vm/flags.json`, `TZ` is `UTC`, `VM_LOG_LEVEL` is `debug`, `info`, `warn` or `error`, `PORT` is a number that is also one of `ports`, and `env` has at least one entry. `vm.expires` is a token or a real UTC date-time (the validator rejects a date such as 30 February).
 - The validator also rejects any other role mounting `/run/vm` (only the injector and the shop do, the shop read-only from the injector's volume), `/run/import` (only the shop and the import service), `/run/placement/import` (only the injector and the import service, read-only from the injector's volume) or `/run/placement/mock` (only the injector and mock-services, same rule); the sidecar, mock-services and bot controller never mount `/run/vm`.
 - Required mounts (validator): shop `/tmp`, `/data`, `/run/vm` read-only, `/run/import`; injector `/tmp`, `/run/vm`, `/run/placement/import` and `/run/placement/mock` read-write; import service `/tmp`, `/run/import` and `/run/placement/import` read-only; mock-services `/run/placement/mock` read-only.
 - Hand-over of data (to confirm with T): the injector writes the patched snapshot to `/run/vm`; the shop copies it into its own `/data` before it reports ready. The files for the import service and mock-services (placement kinds "file in import service" and "file in mock-services") reach those containers through the two placement volumes described in section 5.
-
+- Lifetime of a memory-backed volume (found in L-06, proposal, open point 36): Docker's local `tmpfs` volume is unmounted, and its content lost, when the last container that mounts it stops. The injector exits before the shop starts, so the flags file, the marker and the placement files would vanish. Something must keep the four volumes mounted from before the injector starts until the instance is removed. The L-06 harness does it with a helper container (`volume-keeper`: read-only mounts, no network, does nothing); the orchestrator (L-13) needs an equivalent.
 - Restart and data loss: the shop's `/data` is memory-backed, so a restart loses it (see OI-23 for candidate behaviour). There is no restart policy in v0; a dead shop means the orchestrator resets the instance.
 - Labels on networks are applied by the orchestrator at create time and are not checked by this schema (the schema covers container labels in the template only).
 
@@ -190,8 +196,8 @@ Every value below was chosen by this draft because the architecture does not fix
 | 19 | Decoy placement field | `decoy_placement` (optional string, content defined by T) | Sahil |
 | 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | Tanmay |
 | 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | Tanmay |
-| 22 | Event endpoint base URL | `http://sidecar:9000` (path left to IF-4); mock base `http://mock-services` | Tanmay, Sahil |
-| 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex; `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
+| 22 | Event endpoint base URL | `http://sidecar:9000` (path `/v1/events`, defined by IF-4); mock base `http://mock-services` | Tanmay, Sahil |
+| 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex and arrives as the required `owner_hash` of the IF-5 create body, computed by the platform (proposal: HMAC-SHA256 of the user id with a platform label key; handoff H-20); `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
 | 24 | Env value limit and reason length | value at most 512 characters; flag-in-env reason 20 to 300 characters, not blank; only the shop may use the exception | Sahil |
 | 25 | Env allowlist | the 13 names in section 2 | Sahil |
 | 26 | `issued_at` handling | optional, advisory and not enforced in v0, no age check | Tanmay |
@@ -203,3 +209,5 @@ Every value below was chosen by this draft because the architecture does not fix
 | 32 | Injection document size limit and UTF-8 handling on standard input | Left to the injector | Sahil |
 | 33 | Who mounts the shared volumes | Only the injector and the shop mount `/run/vm` (the shop read-only); only the shop and the import service mount `/run/import`; only the injector and the import service mount `/run/placement/import`; only the injector and mock-services mount `/run/placement/mock`; the sidecar, mock-services and bot controller never mount `/run/vm` | Sahil |
 | 34 | Volume owner and mode options | The orchestrator creates the memory-backed volumes with uid and gid 65532 and a writable mode for that user (volume options to be confirmed in L-13) | Tanmay |
+| 35 | Sidecar start input | **Proposal, story L-06 (2026-10-10):** one JSON document on standard input at start, written once and read once, shape in sidecar-start.schema.json (section 6): schema_version, instance_id, epoch, event_key (32 to 128 printable ASCII characters), flag_digests (`first_seq` was removed in 0.2.0, D-42); at most 64 KiB, UTF-8; never in the environment or a label (handoff H-59). To confirm for the orchestrator (L-13) and the platform (Akshay) | Tanmay, Akshay |
+| 36 | Lifetime of a memory-backed volume | **Finding and proposal, story L-06:** a Docker tmpfs volume is lost when the last container that mounts it stops, so the injector's files vanish once it exits. Proposal: a helper container that mounts the four volumes read-only, has no network and starts before the injector, removed with the instance (section 7). The orchestrator (L-13) must do the same or choose another way | Tanmay |
