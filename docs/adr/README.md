@@ -33,5 +33,6 @@
 | 0029 | [Contract approvals checked by CI, and the tag procedure](0029-contract-approvals-by-ci-and-tag-procedure.md) | Proposed (decided on the developer's delegation 2026-10-11; open: the author-who-is-consumer rule and the branch protection fact) (D-48) |
 | 0030 | [Certificates by lego on each host (DNS-01, DuckDNS)](0030-certificates-by-lego-on-the-host-dns-01.md) | Proposed (decided on the developer's delegation 2026-10-11) (D-49) |
 | 0031 | [Vercel same-origin rewrite with an origin secret, checked in Caddy and in the application](0031-vercel-same-origin-rewrite-and-origin-secret-gate.md) | Proposed (decided on the developer's delegation 2026-10-11) (D-50) |
+| 0032 | [Image builds in CI (amd64 now, arm64 behind a switch) and a human-run deploy script](0032-image-builds-in-ci-and-human-run-deploy.md) | Proposed (decided on the developer's delegation 2026-10-12) (D-51) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

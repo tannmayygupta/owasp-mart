@@ -127,3 +127,45 @@ test('compose job runs the Caddy origin e2e test; vm-p compose pins the stock Ca
   }
   assert.match(compose.services.caddy.image, /^caddy:/);
 });
+// Story L-12 (docs/adr/0032): the image workflow. It cannot run here; these tests pin what makes it safe. Asserted on the parsed workflow.
+const images = yaml.load(fs.readFileSync(path.join(WORKFLOWS, 'images.yml'), 'utf8'));
+const imagesText = stripComments(fs.readFileSync(path.join(WORKFLOWS, 'images.yml'), 'utf8'));
+const PUSH_JOBS = ['build', 'publish'];
+
+test('images workflow: only the two push jobs have packages: write, and they never run on a pull request', () => {
+  assert.deepEqual(images.permissions, { contents: 'read' });
+  const writers = Object.entries(images.jobs).filter(([, j]) => j.permissions?.packages === 'write').map(([n]) => n).sort();
+  assert.deepEqual(writers, [...PUSH_JOBS].sort());
+  // Only main and tags publish: a workflow_dispatch from a feature branch must not push (and a pull request never does).
+  for (const n of PUSH_JOBS) assert.equal(images.jobs[n].if, "github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref_type == 'tag')", `${n} runs only on main and tags`);
+  assert.equal(images.jobs.check.if, "github.event_name == 'pull_request'");
+  assert.deepEqual(images.jobs.check.permissions, { contents: 'read' });
+  for (const [n, j] of Object.entries(images.jobs)) if (!PUSH_JOBS.includes(n)) assert.ok(!JSON.stringify(j.permissions ?? {}).includes('write'), `${n} has no write permission`);
+  assert.ok(!/--push|push=true|docker login|imagetools create/.test(JSON.stringify(images.jobs.check)), 'the pull request job pushes nothing and logs in nowhere');
+});
+
+test('images workflow: no secret, only the job token, passed through the environment to --password-stdin; no deployment from CI', () => {
+  assert.ok(!/secrets\./.test(imagesText));
+  assert.ok(!/pull_request_target/.test(imagesText));
+  const tokenUses = imagesText.match(/github\.token|GITHUB_TOKEN/g) ?? [];
+  assert.equal(tokenUses.length, 2, 'the token appears only in the two login steps');
+  assert.equal((imagesText.match(/--password-stdin/g) ?? []).length, 2);
+  assert.ok(!/\\bssh\\b|\\bscp\\b|\\bterraform\\b|\\baws\\b|deploy\\.mjs/.test(imagesText), 'no deployment step');
+  for (const j of Object.values(images.jobs)) for (const s of j.steps ?? []) if (s.uses?.startsWith('actions/checkout')) assert.equal(s.with['persist-credentials'], false);
+});
+
+test('images workflow: pull requests and main use a path filter; arm64 only behind the repository variable', () => {
+  assert.ok(images.on.pull_request.paths.includes('infra/images.json'));
+  assert.ok(images.on.push.paths.includes('infra/images.json'));
+  assert.deepEqual(images.on.push.branches, ['main']);
+  const m = images.jobs.matrix.steps.find((s) => s.id === 'm');
+  assert.equal(m.env.BUILD_ARM64, '${{ vars.BUILD_ARM64 }}');
+  assert.match(m.run, /node scripts\/images-matrix\.mjs/);
+});
+
+test('every action in every workflow is pinned by a full commit SHA', () => {
+  for (const f of fs.readdirSync(WORKFLOWS).filter((x) => /\.ya?ml$/.test(x))) {
+    const d = yaml.load(fs.readFileSync(path.join(WORKFLOWS, f), 'utf8'));
+    for (const [n, j] of Object.entries(d.jobs)) for (const s of j.steps ?? []) if (s.uses) assert.match(s.uses, /^[\w.-]+\/[\w.\/-]+@[0-9a-f]{40}$/, `${f} job ${n}: ${s.uses}`);
+  }
+});

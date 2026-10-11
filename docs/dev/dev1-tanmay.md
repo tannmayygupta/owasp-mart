@@ -153,6 +153,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Build: CI builds images for amd64 and natively for arm64 on the VM, and a deploy step puts them on both VMs.
   - Covers: LE-4
   - Waits on: L-08, L-07.
+  - Handoffs: H-118 (how to add an image; added by the story, 2026-10-12). Preparation done and tested locally (story plan, ADR 0032, D-51, runbook `docs/runbooks/deploy.md`); NOT ticked: the workflow run, the public package and the deploy to both VMs and the laptop are yours.
   - Done when: A hello stack from CI runs on both VMs and on the laptop.
 
 - [ ] **L-13. Orchestrator creates an instance from a template**
