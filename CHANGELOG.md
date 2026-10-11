@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-04 shop meets the instance contract, 2026-10-11, Sahil)
+- `apps/shop/` instance integration (TB-3), completing Sprint 1: the real shop joins a VulnMart instance per IF-6/IF-4. `/readyz` returns 200 only after the injector marker `/run/vm/injected` exists and the injected snapshot is copied to writable `/data` and opened (`src/instance/instance.mjs`, readiness injected into `createApp`); the shop reads a planted flag from `/run/vm/flags.json` for sentinel logic only (never a served route); and it posts a best-effort, IF-4-posted-schema-valid event to the sidecar (unsigned — the sidecar stamps and signs). Proven by a shop-owned integration test (real seeded snapshot + flags + marker + a fake sidecar validating against the posted schema); 61 shop tests pass. The live docker-compose swap, runtime profile and full sidecar→signing→fake-ingest chain are T-09.
+
 ### Changed (PR 3 review remediation, story 1.15, 2026-10-11, Tanmay)
 - Decisions D-42 to D-47 recorded in `initial.md`, ADRs 0025 to 0028 Accepted; the EARLY PR reminder added to `CLAUDE.md`; messages for Sahil and Akshay (T-04, T-09, T-10 and P-04 unblock, handoff H-112); the sprint 1 pull request checklist updated.
 - Merged `origin/main` into the sprint 1 branch: 7 conflicts resolved as unions, IF-7 registered, this branch's ADRs 0017 and 0018 renumbered 0023 and 0024, the IF-4 consumer sign-off flagged stale.

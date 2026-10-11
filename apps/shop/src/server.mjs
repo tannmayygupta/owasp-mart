@@ -5,6 +5,7 @@
 // only; the shop has no egress of its own (that boundary is enforced in T-09).
 
 import { createApp } from './app.mjs';
+import { makeReadiness } from './instance/instance.mjs';
 
 // Resolve PORT once. An unset value defaults to 3000; a set-but-invalid value is
 // a misconfiguration we fail loudly on rather than binding a random port. The
@@ -21,7 +22,24 @@ function resolvePort(raw) {
 const PORT = resolvePort(process.env.PORT);
 const HOST = '0.0.0.0';
 
-const app = createApp();
+// Inside an instance the injector hands over a snapshot and a flags file and
+// writes the marker last; the shop is ready only after that (T-04, IF-6 s5/6).
+// The env names are the ones the instance contract allows. Outside an instance
+// (no snapshot/flags configured) the shop is simply always-ready.
+function instanceReadiness(env) {
+  const snapshotPath = env.VM_SNAPSHOT_PATH;
+  const flagsPath = env.VM_FLAGS_PATH;
+  const dbPath = env.VM_DB_PATH;
+  const set = [snapshotPath, flagsPath, dbPath].filter(Boolean).length;
+  if (set === 0) return undefined; // not an instance: always-ready skeleton
+  // A partially configured instance must fail loudly, not silently be always-ready.
+  if (set !== 3) {
+    throw new Error('instance mode needs all of VM_SNAPSHOT_PATH, VM_FLAGS_PATH and VM_DB_PATH (or none)');
+  }
+  return makeReadiness({ snapshotPath, flagsPath, dbPath }).ready;
+}
+
+const app = createApp({ isReady: instanceReadiness(process.env) });
 const server = app.listen(PORT, HOST, () => {
   console.log(`vulnmart-shop listening on http://${HOST}:${PORT}`);
 });
