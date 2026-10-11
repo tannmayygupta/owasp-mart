@@ -224,8 +224,8 @@ Every value below was chosen by this draft because the architecture does not fix
 |---|---|---|---|
 | 1 | Signature header and form | `X-VM-Signature: v1=<hex>`, HMAC-SHA256 over `instance_id`, newline, `epoch`, newline, `seq`, newline, hex SHA-256 of the body. The label stays `v1` while the contracts are 0.x; the epoch was added in 0.2.0 (BREAKING, D-42) | Tanmay, Akshay (ingest) |
 | 2 | Per-instance key derivation | **Proposal D-42 (decided on delegation 2026-10-11, to be confirmed):** HKDF-SHA256 (RFC 5869) from the platform master `K_evt`, salt `vm-evt-salt-v1`, info `vm-event-key-v1` 0x00 `instance_id` 0x00 decimal `epoch`, 32 bytes, base64url (43 characters); one key per `(instance, epoch)`, so a reset gets a new key; vector in `examples/event-key-vector.json`; ADR 0025. Closes the "not defined" of 0.1.0; master rotation `K_evt[v]` stays with ADR 0009 | Akshay, Tanmay |
-| 3 | Size caps | Posted body 4 KiB; wire event 16 KiB; `evidence.capture` body 8 KiB; timestamp 10 minutes ahead | Tanmay |
-| 4 | Order of ingest checks and answers for malformed bodies | Size, then JSON and usable id and seq (422), then signature (401), then evidence size (413), schema (422), clock (422), duplicate (200 or 409) | Tanmay |
+| 3 | Size caps | Posted body 4 KiB; wire event 16 KiB; `evidence.capture` body 8 KiB; timestamp 10 minutes ahead | confirmed on delegation (Tanmay, 2026-10-11) |
+| 4 | Order of ingest checks and answers for malformed bodies | Size (413), then content type, JSON and a usable id, epoch and seq (422), then signature and an epoch above the instance's current one (both 401), then evidence size (413), schema (422), clock (422), duplicate (200 or 409), store full (503, fake only), else 202 (section 5) | confirmed on delegation (Tanmay, 2026-10-11) |
 | 5 | `EVT-*` codes | `EVT-BAD-SIGNATURE`, `EVT-TOO-LARGE`, `EVT-SCHEMA`, `EVT-DUPLICATE-MISMATCH` (placeholders; one code for all 401 causes) | Akshay (registry P-02) |
 | 6 | Sidecar answers to the shop | 202, 400, 405, 413, 415, 422, and 503 when the sidecar cannot give the event a sequence number (0.2.0) | Tanmay, Sahil |
 | 7 | Shop to sidecar path and cap | `/v1/events`, POST only, `application/json`, 4 KiB | Tanmay, Sahil |
@@ -234,22 +234,22 @@ Every value below was chosen by this draft because the architecture does not fix
 | 10 | Name `infrastructure_fault` | Listed as `infrastructure_fault` (no dot), source `orchestrator` or `platform`, data `fault_class` and optional `detail_code` | Tanmay, Akshay |
 | 11 | Data field shapes the specs leave open | Ids are letters, digits, `_`, `.`, `-` (1 to 64); class names are `a-z0-9_` (1 to 32); `method` is a fixed list; CRS `rule_ids` are 3 to 9 digit strings | Sahil, Tanmay |
 | 12 | Fields the specs name loosely | `import.job` `flagged_keys` is a list of class names; `refund_decision` `decision` and `amount` are a class name and a whole number of minor units; `status` is 0 to 599 | Sahil |
-| 13 | `proxy.request` `count` | Optional count when the sidecar aggregates a window | Tanmay |
-| 14 | `proxy.flag_seen` extra fields | Optional `route_template` and `request_ref` kept from the challenge specs | Tanmay |
+| 13 | `proxy.request` `count` | Optional count when the sidecar aggregates a window | confirmed on delegation (Tanmay, 2026-10-11) |
+| 14 | `proxy.flag_seen` extra fields | Optional `route_template` and `request_ref` kept from the challenge specs | confirmed on delegation (Tanmay, 2026-10-11) |
 | 15 | `challenge_key` on events | In the envelope (optional; required for `evidence.capture`); `proxy.flag_seen` also has it in `data` as decided; when both are present they must be equal | Tanmay, Sahil |
 | 16 | No flag-like text anywhere | Any string containing `VM{` (any letter case), `VM%7B` or `VM` plus a full-width brace is rejected in `data`; the flag format is itself a placeholder (FR-FLG-02), so this pattern follows it | Tanmay, Sahil |
 | 17 | `user_id` shape | Same id pattern as other ids, or `null` | Sahil |
 | 18 | `session_kind` for mock and collector events | Examples use `anon`; any value except `internal`, and except a wrong one for source `bot`, is allowed | Sahil |
-| 19 | Sidecar-side check of posted events | The sidecar refuses a source the type does not allow; the posted body has its own derived schema (row 25) | Tanmay |
-| 20 | Fake ingest options | `--key` (one fixed key for every epoch, harness only) or `--master` (64 hex characters, a fake master: keys derived per epoch), `--instance` (its id, default `i-AAAAAAAAAAAAAAAA`), `--epoch` (current epoch, default 1), `--port` (default 8081); `GET /_fake/events` lists what was stored ordered by `(epoch, seq)`; `POST /_fake/epoch` sets the current epoch (not part of IF-4) | Tanmay |
+| 19 | Sidecar-side check of posted events | The sidecar refuses a source the type does not allow; the posted body has its own derived schema (row 25) | confirmed on delegation (Tanmay, 2026-10-11) |
+| 20 | Fake ingest options | `--key` (one fixed key for every epoch, harness only) or `--master` (64 hex characters, a fake master: keys derived per epoch), `--instance` (its id, default `i-AAAAAAAAAAAAAAAA`), `--epoch` (current epoch, default 1), `--port` (default 8081); `GET /_fake/events` lists what was stored ordered by `(epoch, seq)`; `POST /_fake/epoch` sets the current epoch (not part of IF-4) | confirmed on delegation (Tanmay, 2026-10-11) |
 | 21 | Duplicate with a different body | `409` with placeholder code `EVT-DUPLICATE-MISMATCH` for the same `(instance_id, epoch, seq)`; the ingest keeps a SHA-256 of each accepted body | Tanmay, Akshay (registry P-02) |
-| 22 | Fake ingest store cap | At most 100000 events, then `503` `EVT-STORE-FULL` (fake only) | Tanmay |
+| 22 | Fake ingest store cap | At most 100000 events, then `503` `EVT-STORE-FULL` (fake only) | confirmed on delegation (Tanmay, 2026-10-11) |
 | 23 | Evidence redaction marker | `[FLAG-REDACTED]` replaces every flag-like string in the evidence body and header values before sending | Tanmay, Sahil |
 | 24 | Per-poster caps | Posted bodies 4 KiB, so a collector's evidence body is at most 2 KiB; the sidecar's own evidence body up to 8 KiB | Tanmay, Sahil |
 | 25 | Posted-body schema | `instance-events.posted.schema.json`, derived from the wire schema by `--write-posted` (no `instance_id`, `epoch` or `seq`); sidecar answers 202, 400, 405, 413, 415, 422, 503 | Tanmay, Sahil |
 | 26 | `session_kind` `internal` | Only for the sources `import`, `orchestrator` and `platform` | Tanmay, Sahil |
-| 27 | Best-effort flag check | The pattern rejects `VM{` in any case, `VM%7B` and a full-width brace; it is not a guarantee (FR-FLG-02 owns the format) | Tanmay |
-| 28 | Unreadable `ts` | A `ts` that parses to no time (leap second) answers `422` "ts is not a usable time" | Tanmay |
+| 27 | Best-effort flag check | The pattern rejects `VM{` in any case, `VM%7B` and a full-width brace; it is not a guarantee (FR-FLG-02 owns the format) | confirmed on delegation (Tanmay, 2026-10-11) |
+| 28 | Unreadable `ts` | A `ts` that parses to no time (leap second) answers `422` "ts is not a usable time" | confirmed on delegation (Tanmay, 2026-10-11) |
 | 29 | Epoch on the event and the seq lanes | `epoch` (integer at least 1) is a required wire field stamped by the sidecar; lanes per source in the schema (open point 9) | Tanmay, Akshay |
 | 30 | Epoch rules at the ingest | After the signature check, an epoch above the instance's current epoch is `401`; an epoch equal or below is accepted and stored under its own epoch, never credited to a later epoch (section 6). The platform supplies the current epoch; the fake sets it with `--epoch` or `POST /_fake/epoch` | Akshay, Tanmay |
 | 31 | Sidecar counter persistence | Write-ahead (the next value is saved before the event is queued), in a state file in the sidecar's own `/tmp` (`/tmp/vm-sidecar-seq.json`, owner and instance and epoch inside); a restart of the sidecar process continues, a lost container does not (memory-backed `/tmp`). Reserve no new volume now; see open point 32 | Tanmay, Akshay |

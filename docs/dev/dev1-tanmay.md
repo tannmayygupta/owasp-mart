@@ -126,6 +126,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Waits on: L-05, L-06, L-07 and the sign-offs of Akshay (P-08) and Sahil (T-03).
   - Done when: The tag exists, COMPAT.md lists the versions every stream targets and the approvals check is active.
   - Handoffs: H-58, H-80, H-81, H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT ticked: the tag contracts-v1.0.0 waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run 
+ode scripts/tag-contracts.mjs --dry-run.
 
 - [ ] **L-10. DuckDNS names and certificates**
   - Epic: `epic-environments-and-deployment`

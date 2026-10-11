@@ -5,11 +5,14 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (contracts tag preparation, story L-09, 2026-10-11, Tanmay)
+- `contracts/COMPAT.md` (versions and approvers), CI rule `approvals` (from the first `contracts-v*` tag: one approval, or every consumer other than the author for BREAKING; the author's review and stale approvals never count; approvers read from the base copy), a read-only reviews step in the job `contract-rules`, `scripts/tag-contracts.mjs` (preconditions, `--dry-run`, local `--create`, never pushes), ADR 0029, runbook `docs/runbooks/contracts-tag.md`, D-48. IF-4 0.2.1 and IF-6 0.3.1 (editorial; IF-6 duplicate 0.2.0 renumbered 0.3.0). Tanmay's handoffs closed, stale rows corrected, H-113 and H-114 added. The tag is **not** made; L-09 is not ticked.
+
 ### Changed (PR 3 review remediation, story 1.15, 2026-10-11, Tanmay)
 - Decisions D-42 to D-47 recorded in `initial.md`, ADRs 0025 to 0028 Accepted; the EARLY PR reminder added to `CLAUDE.md`; messages for Sahil and Akshay (T-04, T-09, T-10 and P-04 unblock, handoff H-112); the sprint 1 pull request checklist updated.
 - Merged `origin/main` into the sprint 1 branch: 7 conflicts resolved as unions, IF-7 registered, this branch's ADRs 0017 and 0018 renumbered 0023 and 0024, the IF-4 consumer sign-off flagged stale.
 - IF-4 0.2.0: `epoch` on every event, identity `(instance_id, epoch, seq)`, seq lanes per source, signed epoch, per-epoch HKDF event key with a test vector, `first_seq` removed from IF-5 and the sidecar start input, sidecar counter saved before each event (ADR 0025). Breaking inside 0.x.
-- IF-6 0.2.0: template schema rejects 40 more invalid shapes (fixed network and image per role, limits, env patterns, injector rules, reason quality, dates, user).
+- IF-6 0.3.0 (first written 0.2.0, renumbered in story L-09): template schema rejects 40 more invalid shapes (fixed network and image per role, limits, env patterns, injector rules, reason quality, dates, user).
 - IF-5 0.3.0: required `transition` on StateReport, strict integers on the wire, RFC 9457 problem details with an open schema, `ssl_context` must verify (ADR 0028).
 - IF-2 0.2.0: stable `(epoch, seq)` cursor, `has_more` and `limit`, RFC 9457 problems, flag answer only `correct` or `incorrect`, role table, 410 for withdrawn and cancelled reads.
 - Contract rules engine: trusted base checker, whole-contract deletion is breaking, exact `BREAKING:` marker, `oneOf` branch removal and unlisted artefacts are compared, `.github/CODEOWNERS` for the checker paths (ADR 0026). The workflow has not run on GitHub yet.

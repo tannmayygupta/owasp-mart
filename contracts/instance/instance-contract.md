@@ -194,13 +194,13 @@ Every value below was chosen by this draft because the architecture does not fix
 | 17 | Healthcheck numbers and kinds | interval 2 s, timeout 2 s, 15 retries; kinds `http`, `tcp`, `socket`; shop checks `/readyz` | Tanmay (spike S-4) |
 | 18 | Import service transport | unix socket, no network, fresh process per job, healthcheck by socket | Sahil |
 | 19 | Decoy placement field | `decoy_placement` (optional string, content defined by T) | Sahil |
-| 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | Tanmay |
-| 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | Tanmay |
+| 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | confirmed on delegation (Tanmay, 2026-10-11) |
+| 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | confirmed on delegation (Tanmay, 2026-10-11) |
 | 22 | Event endpoint base URL | `http://sidecar:9000` (path `/v1/events`, defined by IF-4); mock base `http://mock-services` | Tanmay, Sahil |
 | 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex and arrives as the required `owner_hash` of the IF-5 create body, computed by the platform (proposal: HMAC-SHA256 of the user id with a platform label key; handoff H-20); `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
 | 24 | Env value limit and reason length | value at most 512 characters; flag-in-env reason 20 to 300 characters, not blank; only the shop may use the exception | Sahil |
 | 25 | Env allowlist | the 13 names in section 2 | Sahil |
-| 26 | `issued_at` handling | optional, advisory and not enforced in v0, no age check | Tanmay |
+| 26 | `issued_at` handling | optional, advisory and not enforced in v0, no age check | confirmed on delegation (Tanmay, 2026-10-11) |
 | 27 | Sentinel and file paths of the placement kinds | file names are defined by the catalogue (IF-7); the directories `/run/placement/import` and `/run/placement/mock` are fixed here (row 16) | Sahil (T-02) |
 | 28 | Shop restart and data loss | `/data` is memory-backed and lost on restart; no restart policy in v0; a dead shop means the orchestrator resets the instance (refers to OI-23) | Tanmay, Sahil |
 | 29 | Injector network mode | Decision by Tanmay (2026-10-08): `network_mode: none` for the injector, enforced by the schema. This deviates from the architecture 02 drawing, which shows the injector on the instance network | Tanmay |

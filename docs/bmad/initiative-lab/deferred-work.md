@@ -80,3 +80,11 @@
 - source_plan: same
   summary: Free Plan limits (instance count, disk size, eligible types in Sydney, zone availability) and the 16384-byte user data limit are unverified; so are Budgets' treatment of credits, idle reclaim by AWS and the completeness of `iam-policy.json`.
   evidence: AWS pages were read only while planning (2026-10-11), not in the build; record the real answers in `docs/research/s-11-aws-hosts.md` after the first apply.
+
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: Feed one real `gh api --paginate --slurp .../pulls/N/reviews` output to `loadReviews` as a test fixture.
+  evidence: The approvals rule and the reviews step were proven only with hand-built review arrays and a workflow text test; the real JSON shape (user.login, state, commit_id, submitted_at) and the `--slurp` behaviour of the runner's gh were not run on GitHub (maybe-false, medium if wrong). It fails closed after the tag (a missing or invalid file is a FAIL), and the first real pull request that runs the job shows it; capture that output into scripts/fixtures then.
+
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: The header of contracts/instance/instance-contract.md still says "Version: 0.1.0" while the contract is at 0.3.1.
+  evidence: Found by the story 1.7 review pass; it was stale before the story and does not refer to the changes made here. A text change under contracts/instance/ needs a contracts changelog entry, so it is fixed together with the next IF-6 change or the 1.0.0 release commit.

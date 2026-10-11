@@ -12,6 +12,17 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance contract (IF-6), `contracts/instance/`
 
+### 0.3.1 (2026-10-11, Tanmay, story L-09 preparation)
+- Editorial, no schema change: the template-hardening entry below was numbered 0.2.0 a second time; it is renumbered 0.3.0 so that every IF-6 version is unique (`contracts/COMPAT.md` lists versions). Open points 20, 21 and 26 of `instance-contract.md` are marked confirmed on delegation by Tanmay (handoff H-82); the written proposals stand.
+
+### 0.3.0 (2026-10-11, Tanmay, story 1.15, instance template hardening; a minor step because it is breaking before v1.0.0)
+- `instance-template.schema.json` now closes the holes found in the audit. Component `name` is one of the six role names and equals its role; `image` is exactly `{image:<role>}`; `network_mode` is fixed per role (`instance` for the shop, sidecar, mock-services and bot controller, `none` for the injector and import service); the injector has no `ports` and no `healthcheck`; the shop healthcheck path is `/readyz` (the contract text always said `/readyz`; the schema did not check it); `user` is exactly `65532:65532`; `memory_mb` 16 to 1024, `cpu_limit` above 0 up to 2, `pids_limit` 1 to 512, volume `size_mb` up to 64, tmpfs `size_mb` up to 512 (maxima are about twice the largest example and are proposals, to confirm after spikes S-4 and S-5); each `env` name has a value pattern or fixed value (URLs, socket, database and snapshot paths, `TZ`, log level, `PORT`) and `env` is not empty; `vm.expires` is a token or a UTC date-time with a valid month, day, hour, minute and second; `flag_delivery_env.reason` must be a real sentence (no run of four equal characters, no double whitespace, at least three words).
+- `scripts/validate-contracts.mjs` adds three semantic rules: `PORT` is one of `ports`, `vm.expires` is a real calendar date, a flag-in-env `reason` has at least 8 different letters or digits. Section 7 and open point text of `instance-contract.md` describe them.
+- 40 new invalid examples under `examples/invalid/instance-template/` (each with its path in `examples/invalid/manifest.json`); no valid example changed.
+- BREAKING: a template that used another run user than 65532:65532, a component name or image other than the role's own, network_mode other than the role's fixed value, a shop healthcheck path other than /readyz, limits above the new maxima, an env value outside its pattern or an empty env is now invalid
+- no mock change: the stub instance mock (`contracts/mocks/stub-instance`) does not read `instance-template.schema.json`; the checkers that use it are `scripts/validate-contracts.mjs` and `scripts/check-instance-conformance.mjs`, both changed here with tests.
+- `scripts/check-instance-conformance.mjs`: the helper-name allowlist (`ingest`, `volume-keeper`) is frozen and no longer a way to skip rules (new rule `harness-helpers-minimal`; `no-outside-network` now covers helpers too).
+
 ### 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42)
 - BREAKING: `first_seq` is removed from the sidecar start document (`sidecar-start.schema.json`: no longer required, no longer allowed); the sidecar restarts its sequence counter at 1 in every epoch and stamps the `epoch` of the start document on every event (IF-4 0.2.0). The `event_key` in the document is now the 43-character base64url key derived per `(instance, epoch)`; the accepted shape (32 to 128 printable ASCII characters) is unchanged.
 - Section 6 and open point 35 updated; the sidecar keeps its write-ahead counter in a file in its own `/tmp` (`/tmp/vm-sidecar-seq.json`). No new mount, volume or path is added to the template; a lost sidecar container loses the file (IF-4 open point 32).
@@ -36,14 +47,6 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Additive: new schema `sidecar-start.schema.json` (the start document of the sidecar: `schema_version`, `instance_id`, `epoch`, `first_seq`, `event_key`, `flag_digests`), 2 valid and 24 invalid examples, one semantic rule in `contracts/mocks/stub-instance/semantic.mjs`, shared by `scripts/validate-contracts.mjs` and the stub (no repeated digest, one real digest per challenge key). Section 6 describes it; open point 35 is now a proposal with a shape (handoff H-59, for L-13 and L-20). Decided by Tanmay on 2026-10-10 as a proposal; Akshay and the orchestrator story confirm it.
 - Additive note in section 7 and new open point 36: a Docker tmpfs volume is lost when its last container stops, so something must keep the four volumes mounted while the injector exits and the shop starts (found while building the L-06 harness).
 - No change to the other three schemas, to IF-4, IF-5, IF-1 or IF-2.
-
-### 0.2.0 (2026-10-11, Tanmay, story 1.15, instance template hardening; a minor step because it is breaking before v1.0.0)
-- `instance-template.schema.json` now closes the holes found in the audit. Component `name` is one of the six role names and equals its role; `image` is exactly `{image:<role>}`; `network_mode` is fixed per role (`instance` for the shop, sidecar, mock-services and bot controller, `none` for the injector and import service); the injector has no `ports` and no `healthcheck`; the shop healthcheck path is `/readyz` (the contract text always said `/readyz`; the schema did not check it); `user` is exactly `65532:65532`; `memory_mb` 16 to 1024, `cpu_limit` above 0 up to 2, `pids_limit` 1 to 512, volume `size_mb` up to 64, tmpfs `size_mb` up to 512 (maxima are about twice the largest example and are proposals, to confirm after spikes S-4 and S-5); each `env` name has a value pattern or fixed value (URLs, socket, database and snapshot paths, `TZ`, log level, `PORT`) and `env` is not empty; `vm.expires` is a token or a UTC date-time with a valid month, day, hour, minute and second; `flag_delivery_env.reason` must be a real sentence (no run of four equal characters, no double whitespace, at least three words).
-- `scripts/validate-contracts.mjs` adds three semantic rules: `PORT` is one of `ports`, `vm.expires` is a real calendar date, a flag-in-env `reason` has at least 8 different letters or digits. Section 7 and open point text of `instance-contract.md` describe them.
-- 40 new invalid examples under `examples/invalid/instance-template/` (each with its path in `examples/invalid/manifest.json`); no valid example changed.
-- BREAKING: a template that used another run user than 65532:65532, a component name or image other than the role's own, network_mode other than the role's fixed value, a shop healthcheck path other than /readyz, limits above the new maxima, an env value outside its pattern or an empty env is now invalid
-- no mock change: the stub instance mock (`contracts/mocks/stub-instance`) does not read `instance-template.schema.json`; the checkers that use it are `scripts/validate-contracts.mjs` and `scripts/check-instance-conformance.mjs`, both changed here with tests.
-- `scripts/check-instance-conformance.mjs`: the helper-name allowlist (`ingest`, `volume-keeper`) is frozen and no longer a way to skip rules (new rule `harness-helpers-minimal`; `no-outside-network` now covers helpers too).
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
@@ -94,6 +97,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance events (IF-4), `contracts/events/`
 
+### 0.2.1 (2026-10-11, Tanmay, story L-09 preparation)
+- Editorial, no schema change: open point 4 now states the whole order of the ingest checks as section 5 has it (it had stayed at the 0.1.0 wording, without the epoch checks and the store-full answer); open points 3, 4, 13, 14, 19, 20, 22, 27 and 28 are marked confirmed on delegation by Tanmay (handoff H-82; point 28 had been left out of that handoff); the written proposals stand.
+
 ### 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42, decided on the developer's delegation; to be confirmed)
 - BREAKING: new required wire field `epoch` (integer at least 1) in `instance-events.schema.json`; event identity is now `(instance_id, epoch, seq)` instead of `(instance_id, seq)`. Every epoch restarts the sidecar counter at 1. The posted schema does not contain `epoch` (the sidecar stamps it; a poster that sends it gets 422).
 - BREAKING: the signing string of `X-VM-Signature` (label stays `v1` while the contracts are 0.x) is now `instance_id`, newline, `epoch`, newline, `seq`, newline, hex SHA-256 of the body. The three signed envelope examples are signed again.
@@ -134,6 +140,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Full content (briefs, write-ups, decoys, filled hints, official-site id re-check) is T-30; each challenge's real milestone signals and confirmed flag placement come with its own story.
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
+
+### 2026-10-11 (Tanmay, story L-09 preparation, ADR 0029)
+- registry change: new rule `approvals` (starts with the first tag `contracts-v*`: a pull request that changes a contract needs one approval from an owner or consumer, or from every consumer other than the author when the change is declared BREAKING (if the author is the only consumer, one approval from any other listed person), never the author's own, never one given before a later change of the contract files; the approvers are read from the base copy of `contracts/COMPAT.md`); `compat` reads only the `## Versions` table; the job `contract-rules` fetches the pull request reviews in a separate step (`pull-requests: read`) and hands the file to the checker; new file `contracts/COMPAT.md` (also guarded: an edit of it needs a `registry change:` line; CODEOWNERS lists the three owners); new script `scripts/tag-contracts.mjs` (checks the preconditions and prints the tag commands, never pushes).
 
 ### 2026-10-11 (Tanmay, story 1.15)
 - registry change: IF-7 (challenge catalogue, owner T) is registered and `contracts/catalog` is no longer reserved; the checker, its registry, the oasdiff pins and the workflow now run from the base commit (trusted checker, ADR 0026); deleting a whole contract is a breaking change; the marker is the exact line `BREAKING:`.

@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import yaml from 'js-yaml';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -53,6 +54,40 @@ test('contract-rules: no step runs code from head/ except the declared bootstrap
   assert.ok(!/GITHUB_TOKEN/.test(j));
 });
 
+// Story L-09 (docs/adr/0029): the rule `approvals` needs the pull request reviews. The one place that holds a token is a step that only runs `gh api`
+// and writes a file; the checker steps get the file path and never the token. The token is the read-only token of the job. Asserted on the parsed
+// workflow, not on the text layout.
+const doc = yaml.load(ci);
+const allSteps = Object.entries(doc.jobs).flatMap(([jobName, j]) => (j.steps ?? []).map((s) => ({ jobName, ...s })));
+test('contract-rules: the reviews are fetched with a read-only token in one step that runs no repository code; the checker never holds it', () => {
+  const j = doc.jobs['contract-rules'];
+  assert.deepEqual(j.permissions, { contents: 'read', 'pull-requests': 'read' });
+  const holders = j.steps.filter((s) => s.env && 'GH_TOKEN' in s.env);
+  assert.equal(holders.length, 1, 'exactly one step of the job has GH_TOKEN');
+  const [fetch] = holders;
+  assert.match(fetch.name, /^Fetch the pull request reviews/);
+  assert.equal(fetch.env.GH_TOKEN, '${{ github.token }}');
+  assert.equal(fetch.env.REVIEWS_URL, 'repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews');
+  assert.equal(fetch.run, 'gh api --paginate --slurp "$REVIEWS_URL" > "$RUNNER_TEMP/reviews.json"');
+  assert.ok(!fetch.uses && !fetch['working-directory'], 'the token step runs no repository code');
+  assert.equal(fetch['continue-on-error'], true, 'a failed fetch must not fail every pull request before the tag; the checker then sees no file (NOT-APPLICABLE before the tag, FAIL after it)');
+  assert.deepEqual(j.steps.filter((s) => s['continue-on-error'] !== undefined).map((s) => s.name), [fetch.name], 'continue-on-error on that step only');
+  const checker = j.steps.find((s) => /Run the contract rules from the base commit/.test(s.name));
+  assert.ok(checker && !('GH_TOKEN' in (checker.env ?? {})) && !JSON.stringify(checker).includes('github.token'));
+  assert.equal((checker.run.match(/--reviews "\$RUNNER_TEMP\/reviews\.json" --require-reviews --pr-author "\$PR_AUTHOR"/g) ?? []).length, 2, 'both the trusted and the bootstrap run pass the reviews');
+  assert.equal(checker.env.PR_AUTHOR, '${{ github.event.pull_request.user.login }}');
+  assert.ok(j.steps.indexOf(fetch) < j.steps.indexOf(checker));
+});
+
+test('no step of any job uses secrets, only that one step uses gh or a token, and no other job asks for more than contents: read', () => {
+  for (const s of allSteps) assert.ok(!/secrets\./.test(JSON.stringify(s)), `${s.jobName}: ${s.name ?? s.uses} uses secrets`);
+  const ghUsers = allSteps.filter((s) => /(^|[\s;&|(])gh\s/.test(s.run ?? ''));
+  assert.deepEqual(ghUsers.map((s) => `${s.jobName}/${s.name}`), ['contract-rules/Fetch the pull request reviews (read-only token, this step only)']);
+  const tokenUsers = allSteps.filter((s) => /github\.token|GH_TOKEN|GITHUB_TOKEN/.test(JSON.stringify(s)));
+  assert.equal(tokenUsers.length, 1);
+  assert.deepEqual(doc.permissions, { contents: 'read' });
+  for (const [name, j] of Object.entries(doc.jobs)) if (name !== 'contract-rules' && j.permissions) assert.deepEqual(j.permissions, { contents: 'read' }, name);
+});
 test('contract-rules-untrusted: head code runs here, with no credentials and read-only permissions', () => {
   const j = stripComments(job('contract-rules-untrusted'));
   assert.match(j, /permissions:\n\s+contents: read/);
@@ -74,7 +109,7 @@ test('every action in the contract-rules jobs is pinned by a full commit SHA, th
 
 test('CODEOWNERS covers the files that define the rules engine', () => {
   const owners = fs.readFileSync(path.join(ROOT, '.github', 'CODEOWNERS'), 'utf8');
-  for (const p of ['/scripts/check-contract-rules.mjs', '/scripts/schema-diff.mjs', '/scripts/oasdiff.mjs', '/tools/oasdiff.json', '/contracts/registry.json', '/.github/workflows/']) {
+  for (const p of ['/scripts/check-contract-rules.mjs', '/scripts/schema-diff.mjs', '/scripts/oasdiff.mjs', '/tools/oasdiff.json', '/contracts/registry.json', '/contracts/COMPAT.md', '/.github/workflows/']) {
     const line = owners.split('\n').find((l) => l.startsWith(`${p} `) || l.startsWith(`${p}\t`));
     assert.ok(line, `${p} has a CODEOWNERS entry`);
     assert.match(line, /@\w+/);

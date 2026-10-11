@@ -30,6 +30,7 @@ export const STEPS = [
   ['pytest', 'uv run --locked --package vulnmart-api pytest -q'],
   ['contracts-check', 'pnpm run contracts:check'],
   ['uv-lock-check', 'uv lock --check'],
+  // local form: no reviews file, so the rule `approvals` prints NOT-APPLICABLE (in CI a separate step fetches the reviews and passes --reviews --require-reviews)
   ['contract-rules', 'node scripts/check-contract-rules.mjs'],
   ['e2e', 'node --test scripts/e2e/lab.e2e.test.mjs scripts/e2e/orchestrator.e2e.test.mjs scripts/e2e/events.e2e.test.mjs'],
 ];

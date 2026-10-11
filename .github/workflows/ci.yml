@@ -56,8 +56,10 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 10
     runs-on: ubuntu-24.04
+    # pull-requests: read is for the one step that fetches the reviews (story L-09, docs/adr/0029); nothing here can write.
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: Checkout the pull request head (data only, never executed here)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,15 +83,25 @@ jobs:
       - name: Install the dependencies of the base commit
         working-directory: base
         run: pnpm install --frozen-lockfile
+      # The only step that holds a token. It writes the reviews of this pull request to a file outside both checkouts and runs no repository code;
+      # the checker below reads that file as data and never sees the token (the rule "approvals" starts with the first tag contracts-v*).
+      - name: Fetch the pull request reviews (read-only token, this step only)
+        # a failed fetch must not fail every pull request before the tag: the checker then finds no file (NOT-APPLICABLE before the tag, FAIL after it)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWS_URL: repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews
+        run: gh api --paginate --slurp "$REVIEWS_URL" > "$RUNNER_TEMP/reviews.json"
       - name: Run the contract rules from the base commit
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           if [ -f base/scripts/check-contract-rules.mjs ] && grep -q 'trusted-base-checker-v1' base/scripts/check-contract-rules.mjs; then
-            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --tools base/tools/oasdiff.json
+            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --tools base/tools/oasdiff.json --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR"
           else
             echo "::notice title=contract rules bootstrap::The base commit has no trusted-mode checker yet, so the checker of the pull request head runs. This run does not protect against a pull request that weakens the rules; review it by hand."
-            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --bootstrap --tools head/tools/oasdiff.json
+            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --bootstrap --tools head/tools/oasdiff.json --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR"
           fi
 
   # The checks that must run code of the pull request (the bundle script of package.json, Alembic and table owners with Python). No credentials are kept

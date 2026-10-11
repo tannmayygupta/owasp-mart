@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isBreakingMarker, REGISTRY_CHANGE_LINE, isGuarded, effectiveRegistry, runRules, formatResults, resolveBase, resolveTag, latestTag, spawn, runPythonCheck, validateRegistry, newEntries, changelogSection, addedLines, sectionVersions, PASS, FAIL, NA, REPO_ROOT } from './check-contract-rules.mjs';
+import { isBreakingMarker, REGISTRY_CHANGE_LINE, isGuarded, effectiveRegistry, runRules, formatResults, resolveBase, resolveTag, latestTag, spawn, runPythonCheck, validateRegistry, parseApprovers, loadReviews, newEntries, changelogSection, addedLines, sectionVersions, PASS, FAIL, NA, REPO_ROOT } from './check-contract-rules.mjs';
 import { ensureOasdiff } from './oasdiff.mjs';
 
 const SCRIPT = path.join(REPO_ROOT, 'scripts', 'check-contract-rules.mjs');
@@ -939,4 +939,295 @@ test('D-46 b: the CLI accepts --root, --base and --tools, and refuses to grade t
   } finally {
     cleanup(root);
   }
+});
+// ---- Story L-09 (ADR 0029): COMPAT.md with two tables, and the rule `approvals` ----------------------------------------------------------------
+const COMPAT2 = `# Compatibility
+
+Prose before the tables. | a pipe here is not a row because the line does not start with one.
+
+## Versions
+
+| Contract | Version | Owner |
+|---|---|---|
+| A | 0.1.0 | L |
+| B | contracts-v0.1.0 | L |
+| DB | 0.1.0 | P |
+
+## Approvals
+
+| Contract | Stream | Handle | Role | Version | Date | Status |
+|---|---|---|---|---|---|---|
+| A | L | @alice | owner | 0.1.0 | - | pending |
+| A | P | @bob | consumer | 0.1.0 | - | pending |
+| A | T | @carol | consumer | 0.1.0 | - | pending |
+| B | L | @alice | owner | 0.1.0 | - | pending |
+| B | P | @bob | consumer | 0.1.0 | - | pending |
+| DB | P | @bob | owner | 0.1.0 | - | pending |
+| DB | L | @alice | consumer | 0.1.0 | - | pending |
+| DB | T | @carol | consumer | 0.1.0 | - | pending |
+
+## Tag preconditions
+
+| Not a table of versions | x | y |
+|---|---|---|
+| nothing | here | counts |
+`;
+
+test('matrix: two tables in COMPAT.md: compat reads only the Versions table, and the Approvals table is checked for shape', async () => {
+  const ok = await run((root) => write(root, 'contracts/COMPAT.md', COMPAT2));
+  assert.equal(ok.compat.status, PASS, ok.compat.details.join('\n'));
+  assert.match(ok.compat.details[0], /3 row\(s\).*8 approver row\(s\)/);
+  const noVersions = await run((root) => write(root, 'contracts/COMPAT.md', COMPAT2.replace('## Versions', '## Release list')));
+  assert.equal(noVersions.compat.status, FAIL);
+  assert.match(noVersions.compat.details[0], /no "## Versions" section/);
+  const badVersion = await run((root) => write(root, 'contracts/COMPAT.md', COMPAT2.replace('| A | 0.1.0 | L |', '| A | 9.9.9 | L |')));
+  assert.match(badVersion.compat.details[0], /^line 9: A lists version 9\.9\.9/, 'line numbers count the whole file');
+  const bad = await run((root) => write(root, 'contracts/COMPAT.md', COMPAT2.replace('| consumer | 0.1.0 | - | pending |\n| A | T', '| reviewer | 0.1.0 | - | pending |\n| A | T').replace('@carol | consumer | 0.1.0 | - | pending |\n| B', '@carol | consumer | 0.1.0 | - | maybe |\n| B')));
+  assert.equal(bad.compat.status, FAIL);
+  assert.match(bad.compat.details.join('\n'), /role "reviewer" must be owner or consumer/);
+  assert.match(bad.compat.details.join('\n'), /status "maybe" must be pending or approved/);
+  const cols = await run((root) => write(root, 'contracts/COMPAT.md', COMPAT2.replace('| Contract | Stream | Handle | Role |', '| Contract | Stream | Person | Role |')));
+  assert.match(cols.compat.details[0], /must start with the columns contract \| stream \| handle/);
+  const handle = parseApprovers(COMPAT2.replace('@alice | owner', 'alice | owner'), REGISTRY);
+  assert.match(handle.problems[0], /handle "alice" must look like @github-login/);
+});
+
+const rv = (login, state, commit, n = 1) => ({ id: n, user: { login }, state, commit_id: commit, submitted_at: `2026-10-11T10:0${n}:00Z` });
+// A pull request on the branch `pr` against `main`. `change` edits contract A (default: additive). `reviews` gets { head, root } after the commit and
+// returns the review list; `after` may commit more work after the reviews were made (a stale approval).
+async function approvalsPr({ tag = true, compat = COMPAT2, change = 'additive', author = 'alice', reviews = () => [], after, require = true, prOpts = {}, mutate } = {}) {
+  const root = makeRepo((r) => { if (compat !== null) write(r, 'contracts/COMPAT.md', compat); });
+  try {
+    if (tag) sh(root, 'tag', 'contracts-v1.0.0');
+    sh(root, 'checkout', '-q', '-b', 'pr');
+    if (change === 'additive') {
+      const s = JSON.parse(read(root, 'contracts/a/a.schema.json')); s.properties.extra = { type: 'string' }; write(root, 'contracts/a/a.schema.json', s);
+      addChangelog(root, A, '### 0.2.0 (2026-10-11)\n- Additive: optional `extra`.');
+      touchMock(root, 'mock-a');
+    } else if (change === 'breaking') {
+      breakA(root, '### 2.0.0 (2026-10-11)\n- BREAKING: removed `kind`.');
+    }
+    if (mutate) mutate(root);
+    commitAll(root, 'the change');
+    const head = sh(root, 'rev-parse', 'HEAD').trim();
+    const list = reviews === null ? undefined : typeof reviews === 'function' ? reviews({ head, root }) : reviews;
+    if (after) { after(root); commitAll(root, 'later work'); }
+    const results = await runRules({ root, base: 'main', oasdiffBin, skip: ['table-owners', 'alembic'], reviews: list, requireReviews: require, prAuthor: author === null ? undefined : author, ...prOpts });
+    const by = Object.fromEntries(results.map((r) => [r.name, r]));
+    return { by, results, text: formatResults(results) };
+  } finally {
+    cleanup(root);
+  }
+}
+
+test('matrix: approvals before the first tag: NOT-APPLICABLE with the reason "starts with the tag"; the rest of the run is unchanged', async () => {
+  const { by, results, text } = await approvalsPr({ tag: false });
+  assert.equal(by.approvals.status, NA);
+  assert.match(by.approvals.details[0], /starts with the first tag contracts-v\*/);
+  assert.deepEqual(failing(results), [], text);
+  assert.equal(by.compat.status, PASS);
+});
+
+test('matrix: approvals, additive change: one approval from a consumer at the head passes; none fails naming who could approve', async () => {
+  const ok = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(ok.by.approvals.status, PASS, ok.text);
+  assert.match(ok.by.approvals.details[0], /^A \(additive\): approved by @bob at /);
+  assert.deepEqual(failing(ok.results), [], ok.text);
+  const sameCase = await approvalsPr({ reviews: ({ head }) => [rv('BOB', 'APPROVED', head.toUpperCase())] });
+  assert.equal(sameCase.by.approvals.status, PASS, 'logins and commit ids are compared without case');
+  const none = await approvalsPr({ reviews: [] });
+  assert.equal(none.by.approvals.status, FAIL);
+  assert.match(none.by.approvals.details[0], /^A \(additive\): needs one approval from @bob, @carol \(owner or consumer, not the author\)/);
+  assert.deepEqual(failing(none.results), ['approvals'], 'nothing else fails');
+});
+
+test('matrix: approvals, BREAKING change: every consumer must approve; one of two fails naming the missing one', async () => {
+  const one = await approvalsPr({ change: 'breaking', reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(one.by.approvals.status, FAIL, one.text);
+  assert.match(one.by.approvals.details[0], /^A \(declared BREAKING in its new changelog entry\): needs the approval of every consumer, missing @carol/);
+  const both = await approvalsPr({ change: 'breaking', reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('carol', 'APPROVED', head, 2)] });
+  assert.equal(both.by.approvals.status, PASS, both.text);
+  const byConsumerAuthor = await approvalsPr({ change: 'breaking', author: 'bob', reviews: ({ head }) => [rv('carol', 'APPROVED', head)] });
+  assert.equal(byConsumerAuthor.by.approvals.status, PASS, 'an author who is a consumer needs the other consumers only');
+});
+
+test('matrix: approvals, stale approval: a change to the contract files after the approval makes it count for nothing; other files do not', async () => {
+  const stale = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head)], after: (root) => write(root, 'contracts/a/a.md', '# A, edited after the approval\n') });
+  assert.equal(stale.by.approvals.status, FAIL, stale.text);
+  assert.match(stale.by.approvals.details.join('\n'), /ignored: @bob approved [0-9a-f]{7}, but the files of A changed after it/);
+  const outside = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head)], after: (root) => write(root, 'README.md', 'x\n') });
+  assert.equal(outside.by.approvals.status, PASS, outside.text);
+  const other = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head)], after: (root) => write(root, 'contracts/b/b.md', 'another contract changed later\n') });
+  assert.equal(other.by.approvals.status, FAIL, 'B changed later and has no approval of its own');
+  assert.match(other.by.approvals.details.join('\n'), /^B \(additive\)|\nB \(additive\)/m);
+  const missing = await approvalsPr({ reviews: [rv('bob', 'APPROVED', '0123456789abcdef0123456789abcdef01234567')] });
+  assert.equal(missing.by.approvals.status, FAIL);
+  assert.match(missing.by.approvals.details.join('\n'), /cannot be compared with the head/);
+});
+
+test('matrix: approvals, self approval, unlisted people, comments and later change requests', async () => {
+  const self = await approvalsPr({ author: 'bob', reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(self.by.approvals.status, FAIL);
+  assert.match(self.by.approvals.details.join('\n'), /ignored: @bob is the author: an own review never counts/);
+  const stranger = await approvalsPr({ reviews: ({ head }) => [rv('mallory', 'APPROVED', head)] });
+  assert.equal(stranger.by.approvals.status, FAIL);
+  assert.match(stranger.by.approvals.details.join('\n'), /ignored: @mallory is not listed for A in the Approvals table of the base COMPAT\.md/);
+  const comment = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('bob', 'COMMENTED', head, 2)] });
+  assert.equal(comment.by.approvals.status, PASS, 'a comment does not take an approval back');
+  const changes = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('bob', 'CHANGES_REQUESTED', head, 2)] });
+  assert.equal(changes.by.approvals.status, FAIL);
+  assert.match(changes.by.approvals.details.join('\n'), /latest review is CHANGES_REQUESTED/);
+  const later = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'CHANGES_REQUESTED', head, 1), rv('bob', 'APPROVED', head, 2)] });
+  assert.equal(later.by.approvals.status, PASS, 'the latest review of a person counts');
+  const nested = await approvalsPr({ reviews: ({ head }) => [[rv('bob', 'APPROVED', head)], []] });
+  assert.equal(nested.by.approvals.status, PASS, 'the output of gh api --paginate --slurp (one array per page) is read');
+  const noAuthor = await approvalsPr({ author: null, reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(noAuthor.by.approvals.status, FAIL);
+  assert.match(noAuthor.by.approvals.details[0], /author of the pull request is unknown/);
+});
+
+test('matrix: approvals, the approvers come from the BASE copy of COMPAT.md: a pull request cannot add itself or change roles', async () => {
+  const withDave = COMPAT2.replace('| B | L | @alice | owner', '| A | T | @dave | consumer | 0.1.0 | - | approved |\n| B | L | @alice | owner');
+  const { by } = await approvalsPr({ reviews: ({ head }) => [rv('dave', 'APPROVED', head)], mutate: (root) => write(root, 'contracts/COMPAT.md', withDave) });
+  assert.equal(by.approvals.status, FAIL);
+  assert.match(by.approvals.details.join('\n'), /ignored: @dave is not listed for A/);
+  const noRow = await approvalsPr({ compat: COMPAT2.replace(/\| A \| [LPT] \| @\w+ \| (owner|consumer) .*\n/g, ''), reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(noRow.by.approvals.status, FAIL);
+  assert.match(noRow.by.approvals.details[0], /^A \(additive\): the base COMPAT\.md lists no approver for it/);
+});
+
+test('matrix: approvals, a tag but no COMPAT.md in the base FAILs; without a tag it is NOT-APPLICABLE; a pull request with no contract change needs nothing', async () => {
+  const boot = await approvalsPr({ compat: null, mutate: (root) => write(root, 'contracts/COMPAT.md', COMPAT2) });
+  assert.equal(boot.by.approvals.status, FAIL);
+  assert.match(boot.by.approvals.details[0], /^tag exists \(contracts-v1\.0\.0\) but the base \(main\) has no contracts\/COMPAT\.md/);
+  const noTag = await approvalsPr({ tag: false, compat: null, mutate: (root) => write(root, 'contracts/COMPAT.md', COMPAT2) });
+  assert.equal(noTag.by.approvals.status, NA);
+  const docsOnly = await approvalsPr({ change: 'none', mutate: (root) => write(root, 'docs-only.md', 'x\n') });
+  assert.equal(docsOnly.by.approvals.status, PASS);
+  assert.match(docsOnly.by.approvals.details[0], /no file of any contract changed/);
+});
+
+test('matrix: approvals, reviews missing or invalid: FAIL when required, NOT-APPLICABLE for a local run', async () => {
+  const required = await approvalsPr({ reviews: null });
+  assert.equal(required.by.approvals.status, FAIL);
+  assert.match(required.by.approvals.details[0], /reviews are required/);
+  const local = await approvalsPr({ reviews: null, require: false });
+  assert.equal(local.by.approvals.status, NA);
+  assert.match(local.by.approvals.details[0], /no reviews file given/);
+  const nofile = await approvalsPr({ reviews: path.join(os.tmpdir(), 'vm-no-such-reviews.json') });
+  assert.match(nofile.by.approvals.details[0], /does not exist/);
+  const notArray = await approvalsPr({ reviews: { message: 'Not Found' } });
+  assert.equal(notArray.by.approvals.status, FAIL);
+  assert.match(notArray.by.approvals.details[0], /not a JSON array/);
+  const malformed = await approvalsPr({ reviews: [{ user: { login: 'bob' }, state: 'APPROVED' }] });
+  assert.match(malformed.by.approvals.details[0], /review 1 lacks user\.login, state or a commit_id/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-reviews-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'bad.json'), '{ not json');
+    assert.match(loadReviews(path.join(dir, 'bad.json')).error, /is not valid JSON/);
+    fs.writeFileSync(path.join(dir, 'ok.json'), JSON.stringify([[{ id: 1, user: null, state: 'APPROVED', commit_id: 'abcdef1' }]]));
+    assert.deepEqual(loadReviews(path.join(dir, 'ok.json')).reviews, [], 'a deleted account is skipped');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('approvals: the command line reads --reviews, --require-reviews and --pr-author, and exits 1 on a missing approval', () => {
+  const root = makeRepo((r) => write(r, 'contracts/COMPAT.md', COMPAT2));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-reviews-'));
+  try {
+    sh(root, 'tag', 'contracts-v1.0.0');
+    sh(root, 'checkout', '-q', '-b', 'pr');
+    const s = JSON.parse(read(root, 'contracts/a/a.schema.json')); s.properties.extra = { type: 'string' }; write(root, 'contracts/a/a.schema.json', s);
+    addChangelog(root, A, '### 0.2.0 (2026-10-11)\n- Additive: optional `extra`.');
+    touchMock(root, 'mock-a');
+    commitAll(root, 'change');
+    const head = sh(root, 'rev-parse', 'HEAD').trim();
+    const file = path.join(dir, 'reviews.json');
+    const go = (author) => spawnSync(process.execPath, [SCRIPT, '--root', root, '--base', 'main', '--reviews', file, '--require-reviews', '--pr-author', author], { encoding: 'utf8', timeout: 300_000 });
+    fs.writeFileSync(file, JSON.stringify([[rv('bob', 'APPROVED', head)]]));
+    const ok = go('alice');
+    assert.match(ok.stdout, /PASS\s+approvals: A \(additive\): approved by @bob/, ok.stdout + ok.stderr);
+    const self = go('bob');
+    assert.equal(self.status, 1);
+    assert.match(self.stdout, /FAIL\s+approvals: A \(additive\): needs one approval from @alice, @carol/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    cleanup(root);
+  }
+});
+
+// ---- Review fixes: the author alone, change requests, removed contracts, guarded COMPAT.md ------------------------------------------------------
+const onlyBobConsumer = COMPAT2.replace('| A | T | @carol | consumer | 0.1.0 | - | pending |\n', '');
+const onlyBob = COMPAT2.replace(/\| A \| [LT] \| @(alice|carol) \| (owner|consumer) .*\n/g, '').replace('| A | P | @bob | consumer', '| A | P | @bob | owner');
+
+test('approvals: nobody but the author is listed: FAIL, never a pass with zero approvals', async () => {
+  const { by } = await approvalsPr({ compat: onlyBob, author: 'bob', reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(by.approvals.status, FAIL);
+  assert.match(by.approvals.details[0], /^A \(additive\): no listed person other than the author can approve/);
+});
+
+test('approvals: a change request of another listed person fails the contract and names them, even when someone else approved; the author\'s own does not', async () => {
+  const blocked = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('carol', 'CHANGES_REQUESTED', head, 2)] });
+  assert.equal(blocked.by.approvals.status, FAIL, blocked.text);
+  assert.match(blocked.by.approvals.details.join('\n'), /A \(additive\): @carol requested changes in the latest review/);
+  const blockedBreaking = await approvalsPr({ change: 'breaking', reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('carol', 'APPROVED', head, 2), rv('bob', 'CHANGES_REQUESTED', head, 3)] });
+  assert.equal(blockedBreaking.by.approvals.status, FAIL);
+  assert.match(blockedBreaking.by.approvals.details.join('\n'), /@bob requested changes/);
+  const own = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('alice', 'CHANGES_REQUESTED', head, 2)] });
+  assert.equal(own.by.approvals.status, PASS, 'the author cannot block their own pull request');
+  const stranger = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('mallory', 'CHANGES_REQUESTED', head, 2)] });
+  assert.equal(stranger.by.approvals.status, PASS, 'an unlisted person decides nothing');
+});
+
+test('approvals: a DISMISSED review does not count, also when it came after an approval', async () => {
+  const dismissed = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'DISMISSED', head)] });
+  assert.equal(dismissed.by.approvals.status, FAIL);
+  const after = await approvalsPr({ reviews: ({ head }) => [rv('bob', 'APPROVED', head, 1), rv('bob', 'DISMISSED', head, 2)] });
+  assert.equal(after.by.approvals.status, FAIL);
+});
+
+test('approvals: a BREAKING change authored by the only consumer needs one approval from another listed person', async () => {
+  const none = await approvalsPr({ compat: onlyBobConsumer, change: 'breaking', author: 'bob', reviews: [] });
+  assert.equal(none.by.approvals.status, FAIL, none.text);
+  assert.match(none.by.approvals.details[0], /needs one approval from @alice/);
+  const ok = await approvalsPr({ compat: onlyBobConsumer, change: 'breaking', author: 'bob', reviews: ({ head }) => [rv('alice', 'APPROVED', head)] });
+  assert.equal(ok.by.approvals.status, PASS, ok.text);
+});
+
+test('approvals: an additive change by a consumer approved by the OWNER passes', async () => {
+  const { by, text } = await approvalsPr({ author: 'bob', reviews: ({ head }) => [rv('alice', 'APPROVED', head)] });
+  assert.equal(by.approvals.status, PASS, text);
+});
+
+test('approvals: a removed contract needs every consumer other than the author', async () => {
+  const gone = (reviews) => approvalsPr({ change: 'none', mutate: (root) => { dropContract(root, 'B'); addChangelog(root, B, '### 2.0.0 (2026-10-11)\n- BREAKING: removed contract B.'); }, reviews });
+  const none = await gone([]);
+  assert.equal(none.by.approvals.status, FAIL, none.text);
+  assert.match(none.by.approvals.details.join('\n'), /B \(the contract was removed\): needs the approval of every consumer, missing @bob/);
+  const ok = await gone(({ head }) => [rv('bob', 'APPROVED', head)]);
+  assert.equal(ok.by.approvals.status, PASS, ok.text);
+});
+
+test('approvals: a COMMENTED or PENDING review without commit_id or login does not break the file; --pr-author may be written with @', async () => {
+  const loose = await approvalsPr({ reviews: ({ head }) => [{ id: 1, user: { login: 'bob' }, state: 'COMMENTED' }, { id: 2, user: null, state: 'PENDING' }, rv('bob', 'APPROVED', head, 3)] });
+  assert.equal(loose.by.approvals.status, PASS, loose.text);
+  assert.deepEqual(loadReviews([{ state: 'COMMENTED' }]).reviews, []);
+  assert.match(loadReviews([{ state: 'APPROVED', user: { login: 'bob' } }]).error, /lacks user\.login, state or a commit_id/);
+  const self = await approvalsPr({ author: '@bob', reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(self.by.approvals.status, FAIL);
+  assert.match(self.by.approvals.details.join('\n'), /@bob is the author/);
+  const ok = await approvalsPr({ author: '@ALICE', reviews: ({ head }) => [rv('bob', 'APPROVED', head)] });
+  assert.equal(ok.by.approvals.status, PASS, ok.text);
+});
+
+test('D-46 b: contracts/COMPAT.md is guarded: a change needs a "registry change:" line, or trusted-base FAILs', async () => {
+  assert.equal(isGuarded('contracts/COMPAT.md'), true);
+  const edit = (root) => write(root, 'contracts/COMPAT.md', read(root, 'contracts/COMPAT.md').replace('| A | T | @carol | consumer', '| A | T | @mallory | consumer'));
+  const custom = { opts: trusted, customize: (root) => write(root, 'contracts/COMPAT.md', COMPAT2) };
+  const bad = await scenario(edit, custom);
+  assert.equal(bad.by['trusted-base'].status, FAIL);
+  assert.match(bad.by['trusted-base'].details[0], /contracts\/COMPAT\.md/);
+  const declared = await scenario((root) => { edit(root); addChangelog(root, A, '### 0.1.1\n- registry change: new approver'); }, custom);
+  assert.equal(declared.by['trusted-base'].status, PASS);
 });

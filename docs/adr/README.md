@@ -30,5 +30,6 @@
 | 0026 | [Trusted base checker for the contract rules](0026-trusted-base-checker-for-contract-rules.md) | Accepted (D-46); not yet proven on GitHub |
 | 0027 | [Labs host isolation, IAM guard and remote state](0027-labs-host-isolation-iam-guard-and-remote-state.md) | Accepted (D-43, D-44; applied and verified live); S3 state prepared (D-45) |
 | 0028 | [IF-5 problem details, state report transition number, strict integers](0028-if5-problem-details-state-report-and-strict-seq.md) | Accepted (D-47) |
+| 0029 | [Contract approvals checked by CI, and the tag procedure](0029-contract-approvals-by-ci-and-tag-procedure.md) | Proposed (decided on the developer's delegation 2026-10-11; open: the author-who-is-consumer rule and the branch protection fact) (D-48) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.
