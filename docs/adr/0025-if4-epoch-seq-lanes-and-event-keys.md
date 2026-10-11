@@ -1,6 +1,6 @@
 # 0025. IF-4 event identity with epoch, seq lanes per source and per-epoch event keys
 
-- **Status:** Proposed (decided on the developer's delegation 2026-10-11, story 1.15; to be confirmed)
+- **Status:** Accepted (D-42, on the developer's delegation 2026-10-11; revisable)
 - **Date:** 2026-10-11
 - **Deciders:** Tanmay (stream L), on delegation ("decided on delegation", decision D-42). Akshay (stream P, ingest and orchestrator caller) and Sahil (stream T, consumer) to confirm.
 - **Requirements:** IF-4 (instance events), IF-5 (orchestrator API), IF-6 (instance contract, sidecar start input), D-42, D-37, ADR 0009 (event key master), ADR 0020 (sidecar start input), ADR 0023 (event identity, signing, source). Replaces the `first_seq` rule of IF-4 0.1.0 section 6 (open point 8) and fills open points 2 and 9 of IF-4 and open point 33 of IF-5.

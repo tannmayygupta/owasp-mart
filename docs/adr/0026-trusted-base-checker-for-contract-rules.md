@@ -1,6 +1,6 @@
 # 0026. Trusted base checker for the contract rules
 
-- **Status:** Proposed (decided on the developer's delegation 2026-10-11, story 1.15)
+- **Status:** Accepted (D-46, on the developer's delegation 2026-10-11; revisable). Not yet proven on GitHub
 - **Date:** 2026-10-11
 - **Deciders:** Tanmay (delegated the design to Claude Code; to be confirmed)
 - **Requirements:** L-07 (contract rules), D-46, architecture 07 section 5 and rules 3, 4, 8, 9

@@ -32,3 +32,6 @@ Thank you, this was a careful review. Everything below is fixed in the branch in
 - Not run: the workflow on GitHub, `ci:linux`. The S3 state move is prepared but not done.
 
 Please re-review, especially the merge commit, the stale IF-4 sign-off (H-108) and the `ci.yml` union.
+
+**Your waiting tasks (T-04, T-09, T-10), and why they were stuck**
+That was my mistake: L-03, L-05 and L-06 are marked EARLY PR in my task file, and I batched them into this pull request instead of merging each through its own small pull request. You do not have to wait for the merge: `git switch -c sprint-2-sahil origin/sprint-1-tanmay` gives you `main` plus my commits (harness, fake ingest, IF-4, IF-6, IF-2); merging the later `main` into it is conflict-free (tested), and I will never rewrite this branch. T-09 does not need L-13: its "Done when" is "in the harness", so build on the L-06 harness and the fake orchestrator. The shop never signs events and never carries `epoch` or `seq`; the sidecar does. Open point 17 (healthcheck 2 s, 2 s, 15 retries) is confirmed as the working default. Details: `docs/dev/messages/2026-10-11-sahil-pr3-and-t04.md`. Your IF-4 re-review (H-108) does not block you.

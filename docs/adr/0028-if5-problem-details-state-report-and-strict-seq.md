@@ -1,6 +1,6 @@
 # 0028. IF-5: problem details, state report transition number, strict integers
 
-- **Status:** Proposed (decided on the developer's delegation 2026-10-11, story 1.15; to be confirmed by Akshay, who owns the platform side)
+- **Status:** Accepted (D-47, on the developer's delegation 2026-10-11; revisable); the platform side is still to be confirmed by Akshay (H-106)
 - **Date:** 2026-10-11
 - **Deciders:** Tanmay (by delegation to Claude Code, story 1.15)
 - **Requirements:** NFR-SEC-03, NFR-SEC-04, FR-INS-07, D-39 (M1 of ADR 0019), D-42, handoff H-91; contract IF-5 version 0.3.0
