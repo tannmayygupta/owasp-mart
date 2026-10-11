@@ -43,6 +43,13 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | LB-2 | Docker works on Tanmay's PC (WSL and data on D:, memory cap) | Done | `docs/assets/l-01-repository-skeleton/` | `node scripts/dev.mjs doctor` and `hello` | WSL repaired, doctor 6 of 6 PASS, hello exit 0, 8 GB cap set, Docker data moved to D: (junction) | [2026-10-08-tannmayygupta-repository-skeleton](dev-log/2026-10-08-tannmayygupta-repository-skeleton.md) |
 | LB-3 | Instance contract v0 (IF-6): contract text, 3 JSON Schemas, examples, validator (touches F1, F3, FR-INS-02, FR-INS-05, FR-FLG-03, FR-SHP-15, NFR-ISO-03, D-02) | Done, awaiting Sahil's approval (consumer) | `contracts/instance/`, `contracts/CHANGELOG.md`, `scripts/validate-contracts.mjs` | `scripts/validate-contracts.test.mjs`, `node scripts/validate-contracts.mjs` | 40 of 40 script tests and 7 of 7 end-to-end tests pass (fresh-checkout run of the CI command included); validator PASS on 3 schemas, 5 valid and 129 invalid examples (see dev-log) | [2026-10-08-tannmayygupta-instance-contract-v0](dev-log/2026-10-08-tannmayygupta-instance-contract-v0.md) |
 
+## Platform baseline (P stream)
+
+| ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |
+|---|---|---|---|---|---|---|
+| PB-7 | The platform Compose profile (Postgres 18, Valkey, Mailpit, API) starts with one command on Windows and macOS (NFR-POR-03) | Done on Windows (macOS not tested; the developer uses no Mac). Pull request not yet merged | `infra/compose/compose.yaml`, `apps/api/`, `apps/web/` | `scripts/e2e/platform-stack.e2e.test.mjs`, `apps/api/tests/test_healthz.py`, `scripts/dev.test.mjs` | `up platform web` gives five healthy services; 9 of 9 platform e2e tests and 26 of 26 e2e tests pass on real Docker; 10 of 10 API tests; 54 of 54 script tests; page shows API, Postgres and Valkey ok in a real browser engine | [2026-10-11-akshaay29-p01-platform-stack-tracer](dev-log/2026-10-11-akshaay29-p01-platform-stack-tracer.md) |
+| PB-8 | The developer environment is verified (Docker, Node 24, uv, skills verifier) (NFR-POR-03, Q-24) | Done, on the developer's Windows PC instead of a Mac (his decision, 2026-10-11) | `docs/assets/p-01-platform-stack/doctor-2026-10-11.txt` | `node scripts/dev.mjs doctor`, `node scripts/verify-skills.mjs` | doctor 6 of 6 PASS (Node 24.11.0, pnpm 12.10.1, uv 0.12.23, Docker 28.5.1, Compose 2.40.3, engine running); verify-skills OK, 217 files | [2026-10-11-akshaay29-p01-platform-stack-tracer](dev-log/2026-10-11-akshaay29-p01-platform-stack-tracer.md) |
+
 ## Target baseline (T stream)
 
 | ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |

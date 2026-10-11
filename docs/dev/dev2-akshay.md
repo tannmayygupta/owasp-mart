@@ -33,7 +33,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton exist and are signed off.
 
-- [ ] **P-01. Platform stack runs end to end locally (tracer bullet)**
+- [x] **P-01. Platform stack runs end to end locally (tracer bullet)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Postgres, API, worker, Valkey and the dashboards start with `node scripts/dev.mjs`, and a request passes dashboards, API and database.

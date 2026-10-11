@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (P-01 platform stack runs end to end locally, 2026-10-11, Akshay)
+- `apps/api` (FastAPI 0.143.0, `GET /healthz` checking Postgres and Valkey, never returning error text) and `apps/web` (Next.js 16.4.0 page showing the result through a same-origin `/api/*` rewrite). Compose services `postgres` 18.6, `valkey` 9.0.6, `mailpit` v1.31.5, `api` (profile `platform`) and `web` (profile `web`, dev server with the source mounted), digest-pinned, non-root, read-only, loopback-only ports; start with `node scripts/dev.mjs up platform web`. Tests: 10 API unit tests, a Docker-free Compose hardening test, a 9-test end-to-end test on a real engine; CI `api` job. `test:e2e` now runs one file at a time. Proven on the developer's Windows PC including a real-browser check. Covers PB-7, PB-8 (verified on Windows, not a Mac). Pull request pending: it edits stream L's `infra/compose/compose.yaml` and `scripts/dev.test.mjs`.
+
 ### Added (T-08 snapshot seeding mechanism, 2026-10-09, Sahil)
 - `apps/shop/seed/`: a per-epic seed registry that discovers `contributions/NNN-*.mjs` in numeric order and runs them in one transaction, a deterministic baseline world (users, stores, categories, products with fixed timestamps), and a `build-snapshot` CLI (`pnpm run snapshot`) that migrates a fresh SQLite db, seeds it, and reports dynamic row counts and build time (~320 ms). Later epics add seed data by dropping a file, no shared-file edits. Snapshot is a gitignored CI artifact. 7 tests. Covers FR-SHP-12.
 

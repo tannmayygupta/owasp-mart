@@ -28,11 +28,14 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 |---|---|
 | `node scripts/dev.mjs doctor` | Prints tool versions with PASS or FAIL |
 | `node scripts/dev.mjs hello` | Starts a hardened hello container, checks it, removes it |
-| `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (empty until later stories) |
+| `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (`lab` and `mocks` are empty until later stories) |
+| `node scripts/dev.mjs up platform web` | Starts the platform stack: Postgres, Valkey, Mailpit, the API and the dashboards dev server. Open <http://127.0.0.1:3000> (page shows API, Postgres and Valkey health), the API is on port 8000 and the Mailpit page on 8025 (all loopback only). First start builds the images and installs the dashboards' packages, so allow a few minutes. `up` does not rebuild an existing image: after changing API code run `docker compose -f infra/compose/compose.yaml --profile platform build api` (dashboards code reloads by itself) |
+| `uv run --directory apps/api pytest` | Runs the API unit tests (needs `uv`; no Docker) |
+| `docker compose -f infra/compose/compose.yaml --profile platform --profile web down -v` | Resets the platform stack: `dev.mjs down` keeps the named volumes (database data, the dashboards' `node_modules` and `.next`), so use this when you change the dev database password or want a clean database |
 | `node scripts/dev.mjs down` | Stops and removes the project's containers |
 | `pnpm run contracts:check` | Validates the instance contract (IF-6): schemas, examples, semantic rules (needs `pnpm install` once) |
 | `pnpm run catalog:check` | Validates the challenge catalogue (IF-7): the 11 stubs against the schema and the semantic rules (needs `pnpm install` once) |
 | `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed; needs `pnpm install` once) |
-| `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests: real Docker engine and contract copies (about 1 minute; the contract tests also install dependencies in a temporary copy) |
+| `pnpm run test:e2e` | Runs `node --test --test-concurrency=1 "scripts/e2e/*.test.mjs"`, the end-to-end tests, one file at a time: real Docker engine and contract copies (a few minutes; needs ports 3000, 8000 and 8025 free; the contract tests also install dependencies in a temporary copy) |
 
 Application code (platform, lab and target) is not written yet; it starts with the Sprint 1 tasks.
