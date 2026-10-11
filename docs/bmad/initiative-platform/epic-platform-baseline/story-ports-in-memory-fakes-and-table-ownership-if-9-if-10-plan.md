@@ -3,7 +3,7 @@ title: 'Ports, in-memory fakes and table ownership (IF-9, IF-10)'
 type: 'feature'
 ticket: '5'
 created: '2026-10-12'
-status: 'built'
+status: done
 baseline_revision: '5d526b62be95cfd88b00726f6df505f7cb2cb948'
 route: 'full'
 route_source: 'auto'
