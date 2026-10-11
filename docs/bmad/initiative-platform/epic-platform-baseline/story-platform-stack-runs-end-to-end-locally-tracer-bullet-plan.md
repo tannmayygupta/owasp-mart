@@ -3,7 +3,7 @@ title: 'Platform stack runs end to end locally (tracer bullet)'
 type: 'feature'
 ticket: '1'
 created: '2026-10-11'
-status: 'built'
+status: done
 baseline_revision: '653d6f8b7c24b1eda571fc102c308b98eada0d91'
 route: 'full'
 route_source: 'pinned'

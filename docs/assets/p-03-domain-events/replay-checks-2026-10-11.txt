@@ -1,0 +1,15 @@
+PASS  ids are increasing and unique
+PASS  the stream of each audience is live:<audience>
+PASS  learner receives exactly its events, in order, valid, with matching ids
+PASS  candidate receives exactly its events, in order, valid, with matching ids
+PASS  recruiter receives exactly its events, in order, valid, with matching ids
+PASS  admin receives exactly its events, in order, valid, with matching ids
+PASS  privacy wall: the recruiter never receives learner practice, a stranger receives nothing
+PASS  the candidate does not receive their own milestones, captures or score (OI-15 open)
+PASS  Last-Event-ID: a reconnect gets only the events after that id, and only those its audiences may see
+PASS  an unknown or malformed Last-Event-ID gives one resync, no events, and the connection ends
+PASS  a fresh connection (no Last-Event-ID) receives only events published after it connects
+PASS  an id older than the buffer gives one resync (id_too_old); an id inside the buffer is replayed
+PASS  a Valkey reset gives one resync (buffer_reset) for every earlier id, and newer events flow again
+PASS  live delivery: an event published after the connection arrives, with heartbeats in between
+OK: 14 checks, 18 fixture records replayed.

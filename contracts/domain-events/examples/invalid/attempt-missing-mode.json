@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "type": "attempt.state_changed",
+  "occurred_at": "2026-10-11T09:00:00Z",
+  "data": {
+    "attempt_id": "a-CANDIDATEATTEMPT",
+    "state": "running",
+    "previous_state": "ready",
+    "deadline_at": "2026-10-11T10:00:00Z"
+  }
+}

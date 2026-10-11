@@ -1,0 +1,127 @@
+{
+  "unknown-type.json": {
+    "path": "/type",
+    "rule": "type is one of the seven",
+    "stage": "schema"
+  },
+  "extra-top-level-member.json": {
+    "path": "/audience",
+    "rule": "the audience is never in the event: the server decides it",
+    "stage": "schema"
+  },
+  "missing-occurred-at.json": {
+    "path": "/occurred_at",
+    "rule": "occurred_at is required",
+    "stage": "schema"
+  },
+  "timestamp-with-milliseconds.json": {
+    "path": "/occurred_at",
+    "rule": "a timestamp is UTC to the second",
+    "stage": "schema"
+  },
+  "schema-version-2.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is 1",
+    "stage": "schema"
+  },
+  "instance-unknown-state.json": {
+    "path": "/data/state",
+    "rule": "state is one of the ten of IF-2 and IF-5",
+    "stage": "schema"
+  },
+  "instance-extra-member.json": {
+    "path": "/data/host",
+    "rule": "no host, address or other member",
+    "stage": "schema"
+  },
+  "instance-error-code-not-inst.json": {
+    "path": "/data/error_code",
+    "rule": "error_code is an INST-* code",
+    "stage": "schema"
+  },
+  "instance-id-lowercase.json": {
+    "path": "/data/instance_id",
+    "rule": "instance id is i- plus 16 Base32 capitals and digits 2 to 7",
+    "stage": "schema"
+  },
+  "instance-epoch-zero.json": {
+    "path": "/data/epoch",
+    "rule": "epoch is at least 1",
+    "stage": "schema"
+  },
+  "attempt-unknown-state.json": {
+    "path": "/data/state",
+    "rule": "attempt state is one of the ten of IF-2",
+    "stage": "schema"
+  },
+  "attempt-missing-mode.json": {
+    "path": "/data/mode",
+    "rule": "mode is required",
+    "stage": "schema"
+  },
+  "milestone-none.json": {
+    "path": "/data/milestone",
+    "rule": "only M1, M2 or M3 is announced",
+    "stage": "schema"
+  },
+  "flag-captured-carries-the-flag.json": {
+    "path": "/data/flag",
+    "rule": "no flag or submitted text in an event (FR-FLG-05)",
+    "stage": "schema"
+  },
+  "score-over-1000.json": {
+    "path": "/data/score",
+    "rule": "score is 0 to 1000",
+    "stage": "schema"
+  },
+  "score-too-many-challenges.json": {
+    "path": "/data/per_challenge",
+    "rule": "at most 11 challenges",
+    "stage": "schema"
+  },
+  "hint-level-4.json": {
+    "path": "/data/level",
+    "rule": "hint level is 1 to 3",
+    "stage": "schema"
+  },
+  "hint-carries-the-text.json": {
+    "path": "/data/text",
+    "rule": "a hint text is never in an event (FR-HNT-01)",
+    "stage": "schema"
+  },
+  "resync-unknown-reason.json": {
+    "path": "/data/reason",
+    "rule": "reason is one of three",
+    "stage": "schema"
+  },
+  "failed-without-error-code.json": {
+    "path": "/data/error_code",
+    "rule": "a failed instance names its INST-* code (in the schema)",
+    "stage": "schema"
+  },
+  "error-code-on-a-running-instance.json": {
+    "path": "/data/error_code",
+    "rule": "error_code is null unless the state is failed (in the schema)",
+    "stage": "schema"
+  },
+  "error-code-not-in-the-registry.json": {
+    "path": "/data/error_code",
+    "rule": "the code is not in the error registry (IF-8)",
+    "stage": "semantic"
+  },
+  "timestamp-impossible-date.json": {
+    "path": "/occurred_at",
+    "rule": "a timestamp is a real calendar date and time (UTC)",
+    "stage": "schema"
+  },
+  "timestamp-impossible-hour.json": {
+    "path": "/occurred_at",
+    "rule": "a timestamp is a real calendar date and time (UTC)",
+    "stage": "schema"
+  },
+  "score-duplicate-challenge.json": {
+    "path": "/data/per_challenge",
+    "rule": "one row per challenge",
+    "stage": "semantic"
+  }
+}

@@ -7,6 +7,7 @@
 /contracts/api/platform/            @akshaay29
 /contracts/api/lab/                 @tannmayygupta
 /contracts/events/                  @tannmayygupta
+/contracts/domain-events/           @akshaay29 @tannmayygupta
 /contracts/orchestrator/            @tannmayygupta
 /contracts/instance/                @tannmayygupta @sahillroy
 /contracts/catalog/                 @sahillroy

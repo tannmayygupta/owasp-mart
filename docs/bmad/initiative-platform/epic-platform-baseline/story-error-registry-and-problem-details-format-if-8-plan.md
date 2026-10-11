@@ -3,7 +3,7 @@ title: 'Error registry and problem-details format (IF-8)'
 type: 'feature'
 ticket: '2'
 created: '2026-10-11'
-status: 'built'
+status: done
 baseline_revision: '08b816e66b11254780c48a463e3b237f944001d3'
 route: 'full'
 route_source: 'pinned'

@@ -25,3 +25,10 @@
 - Registry gaps: no generic `REQ-RATE-LIMITED` (429), `REQ-UNAVAILABLE` (503), `REQ-TIMEOUT`, `AUTH-FORBIDDEN` (403 for a signed-in user) or sign-in failure code, and `retryable` is in the registry but not in the body (no `Retry-After` convention). Add them with the stories that need them (accounts, P-11 and P-12); each is an additive change.
 - The generated TypeScript file is not type-checked in CI (it was checked once with `tsc --strict`, exit 0). Add when `apps/web` imports `@vulnmart/ts-client`.
 
+## Deferred from: code review of story-domain-event-schema-if-3-with-fixtures-and-replay-script-plan (2026-10-11)
+
+- No mapping from orchestrator infrastructure faults (IF-4 `fault_class` and `detail_code`) to an `INST-*` registry code: only `INST-HEALTH-TIMEOUT` and the injector codes exist. Needs stream L's list of fault classes; add the codes to the registry and a fixture when L defines them. Source plan: `docs/bmad/initiative-platform/epic-platform-baseline/story-domain-event-schema-if-3-with-fixtures-and-replay-script-plan.md`.
+- The H-22 decision (64-bit `seq`, reserved range, `infrastructure_fault` written by the orchestrator) is recorded in HANDOFFS, the IF-3 README and the changelog, but IF-4 and IF-5 text and schemas (stream L's) do not say it yet; they change in their own story.
+- The replay script has its own hub and consumer and cannot be pointed at another one; a `--url` mode to drive the real hub is a follow-up for P-22. No code resolves an audience from an attempt yet (the relay, P-05 and P-22); the fixtures supply the resolved audiences and the validator compares them with the table.
+- Streams are not size-limited in the contract (trim age or length, connection caps, slow consumers): decided with the hub in P-22 and spike S-2.
+

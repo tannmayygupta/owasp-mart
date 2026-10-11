@@ -90,6 +90,18 @@
       "mocks": [],
       "noMock": "no mock by design: the generated constants (packages/py-models, packages/ts-client) are the stub, produced from the registry by scripts/generate-error-codes.mjs and checked for freshness in CI",
       "conformance": ["scripts/validate-errors.mjs", "scripts/generate-error-codes.mjs", "apps/api/tests/test_problem.py"]
+    },
+    {
+      "id": "IF-3",
+      "name": "Domain events",
+      "owner": "P",
+      "folders": ["contracts/domain-events"],
+      "schemas": ["contracts/domain-events/domain-events.schema.json"],
+      "openapi": [],
+      "changelog": "Domain events (IF-3), `contracts/domain-events/`",
+      "mocks": [],
+      "noMock": "no mock by design: the fixtures in the contract folder and scripts/replay-domain-events.mjs (a local SSE hub and consumer) are the stub",
+      "conformance": ["scripts/validate-domain-events.mjs", "scripts/replay-domain-events.mjs"]
     }
   ]
 }

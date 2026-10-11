@@ -1,0 +1,333 @@
+{
+  "$comment": "Published records in order, as OutboxPort hands them to the relay: the audiences the relay resolved (user:<id>, org:<id>, admin) and the event. Opaque test ids only. A learner practises C01 (user and admin only); a candidate takes an assessment of ORG-ACME-1 on C03 (the recruiter sees milestones, captures and score; the candidate does not, while OI-15 is open).",
+  "records": [
+    {
+      "audiences": [
+        "user:USR-LEARNER-1",
+        "admin"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "instance.state_changed",
+        "occurred_at": "2026-10-11T09:00:00Z",
+        "data": {
+          "instance_id": "i-LEARNERINSTANCE2",
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "state": "requested",
+          "access": "closed",
+          "health": "unknown",
+          "epoch": 1,
+          "error_code": null
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1",
+        "admin"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "instance.state_changed",
+        "occurred_at": "2026-10-11T09:00:02Z",
+        "data": {
+          "instance_id": "i-LEARNERINSTANCE2",
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "state": "provisioning",
+          "access": "closed",
+          "health": "unknown",
+          "epoch": 1,
+          "error_code": null
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1",
+        "admin"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "instance.state_changed",
+        "occurred_at": "2026-10-11T09:00:20Z",
+        "data": {
+          "instance_id": "i-LEARNERINSTANCE2",
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "state": "ready",
+          "access": "open",
+          "health": "healthy",
+          "epoch": 1,
+          "error_code": null
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.state_changed",
+        "occurred_at": "2026-10-11T09:00:21Z",
+        "data": {
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "mode": "learner",
+          "state": "running",
+          "previous_state": "ready",
+          "deadline_at": null
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.milestone_reached",
+        "occurred_at": "2026-10-11T09:07:40Z",
+        "data": {
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "mode": "learner",
+          "challenge_key": "C01",
+          "milestone": "M1"
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.hint_unlocked",
+        "occurred_at": "2026-10-11T09:09:05Z",
+        "data": {
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "mode": "learner",
+          "challenge_key": "C01",
+          "level": 1
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.milestone_reached",
+        "occurred_at": "2026-10-11T09:14:12Z",
+        "data": {
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "mode": "learner",
+          "challenge_key": "C01",
+          "milestone": "M2"
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.flag_captured",
+        "occurred_at": "2026-10-11T09:16:30Z",
+        "data": {
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "mode": "learner",
+          "challenge_key": "C01"
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.score_updated",
+        "occurred_at": "2026-10-11T09:16:31Z",
+        "data": {
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "mode": "learner",
+          "score": 86,
+          "computed_at": "2026-10-11T09:16:31Z",
+          "per_challenge": [
+            {
+              "challenge_key": "C01",
+              "best_milestone": "M3",
+              "points": 86
+            }
+          ]
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-LEARNER-1",
+        "admin"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "instance.state_changed",
+        "occurred_at": "2026-10-11T09:40:00Z",
+        "data": {
+          "instance_id": "i-LEARNERINSTANCE2",
+          "attempt_id": "a-LEARNERATTEMPTAA",
+          "state": "failed",
+          "access": "closed",
+          "health": "unhealthy",
+          "epoch": 2,
+          "error_code": "INST-HEALTH-TIMEOUT"
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-CANDIDATE-1",
+        "org:ORG-ACME-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.state_changed",
+        "occurred_at": "2026-10-11T10:00:00Z",
+        "data": {
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "mode": "candidate",
+          "state": "ready",
+          "previous_state": "consent",
+          "deadline_at": null
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-CANDIDATE-1",
+        "admin"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "instance.state_changed",
+        "occurred_at": "2026-10-11T10:00:25Z",
+        "data": {
+          "instance_id": "i-CANDIDATEINSTANC",
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "state": "ready",
+          "access": "open",
+          "health": "healthy",
+          "epoch": 1,
+          "error_code": null
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-CANDIDATE-1",
+        "org:ORG-ACME-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.state_changed",
+        "occurred_at": "2026-10-11T10:01:00Z",
+        "data": {
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "mode": "candidate",
+          "state": "running",
+          "previous_state": "ready",
+          "deadline_at": "2026-10-11T11:01:00Z"
+        }
+      }
+    },
+    {
+      "audiences": [
+        "org:ORG-ACME-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.milestone_reached",
+        "occurred_at": "2026-10-11T10:12:10Z",
+        "data": {
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "mode": "candidate",
+          "challenge_key": "C03",
+          "milestone": "M1"
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-CANDIDATE-1",
+        "org:ORG-ACME-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.hint_unlocked",
+        "occurred_at": "2026-10-11T10:20:00Z",
+        "data": {
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "mode": "candidate",
+          "challenge_key": "C03",
+          "level": 1
+        }
+      }
+    },
+    {
+      "audiences": [
+        "org:ORG-ACME-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.flag_captured",
+        "occurred_at": "2026-10-11T10:41:30Z",
+        "data": {
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "mode": "candidate",
+          "challenge_key": "C03"
+        }
+      }
+    },
+    {
+      "audiences": [
+        "org:ORG-ACME-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.score_updated",
+        "occurred_at": "2026-10-11T10:41:31Z",
+        "data": {
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "mode": "candidate",
+          "score": 120,
+          "computed_at": "2026-10-11T10:41:31Z",
+          "per_challenge": [
+            {
+              "challenge_key": "C03",
+              "best_milestone": "M3",
+              "points": 120
+            }
+          ]
+        }
+      }
+    },
+    {
+      "audiences": [
+        "user:USR-CANDIDATE-1",
+        "org:ORG-ACME-1"
+      ],
+      "event": {
+        "schema_version": 1,
+        "type": "attempt.state_changed",
+        "occurred_at": "2026-10-11T10:50:00Z",
+        "data": {
+          "attempt_id": "a-CANDIDATEATTEMPT",
+          "mode": "candidate",
+          "state": "submitted",
+          "previous_state": "running",
+          "deadline_at": "2026-10-11T11:01:00Z"
+        }
+      }
+    }
+  ]
+}

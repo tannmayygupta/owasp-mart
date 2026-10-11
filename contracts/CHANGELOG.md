@@ -10,6 +10,16 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
 
+## Domain events (IF-3), `contracts/domain-events/`
+
+### 0.1.0 (2026-10-11, Akshay, story P-03)
+- registry change: IF-3 is registered in `contracts/registry.json` (new contract in its own folder: `contracts/events/` is IF-4's folder in the registry, so the architecture's path `contracts/events/domain-events.schema.json` moved to `contracts/domain-events/`; `docs/architecture/07-repo-and-workstreams.md` is updated).
+- First draft: `domain-events.schema.json` (one closed JSON Schema, seven types: `instance.state_changed`, `attempt.state_changed`, `attempt.milestone_reached`, `attempt.flag_captured`, `attempt.score_updated`, `attempt.hint_unlocked` and the control event `stream.resync`), `audiences.json` (who may receive what by attempt mode: learner practice never reaches a company; the candidate does not receive their own milestones, captures or score while OI-15 is open), the SSE wire format and the `Last-Event-ID` and `resync` rules (README), `fixtures/session.json` (18 ordered records), 8 valid and 25 invalid example events. The schema rejects impossible dates and a failed instance without an `error_code` (or a code on another state).
+- State vocabularies and id shapes are copied from IF-2 and IF-5; `INST-*` codes come from IF-8. Handoff H-22 answered: `seq` is 64-bit, orchestrator and platform events use a reserved range from 2^40 up to 2^53 - 1, an infrastructure fault is shown as `instance.state_changed` with state `failed`. Stream layout (`live:user:<id>`, `live:org:<id>`, `live:admin`, one `event` field per entry), delivery rules and the `resync` loop are in the README.
+- Checked by `scripts/validate-domain-events.mjs` and `scripts/replay-domain-events.mjs` (`pnpm run domain-events:check`, in CI) with tests.
+- no mock change: the fixtures and the replay script are the stub of this contract (`noMock` in the registry).
+- Status: awaiting review by Tanmay (publisher side, `stream.resync`, audience table).
+
 ## Error codes and error format (IF-8), `contracts/errors/`
 
 ### 0.1.0 (2026-10-11, Akshay, story P-02)

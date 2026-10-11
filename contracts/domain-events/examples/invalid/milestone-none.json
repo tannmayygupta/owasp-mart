@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "type": "attempt.milestone_reached",
+  "occurred_at": "2026-10-11T09:00:00Z",
+  "data": {
+    "attempt_id": "a-LEARNERATTEMPTAA",
+    "mode": "learner",
+    "challenge_key": "C01",
+    "milestone": "none"
+  }
+}

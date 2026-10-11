@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/domain-events/domain-events.schema.json",
+  "title": "VulnMart domain event, as the browser receives it (IF-3, contract 0.1)",
+  "description": "The `data` of one Server-Sent Event of the live stream. The SSE frame carries `id` (the stream id) and `event` (the type); who may receive an event is in audiences.json and is decided on the server, never by a client. An event holds ids and states only: never a flag, digest, seed, key, owner hash, submitted text or personal data. State vocabularies and id shapes are copied from the lab API (IF-2) and the orchestrator API (IF-5); scripts/validate-domain-events.mjs fails when they drift.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "type", "occurred_at", "data"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "type": {
+      "enum": [
+        "instance.state_changed",
+        "attempt.state_changed",
+        "attempt.milestone_reached",
+        "attempt.flag_captured",
+        "attempt.score_updated",
+        "attempt.hint_unlocked",
+        "stream.resync"
+      ]
+    },
+    "occurred_at": { "$ref": "#/$defs/Timestamp" },
+    "data": { "type": "object" }
+  },
+  "allOf": [
+    { "if": { "properties": { "type": { "const": "instance.state_changed" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/$defs/InstanceStateChanged" } } } },
+    { "if": { "properties": { "type": { "const": "attempt.state_changed" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/$defs/AttemptStateChanged" } } } },
+    { "if": { "properties": { "type": { "const": "attempt.milestone_reached" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/$defs/AttemptMilestoneReached" } } } },
+    { "if": { "properties": { "type": { "const": "attempt.flag_captured" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/$defs/AttemptFlagCaptured" } } } },
+    { "if": { "properties": { "type": { "const": "attempt.score_updated" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/$defs/AttemptScoreUpdated" } } } },
+    { "if": { "properties": { "type": { "const": "attempt.hint_unlocked" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/$defs/AttemptHintUnlocked" } } } },
+    { "if": { "properties": { "type": { "const": "stream.resync" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/$defs/StreamResync" } } } }
+  ],
+  "$defs": {
+    "Timestamp": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "InstanceId": { "type": "string", "pattern": "^i-[A-Z2-7]{16}$" },
+    "AttemptId": { "type": "string", "pattern": "^a-[A-Z2-7]{16}$" },
+    "ChallengeKey": { "type": "string", "pattern": "^C(0[1-9]|10|11)$" },
+    "Mode": { "enum": ["learner", "candidate"] },
+    "State": { "enum": ["requested", "provisioning", "starting", "ready", "active", "idle", "resetting", "stopping", "destroyed", "failed"] },
+    "Access": { "enum": ["open", "frozen", "closed"] },
+    "Health": { "enum": ["unknown", "healthy", "unhealthy"] },
+    "AttemptState": { "enum": ["invited", "consent", "ready", "running", "submitted", "reported", "withdrawn", "expired", "cancelled", "deleted"] },
+    "Milestone": { "enum": ["none", "M1", "M2", "M3"] },
+    "InstanceStateChanged": {
+      "description": "An instance moved to a new state. `error_code` is set while the state is failed (an INST-* code of the error registry, IF-8), otherwise null. An orchestrator infrastructure fault reaches the dashboards this way (state failed), not as a separate event (handoff H-22).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance_id", "attempt_id", "state", "access", "health", "epoch", "error_code"],
+      "properties": {
+        "instance_id": { "$ref": "#/$defs/InstanceId" },
+        "attempt_id": { "$ref": "#/$defs/AttemptId" },
+        "state": { "$ref": "#/$defs/State" },
+        "access": { "$ref": "#/$defs/Access" },
+        "health": { "$ref": "#/$defs/Health" },
+        "epoch": { "type": "integer", "minimum": 1 },
+        "error_code": { "anyOf": [{ "type": "string", "pattern": "^INST(-[A-Z]+)+$", "maxLength": 60 }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "failed" } }, "required": ["state"] },
+          "then": { "type": "object", "properties": { "error_code": { "type": "string" } } },
+          "else": { "type": "object", "properties": { "error_code": { "type": "null" } } }
+        }
+      ]
+    },
+    "AttemptStateChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "mode", "state", "previous_state", "deadline_at"],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/AttemptId" },
+        "mode": { "$ref": "#/$defs/Mode" },
+        "state": { "$ref": "#/$defs/AttemptState" },
+        "previous_state": { "anyOf": [{ "$ref": "#/$defs/AttemptState" }, { "type": "null" }] },
+        "deadline_at": { "description": "The server deadline (FR-SES-02); null when there is none yet.", "anyOf": [{ "$ref": "#/$defs/Timestamp" }, { "type": "null" }] }
+      }
+    },
+    "AttemptMilestoneReached": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "mode", "challenge_key", "milestone"],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/AttemptId" },
+        "mode": { "$ref": "#/$defs/Mode" },
+        "challenge_key": { "$ref": "#/$defs/ChallengeKey" },
+        "milestone": { "enum": ["M1", "M2", "M3"] }
+      }
+    },
+    "AttemptFlagCaptured": {
+      "description": "A capture that is counted. A held capture (waiting for a human decision) and a wrong submission are not announced by this event.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "mode", "challenge_key"],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/AttemptId" },
+        "mode": { "$ref": "#/$defs/Mode" },
+        "challenge_key": { "$ref": "#/$defs/ChallengeKey" }
+      }
+    },
+    "AttemptScoreUpdated": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "mode", "score", "computed_at", "per_challenge"],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/AttemptId" },
+        "mode": { "$ref": "#/$defs/Mode" },
+        "score": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "computed_at": { "$ref": "#/$defs/Timestamp" },
+        "per_challenge": {
+          "type": "array",
+          "maxItems": 11,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["challenge_key", "best_milestone", "points"],
+            "properties": {
+              "challenge_key": { "$ref": "#/$defs/ChallengeKey" },
+              "best_milestone": { "$ref": "#/$defs/Milestone" },
+              "points": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "AttemptHintUnlocked": {
+      "description": "A hint level was unlocked. The hint text is never in the event: the browser reads it from the lab API.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_id", "mode", "challenge_key", "level"],
+      "properties": {
+        "attempt_id": { "$ref": "#/$defs/AttemptId" },
+        "mode": { "$ref": "#/$defs/Mode" },
+        "challenge_key": { "$ref": "#/$defs/ChallengeKey" },
+        "level": { "type": "integer", "minimum": 1, "maximum": 3 }
+      }
+    },
+    "StreamResync": {
+      "description": "Control event sent by the hub to one connection, never stored in a stream and without an id: the client discards what it holds, reloads the snapshot and reconnects without Last-Event-ID.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": { "enum": ["id_unknown", "id_too_old", "buffer_reset"] }
+      }
+    }
+  }
+}
