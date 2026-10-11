@@ -1,4 +1,4 @@
-# 0018. Signing of platform-to-orchestrator requests (IF-5)
+# 0024. Signing of platform-to-orchestrator requests (IF-5)
 
 - **Status:** Proposed (written during story L-04; to be confirmed by Akshay, stream P, in the team chat)
 - **Date:** 2026-10-09
@@ -9,7 +9,7 @@
 Architecture 06 says calls from the platform worker to the orchestrator use mutual TLS and also carry a signed body with a timestamp and a nonce, with the request-signing key separate from the TLS certificate. It does not say how the request is signed. The orchestrator is the most privileged component, so the form must be written down before either stream builds against it.
 
 ## Options considered
-1. **A small custom HMAC form (proposed in the contract).** HMAC-SHA256 with a shared key over a string made of the version, method, request target, timestamp, nonce and the SHA-256 of the body, carried in three headers (`X-VM-Timestamp`, `X-VM-Nonce`, `X-VM-Signature`); skew 60 seconds, nonce remembered for 5 minutes. Pros: tiny, easy to implement identically in Python and Node (a shared signing vector tests it), same family as the event signing of ADR 0017. Cons: custom format; interoperability only with our own code.
+1. **A small custom HMAC form (proposed in the contract).** HMAC-SHA256 with a shared key over a string made of the version, method, request target, timestamp, nonce and the SHA-256 of the body, carried in three headers (`X-VM-Timestamp`, `X-VM-Nonce`, `X-VM-Signature`); skew 60 seconds, nonce remembered for 5 minutes. Pros: tiny, easy to implement identically in Python and Node (a shared signing vector tests it), same family as the event signing of ADR 0023. Cons: custom format; interoperability only with our own code.
 2. **RFC 9421 HTTP Message Signatures with HMAC.** The standard defines the signature base, the `Signature-Input` and `Signature` headers and the `created`, `expires` and `nonce` parameters; HMAC is allowed. Pros: a standard, library support, covers chosen components. Cons: more moving parts (component identifiers, structured fields), the verifier must still enforce the window and the nonce store itself; libraries for both languages would be new dependencies.
 3. **AWS Signature Version 4 style.** Well known, but built around cloud credentials and regions; more than needed here.
 

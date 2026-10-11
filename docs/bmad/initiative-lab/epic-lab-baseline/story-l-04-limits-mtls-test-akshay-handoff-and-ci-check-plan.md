@@ -20,7 +20,7 @@ assignee: "tannmayygupta"
 
 ## Intent
 
-**Problem:** Story 1.4 left three limits: mutual TLS between the orchestrator client and the orchestrator is not exercised, Akshay has not been told about the IF-5 open points, the `apps/api` skeleton and ADR 0018, and the Python and contract CI steps have never run on GitHub.
+**Problem:** Story 1.4 left three limits: mutual TLS between the orchestrator client and the orchestrator is not exercised, Akshay has not been told about the IF-5 open points, the `apps/api` skeleton and ADR 0024, and the Python and contract CI steps have never run on GitHub.
 
 **Approach:** Give the fake orchestrator optional TLS flags and test `HttpInstanceHost` against it over real mTLS with certificates made at test time; write the team-chat message and a pinned handoff row for Akshay; after the developer opens the pull request, read the CI result, fix failures and record it.
 
@@ -52,7 +52,7 @@ assignee: "tannmayygupta"
 - `contracts/mocks/fake-orchestrator/server.mjs` -- imports only `node:http`; `parseArgs` (about L488) rejects unknown flags with exit 2; first stdout line is `{"listening":true,"port":N}`. Add the TLS flags here (Node `https` with `requestCert` and `rejectUnauthorized`).
 - `apps/api/tests/support.py` -- `ServiceProcess(..., extra_args=())` starts the fake, reads the port, sets `url` to `http://127.0.0.1:<port>`; needs a way to give the scheme and host name. `conftest.py` fixtures start and stop services.
 - `apps/api/tests/test_http_service.py` -- pattern for client tests against the service; new tests go in a new `apps/api/tests/test_mtls.py`.
-- `contracts/orchestrator/orchestrator-api.md` section 4 (L74-97) and open point 6; `docs/adr/0018-orchestrator-request-signing.md`; `docs/architecture/06-security.md` L64 (private CA, short-lived leaf certificates).
+- `contracts/orchestrator/orchestrator-api.md` section 4 (L74-97) and open point 6; `docs/adr/0024-orchestrator-request-signing.md`; `docs/architecture/06-security.md` L64 (private CA, short-lived leaf certificates).
 - `docs/dev/HANDOFFS.md` -- row H-68 (mTLS, L-08 and L-13) gets a note; a new row for Akshay is added (rule 2b of `CLAUDE.md`). Task ids for Akshay's orchestrator client are read from `docs/dev/dev2-akshay.md`.
 - `.github/workflows/ci.yml` -- the `scripts` job runs `uv run --locked --package vulnmart-api pytest -q` on `ubuntu-24.04`, which has `openssl`; triggers are `pull_request` and push to `main`.
 - Do not touch: other developers' tracker folders, `contracts/orchestrator/orchestrator.openapi.yaml`, the signing code.
@@ -64,7 +64,7 @@ assignee: "tannmayygupta"
 - [x] `apps/api/tests/support.py` -- let `ServiceProcess` serve and report an `https` URL when TLS args are given; helper that builds the throwaway CAs and certificates with `openssl` in a temp folder and removes it afterwards -- keep certificate code out of the tests
 - [x] `apps/api/tests/test_mtls.py` -- one test per row of the matrix above (skip when `openssl` is missing and `CI` is unset) -- proves the transport behaves
 - [x] `scripts/e2e/orchestrator.e2e.test.mjs` -- one end-to-end test that starts the fake with TLS flags and checks, with Node only and its own certificates, that a call without a client certificate is refused -- independent consumer check
-- [x] `docs/dev/HANDOFFS.md` and `docs/dev/messages/2026-10-09-akshay-orchestrator-contract.md` -- new row for Akshay (30+ open points, `apps/api` skeleton, ADR 0018, where the proposals live, what stands by default) and the ready chat message; note on H-68 that the fake now offers mTLS -- Akshay's Claude finds it at his task
+- [x] `docs/dev/HANDOFFS.md` and `docs/dev/messages/2026-10-09-akshay-orchestrator-contract.md` -- new row for Akshay (30+ open points, `apps/api` skeleton, ADR 0024, where the proposals live, what stands by default) and the ready chat message; note on H-68 that the fake now offers mTLS -- Akshay's Claude finds it at his task
 - [x] Documentation rule -- dev-log, CHANGELOG line, traceability row, evidence in `docs/assets/l-04-limits/` (real output)
 - [ ] CI check -- after the developer opens the pull request: read the result they report (screenshot or pasted log), fix failures, rerun, record the real result in the dev-log
 
@@ -73,7 +73,7 @@ assignee: "tannmayygupta"
 - Given any matrix row marked refused, when the client calls, then it raises `OrchestratorUnavailable` and the fake records no instance change.
 - Given the fake without TLS flags, when started as before, then all existing tests pass unchanged (244 Python, 82 unit, e2e).
 - Given the repository after the tests, when searched, then no certificate or private key file is committed.
-- Given the handoff row and message, when Akshay's Claude plans his task, then the row names the contract, the skeleton and ADR 0018 with the default that stands.
+- Given the handoff row and message, when Akshay's Claude plans his task, then the row names the contract, the skeleton and ADR 0024 with the default that stands.
 - Given the pull request, when CI finishes, then every job is green or each failure is fixed and recorded.
 
 ## Implementation Notes

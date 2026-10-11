@@ -77,3 +77,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ### 0.1.0 (2026-10-10, Tanmay, story L-07)
 - First draft, a proposal for Akshay to confirm (tasks P-05 and P-06): `table-owners.schema.json`, the shape of `contracts/db/table-owners.yaml` (a `tables` list of `table` and `owner`, the owner being a module folder of `apps/api/src/vulnmart/` named in CODEOWNERS). The YAML file itself is Akshay's and does not exist yet; `scripts/check_table_owners.py` reports NOT-APPLICABLE until it does, then checks shape, owner names and duplicate tables.
 - The registry has no mock for this contract (`no mock change: nothing runs against it`).
+
+## Challenge catalogue (IF-7), `contracts/catalog/` and `challenges/catalog/`
+
+### 0.1.0 (2026-10-09, Sahil, story T-02)
+- First draft: `contracts/catalog/challenge.schema.json` (JSON Schema 2020-12, one challenge entry) and a short `contracts/catalog/README.md`.
+- 11 stub entries `challenges/catalog/c01..c11.yaml` (`status: stub`): OWASP 2021/2025 tags, CWE and ATT&CK ids, difficulty and tier, placeholder milestone summaries and three empty hint slots, provisional flag placement/delivery, start-state, exploit-test and fixed-build paths.
+- Validator `scripts/validate-catalog.mjs` (`pnpm run catalog:check`) and tests `scripts/validate-catalog.test.mjs`: schema plus semantic rules (tier matches difficulty per D-32, key matches filename, exactly 11 entries, no real flag value). `js-yaml` 4.1.0 added as a pinned dev dependency.
+- Full content (briefs, write-ups, decoys, filled hints, official-site id re-check) is T-30; each challenge's real milestone signals and confirmed flag placement come with its own story.

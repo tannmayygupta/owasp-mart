@@ -105,7 +105,7 @@ Pass 1 (thorough: blind-hunter BH, edge-case-hunter EH, verification-gap VG, int
 | BH: client accepts `https` without a client certificate and plain `http` for any host; no minimum key length; no response size cap; no 429 `Retry-After`; `ORCH-UNAVAILABLE` missing from the code map | medium | patch | Refuse `https` without a context and `http` to non-loopback hosts; minimum key length 32; cap responses at 1 MiB; carry `retry_after`; add the code. |
 | BH, EH: `NonceCache` not thread-safe, rebuilds on every check | low | patch | Lock and incremental expiry; document the per-process limit. |
 | BH: responses are not signed | low | patch | State in the contract that responses rely on mTLS; open point. |
-| BH: signing scheme chosen without research or ADR | medium | patch | ADR 0018 (Proposed) with alternatives (RFC 9421, AWS SigV4) and sources. |
+| BH: signing scheme chosen without research or ADR | medium | patch | ADR 0024 (Proposed) with alternatives (RFC 9421, AWS SigV4) and sources. |
 | VG, EH: the "no secret in GET answers" check skips `$ref` responses and non-JSON media types | medium | patch | Resolve references and walk every media type; extend the test. |
 | EH, BH, VG: fake Node service: unbounded body read, an invalid timestamp passes the skew check (NaN), a long unknown key is echoed past the schema limit, state-report fetch has no timeout and non-2xx is dropped, strict `limit` and repeated query parameters, 405 for a wrong method, numeric CLI options, a same-state activity call emits a report | medium | patch | Fix each; add tests. |
 | VG, EH: test helper never drains `stderr` and can hang on startup | medium | patch | Send stderr to a file, timeout on the first line. |

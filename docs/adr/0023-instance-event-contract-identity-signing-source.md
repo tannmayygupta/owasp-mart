@@ -1,4 +1,4 @@
-# 0017. Instance event contract: identity, signing, sources and flag sightings (IF-4)
+# 0023. Instance event contract: identity, signing, sources and flag sightings (IF-4)
 
 - **Status:** Accepted (D-38)
 - **Date:** 2026-10-09

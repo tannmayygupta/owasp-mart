@@ -9,7 +9,7 @@
 | Report tag | testing and quality; instance contract; lab harness |
 
 ## Requirements covered
-IF-6 (instance contract), IF-4 (event contract), OI-35 and H-59 (sidecar start input), handoffs H-56, H-74, H-26 to H-28, H-60, H-62, H-75, H-76 (answered), D-37, ADR 0005, 0016, 0017. Report row LB-6.
+IF-6 (instance contract), IF-4 (event contract), OI-35 and H-59 (sidecar start input), handoffs H-56, H-74, H-26 to H-28, H-60, H-62, H-75, H-76 (answered), D-37, ADR 0005, 0016, 0023. Report row LB-6.
 
 ## Summary (plain language, 3-5 lines)
 Sahil and the lab needed a reference instance, and nothing proved that the instance contract and the event contract work together. A small Node program (one pinned image) now plays the shop, injector, sidecar, edge and gate; a Compose harness starts it with the fake ingest; one command, `node scripts/dev.mjs harness`, runs it, checks it against both contracts and removes it. The run passed on real Docker, and a deliberately broken copy of the config fails with the rule's name.

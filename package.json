@@ -12,10 +12,12 @@
     "contracts:check": "node scripts/validate-contracts.mjs && node scripts/validate-events.mjs && uv run --locked --package vulnmart-api python scripts/check_orchestrator_contract.py && uv run --locked --package vulnmart-api python scripts/check_lab_contract.py",
     "ci:linux": "node scripts/ci-linux.mjs",
     "contracts:rules": "node scripts/check-contract-rules.mjs",
-    "events:check": "node scripts/validate-events.mjs"
+    "events:check": "node scripts/validate-events.mjs",
+    "catalog:check": "node scripts/validate-catalog.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0",
-    "ajv-formats": "3.0.1"
+    "ajv-formats": "3.0.1",
+    "js-yaml": "4.1.0"
   }
 }

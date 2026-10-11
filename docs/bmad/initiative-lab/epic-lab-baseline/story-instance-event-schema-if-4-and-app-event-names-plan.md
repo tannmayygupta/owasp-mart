@@ -99,7 +99,7 @@ Pass 1 (thorough: blind-hunter BH, edge-case-hunter EH, verification-gap VG, int
 | BH, EH(claim): shop-to-sidecar posted body has no machine-checkable form; its refusals untested | medium | patch | Derive a posted-body schema from the wire schema, with examples and tests. |
 | BH: 4 KiB shop cap and 8 KiB evidence body conflict for mock-sourced evidence | low | patch | Clarify per poster in the text. |
 | BH: instance contract changed in substance but changelog says editorial | low | patch | Add an IF-6 entry in `contracts/CHANGELOG.md`. |
-| BH, IA: significant decisions (signing scheme, identity, source, flag_seen) have no ADR; old documents not marked superseded | medium | patch | ADR 0017 and D-38 by the coordinator; supersession notes in architecture 04, 07 and README (not in `challenge-specs.md`, which the plan forbids touching). |
+| BH, IA: significant decisions (signing scheme, identity, source, flag_seen) have no ADR; old documents not marked superseded | medium | patch | ADR 0023 and D-38 by the coordinator; supersession notes in architecture 04, 07 and README (not in `challenge-specs.md`, which the plan forbids touching). |
 | BH: traceability lacks challenge numbers; tracker and tick | low | patch | Add C01 to C11; tracker and tick are done at close. |
 | VG, EH: oversize evidence matrix row uses a double-encoded character, so it hits the wrong cap | medium | patch | Verified in the file (code points 195 and 169). Use the real character. |
 | VG, EH: e2e test title overstates; tamper case depends on the word "browser"; spawned server not awaited | low | patch | Rename, mutate a parsed field, await exit. |

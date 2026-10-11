@@ -1,0 +1,44 @@
+VulnMart shop skeleton (T-01) — captured 2026-10-09T13:11:18Z
+
+## Environment (TB-5)
+node v24.8.0
+uv 0.12.24 (5411378eb 2026-10-08 x86_64-pc-windows-msvc)
+Docker version 28.5.1, build e180ab8
+OK: all 217 installed skill files match the manifest.
+
+## Unit tests (pnpm --filter @vulnmart/shop test)
+$ node --test
+✔ GET /healthz returns 200 {status:"ok"} as JSON (120.8219ms)
+✔ responses do not advertise the framework (x-powered-by disabled) (4.726ms)
+✔ GET /readyz returns 200 {status:"ready"} (10.6591ms)
+✔ GET /version returns 200 with build and catalogue_version, no secrets (14.1832ms)
+✔ unknown route returns 404 JSON without a stack trace (4.4191ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 927.3817
+
+## docker build
+#16 DONE 0.2s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/ignjtq45dwek6m67lxl7wvr52
+
+## docker run (hardening flags) + endpoints
+$ docker run -d --read-only --tmpfs /tmp --user 65532:65532 --cap-drop ALL --security-opt no-new-privileges=true --memory 512m --pids-limit 256 -p 127.0.0.1:3000:3000 vulnmart-shop:t01
+GET /healthz -> {"status":"ok"} [200]
+GET /readyz -> {"status":"ready"} [200]
+GET /version -> {"build":"dev","catalogue_version":"dev"} [200]
+GET /nope -> {"code":"SHOP-NOT-FOUND","message":"Not found"} [404]
+
+## docker inspect (hardening)
+ReadonlyRootfs=true CapDrop=[ALL] SecurityOpt=[no-new-privileges=true] Memory=536870912 PidsLimit=256
+exec id/version: v24.14.0 uid=65532 gid=65532
+health: starting
+
+## port
+3000/tcp -> 127.0.0.1:3000
+health (after wait): healthy

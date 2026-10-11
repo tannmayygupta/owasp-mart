@@ -1,0 +1,72 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-09 from the T-stream task file (docs/dev/dev3-sahil.md); one
+# story per task, with each task's Covers and Waits on. Draft for approval.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Shop data model and seven state machines"
+description = "About 20 tables with migrations and the seven state machines, on SQLite. The correct marketplace model; weaknesses come later as isolated paths."
+verify = "Migrations run on SQLite and the seven state transitions are tested."
+covers = ["FR-SHP-02", "FR-SHP-04"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-01 (epic-target-baseline story 1.1), which is merged/done.
+
+[[entry]]
+id = 2
+type = "story"
+title = "Shop identity, six roles, permissions and strong hashing"
+description = "Neutral marketplace look, accounts, six roles with the RS-G permission matrix, strong password hashing (no MD5, no unsalted hash)."
+verify = "Role permissions are tested and no MD5 or unsalted hash exists in the shop."
+covers = ["FR-SHP-01", "FR-SHP-03", "FR-SHP-09"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Customer flows"
+description = "Browse, search, cart, checkout with the simulated payment, orders, reviews and support tickets."
+verify = "A customer can complete the whole flow in a fresh instance."
+covers = ["FR-SHP-05"]
+after = [2]
+hitl = false
+risk = "medium"
+# Also waits on T-08 (snapshot seeding, epic-shop-instance-integration) for a fresh instance.
+
+[[entry]]
+id = 4
+type = "story"
+title = "Support, finance and admin flows"
+description = "Support, finance and admin screens following the RS-G permission matrix."
+verify = "Each role works as the matrix says in tests."
+covers = ["FR-SHP-07"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Seeded accounts for the challenges"
+description = "Seeded accounts for every challenge; no seeded password repeats across challenges."
+verify = "The seeded accounts work in a fresh instance and no seeded password repeats across challenges."
+covers = ["FR-SHP-08"]
+after = [2]
+hitl = false
+risk = "low"
+# Also waits on T-08 (snapshot seeding, epic-shop-instance-integration).
+
+[[entry]]
+id = 6
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what this epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3, 4, 5]
+hitl = false
+risk = "low"

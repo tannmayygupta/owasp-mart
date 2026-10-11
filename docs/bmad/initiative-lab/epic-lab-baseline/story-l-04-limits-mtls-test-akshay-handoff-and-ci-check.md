@@ -13,7 +13,7 @@ risk: medium
 
 ## Description
 
-Closes three limits left by story 4. A test shows the orchestrator client works over mutual TLS against the fake orchestrator with a throwaway certificate authority made inside the test (no key or certificate committed). A team-chat message and a HANDOFFS.md row tell Akshay about the open points of IF-5, the apps/api skeleton and ADR 0018. The CI result of the pull request is read, failures are fixed and the real result is recorded. A person opens the pull request and pastes the message.
+Closes three limits left by story 4. A test shows the orchestrator client works over mutual TLS against the fake orchestrator with a throwaway certificate authority made inside the test (no key or certificate committed). A team-chat message and a HANDOFFS.md row tell Akshay about the open points of IF-5, the apps/api skeleton and ADR 0024. The CI result of the pull request is read, failures are fixed and the real result is recorded. A person opens the pull request and pastes the message.
 
 ## Acceptance Criteria
 

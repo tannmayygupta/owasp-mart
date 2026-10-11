@@ -9,10 +9,10 @@
 | Report tag | contracts, IF-5, mTLS, handoff, sprint 1 |
 
 ## Requirements covered
-IF-5 section 4 and open point 6 (mTLS is a deployment matter), ADR 0018 (signing), architecture 06 (private CA, short-lived leaf certificates); handoffs H-68 (note) and H-83 (new); traceability row LB-5. Decisions confirmed by the developer on 2026-10-09 are in the story plan (TLS flags on the fake; certificates with the `openssl` command, no new dependency).
+IF-5 section 4 and open point 6 (mTLS is a deployment matter), ADR 0024 (signing), architecture 06 (private CA, short-lived leaf certificates); handoffs H-68 (note) and H-83 (new); traceability row LB-5. Decisions confirmed by the developer on 2026-10-09 are in the story plan (TLS flags on the fake; certificates with the `openssl` command, no new dependency).
 
 ## Summary (plain language)
-The fake orchestrator can now speak HTTPS and demand a client certificate. The Python client `HttpInstanceHost` is tested against it over real mutual TLS: the normal calls work, and a missing, foreign or untrusted certificate, a wrong host name and a plain HTTP client are all refused as `OrchestratorUnavailable`. A handoff row and a ready chat message tell Akshay about the 33 open points, the `apps/api` skeleton and ADR 0018.
+The fake orchestrator can now speak HTTPS and demand a client certificate. The Python client `HttpInstanceHost` is tested against it over real mutual TLS: the normal calls work, and a missing, foreign or untrusted certificate, a wrong host name and a plain HTTP client are all refused as `OrchestratorUnavailable`. A handoff row and a ready chat message tell Akshay about the 33 open points, the `apps/api` skeleton and ADR 0024.
 
 ## Why
 Story 1.4 left three limits: mTLS was never exercised, Akshay had not been told, and the Python and contract CI steps had never run on GitHub.

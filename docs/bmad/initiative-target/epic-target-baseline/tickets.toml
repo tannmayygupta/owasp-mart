@@ -10,7 +10,6 @@ covers = ["TB-3", "TB-5"]
 after = []
 hitl = true
 risk = "low"
-unknown = "Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton, tooling and CI) being merged so the shop folder has a home; remove when merged."
 
 [[entry]]
 id = 2
@@ -22,7 +21,6 @@ covers = ["TB-1"]
 after = []
 hitl = false
 risk = "low"
-unknown = "Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton) being merged; remove when merged."
 
 [[entry]]
 id = 3
@@ -34,7 +32,6 @@ covers = ["TB-2"]
 after = []
 hitl = true
 risk = "low"
-unknown = "Waits on draft pull requests of initiative-lab epic-lab-baseline entries 2 and 3 (instance contract v0, instance event schema); remove when they are open for review."
 
 [[entry]]
 id = 4

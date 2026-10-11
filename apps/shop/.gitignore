@@ -1,0 +1,6 @@
+# Built snapshot artifacts (T-08): built in CI, never committed.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+build/

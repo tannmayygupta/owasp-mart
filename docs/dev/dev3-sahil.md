@@ -33,7 +33,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and the shop data model is in place.
 
-- [ ] **T-01. Shop skeleton runs in a container (tracer bullet)**
+- [x] **T-01. Shop skeleton runs in a container (tracer bullet)**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Set up your Windows environment and run an Express app on Node 24 in a hardened container that answers /healthz, /readyz and /version.
@@ -42,7 +42,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Done when: `docker run` of the shop image answers its health endpoints and Docker, Node 24, uv and `node scripts/verify-skills.mjs` succeed on your PC.
   - Handoffs: H-30 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-02. Challenge catalogue schema and 11 stub entries (IF-7)**
+- [x] **T-02. Challenge catalogue schema and 11 stub entries (IF-7)**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-target-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. P-04 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -52,7 +52,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Done when: All 11 stubs validate against the schema in CI.
   - Handoffs: H-25, H-32, H-41, H-43 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-03. Review the instance contract and event schema as consumer**
+- [x] **T-03. Review the instance contract and event schema as consumer**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Review IF-6 and IF-4 against what the shop needs and file change requests through the contract rules.
@@ -70,7 +70,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Done when: In the harness the instance becomes ready after the marker, the planted flag is served and the fake ingest accepts the event.
   - Handoffs: H-26, H-30, H-34, H-35, H-56 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-05. Exploit test runner skeleton**
+- [x] **T-05. Exploit test runner skeleton**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: A runner that executes a test against any instance URL, with its own tiny vulnerable and fixed stubs.
@@ -78,7 +78,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: T-01.
   - Done when: A trivial test passes on the vulnerable stub and fails on the fixed stub in CI.
 
-- [ ] **T-06. Shop data model and seven state machines**
+- [x] **T-06. Shop data model and seven state machines**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: About 20 tables with migrations and the seven state machines.
@@ -86,7 +86,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: T-01.
   - Done when: Migrations run on SQLite and state transitions are tested.
 
-- [ ] **T-07. Shop identity, six roles, permissions and strong hashing**
+- [x] **T-07. Shop identity, six roles, permissions and strong hashing**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Neutral marketplace look, accounts, six roles with the permission matrix, strong password hashing.
@@ -94,7 +94,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Waits on: T-06.
   - Done when: Role permissions are tested and no MD5 or unsalted hash exists in the shop.
 
-- [ ] **T-08. Snapshot seeding mechanism**
+- [x] **T-08. Snapshot seeding mechanism**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Build a seeded snapshot in CI and a per-epic seed-data mechanism so later work adds seed data without editing shared files.

@@ -20,7 +20,7 @@ Browsers talk only to the dashboards on Vercel. Vercel forwards `/api/*` to the 
 
 ## Update note (2026-10-09)
 
-The instance event description (architecture 07 section 3.2 item 6, the events table in 04, and the envelope in docs/design/challenge-specs.md section 10) is superseded by the IF-4 contract contracts/events/app-events.md (ADR 0017, D-38). The challenge specs file itself was not edited.
+The instance event description (architecture 07 section 3.2 item 6, the events table in 04, and the envelope in docs/design/challenge-specs.md section 10) is superseded by the IF-4 contract contracts/events/app-events.md (ADR 0023, D-38). The challenge specs file itself was not edited.
 
 ## Evidence register
 

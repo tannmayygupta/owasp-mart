@@ -3,7 +3,7 @@
 - **Status:** Accepted for the stub design and the sidecar start input (confirmed by Tanmay on 2026-10-10, recorded in the L-06 plan). **Proposed** for points 4 and 5 under Decision (found while building, not yet confirmed).
 - **Date:** 2026-10-10
 - **Deciders:** Tanmay (stream L). Akshay and the L-13 and L-20 stories confirm the sidecar input.
-- **Requirements:** IF-6 (instance contract), IF-4 (event contract), OI-35 and handoff H-59 (sidecar start input), H-74, H-56, D-37, ADR 0005, ADR 0016, ADR 0017. Report row LB-6.
+- **Requirements:** IF-6 (instance contract), IF-4 (event contract), OI-35 and handoff H-59 (sidecar start input), H-74, H-56, D-37, ADR 0005, ADR 0016, ADR 0023. Report row LB-6.
 
 ## Context
 Sahil (T-04) and the lab needed a reference instance to build against before any real instance component exists, and nothing proved that the instance contract (IF-6) and the event contract (IF-4) work together. The sidecar start input was also still open (OI-35): IF-6 said the sidecar gets an event key, flag digests and `first_seq` on standard input but gave no shape.

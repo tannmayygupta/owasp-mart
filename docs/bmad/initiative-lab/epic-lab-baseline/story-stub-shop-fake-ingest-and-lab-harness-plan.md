@@ -56,7 +56,7 @@ assignee: "tannmayygupta"
 - `contracts/events/app-events.md` s3 to s5, `instance-events.posted.schema.json`, `contracts/mocks/fake-ingest/{server,ingest,sign}.mjs` -- posted body rules, signing HMAC, relay path `/internal/v1/events` on 8081, ingest answers and `GET /_fake/events`; the ingest binds 127.0.0.1 by default (`--host`).
 - `infra/compose/compose.yaml` (service `hello`: hardening pattern, digest pin, healthcheck 2s/2s/15), `scripts/dev.mjs` (commands `hello`, `up`, `down`, `doctor`; `PROFILES`, `HELP`, `parseArgs`), `scripts/dev.test.mjs`, `scripts/e2e/dev.e2e.test.mjs` -- extend with `harness`.
 - `.github/workflows/ci.yml` job `compose` -- add the harness run; do not change the other jobs.
-- `docs/architecture/07-repo-and-workstreams.md` s3.1, line 185 (stub shop = tiny Node app) and 02 (edge, gate, networks `inst-<id>` and `front-<id>`), ADR 0005, 0016, 0017.
+- `docs/architecture/07-repo-and-workstreams.md` s3.1, line 185 (stub shop = tiny Node app) and 02 (edge, gate, networks `inst-<id>` and `front-<id>`), ADR 0005, 0016, 0023.
 - New: `contracts/mocks/stub-instance/` (stub sources, tests, Dockerfile), `scripts/check-instance-conformance.mjs` (live probes plus checks on the resolved compose config through `docker compose config --format json`).
 - Handoffs read for this plan (rule 2b): H-74 (stub conformance), H-56 (T-04 uses this as the reference), H-59 (sidecar start input), H-26 to H-28 (injector, snapshot hand-over, placement volumes), H-60 (start order), H-62 (injector network none), H-63, H-64 (flag flow, flags_injected not via sidecar: out of scope here), H-75, H-76 (ingest, edge relay and sidecar behaviour). Answers are written back to the rows.
 - Do not touch: other developers' tracker folders, IF-1, IF-2, IF-5 files.

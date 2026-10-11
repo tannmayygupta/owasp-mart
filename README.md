@@ -34,6 +34,7 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 | `uv run --package vulnmart-api pytest` | Runs the Python tests: the orchestrator API (IF-5) protocol suite against `FakeInstanceHost` and against the HTTP client plus the fake orchestrator `contracts/mocks/fake-orchestrator/server.mjs` (needs Node and uv) |
 | `pnpm run events:check` | Validates only the instance event contract (IF-4, `contracts/events/`) |
 | `node contracts/mocks/fake-ingest/server.mjs --key <test key> --port <n>` | Starts the fake ingest (stand-in for the real one; answers 202, 200, 401, 413, 422; use a throwaway key, never a real one) |
+| `pnpm run catalog:check` | Validates the challenge catalogue (IF-7): the 11 stubs against the schema and the semantic rules (needs `pnpm install` once) |
 | `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed; needs `pnpm install` once) |
 | `node --test "scripts/e2e/*.test.mjs"` | Runs the end-to-end tests: real Docker engine and contract copies (about 1 minute; the contract tests also install dependencies in a temporary copy) |
 
