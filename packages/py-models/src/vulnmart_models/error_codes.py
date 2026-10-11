@@ -1,25 +1,31 @@
 """GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
 
-Error registry (IF-8) version 0.1.0.
+Error registry (IF-8) version 0.3.0.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
 
-REGISTRY_VERSION = "0.1.0"
+REGISTRY_VERSION = "0.3.0"
 PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:"
 
 
 class ErrorCode(StrEnum):
     ATT_CHALLENGE_NOT_FOUND = "ATT-CHALLENGE-NOT-FOUND"
+    ATT_CONSENT_STALE = "ATT-CONSENT-STALE"
     ATT_FLAG_RATE_LIMITED = "ATT-FLAG-RATE-LIMITED"
     ATT_GONE = "ATT-GONE"
     ATT_HINTS_DISABLED = "ATT-HINTS-DISABLED"
     ATT_INVALID_STATE = "ATT-INVALID-STATE"
     ATT_NOT_FOUND = "ATT-NOT-FOUND"
     AUTH_CSRF_FAILED = "AUTH-CSRF-FAILED"
+    AUTH_EMAIL_NOT_VERIFIED = "AUTH-EMAIL-NOT-VERIFIED"
+    AUTH_INVALID_CREDENTIALS = "AUTH-INVALID-CREDENTIALS"
+    AUTH_MFA_INVALID = "AUTH-MFA-INVALID"
+    AUTH_MFA_STATE = "AUTH-MFA-STATE"
     AUTH_ORIGIN_FORBIDDEN = "AUTH-ORIGIN-FORBIDDEN"
     AUTH_SESSION_REQUIRED = "AUTH-SESSION-REQUIRED"
+    AUTH_TOKEN_INVALID = "AUTH-TOKEN-INVALID"
     EVT_BAD_SIGNATURE = "EVT-BAD-SIGNATURE"
     EVT_DUPLICATE_MISMATCH = "EVT-DUPLICATE-MISMATCH"
     EVT_SCHEMA = "EVT-SCHEMA"
@@ -56,6 +62,7 @@ class ErrorCode(StrEnum):
     ORCH_VALIDATION = "ORCH-VALIDATION"
     REQ_INTERNAL = "REQ-INTERNAL"
     REQ_METHOD_NOT_ALLOWED = "REQ-METHOD-NOT-ALLOWED"
+    REQ_RATE_LIMITED = "REQ-RATE-LIMITED"
     REQ_ROUTE_UNKNOWN = "REQ-ROUTE-UNKNOWN"
     REQ_TOO_LARGE = "REQ-TOO-LARGE"
     REQ_UNSUPPORTED_MEDIA_TYPE = "REQ-UNSUPPORTED-MEDIA-TYPE"
@@ -73,14 +80,20 @@ class ErrorInfo:
 
 ERRORS: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.ATT_CHALLENGE_NOT_FOUND: ErrorInfo(ErrorCode.ATT_CHALLENGE_NOT_FOUND, 404, "Challenge not found.", False),
+    ErrorCode.ATT_CONSENT_STALE: ErrorInfo(ErrorCode.ATT_CONSENT_STALE, 409, "The consent text has changed. Read it again.", False),
     ErrorCode.ATT_FLAG_RATE_LIMITED: ErrorInfo(ErrorCode.ATT_FLAG_RATE_LIMITED, 429, "Too many attempts. Try again later.", True),
     ErrorCode.ATT_GONE: ErrorInfo(ErrorCode.ATT_GONE, 410, "This attempt is no longer available.", False),
     ErrorCode.ATT_HINTS_DISABLED: ErrorInfo(ErrorCode.ATT_HINTS_DISABLED, 404, "Hints are not available for this attempt.", False),
     ErrorCode.ATT_INVALID_STATE: ErrorInfo(ErrorCode.ATT_INVALID_STATE, 409, "This action is not allowed in the attempt's current state.", False),
     ErrorCode.ATT_NOT_FOUND: ErrorInfo(ErrorCode.ATT_NOT_FOUND, 404, "Attempt not found.", False),
     ErrorCode.AUTH_CSRF_FAILED: ErrorInfo(ErrorCode.AUTH_CSRF_FAILED, 403, "The request could not be verified.", False),
+    ErrorCode.AUTH_EMAIL_NOT_VERIFIED: ErrorInfo(ErrorCode.AUTH_EMAIL_NOT_VERIFIED, 403, "Verify your email address to continue.", False),
+    ErrorCode.AUTH_INVALID_CREDENTIALS: ErrorInfo(ErrorCode.AUTH_INVALID_CREDENTIALS, 401, "The email address or password is not correct.", False),
+    ErrorCode.AUTH_MFA_INVALID: ErrorInfo(ErrorCode.AUTH_MFA_INVALID, 401, "The code is not correct.", False),
+    ErrorCode.AUTH_MFA_STATE: ErrorInfo(ErrorCode.AUTH_MFA_STATE, 409, "The second factor cannot be changed in its current state.", False),
     ErrorCode.AUTH_ORIGIN_FORBIDDEN: ErrorInfo(ErrorCode.AUTH_ORIGIN_FORBIDDEN, 403, "The request origin is not allowed.", False),
     ErrorCode.AUTH_SESSION_REQUIRED: ErrorInfo(ErrorCode.AUTH_SESSION_REQUIRED, 401, "Sign in to continue.", False),
+    ErrorCode.AUTH_TOKEN_INVALID: ErrorInfo(ErrorCode.AUTH_TOKEN_INVALID, 400, "This link is no longer valid.", False),
     ErrorCode.EVT_BAD_SIGNATURE: ErrorInfo(ErrorCode.EVT_BAD_SIGNATURE, 401, "The event could not be authenticated.", False),
     ErrorCode.EVT_DUPLICATE_MISMATCH: ErrorInfo(ErrorCode.EVT_DUPLICATE_MISMATCH, 409, "An event with this identity was already accepted with different content.", False),
     ErrorCode.EVT_SCHEMA: ErrorInfo(ErrorCode.EVT_SCHEMA, 422, "The event is not valid.", False),
@@ -117,6 +130,7 @@ ERRORS: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.ORCH_VALIDATION: ErrorInfo(ErrorCode.ORCH_VALIDATION, 422, "The request is not valid.", False),
     ErrorCode.REQ_INTERNAL: ErrorInfo(ErrorCode.REQ_INTERNAL, 500, "Something went wrong. Try again later.", True),
     ErrorCode.REQ_METHOD_NOT_ALLOWED: ErrorInfo(ErrorCode.REQ_METHOD_NOT_ALLOWED, 405, "Method not allowed.", False),
+    ErrorCode.REQ_RATE_LIMITED: ErrorInfo(ErrorCode.REQ_RATE_LIMITED, 429, "Too many requests. Try again later.", True),
     ErrorCode.REQ_ROUTE_UNKNOWN: ErrorInfo(ErrorCode.REQ_ROUTE_UNKNOWN, 404, "Route not found.", False),
     ErrorCode.REQ_TOO_LARGE: ErrorInfo(ErrorCode.REQ_TOO_LARGE, 413, "The request body is too large.", False),
     ErrorCode.REQ_UNSUPPORTED_MEDIA_TYPE: ErrorInfo(ErrorCode.REQ_UNSUPPORTED_MEDIA_TYPE, 415, "The request must be JSON.", False),

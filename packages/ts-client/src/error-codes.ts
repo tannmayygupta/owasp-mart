@@ -1,19 +1,25 @@
 // GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
-// Error registry (IF-8) version 0.1.0.
+// Error registry (IF-8) version 0.3.0.
 
-export const REGISTRY_VERSION = "0.1.0";
+export const REGISTRY_VERSION = "0.3.0";
 export const PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:";
 
 export const ERROR_CODES = {
   ATT_CHALLENGE_NOT_FOUND: "ATT-CHALLENGE-NOT-FOUND",
+  ATT_CONSENT_STALE: "ATT-CONSENT-STALE",
   ATT_FLAG_RATE_LIMITED: "ATT-FLAG-RATE-LIMITED",
   ATT_GONE: "ATT-GONE",
   ATT_HINTS_DISABLED: "ATT-HINTS-DISABLED",
   ATT_INVALID_STATE: "ATT-INVALID-STATE",
   ATT_NOT_FOUND: "ATT-NOT-FOUND",
   AUTH_CSRF_FAILED: "AUTH-CSRF-FAILED",
+  AUTH_EMAIL_NOT_VERIFIED: "AUTH-EMAIL-NOT-VERIFIED",
+  AUTH_INVALID_CREDENTIALS: "AUTH-INVALID-CREDENTIALS",
+  AUTH_MFA_INVALID: "AUTH-MFA-INVALID",
+  AUTH_MFA_STATE: "AUTH-MFA-STATE",
   AUTH_ORIGIN_FORBIDDEN: "AUTH-ORIGIN-FORBIDDEN",
   AUTH_SESSION_REQUIRED: "AUTH-SESSION-REQUIRED",
+  AUTH_TOKEN_INVALID: "AUTH-TOKEN-INVALID",
   EVT_BAD_SIGNATURE: "EVT-BAD-SIGNATURE",
   EVT_DUPLICATE_MISMATCH: "EVT-DUPLICATE-MISMATCH",
   EVT_SCHEMA: "EVT-SCHEMA",
@@ -50,6 +56,7 @@ export const ERROR_CODES = {
   ORCH_VALIDATION: "ORCH-VALIDATION",
   REQ_INTERNAL: "REQ-INTERNAL",
   REQ_METHOD_NOT_ALLOWED: "REQ-METHOD-NOT-ALLOWED",
+  REQ_RATE_LIMITED: "REQ-RATE-LIMITED",
   REQ_ROUTE_UNKNOWN: "REQ-ROUTE-UNKNOWN",
   REQ_TOO_LARGE: "REQ-TOO-LARGE",
   REQ_UNSUPPORTED_MEDIA_TYPE: "REQ-UNSUPPORTED-MEDIA-TYPE",
@@ -69,14 +76,20 @@ export interface ErrorInfo {
 
 export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "ATT-CHALLENGE-NOT-FOUND": { status: 404, title: "Challenge not found.", retryable: false },
+  "ATT-CONSENT-STALE": { status: 409, title: "The consent text has changed. Read it again.", retryable: false },
   "ATT-FLAG-RATE-LIMITED": { status: 429, title: "Too many attempts. Try again later.", retryable: true },
   "ATT-GONE": { status: 410, title: "This attempt is no longer available.", retryable: false },
   "ATT-HINTS-DISABLED": { status: 404, title: "Hints are not available for this attempt.", retryable: false },
   "ATT-INVALID-STATE": { status: 409, title: "This action is not allowed in the attempt's current state.", retryable: false },
   "ATT-NOT-FOUND": { status: 404, title: "Attempt not found.", retryable: false },
   "AUTH-CSRF-FAILED": { status: 403, title: "The request could not be verified.", retryable: false },
+  "AUTH-EMAIL-NOT-VERIFIED": { status: 403, title: "Verify your email address to continue.", retryable: false },
+  "AUTH-INVALID-CREDENTIALS": { status: 401, title: "The email address or password is not correct.", retryable: false },
+  "AUTH-MFA-INVALID": { status: 401, title: "The code is not correct.", retryable: false },
+  "AUTH-MFA-STATE": { status: 409, title: "The second factor cannot be changed in its current state.", retryable: false },
   "AUTH-ORIGIN-FORBIDDEN": { status: 403, title: "The request origin is not allowed.", retryable: false },
   "AUTH-SESSION-REQUIRED": { status: 401, title: "Sign in to continue.", retryable: false },
+  "AUTH-TOKEN-INVALID": { status: 400, title: "This link is no longer valid.", retryable: false },
   "EVT-BAD-SIGNATURE": { status: 401, title: "The event could not be authenticated.", retryable: false },
   "EVT-DUPLICATE-MISMATCH": { status: 409, title: "An event with this identity was already accepted with different content.", retryable: false },
   "EVT-SCHEMA": { status: 422, title: "The event is not valid.", retryable: false },
@@ -113,6 +126,7 @@ export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "ORCH-VALIDATION": { status: 422, title: "The request is not valid.", retryable: false },
   "REQ-INTERNAL": { status: 500, title: "Something went wrong. Try again later.", retryable: true },
   "REQ-METHOD-NOT-ALLOWED": { status: 405, title: "Method not allowed.", retryable: false },
+  "REQ-RATE-LIMITED": { status: 429, title: "Too many requests. Try again later.", retryable: true },
   "REQ-ROUTE-UNKNOWN": { status: 404, title: "Route not found.", retryable: false },
   "REQ-TOO-LARGE": { status: 413, title: "The request body is too large.", retryable: false },
   "REQ-UNSUPPORTED-MEDIA-TYPE": { status: 415, title: "The request must be JSON.", retryable: false },

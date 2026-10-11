@@ -1,0 +1,8 @@
+{
+  "schema": "TokenRequest",
+  "body": {
+    "token": "has spaces and symbols!!!!!!!!!!!!!!!!!"
+  },
+  "path": "/token",
+  "rule": "URL-safe characters only"
+}

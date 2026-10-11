@@ -14,6 +14,7 @@
 /contracts/errors/                  @akshaay29
 /contracts/db/                      @akshaay29
 /contracts/mocks/                   @tannmayygupta
+/contracts/mocks/platform-mock/      @akshaay29
 /apps/api/src/vulnmart/kernel/      @akshaay29
 /apps/api/src/vulnmart/ports/       @akshaay29 @tannmayygupta
 /apps/api/src/vulnmart/accounts/    @akshaay29

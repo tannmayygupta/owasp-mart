@@ -1,0 +1,11 @@
+{
+  "schema": "SignupRequest",
+  "body": {
+    "email": "ada@example.invalid",
+    "password": "correct-horse-battery-staple",
+    "display_name": "Ada Learner",
+    "age_declaration": false
+  },
+  "path": "/age_declaration",
+  "rule": "only a declaration of 18 or over is accepted (FR-ACC-01, FR-PRV-13)"
+}

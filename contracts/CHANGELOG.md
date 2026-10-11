@@ -10,6 +10,16 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
 
+## Platform API (IF-1), `contracts/api/platform/`
+
+### 0.1.0 (2026-10-11, Akshay, story P-04)
+- registry change: IF-1 is registered in `contracts/registry.json` (new contract; `contracts/api/platform` was a reserved folder, now owned by stream P with its OpenAPI file, mock, conformance scripts and generated code).- First draft: `platform.openapi.yaml` (OpenAPI 3.1, 25 operations on 21 paths under `/api/v1/`): health; account creation and e-mail verification; session (sign in, MFA step, read, sign out); profile, password and MFA enrolment; password reset; consent notice and record; challenge catalogue; own attempts; live stream (`GET /live` as SSE, `GET /live/snapshot`, `POST /live/ticket` marked `x-pending` until story S-14). Session cookie `__Host-vm_session`, CSRF header `X-CSRF-Token` on every authenticated unsafe call (public ones have no session and no token, but the Origin check and a rate limit), every error is the closed IF-8 body (`application/problem+json`), public operations say `security: []`, every answer says `Cache-Control: private, no-store`. Every authenticated state-changing route that takes a body also declares 429.
+- Bundle: `contracts/api/bundle/openapi.json` (43 operations: this fragment plus IF-2, written by `node scripts/bundle-openapi.mjs`, proven current by `pnpm run contracts:bundle:check`). IF-2 components that differ from a platform component of the same name are renamed with the prefix `Lab`; IF-2 keeps its own error bodies in the bundle (see the change request to stream L).
+- Generated code, checked in CI (`pnpm run api:check`): `packages/ts-client/src/api.d.ts` and `packages/py-models/src/vulnmart_models/api.py`, from the bundle by `scripts/generate-api-code.mjs`. In the Python models an e-mail address is a plain string, and an object that must have at least one member is not expressed; the bundle and the API validate both.
+- Mock: `contracts/mocks/platform-mock/server.mjs` (a Node server of the bundle: cookies, CSRF, origin and size checks, another declared answer through `Prefer: code=NNN` or `Prefer: example=NAME`, a fake SSE stream, an optional fake lab) with `scripts/platform-mock.test.mjs`.
+- Checked by `scripts/check_platform_contract.py` (fragment and bundle rules, 14 valid and 21 invalid request examples), `scripts/check_api_models.py` and the type test of the client.
+- Status: awaiting review by Tanmay (lab prefix in the bundle, IF-2 error bodies) and Sahil (catalogue fields the dashboards read).
+
 ## Domain events (IF-3), `contracts/domain-events/`
 
 ### 0.1.0 (2026-10-11, Akshay, story P-03)
@@ -21,6 +31,16 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting review by Tanmay (publisher side, `stream.resync`, audience table).
 
 ## Error codes and error format (IF-8), `contracts/errors/`
+
+### 0.3.0 (2026-10-11, Akshay, story P-04, code review)
+- Additive: `AUTH-MFA-STATE` (409: the second factor is already active, or an admin turns it off) and `ATT-CONSENT-STALE` (409: the consent notice the person saw is not the current one). They replace the use of `ATT-INVALID-STATE` for these two cases in IF-1. Constants regenerated (56 codes).
+- BREAKING: none in substance, see 0.2.0 (the rules engine flags any change to `error-codes.yaml`). Checked by hand: 2 added, 0 removed, 0 changed.
+- no mock change: the generated constants are the stub of this contract (`noMock` in the registry).
+
+### 0.2.0 (2026-10-11, Akshay, story P-04)
+- Additive: five codes for the platform routes of IF-1: `AUTH-EMAIL-NOT-VERIFIED` (403), `AUTH-INVALID-CREDENTIALS` (401), `AUTH-MFA-INVALID` (401), `AUTH-TOKEN-INVALID` (400) and `REQ-RATE-LIMITED` (429, the generic rate limit that the deferred-work list of P-02 named). Constants regenerated (54 codes).
+- BREAKING: none in substance. This line only satisfies the rules engine, which cannot compare `error-codes.yaml` (a YAML file outside `schemas` and `openapi`) and flags any change to it as breaking on the safe side. Checked by hand against `origin/main`: 5 codes added, 0 removed, 0 changed.
+- no mock change: the generated constants are the stub of this contract (`noMock` in the registry).
 
 ### 0.1.0 (2026-10-11, Akshay, story P-02)
 - registry change: IF-8 is registered in `contracts/registry.json` (new contract; `contracts/errors` was a reserved folder, now owned by stream P with its schemas, conformance scripts and a stated reason for having no mock).

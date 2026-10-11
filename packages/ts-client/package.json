@@ -2,9 +2,21 @@
   "name": "@vulnmart/ts-client",
   "version": "0.0.0",
   "private": true,
-  "description": "VulnMart TypeScript client pieces generated from the contracts. Today: the error registry constants (IF-8).",
+  "description": "VulnMart typed API client for the dashboards, generated from the bundle of the browser API (IF-1 and IF-2), plus the error registry constants (IF-8).",
   "type": "module",
   "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api.d.ts",
     "./error-codes": "./src/error-codes.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
   }
 }

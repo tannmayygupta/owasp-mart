@@ -1,0 +1,6 @@
+{
+  "schema": "UpdateMeRequest",
+  "body": {},
+  "path": "",
+  "rule": "at least one member"
+}

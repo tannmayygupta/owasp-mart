@@ -1,0 +1,3 @@
+$ node scripts/validate-errors.mjs && node scripts/generate-error-codes.mjs --check
+OK: 56 codes, 7 valid and 24 invalid example bodies.
+OK: generated files are current (56 codes).

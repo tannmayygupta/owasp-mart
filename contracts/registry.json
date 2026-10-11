@@ -2,7 +2,7 @@
   "$comment": "Contract registry read by scripts/check-contract-rules.mjs (story L-07). One entry per contract. `folders`: every file under them belongs to the contract (a change needs an entry in contracts/CHANGELOG.md under `changelog`). `schemas` and `openapi`: the machine-readable files, compared for breaking changes; a change to one of them needs a change under one of `mocks` or a line `no mock change: <reason>` in the changelog entry. `reserved`: folders without a contract yet; any file other than .gitkeep in one needs a registry entry first. `containers`: folders whose child folders are the contracts (contracts/api/lab, contracts/api/platform). `generated`: output of a bundler, not a contract.",
   "version": 1,
   "containers": ["api"],
-  "reserved": ["contracts/api/platform"],
+  "reserved": [],
   "generated": ["contracts/api/bundle"],
   "mockRoot": "contracts/mocks",
   "contracts": [
@@ -54,6 +54,17 @@
       "changelog": "Lab API (IF-2), `contracts/api/lab/`",
       "mocks": ["contracts/mocks/fake-lab"],
       "conformance": ["scripts/check_lab_contract.py", "apps/api/tests/test_lab_contract.py"]
+    },
+    {
+      "id": "IF-1",
+      "name": "Platform API",
+      "owner": "P",
+      "folders": ["contracts/api/platform"],
+      "schemas": [],
+      "openapi": ["contracts/api/platform/platform.openapi.yaml"],
+      "changelog": "Platform API (IF-1), `contracts/api/platform/`",
+      "mocks": ["contracts/mocks/platform-mock"],
+      "conformance": ["scripts/check_platform_contract.py", "scripts/bundle-openapi.mjs", "scripts/generate-api-code.mjs", "scripts/check_api_models.py", "apps/api/tests/test_platform_contract.py", "scripts/bundle-openapi.test.mjs", "scripts/generate-api-code.test.mjs", "scripts/platform-mock.test.mjs"]
     },
     {
       "id": "DB",

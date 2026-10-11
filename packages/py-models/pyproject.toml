@@ -1,9 +1,16 @@
 [project]
 name = "vulnmart-models"
 version = "0.0.0"
-description = "VulnMart shared Python models generated from the contracts. Today: the error registry constants (IF-8)."
+description = "VulnMart shared Python models generated from the contracts: the error registry constants (IF-8) and the Pydantic models of the browser API bundle (IF-1 and IF-2)."
 requires-python = "==3.14.*"
-dependencies = []
+dependencies = [
+    "pydantic==2.14.0",
+]
+
+[dependency-groups]
+dev = [
+    "datamodel-code-generator==0.83.0",
+]
 
 [build-system]
 requires = ["uv_build==0.12.23"]

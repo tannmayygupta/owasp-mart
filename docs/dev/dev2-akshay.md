@@ -59,7 +59,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: Every fixture validates, the replay script emits them in order to a local consumer and the validation runs in CI.
   - Handoffs: H-22 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-04. Platform and lab API fragments, bundle, mock and generated clients (IF-1, IF-2)**
+- [x] **P-04. Platform and lab API fragments, bundle, mock and generated clients (IF-1, IF-2)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.4` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Write the platform API fragment, bundle it with the lab fragment, a mock server and generated clients.

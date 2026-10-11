@@ -1,0 +1,6 @@
+{
+  "schema": "UpdateMeRequest",
+  "body": {
+    "display_name": "Ada L."
+  }
+}

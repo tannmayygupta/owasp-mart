@@ -1,0 +1,10 @@
+{
+  "schema": "SignupRequest",
+  "body": {
+    "email": "ada@example.invalid",
+    "password": "correct-horse-battery-staple",
+    "display_name": "Ada",
+    "age_declaration": true,
+    "captcha_token": "fake-captcha-token"
+  }
+}

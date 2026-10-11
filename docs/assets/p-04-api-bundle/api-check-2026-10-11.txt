@@ -1,0 +1,5 @@
+$ node scripts/bundle-openapi.mjs --check && node scripts/generate-api-code.mjs --check && uv run --locked --package vulnmart-models python scripts/check_api_models.py && pnpm --filter @vulnmart/ts-client typecheck
+OK: the bundle is current (43 operations, 10 shared and 9 renamed components).
+OK: generated API code is current.
+OK: 90 checks, 0 problem(s).
+$ tsc --noEmit -p tsconfig.json
