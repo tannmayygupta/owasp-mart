@@ -5,6 +5,23 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-08 snapshot seeding mechanism, 2026-10-09, Sahil)
+- `apps/shop/seed/`: a per-epic seed registry that discovers `contributions/NNN-*.mjs` in numeric order and runs them in one transaction, a deterministic baseline world (users, stores, categories, products with fixed timestamps), and a `build-snapshot` CLI (`pnpm run snapshot`) that migrates a fresh SQLite db, seeds it, and reports dynamic row counts and build time (~320 ms). Later epics add seed data by dropping a file, no shared-file edits. Snapshot is a gitignored CI artifact. 7 tests. Covers FR-SHP-12.
+
+### Added (T-07 shop identity, roles, permissions and hashing, 2026-10-09, Sahil)
+- `apps/shop/` identity and authorization: scrypt password hashing (`src/identity/password.mjs`, salted, timing-safe, param floor, PHC-style, no MD5/unsalted — ADR 0018), an accounts service (`src/identity/accounts.mjs`, create/authenticate over `users`, normalized email, no hash leak), the six roles and the RS-G 1.2 permission matrix with a scoped `can(role, action, ctx)` guard (`src/domain/roles.mjs`, `permissions.mjs`), and neutral branding (`src/identity/branding.mjs`). 48 tests. Covers FR-SHP-01, FR-SHP-03, FR-SHP-09.
+
+### Added (T-06 shop data model and seven state machines, 2026-10-09, Sahil)
+- `apps/shop/` data layer: 23-table SQLite schema (`migrations/0001_init.sql`, the RS-G 1.1 marketplace model plus the thin audit log and the C09 security-events/alerts tables, integer `*_cents` money, status CHECKs mirroring the state machines), an idempotent migration runner + CLI (`src/db/migrate.mjs`, `migrate` script), and the seven state machines (`src/domain/state-machines.mjs`: seller approval, product, checkout, fulfilment, refund, dispute, payout) as pure guarded transition logic. On Node 24's built-in `node:sqlite` (ADR 0017). 21 tests. Covers FR-SHP-02, FR-SHP-04.
+
+### Added (T-05 exploit test runner skeleton, 2026-10-09, Sahil)
+- `challenges/tests/runner/` exploit test runner: runs an exploit test against any instance URL and reports passed (vulnerable) / failed (fixed) / errored (could not run), as a library and a CLI (exit 0/1/3, 2 on usage). Ships a tiny vulnerable/fixed stub and a demo exploit under `challenges/tests/_example/`, a self-test (6 cases) proving pass-on-vulnerable and fail-on-fixed, and a CI `exploit runner` job that fails if no exploit tests are found. Node built-ins only. Covers TB-4.
+
+### Added (T-03 IF-6/IF-4 consumer review, 2026-10-09, Sahil)
+- Target-stream consumer review and sign-off of the instance contract (IF-6 v0.1.0) and the instance event contract (IF-4 v0.1.0): `docs/reviews/2026-10-09-target-if6-if4-consumer-review.md`. Confirms every IF-6 open point owned by Sahil, checks IF-4 carries every shop-produced event the 11 challenges need, and raises one change request (CR-1: the `/version` env names vs the env allowlist). Covers TB-2.
+
+### Added (T-01 shop skeleton, 2026-10-09, Sahil)
+- `apps/shop/` shop skeleton (tracer bullet): Express 5.2.1 on Node 24 answering `/healthz`, `/readyz` and `/version`, packaged as a hardened, digest-pinned container (non-root uid 65532, read-only rootfs, cap-drop ALL, no-new-privileges, 512 MB / 256 pids) with a `/readyz` healthcheck. Unit tests (5) cover the endpoint behaviour; a new CI `app tests` job runs `apps/*/test` on every pull request. Proven on Sahil's PC with `docker run` (all three endpoints 200, container healthy). Covers TB-3, TB-5.
 ### Added (T-02 challenge catalogue IF-7, 2026-10-09, Sahil)
 - Challenge catalogue contract IF-7: `contracts/catalog/challenge.schema.json` (JSON Schema 2020-12) and 11 stub entries `challenges/catalog/c01..c11.yaml` with OWASP 2021/2025 tags, CWE and ATT&CK ids, difficulty and tier (derived per D-32), placeholder milestones and three hint slots, and provisional flag placement/delivery. Validator `scripts/validate-catalog.mjs` (`pnpm run catalog:check`) and tests enforce the schema plus semantic rules (tier↔difficulty, key↔filename, key-matched test/fixed paths, env-delivery reason, exactly 11 entries, no real flag). `js-yaml` 4.1.0 added as a pinned dev dependency. Covers TB-1. EARLY PR; P-04 (Akshay) consumes it.
 
