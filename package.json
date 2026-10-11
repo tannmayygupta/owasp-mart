@@ -6,14 +6,15 @@
   "packageManager": "pnpm@12.10.1",
   "scripts": {
     "test": "node --test \"scripts/*.test.mjs\" \"contracts/mocks/stub-instance/**/*.test.mjs\"",
-    "test:e2e": "node --test \"scripts/e2e/*.test.mjs\"",
+    "test:e2e": "node --test --test-concurrency=1 \"scripts/e2e/*.test.mjs\"",
     "dev": "node scripts/dev.mjs",
     "progress": "node scripts/progress-page.mjs --serve",
     "contracts:check": "node scripts/validate-contracts.mjs && node scripts/validate-events.mjs && uv run --locked --package vulnmart-api python scripts/check_orchestrator_contract.py && uv run --locked --package vulnmart-api python scripts/check_lab_contract.py",
     "ci:linux": "node scripts/ci-linux.mjs",
     "contracts:rules": "node scripts/check-contract-rules.mjs",
     "events:check": "node scripts/validate-events.mjs",
-    "catalog:check": "node scripts/validate-catalog.mjs"
+    "catalog:check": "node scripts/validate-catalog.mjs",
+    "errors:check": "node scripts/validate-errors.mjs && node scripts/generate-error-codes.mjs --check"
   },
   "devDependencies": {
     "ajv": "8.20.0",

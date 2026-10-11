@@ -5,6 +5,12 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (P-02 error registry and problem-details format IF-8, 2026-10-11, Akshay)
+- `contracts/errors/` (contract 0.1.0): `error-codes.yaml` with 49 codes in six families (every code named in the merged contracts and in stream L's in-flight branches, names unchanged), a registry schema, a closed response-body schema (RFC 9457 members `type`, `title`, `status` plus `code`, `request_id`, optional `field` and `errors`), 7 valid and 24 invalid example bodies and a README. `scripts/validate-errors.mjs` and `scripts/generate-error-codes.mjs` (`pnpm run errors:check`, in CI) generate `packages/py-models` (`vulnmart-models`, new uv member) and `packages/ts-client` (`@vulnmart/ts-client`, new pnpm package) constants. `apps/api` answers unknown routes, wrong methods, invalid bodies and unhandled errors in that format (`vulnmart.problem`, `ProblemError`), tested against the schema; CI builds the API image. Change request for streams L and T: `docs/reviews/2026-10-11-if8-change-request-for-stream-l.md`. Covers PB-1.
+
+### Added (P-01 platform stack runs end to end locally, 2026-10-11, Akshay)
+- `apps/api` (FastAPI 0.143.0, `GET /healthz` checking Postgres and Valkey, never returning error text) and `apps/web` (Next.js 16.4.0 page showing the result through a same-origin `/api/*` rewrite). Compose services `postgres` 18.6, `valkey` 9.0.6, `mailpit` v1.31.5, `api` (profile `platform`) and `web` (profile `web`, dev server with the source mounted), digest-pinned, non-root, read-only, loopback-only ports; start with `node scripts/dev.mjs up platform web`. Tests: 10 API unit tests, a Docker-free Compose hardening test, a 9-test end-to-end test on a real engine; CI `api` job. `test:e2e` now runs one file at a time. Proven on the developer's Windows PC including a real-browser check. Covers PB-7, PB-8 (verified on Windows, not a Mac). Pull request pending: it edits stream L's `infra/compose/compose.yaml` and `scripts/dev.test.mjs`.
+
 ### Changed (PR 3 review remediation, story 1.15, 2026-10-11, Tanmay)
 - Decisions D-42 to D-47 recorded in `initial.md`, ADRs 0025 to 0028 Accepted; the EARLY PR reminder added to `CLAUDE.md`; messages for Sahil and Akshay (T-04, T-09, T-10 and P-04 unblock, handoff H-112); the sprint 1 pull request checklist updated.
 - Merged `origin/main` into the sprint 1 branch: 7 conflicts resolved as unions, IF-7 registered, this branch's ADRs 0017 and 0018 renumbered 0023 and 0024, the IF-4 consumer sign-off flagged stale.

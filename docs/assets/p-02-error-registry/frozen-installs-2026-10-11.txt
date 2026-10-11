@@ -1,0 +1,14 @@
+Scope: all 4 workspace projects
+✓ Lockfile passes supply-chain policies (verified 1h ago)
+Lockfile is up to date, resolution step is skipped
+Done in 236ms using pnpm v12.10.1
+pnpm exit=0
+uv : Resolved 36 packages in 67ms
+At line:10 char:85
++ ... --frozen-lockfile; "pnpm exit=$LASTEXITCODE"; uv lock --check; "uv ex ...
++                                                   ~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Resolved 36 packages in 67ms:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+uv exit=0
+

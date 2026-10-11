@@ -1,0 +1,73 @@
+# IF-8: the VulnMart error registry (contract version 0.1.0, story P-02, owner stream P).
+# The ONE place an error code is defined. Application code names a code only through the constants
+# generated from this file (packages/py-models, packages/ts-client); run `node scripts/generate-error-codes.mjs`.
+#
+# Rules (see contracts/errors/README.md):
+#  - A code is FAMILY-WORD[-WORD...] in capitals, and its family is listed under `families`.
+#  - Adding a code is additive (minor version). Renaming, removing or changing the status of a code is BREAKING.
+#  - `title` is the fixed, generic text sent to clients. It never repeats a submitted value and never names an
+#    internal (no host, path, table, key or flag).
+#  - `status` is the HTTP status when the code is sent as an HTTP answer, or null when it only appears inside an
+#    event or in `error_code` of a failed instance (never as an HTTP answer).
+#  - Entries are sorted by code so a diff shows exactly what changed.
+registry_version: "0.1.0"
+
+families:
+  AUTH: { owner: P, description: "Sign-in, session and request-origin checks on the browser API." }
+  ATT: { owner: L, description: "Attempts: lookup, state and rate rules." }
+  EVT: { owner: L, description: "Event ingest (IF-4)." }
+  INST: { owner: L, description: "Instances, and the injector exit codes (IF-6)." }
+  ORCH: { owner: L, description: "Orchestrator API (IF-5); never reaches a browser." }
+  REQ: { owner: P, description: "Request-level errors any HTTP API of the platform or the lab can raise." }
+
+codes:
+  - { code: ATT-CHALLENGE-NOT-FOUND, status: 404, title: "Challenge not found.", retryable: false }
+  - { code: ATT-FLAG-RATE-LIMITED, status: 429, title: "Too many attempts. Try again later.", retryable: true }
+  - { code: ATT-GONE, status: 410, title: "This attempt is no longer available.", retryable: false }
+  - { code: ATT-HINTS-DISABLED, status: 404, title: "Hints are not available for this attempt.", retryable: false }
+  - { code: ATT-INVALID-STATE, status: 409, title: "This action is not allowed in the attempt's current state.", retryable: false }
+  - { code: ATT-NOT-FOUND, status: 404, title: "Attempt not found.", retryable: false }
+  - { code: AUTH-CSRF-FAILED, status: 403, title: "The request could not be verified.", retryable: false }
+  - { code: AUTH-ORIGIN-FORBIDDEN, status: 403, title: "The request origin is not allowed.", retryable: false }
+  - { code: AUTH-SESSION-REQUIRED, status: 401, title: "Sign in to continue.", retryable: false }
+  - { code: EVT-BAD-SIGNATURE, status: 401, title: "The event could not be authenticated.", retryable: false }
+  - { code: EVT-DUPLICATE-MISMATCH, status: 409, title: "An event with this identity was already accepted with different content.", retryable: false }
+  - { code: EVT-SCHEMA, status: 422, title: "The event is not valid.", retryable: false }
+  - { code: EVT-STORE-FULL, status: 503, title: "The event store is full.", retryable: true }
+  - { code: EVT-TOO-LARGE, status: 413, title: "The event is too large.", retryable: false }
+  - { code: INST-HEALTH-TIMEOUT, status: null, title: "The instance did not become healthy in time.", retryable: true }
+  - { code: INST-INJECT-BAD-DOCUMENT, status: null, title: "The injection document is missing or not valid.", retryable: false, exit_code: 10 }
+  - { code: INST-INJECT-FAILED, status: null, title: "The injector failed.", retryable: false }
+  - { code: INST-INJECT-MARKER-WRITE, status: null, title: "The flags file or the marker could not be written.", retryable: false, exit_code: 13 }
+  - { code: INST-INJECT-PLACEMENT-WRITE, status: null, title: "A placement file could not be written.", retryable: false, exit_code: 12 }
+  - { code: INST-INJECT-SNAPSHOT-PATCH, status: null, title: "The snapshot patch failed.", retryable: false, exit_code: 11 }
+  - { code: INST-INVALID-STATE, status: 409, title: "This action is not allowed in the instance's current state.", retryable: false }
+  - { code: INST-LOST, status: null, title: "The instance was lost.", retryable: false }
+  - { code: INST-NOT-FOUND, status: 404, title: "Instance not found.", retryable: false }
+  - { code: INST-NOT-READY, status: 409, title: "The instance is not ready yet.", retryable: true }
+  - { code: INST-QUOTA-REACHED, status: 409, title: "The instance limit has been reached.", retryable: false }
+  - { code: ORCH-BAD-SIGNATURE, status: 401, title: "The request could not be authenticated.", retryable: false }
+  - { code: ORCH-BODY-TOO-LARGE, status: 413, title: "The request body is too large.", retryable: false }
+  - { code: ORCH-BUSY, status: 429, title: "No capacity is available right now.", retryable: true }
+  - { code: ORCH-FIELD-FORBIDDEN, status: 422, title: "The request names a field that is not allowed.", retryable: false }
+  - { code: ORCH-INSTANCE-EXISTS, status: 409, title: "An instance with this identity already exists.", retryable: false }
+  - { code: ORCH-INSTANCE-NOT-FOUND, status: 404, title: "Instance not found.", retryable: false }
+  - { code: ORCH-INTERNAL, status: 500, title: "Internal error.", retryable: true }
+  - { code: ORCH-INVALID-STATE, status: 409, title: "This action is not allowed in the instance's current state.", retryable: false }
+  - { code: ORCH-LABEL-UNKNOWN, status: 422, title: "The label filter is not known.", retryable: false }
+  - { code: ORCH-METHOD-NOT-ALLOWED, status: 405, title: "Method not allowed.", retryable: false }
+  - { code: ORCH-RATE-LIMITED, status: 429, title: "Too many requests. Try again later.", retryable: true }
+  - { code: ORCH-REQUEST-MISMATCH, status: 409, title: "This request identity was already used with different content.", retryable: false }
+  - { code: ORCH-ROUTE-UNKNOWN, status: 404, title: "Route not found.", retryable: false }
+  - { code: ORCH-STALE-ACCESS-EPOCH, status: 409, title: "The access epoch is out of date.", retryable: false }
+  - { code: ORCH-STALE-EPOCH, status: 409, title: "The epoch is out of date.", retryable: false }
+  - { code: ORCH-TEMPLATE-UNKNOWN, status: 422, title: "The template is not known.", retryable: false }
+  # Client side: what the platform's orchestrator client reports when it cannot reach or understand the orchestrator. Never sent by the orchestrator.
+  - { code: ORCH-UNAVAILABLE, status: 503, title: "The orchestrator could not be reached or understood.", retryable: true }
+  - { code: ORCH-VALIDATION, status: 422, title: "The request is not valid.", retryable: false }
+  - { code: REQ-INTERNAL, status: 500, title: "Something went wrong. Try again later.", retryable: true }
+  - { code: REQ-METHOD-NOT-ALLOWED, status: 405, title: "Method not allowed.", retryable: false }
+  - { code: REQ-ROUTE-UNKNOWN, status: 404, title: "Route not found.", retryable: false }
+  - { code: REQ-TOO-LARGE, status: 413, title: "The request body is too large.", retryable: false }
+  - { code: REQ-UNSUPPORTED-MEDIA-TYPE, status: 415, title: "The request must be JSON.", retryable: false }
+  - { code: REQ-VALIDATION, status: 422, title: "The request is not valid.", retryable: false }

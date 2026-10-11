@@ -10,6 +10,18 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
 
+## Error codes and error format (IF-8), `contracts/errors/`
+
+### 0.1.0 (2026-10-11, Akshay, story P-02)
+- registry change: IF-8 is registered in `contracts/registry.json` (new contract; `contracts/errors` was a reserved folder, now owned by stream P with its schemas, conformance scripts and a stated reason for having no mock).
+- First draft: `error-codes.yaml` (49 codes in six families: `AUTH`, `ATT`, `EVT`, `INST`, `ORCH`, `REQ`; every code named in the merged contracts and in stream L's in-flight branches, under the names those contracts use), `error-codes.schema.json`, `problem.schema.json` (RFC 9457 members `type`, `title`, `status` plus `code`, `request_id`, optional `field` and `errors`; closed shape), 7 valid and 24 invalid example bodies, and `README.md`.
+- `ATT-GONE` (410) is in the seed because IF-2 0.2.0 uses it (`att_gone`).
+- Generated constants: `packages/py-models/src/vulnmart_models/error_codes.py` and `packages/ts-client/src/error-codes.ts` (`node scripts/generate-error-codes.mjs`).
+- Checked by `scripts/validate-errors.mjs` and `scripts/generate-error-codes.mjs --check` (`pnpm run errors:check`, in CI) with tests.
+- The injector exit codes 10 to 13 are `exit_code` on the four `INST-INJECT-*` codes.
+- Streams L and T move their error bodies to this shape in their own stories: see `docs/reviews/2026-10-11-if8-change-request-for-stream-l.md`.
+- Status: awaiting review by Tanmay (statuses, titles, the body shape change for IF-2, IF-4 and IF-5).
+
 ## Instance contract (IF-6), `contracts/instance/`
 
 ### 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42)

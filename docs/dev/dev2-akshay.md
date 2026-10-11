@@ -33,7 +33,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton exist and are signed off.
 
-- [ ] **P-01. Platform stack runs end to end locally (tracer bullet)**
+- [x] **P-01. Platform stack runs end to end locally (tracer bullet)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Postgres, API, worker, Valkey and the dashboards start with `node scripts/dev.mjs`, and a request passes dashboards, API and database.
@@ -41,7 +41,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Waits on: L-01 (repository skeleton and Compose profiles).
   - Done when: A hello request works through the whole local stack and the developer environment on your Mac is verified.
 
-- [ ] **P-02. Error registry and problem-details format (IF-8)**
+- [x] **P-02. Error registry and problem-details format (IF-8)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the shared error codes and the problem-details response format.

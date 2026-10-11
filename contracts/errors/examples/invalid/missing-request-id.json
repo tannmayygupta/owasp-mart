@@ -1,0 +1,6 @@
+{
+  "type": "urn:vulnmart:error:AUTH-SESSION-REQUIRED",
+  "title": "Sign in to continue.",
+  "status": 401,
+  "code": "AUTH-SESSION-REQUIRED"
+}

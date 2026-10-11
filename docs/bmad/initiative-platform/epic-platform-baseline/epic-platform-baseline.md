@@ -57,4 +57,6 @@ Stream P's share of sprint zero. Not the repository skeleton, Compose layout and
 - Decision: no closing end-to-end suite for this epic; the contract checks in CI play that role (2026-10-08).
 - Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton, Compose profile layout, `scripts/dev.mjs`) because the platform profile lives in its layout; entry 1 here carries that as an unknown.
 - Entry 4 consumes the lab API fragment (IF-2) that stream L authors (initiative-lab epic-lab-baseline entry 9). Spike S-14 (SSE through a Vercel rewrite) and the real-VM check move to initiative-lab epic-environments-and-deployment (LE-3).
+- Decision (2026-10-11): entry 1 (story 1.1, P-01) unknown settled. initiative-lab epic-lab-baseline entry 1 (L-01, repository skeleton) is merged to `main` (PR #1, commit 091b820), so `scripts/dev.mjs` and the Compose layout (`infra/compose/compose.yaml`) exist. Unknown removed; story 1.1 is ready to start.
+- Decision (2026-10-11): PB-8 (developer environment verified) is verified on the developer's Windows PC, not a Mac, because Akshay uses Windows only; PRD K-6 and OI-6 still say Intel Mac and should be corrected by the team.
 - Draft written 2026-10-08 by Claude Code for the user to approve; not yet confirmed.

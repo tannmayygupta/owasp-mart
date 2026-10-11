@@ -1,0 +1,125 @@
+// GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
+// Error registry (IF-8) version 0.1.0.
+
+export const REGISTRY_VERSION = "0.1.0";
+export const PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:";
+
+export const ERROR_CODES = {
+  ATT_CHALLENGE_NOT_FOUND: "ATT-CHALLENGE-NOT-FOUND",
+  ATT_FLAG_RATE_LIMITED: "ATT-FLAG-RATE-LIMITED",
+  ATT_GONE: "ATT-GONE",
+  ATT_HINTS_DISABLED: "ATT-HINTS-DISABLED",
+  ATT_INVALID_STATE: "ATT-INVALID-STATE",
+  ATT_NOT_FOUND: "ATT-NOT-FOUND",
+  AUTH_CSRF_FAILED: "AUTH-CSRF-FAILED",
+  AUTH_ORIGIN_FORBIDDEN: "AUTH-ORIGIN-FORBIDDEN",
+  AUTH_SESSION_REQUIRED: "AUTH-SESSION-REQUIRED",
+  EVT_BAD_SIGNATURE: "EVT-BAD-SIGNATURE",
+  EVT_DUPLICATE_MISMATCH: "EVT-DUPLICATE-MISMATCH",
+  EVT_SCHEMA: "EVT-SCHEMA",
+  EVT_STORE_FULL: "EVT-STORE-FULL",
+  EVT_TOO_LARGE: "EVT-TOO-LARGE",
+  INST_HEALTH_TIMEOUT: "INST-HEALTH-TIMEOUT",
+  INST_INJECT_BAD_DOCUMENT: "INST-INJECT-BAD-DOCUMENT",
+  INST_INJECT_FAILED: "INST-INJECT-FAILED",
+  INST_INJECT_MARKER_WRITE: "INST-INJECT-MARKER-WRITE",
+  INST_INJECT_PLACEMENT_WRITE: "INST-INJECT-PLACEMENT-WRITE",
+  INST_INJECT_SNAPSHOT_PATCH: "INST-INJECT-SNAPSHOT-PATCH",
+  INST_INVALID_STATE: "INST-INVALID-STATE",
+  INST_LOST: "INST-LOST",
+  INST_NOT_FOUND: "INST-NOT-FOUND",
+  INST_NOT_READY: "INST-NOT-READY",
+  INST_QUOTA_REACHED: "INST-QUOTA-REACHED",
+  ORCH_BAD_SIGNATURE: "ORCH-BAD-SIGNATURE",
+  ORCH_BODY_TOO_LARGE: "ORCH-BODY-TOO-LARGE",
+  ORCH_BUSY: "ORCH-BUSY",
+  ORCH_FIELD_FORBIDDEN: "ORCH-FIELD-FORBIDDEN",
+  ORCH_INSTANCE_EXISTS: "ORCH-INSTANCE-EXISTS",
+  ORCH_INSTANCE_NOT_FOUND: "ORCH-INSTANCE-NOT-FOUND",
+  ORCH_INTERNAL: "ORCH-INTERNAL",
+  ORCH_INVALID_STATE: "ORCH-INVALID-STATE",
+  ORCH_LABEL_UNKNOWN: "ORCH-LABEL-UNKNOWN",
+  ORCH_METHOD_NOT_ALLOWED: "ORCH-METHOD-NOT-ALLOWED",
+  ORCH_RATE_LIMITED: "ORCH-RATE-LIMITED",
+  ORCH_REQUEST_MISMATCH: "ORCH-REQUEST-MISMATCH",
+  ORCH_ROUTE_UNKNOWN: "ORCH-ROUTE-UNKNOWN",
+  ORCH_STALE_ACCESS_EPOCH: "ORCH-STALE-ACCESS-EPOCH",
+  ORCH_STALE_EPOCH: "ORCH-STALE-EPOCH",
+  ORCH_TEMPLATE_UNKNOWN: "ORCH-TEMPLATE-UNKNOWN",
+  ORCH_UNAVAILABLE: "ORCH-UNAVAILABLE",
+  ORCH_VALIDATION: "ORCH-VALIDATION",
+  REQ_INTERNAL: "REQ-INTERNAL",
+  REQ_METHOD_NOT_ALLOWED: "REQ-METHOD-NOT-ALLOWED",
+  REQ_ROUTE_UNKNOWN: "REQ-ROUTE-UNKNOWN",
+  REQ_TOO_LARGE: "REQ-TOO-LARGE",
+  REQ_UNSUPPORTED_MEDIA_TYPE: "REQ-UNSUPPORTED-MEDIA-TYPE",
+  REQ_VALIDATION: "REQ-VALIDATION",
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
+export interface ErrorInfo {
+  /** HTTP status, or null when the code is never sent as an HTTP answer. */
+  readonly status: number | null;
+  /** The fixed, generic text sent to clients. */
+  readonly title: string;
+  readonly retryable: boolean;
+  readonly exitCode?: number;
+}
+
+export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
+  "ATT-CHALLENGE-NOT-FOUND": { status: 404, title: "Challenge not found.", retryable: false },
+  "ATT-FLAG-RATE-LIMITED": { status: 429, title: "Too many attempts. Try again later.", retryable: true },
+  "ATT-GONE": { status: 410, title: "This attempt is no longer available.", retryable: false },
+  "ATT-HINTS-DISABLED": { status: 404, title: "Hints are not available for this attempt.", retryable: false },
+  "ATT-INVALID-STATE": { status: 409, title: "This action is not allowed in the attempt's current state.", retryable: false },
+  "ATT-NOT-FOUND": { status: 404, title: "Attempt not found.", retryable: false },
+  "AUTH-CSRF-FAILED": { status: 403, title: "The request could not be verified.", retryable: false },
+  "AUTH-ORIGIN-FORBIDDEN": { status: 403, title: "The request origin is not allowed.", retryable: false },
+  "AUTH-SESSION-REQUIRED": { status: 401, title: "Sign in to continue.", retryable: false },
+  "EVT-BAD-SIGNATURE": { status: 401, title: "The event could not be authenticated.", retryable: false },
+  "EVT-DUPLICATE-MISMATCH": { status: 409, title: "An event with this identity was already accepted with different content.", retryable: false },
+  "EVT-SCHEMA": { status: 422, title: "The event is not valid.", retryable: false },
+  "EVT-STORE-FULL": { status: 503, title: "The event store is full.", retryable: true },
+  "EVT-TOO-LARGE": { status: 413, title: "The event is too large.", retryable: false },
+  "INST-HEALTH-TIMEOUT": { status: null, title: "The instance did not become healthy in time.", retryable: true },
+  "INST-INJECT-BAD-DOCUMENT": { status: null, title: "The injection document is missing or not valid.", retryable: false, exitCode: 10 },
+  "INST-INJECT-FAILED": { status: null, title: "The injector failed.", retryable: false },
+  "INST-INJECT-MARKER-WRITE": { status: null, title: "The flags file or the marker could not be written.", retryable: false, exitCode: 13 },
+  "INST-INJECT-PLACEMENT-WRITE": { status: null, title: "A placement file could not be written.", retryable: false, exitCode: 12 },
+  "INST-INJECT-SNAPSHOT-PATCH": { status: null, title: "The snapshot patch failed.", retryable: false, exitCode: 11 },
+  "INST-INVALID-STATE": { status: 409, title: "This action is not allowed in the instance's current state.", retryable: false },
+  "INST-LOST": { status: null, title: "The instance was lost.", retryable: false },
+  "INST-NOT-FOUND": { status: 404, title: "Instance not found.", retryable: false },
+  "INST-NOT-READY": { status: 409, title: "The instance is not ready yet.", retryable: true },
+  "INST-QUOTA-REACHED": { status: 409, title: "The instance limit has been reached.", retryable: false },
+  "ORCH-BAD-SIGNATURE": { status: 401, title: "The request could not be authenticated.", retryable: false },
+  "ORCH-BODY-TOO-LARGE": { status: 413, title: "The request body is too large.", retryable: false },
+  "ORCH-BUSY": { status: 429, title: "No capacity is available right now.", retryable: true },
+  "ORCH-FIELD-FORBIDDEN": { status: 422, title: "The request names a field that is not allowed.", retryable: false },
+  "ORCH-INSTANCE-EXISTS": { status: 409, title: "An instance with this identity already exists.", retryable: false },
+  "ORCH-INSTANCE-NOT-FOUND": { status: 404, title: "Instance not found.", retryable: false },
+  "ORCH-INTERNAL": { status: 500, title: "Internal error.", retryable: true },
+  "ORCH-INVALID-STATE": { status: 409, title: "This action is not allowed in the instance's current state.", retryable: false },
+  "ORCH-LABEL-UNKNOWN": { status: 422, title: "The label filter is not known.", retryable: false },
+  "ORCH-METHOD-NOT-ALLOWED": { status: 405, title: "Method not allowed.", retryable: false },
+  "ORCH-RATE-LIMITED": { status: 429, title: "Too many requests. Try again later.", retryable: true },
+  "ORCH-REQUEST-MISMATCH": { status: 409, title: "This request identity was already used with different content.", retryable: false },
+  "ORCH-ROUTE-UNKNOWN": { status: 404, title: "Route not found.", retryable: false },
+  "ORCH-STALE-ACCESS-EPOCH": { status: 409, title: "The access epoch is out of date.", retryable: false },
+  "ORCH-STALE-EPOCH": { status: 409, title: "The epoch is out of date.", retryable: false },
+  "ORCH-TEMPLATE-UNKNOWN": { status: 422, title: "The template is not known.", retryable: false },
+  "ORCH-UNAVAILABLE": { status: 503, title: "The orchestrator could not be reached or understood.", retryable: true },
+  "ORCH-VALIDATION": { status: 422, title: "The request is not valid.", retryable: false },
+  "REQ-INTERNAL": { status: 500, title: "Something went wrong. Try again later.", retryable: true },
+  "REQ-METHOD-NOT-ALLOWED": { status: 405, title: "Method not allowed.", retryable: false },
+  "REQ-ROUTE-UNKNOWN": { status: 404, title: "Route not found.", retryable: false },
+  "REQ-TOO-LARGE": { status: 413, title: "The request body is too large.", retryable: false },
+  "REQ-UNSUPPORTED-MEDIA-TYPE": { status: 415, title: "The request must be JSON.", retryable: false },
+  "REQ-VALIDATION": { status: 422, title: "The request is not valid.", retryable: false },
+};
+
+/** The `type` member of an error body for this code. */
+export function problemType(code: ErrorCode): string {
+  return PROBLEM_TYPE_PREFIX + code;
+}

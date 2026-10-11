@@ -1,0 +1,2 @@
+OK: all 217 installed skill files match the manifest.
+

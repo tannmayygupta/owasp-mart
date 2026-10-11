@@ -1,0 +1,3 @@
+compose exit=0
+OK: all 217 installed skill files match the manifest.
+

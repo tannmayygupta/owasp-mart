@@ -42,6 +42,7 @@ jobs:
         with:
           version: 0.12.23
       - run: node --test "scripts/*.test.mjs"
+      - run: pnpm run errors:check
       - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"
       - run: uv run --locked --package vulnmart-api pytest -q
       - run: pnpm run contracts:check
@@ -201,6 +202,18 @@ jobs:
           version: 0.12.23
       - run: uv lock --check
 
+  api:
+    name: api tests
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: 0.12.23
+      - run: uv sync --frozen --package vulnmart-api
+      - run: uv run --frozen --package vulnmart-api pytest apps/api
+
   compose:
     name: compose and hello
     timeout-minutes: 15
@@ -216,6 +229,9 @@ jobs:
         with:
           version: 0.12.23
       - run: docker compose -f infra/compose/compose.yaml config -q
+      - run: docker compose -f infra/compose/compose.yaml --profile platform --profile web config -q
+      # The API image copies packages/py-models: build it so a broken Dockerfile or .dockerignore fails here.
+      - run: docker compose -f infra/compose/compose.yaml --profile platform build api
       - run: node scripts/dev.mjs hello
       - run: node scripts/dev.mjs harness
       - run: node --test scripts/e2e/harness.e2e.test.mjs

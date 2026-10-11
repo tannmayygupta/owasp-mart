@@ -10,7 +10,6 @@ covers = ["PB-7", "PB-8"]
 after = []
 hitl = true
 risk = "medium"
-unknown = "Waits on initiative-lab epic-lab-baseline entry 1 (repository skeleton, Compose profile layout, scripts/dev.mjs) being merged; remove when merged."
 
 [[entry]]
 id = 2

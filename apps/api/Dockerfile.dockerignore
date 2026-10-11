@@ -1,0 +1,12 @@
+# Used by BuildKit for apps/api/Dockerfile (build context is the repository root).
+# Allow-list: only what the image build needs.
+*
+!pyproject.toml
+!uv.lock
+!.python-version
+!apps/api/pyproject.toml
+!apps/api/src/**
+!packages/py-models/pyproject.toml
+!packages/py-models/src/**
+**/__pycache__
+**/*.pyc
