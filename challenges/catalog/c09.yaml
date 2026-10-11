@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c09
+title: "Logging and Alerting Failures"
+status: stub
+owasp:
+  "2021": "A09"
+  "2025": "A09"
+cwe:
+  primary: "CWE-778"
+  related: ["CWE-223", "CWE-307"]
+attack: ["T1110.001", "T1078"]
+difficulty: 3
+tier: Medium
+flag:
+  placement: database-seed
+  delivery: db
+start_state: "a customer who has found the legacy login route (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player used the legacy login route"
+    signal: null
+  m2:
+    summary: "an attack succeeded with zero security events recorded for the account"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c09
+fixed_build: challenges/fixed/c09
