@@ -68,7 +68,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The bundle validates, the mock answers every endpoint and clients are generated in CI.
   - Handoffs: H-12, H-13, H-14, H-16, H-17, H-19, H-20, H-23, H-84, H-85, H-86, H-87, H-88, H-89, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
+- [x] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the ports the platform provides (AuditPort, OutboxPort, KeyPort, ScopePort, SettingsPort, QuotaPort) as Python protocols with in-memory fakes, fakes of the lab ports and the table-owners file.

@@ -1,0 +1,59 @@
+# Table owners (IF-10): every table of the platform database and its owning module (apps/api/src/vulnmart/<owner>/).
+# A module writes only its own tables; other modules use its port or Python interface (architecture 04 section 1.3,
+# architecture 07 section 3 rule 5). A migration that touches a table needs its owner's approval (07 section 7.8 rule 8).
+# Source: docs/architecture/04-data-and-state.md sections 2.1 to 2.8 and 5. Checked by scripts/check_table_owners.py.
+# Rows marked "to confirm" are proposals of story P-05: stream L's rows by Tanmay, the catalogue rows by Sahil and Tanmay.
+version: 1
+tables:
+  # 2.1 identity (P)
+  - { table: users, owner: accounts }
+  - { table: user_roles, owner: accounts }
+  - { table: mfa_credentials, owner: accounts }
+  - { table: recovery_codes, owner: accounts }
+  - { table: sessions, owner: accounts }
+  - { table: email_tokens, owner: accounts }
+  # 2.2 organisations (P)
+  - { table: organizations, owner: orgs }
+  - { table: org_members, owner: orgs }
+  - { table: join_requests, owner: orgs }
+  - { table: dpa_acceptances, owner: orgs }
+  # 2.3 catalogue: content is stream T's files, loaded by the sync job; read by P and L
+  - { table: challenges, owner: admin, note: "Written only by the catalogue sync job. To confirm by Sahil and Tanmay." }
+  - { table: challenge_milestones, owner: admin, note: "Written only by the catalogue sync job. To confirm by Sahil and Tanmay." }
+  - { table: challenge_hints, owner: admin, note: "Written only by the catalogue sync job. To confirm by Sahil and Tanmay." }
+  - { table: challenge_writeups, owner: admin, note: "Written only by the catalogue sync job. To confirm by Sahil and Tanmay." }
+  # 2.4 assessments and consent (P)
+  - { table: assessment_templates, owner: assessments }
+  - { table: template_challenges, owner: assessments }
+  - { table: invites, owner: assessments }
+  - { table: consent_records, owner: privacy, note: "Append-only: no UPDATE or DELETE grant (FR-PRV-02)." }
+  # 2.5 attempts and instances (L)
+  - { table: attempts, owner: attempts, note: "To confirm by Tanmay." }
+  - { table: instance_hosts, owner: instances, note: "To confirm by Tanmay." }
+  - { table: instances, owner: instances, note: "To confirm by Tanmay." }
+  - { table: instance_transitions, owner: instances, note: "To confirm by Tanmay." }
+  - { table: instance_epochs, owner: instances, note: "To confirm by Tanmay." }
+  # 2.6 events, scoring and evidence (L)
+  - { table: events, owner: ingest, note: "To confirm by Tanmay. Migrated in P-06 (H-07)." }
+  - { table: activity_buckets, owner: ingest, note: "To confirm by Tanmay." }
+  - { table: evidence, owner: ingest, note: "Sealed with the attempt key (KeyPort). To confirm by Tanmay." }
+  - { table: milestones, owner: scoring, note: "To confirm by Tanmay." }
+  - { table: integrity_flags, owner: scoring, note: "To confirm by Tanmay." }
+  - { table: score_snapshots, owner: scoring, note: "To confirm by Tanmay." }
+  - { table: hint_unlocks, owner: attempts, note: "To confirm by Tanmay (attempts or scoring)." }
+  - { table: flag_submissions, owner: flags, note: "No submitted value is stored (FR-FLG-05). To confirm by Tanmay." }
+  # 2.7 privacy, admin and operations (P)
+  - { table: deletion_requests, owner: privacy }
+  - { table: subject_map, owner: privacy }
+  - { table: break_glass_sessions, owner: admin }
+  - { table: settings, owner: kernel }
+  - { table: quotas, owner: kernel }
+  - { table: job_runs, owner: kernel }
+  - { table: email_outbox, owner: notifications }
+  - { table: domain_events, owner: live }
+  # 2.8 audit (P)
+  - { table: audit_log, owner: kernel, note: "Append-only through the audit_writer role." }
+  - { table: audit_checkpoint, owner: kernel }
+  - { table: audit_anchor, owner: kernel }
+  # 5 key service (P): the separate vm_keystore database
+  - { table: deks, owner: kernel, note: "In the vm_keystore database, not vulnmart (architecture 04 section 5.2)." }
