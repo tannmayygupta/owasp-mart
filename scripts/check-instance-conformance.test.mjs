@@ -143,6 +143,11 @@ const DRIFT2 = [
   ['network_mode bridge', (s) => { s.shop.network_mode = 'bridge'; }, 'explicit-container-network'],
   ['an unlabelled service without depends_on the injector', (s) => { s.gate.labels = {}; delete s.gate.depends_on; }, 'service-kind-label'],
   ['an unlabelled service mounting /run/vm', (s) => { s.gate.labels = {}; s.gate.volumes = [{ type: 'volume', source: 'vm-run', target: '/run/vm' }]; }, 'shared-volume-roles'],
+  ['a helper publishing a port', (s) => { s.ingest.ports = [{ mode: 'ingress', host_ip: '127.0.0.1', target: 8081, published: '18091', protocol: 'tcp' }]; }, 'harness-helpers-minimal'],
+  ['a helper mounting a shared volume read-write', (s) => { s['volume-keeper'].volumes[0].read_only = false; }, 'harness-helpers-minimal'],
+  ['a helper depending on an instance service', (s) => { s.ingest.depends_on = { shop: { condition: 'service_started' } }; }, 'harness-helpers-minimal'],
+  ['a helper on a network with outside access', (s, c) => { s.ingest.networks = { front: null }; }, 'no-outside-network'],
+  ['an unlisted service labelled harness', (s) => { s.sneaky = { ...s.gate, labels: { 'vm.kind': 'harness' } }; delete s.sneaky.depends_on; }, 'service-kind-label'],
   ['an extra service with no depends_on', (s) => { s.extra = { ...s.gate, labels: { 'vm.kind': 'inst' } }; delete s.extra.depends_on; }, 'start-order-injector-first'],
 ];
 for (const [name, fn, rule] of DRIFT2) {
@@ -157,4 +162,10 @@ test('docker missing: a clear "docker not found" message, not a crash on a null 
   const savedExt = process.env.Path;
   process.env.PATH = ''; process.env.Path = '';
   try { assert.throws(() => resolveHarnessConfig(), /docker not found/); } finally { process.env.PATH = saved; if (savedExt !== undefined) process.env.Path = savedExt; }
+});
+test('the helper allowlist is frozen and names exactly the two helpers', async () => {
+  const { HARNESS_HELPERS } = await import('./check-instance-conformance.mjs');
+  assert.deepEqual([...HARNESS_HELPERS], ['ingest', 'volume-keeper']);
+  assert.ok(Object.isFrozen(HARNESS_HELPERS));
+  assert.throws(() => { 'use strict'; HARNESS_HELPERS.push('shop'); }, TypeError);
 });

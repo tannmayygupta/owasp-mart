@@ -111,6 +111,10 @@ class Mock:
             return
         media = hdr["content-type"].split(";")[0]
         assert media in content, f"{method} {path} {status}: content type {media} is not declared"
+        if media == "application/problem+json":  # RFC 9457: the standard members, tied to the status and the code
+            assert body["status"] == status and body["type"] == "https://vulnmart.invalid/problems/" + body["code"], (path, body)
+            assert body["instance"] == "urn:vulnmart:request:" + body["request_id"] and body["title"] and "message" not in body, (path, body)
+            assert body["title"].endswith(".") and len(body["title"]) <= 120, body
         errors = list(Draft202012Validator({"$ref": "#/components/schemas/__x", "components": _components(content[media]["schema"])}).iter_errors(body))
         assert errors == [], f"{method} {path} {status}: " + "; ".join(f"{base.error_path(e)} {e.message}" for e in errors)
 
@@ -226,9 +230,11 @@ def test_the_text_lists_every_operation_and_has_open_points():
 def test_error_codes_in_the_text_are_in_the_pattern_and_examples_use_them():
     text = (LAB_DIR / contract.TEXT).read_text(encoding="utf-8")
     section = text.split("## 5. Error codes")[1].split("## 6.")[0]
-    pattern = re.compile(SPEC["components"]["schemas"]["ErrorCode"]["pattern"])
-    codes = set(re.findall(r"`((?:AUTH|ATT|INST|REQ)-[A-Z-]+)`", section))
+    pattern = re.compile(SPEC["components"]["schemas"]["ProblemCode"]["pattern"])
+    codes = set(re.findall(r"`((?:auth|att|inst|req)_[a-z_]+)`", section))
     assert len(codes) >= 15 and all(pattern.match(c) for c in codes)
+    declared = set(re.findall(r"[a-z]+_[a-z_]+", SPEC["components"]["schemas"]["ProblemCode"]["description"]))
+    assert codes <= declared, codes - declared
 
 
 # ---- the check fails when a rule is broken ----
@@ -327,13 +333,13 @@ def test_check_fails_on_a_real_looking_flag(copy_of_contract):
 
 
 def test_check_fails_when_a_flag_result_has_no_example(copy_of_contract):
-    (copy_of_contract / "examples" / "valid" / "flags.result.decoy.json").unlink()
+    (copy_of_contract / "examples" / "valid" / "flags.result.incorrect.json").unlink()
     m = copy_of_contract / "examples" / "valid" / "manifest.json"
     manifest = json.loads(m.read_text(encoding="utf-8"))
-    del manifest["flags.result.decoy.json"]
+    del manifest["flags.result.incorrect.json"]
     m.write_text(json.dumps(manifest), encoding="utf-8")
     errors, _ = contract.run(copy_of_contract)
-    assert any("flag result decoy" in e for e in errors), errors
+    assert any("flag result incorrect" in e for e in errors), errors
 
 
 def test_check_fails_when_the_open_points_table_is_missing(copy_of_contract):
@@ -402,7 +408,7 @@ def test_read_as_owner_and_by_a_reviewer(mock):
 
 def test_no_session_is_401(mock):
     status, body, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}", None)
-    assert status == 401 and body["code"] == "AUTH-SESSION-REQUIRED"
+    assert status == 401 and body["code"] == "auth_session_required"
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}", "ada", cookie=False)[0] == 401
 
 
@@ -415,7 +421,7 @@ def test_a_post_without_csrf_or_with_another_origin_is_403_and_changes_nothing(f
     s3, b3, _ = m.call("POST", path, "ada", body, origin="https://evil.example.invalid")
     s4, b4, _ = m.call("POST", path, "ada", body, origin=None)
     assert (s1, s2, s3, s4) == (403, 403, 403, 403)
-    assert (b1["code"], b2["code"]) == ("AUTH-CSRF-FAILED", "AUTH-CSRF-FAILED") and b3["code"] == b4["code"] == "AUTH-ORIGIN-FORBIDDEN"
+    assert (b1["code"], b2["code"]) == ("auth_csrf_failed", "auth_csrf_failed") and b3["code"] == b4["code"] == "auth_origin_forbidden"
     assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/timeline")[1]["items"] == []  # nothing changed
 
 
@@ -424,12 +430,13 @@ def test_not_yours_and_missing_give_the_same_404(mock):
     s2, b2, _ = mock.call("GET", "/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ", "eve")
     s3, b3, _ = mock.call("GET", "/api/v1/attempts/not-an-id", "eve")
     assert (s1, s2, s3) == (404, 404, 404)
-    assert {k: v for k, v in b1.items() if k != "request_id"} == {k: v for k, v in b2.items() if k != "request_id"} == {k: v for k, v in b3.items() if k != "request_id"}
+    own = lambda b: {k: v for k, v in b.items() if k not in ("request_id", "instance")}  # noqa: E731
+    assert own(b1) == own(b2) == own(b3)
     i1 = mock.call("GET", f"/api/v1/instances/{I_CAND}", "eve")
     i2 = mock.call("GET", "/api/v1/instances/i-ZZZZZZZZZZZZZZZZ", "eve")
-    assert i1[0] == i2[0] == 404 and i1[1]["code"] == i2[1]["code"] == "INST-NOT-FOUND"
+    assert i1[0] == i2[0] == 404 and i1[1]["code"] == i2[1]["code"] == "inst_not_found"
     # a body error does not tell an existing id from a missing one
-    assert mock.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "eve", {"nope": 1})[1]["code"] == "ATT-NOT-FOUND"
+    assert mock.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "eve", {"nope": 1})[1]["code"] == "att_not_found"
     # a recruiter does not read a learner practice attempt, and a learner does not read a candidate report
     assert mock.call("GET", f"/api/v1/attempts/{A_LEARNER}", "rex")[0] == 404
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/report", "cam")[0] == 404
@@ -440,19 +447,20 @@ def test_flag_results_by_input_and_the_text_is_never_echoed_or_kept(fresh):
     m = fresh()
     path = f"/api/v1/attempts/{A_LEARNER}/flags"
     marker = "VM{ZZZZZZZZZZZZZZZZZZZZZZZZ}"
-    for letter, expected in [("B", "decoy"), ("C", "other_instance"), ("D", "stale_epoch")]:
+    for letter in ("B", "C", "D"):  # decoy, other instance, earlier epoch: the submitter is told nothing more than for a wrong value
         s, b, _ = m.call("POST", path, "ada", {"challenge_key": "C03", "flag": flag(letter)})
-        assert s == 200 and b == {"challenge_key": "C03", "result": expected, "credit": "none"}
+        assert s == 200 and b == {"challenge_key": "C03", "result": "incorrect", "credit": "none"}
     s, b, _ = m.call("POST", path, "ada", {"challenge_key": "C03", "flag": marker})
-    assert s == 200 and b["result"] == "wrong"
+    assert s == 200 and b == {"challenge_key": "C03", "result": "incorrect", "credit": "none"}
     s, b, _ = m.call("POST", path, "ada", {"challenge_key": "C03", "flag": flag("A")})
     assert s == 200 and b == {"challenge_key": "C03", "result": "correct", "credit": "credited"}
     for p in ["score", "timeline", "challenges", "report", "integrity-flags", "evidence"]:
         m.call("GET", f"/api/v1/attempts/{A_LEARNER}/{p}", "ada")
     joined = "\n".join(m.answers)
     assert marker not in joined and flag("A") not in joined and flag("B") not in joined
-    flags = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/integrity-flags", "ada")[1]["items"]
-    assert {f["type"] for f in flags} == {"decoy", "sharing"}  # decoy and other_instance raise a flag for a human
+    # decoy and other_instance raise a flag for a human, but the owner of a learner attempt is not shown it (it would name the reason)
+    assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/integrity-flags", "ada")[1] == {"items": [], "has_more": False}
+    assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/report", "ada")[0] == 200 and m.call("GET", f"/api/v1/attempts/{A_LEARNER}/report", "ada")[1]["integrity_open"] == 0
     assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score", "ada")[1]["score"] > 0
 
 
@@ -465,16 +473,38 @@ def test_more_than_five_wrong_in_ten_minutes_is_429_with_retry_after(fresh):
     m = fresh()
     path = f"/api/v1/attempts/{A_LEARNER}/flags"
     for n in range(5):
-        assert m.call("POST", path, "ada", {"challenge_key": "C05", "flag": f"wrong {n}"})[1]["result"] == "wrong"
+        assert m.call("POST", path, "ada", {"challenge_key": "C05", "flag": f"wrong {n}"})[1]["result"] == "incorrect"
     s, b, h = m.call("POST", path, "ada", {"challenge_key": "C05", "flag": flag("A")})  # even a correct value is refused
-    assert s == 429 and b["code"] == "ATT-FLAG-RATE-LIMITED" and 1 <= int(h["retry-after"]) <= 600
+    assert s == 429 and b["code"] == "att_flag_rate_limited" and 1 <= int(h["retry-after"]) <= 600
     assert m.call("POST", path, "ada", {"challenge_key": "C06", "flag": flag("A")})[0] == 200  # the limit is per challenge
+
+
+@pytest.mark.parametrize("letters", ["BCDBC", "BBBBB", "DDDDD"])
+def test_decoy_other_instance_and_stale_epoch_submits_count_for_the_rate_limit(fresh, letters):
+    m = fresh()
+    path = f"/api/v1/attempts/{A_LEARNER}/flags"
+    for letter in letters:
+        s, b, _ = m.call("POST", path, "ada", {"challenge_key": "C07", "flag": flag(letter)})
+        assert s == 200 and b["result"] == "incorrect"
+    s, b, h = m.call("POST", path, "ada", {"challenge_key": "C07", "flag": "anything"})
+    assert s == 429 and b["code"] == "att_flag_rate_limited" and int(h["retry-after"]) >= 1
+
+
+def test_a_repeated_correct_flag_is_answered_before_the_rate_limit(fresh):
+    m = fresh()
+    path = f"/api/v1/attempts/{A_LEARNER}/flags"
+    assert m.call("POST", path, "ada", {"challenge_key": "C09", "flag": flag("A")})[1]["credit"] == "credited"
+    for n in range(5):
+        assert m.call("POST", path, "ada", {"challenge_key": "C09", "flag": f"nope {n}"})[1]["result"] == "incorrect"
+    assert m.call("POST", path, "ada", {"challenge_key": "C09", "flag": "one more"})[0] == 429
+    s, b, _ = m.call("POST", path, "ada", {"challenge_key": "C09", "flag": flag("A")})
+    assert s == 200 and b == {"challenge_key": "C09", "result": "correct", "credit": "credited"}  # lab-api.md: the repeat check comes first
 
 
 def test_hints_off_refuses_list_and_unlock_with_404(mock):
     for method, path in [("GET", f"/api/v1/attempts/{A_CAND}/challenges/C01/hints"), ("POST", f"/api/v1/attempts/{A_CAND}/challenges/C01/hints/1/unlock")]:
         s, b, _ = mock.call(method, path, "cam")
-        assert s == 404 and b["code"] == "ATT-HINTS-DISABLED"
+        assert s == 404 and b["code"] == "att_hints_disabled"
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/challenges", "cam")[1]["items"][0]["hints_available"] is False
 
 
@@ -491,20 +521,20 @@ def test_hints_text_is_null_until_unlocked_and_unlock_is_repeatable(fresh):
 
 def test_wrong_state_is_409(mock):
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_DONE}/submit", "cam", {"confirm": True})
-    assert s == 409 and b["code"] == "ATT-INVALID-STATE"
+    assert s == 409 and b["code"] == "att_invalid_state"
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_DONE}/flags", "cam", {"challenge_key": "C01", "flag": "x"})
-    assert s == 409 and b["code"] == "ATT-INVALID-STATE"
+    assert s == 409 and b["code"] == "att_invalid_state"
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_CAND}/start", "cam")  # already running
-    assert s == 409 and b["code"] == "ATT-INVALID-STATE"
+    assert s == 409 and b["code"] == "att_invalid_state"
 
 
 def test_reset_raises_the_epoch_and_other_states_are_409(fresh):
     m = fresh("--step-delay-ms", "600000")
     iid = m.call("POST", "/api/v1/instances", "ada", {"kind": "learner"})[1]["instance_id"]
     s, b, _ = m.call("POST", f"/api/v1/instances/{iid}/reset", "ada", {"confirm": True})  # still requested
-    assert s == 409 and b["code"] == "INST-INVALID-STATE"
+    assert s == 409 and b["code"] == "inst_invalid_state"
     s, b, _ = m.call("POST", f"/api/v1/instances/{iid}/open")
-    assert s == 409 and b["code"] == "INST-NOT-READY"
+    assert s == 409 and b["code"] == "inst_not_ready"
     s, b, _ = m.call("POST", f"/api/v1/instances/{I_CAND}/reset", "cam", {"confirm": True})  # seeded ready instance, steps held
     assert s == 202 and b["epoch"] == 2 and b["state"] == "resetting"
     assert m.call("POST", f"/api/v1/instances/{I_CAND}/reset", "cam", {"confirm": True})[0] == 409  # already resetting
@@ -544,7 +574,7 @@ DECISION = f"/api/v1/attempts/{A_CAND}/integrity-flags/g-AAAAAAAAAAAAAAAA/decisi
 ])
 def test_a_bad_body_is_422_with_the_exact_field_pointer(mock, user, path, body, field):
     s, b, _ = mock.call("POST", path, user, body)
-    assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == field
+    assert s == 422 and b["code"] == "req_validation" and b["field"] == field
 
 
 def test_422_names_the_field_and_never_repeats_the_value(mock):
@@ -552,7 +582,7 @@ def test_422_names_the_field_and_never_repeats_the_value(mock):
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", {"challenge_key": "C01", "flag": 7, secret: 1})
     assert s == 422 and secret not in json.dumps(b) and b["field"] == ""
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", {"challenge_key": "C01", "flag": 7})
-    assert b["field"] == "/flag" and "7" not in b["message"]
+    assert b["field"] == "/flag" and "7" not in b["detail"]
 
 
 def test_json_only_size_and_a_body_where_none_is_allowed(mock):
@@ -562,7 +592,7 @@ def test_json_only_size_and_a_body_where_none_is_allowed(mock):
     assert mock.call("POST", f"/api/v1/instances/{I_CAND}/open", "cam", raw=b"{}")[0] == 422
     # a body a little over the limit: the client always reads the 413 (the mock reads and discards the rest before it closes)
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{" + b" " * (70 * 1024) + b"}")
-    assert s == 413 and b["code"] == "REQ-TOO-LARGE"
+    assert s == 413 and b["code"] == "req_too_large"
 
 
 def test_a_huge_body_gets_413_or_a_dropped_connection_and_the_service_goes_on(fresh):
@@ -570,7 +600,7 @@ def test_a_huge_body_gets_413_or_a_dropped_connection_and_the_service_goes_on(fr
     m = fresh()
     try:
         s, b, _ = m.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{" + b" " * (4 * 1024 * 1024) + b"}")
-        assert s == 413 and b["code"] == "REQ-TOO-LARGE"
+        assert s == 413 and b["code"] == "req_too_large"
     except (urllib.error.URLError, ConnectionError):
         pass  # reset or broken pipe: the connection was dropped, which the contract allows here and nowhere else
     assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}", "ada")[0] == 200
@@ -578,9 +608,9 @@ def test_a_huge_body_gets_413_or_a_dropped_connection_and_the_service_goes_on(fr
 
 def test_unknown_path_and_method(mock):
     s, b, _ = mock.call("GET", "/api/v1/nothing", "ada")
-    assert s == 404 and b["code"] == "REQ-ROUTE-UNKNOWN"
+    assert s == 404 and b["code"] == "req_route_unknown"
     s, b, h = mock.call("DELETE", f"/api/v1/instances/{I_CAND}", "cam")
-    assert s == 405 and b["code"] == "REQ-METHOD-NOT-ALLOWED" and h["allow"] == "GET"
+    assert s == 405 and b["code"] == "req_method_not_allowed" and h["allow"] == "GET"
     s, b, h = mock.call("GET", f"/api/v1/attempts/{A_LEARNER}/flags", "ada")
     assert s == 405 and h["allow"] == "POST"
     assert mock.call("GET", "/api/v1/instances", "ada")[0] == 405
@@ -621,7 +651,7 @@ def test_a_second_instance_request_is_refused_by_the_quota_rule(fresh):
     m = fresh()
     assert m.call("POST", "/api/v1/instances", "ada", {"kind": "learner"})[0] == 202
     s, b, _ = m.call("POST", "/api/v1/instances", "ada", {"kind": "learner"})
-    assert s == 409 and b["code"] == "INST-QUOTA-REACHED"
+    assert s == 409 and b["code"] == "inst_quota_reached"
     assert m.call("POST", "/api/v1/instances", "eve", {"kind": "learner"})[0] == 202  # another user is fine
 
 
@@ -691,7 +721,7 @@ def test_hint_levels_unlock_in_order_and_an_early_level_unlocks_nothing(fresh):
     m = fresh()
     base_path = f"/api/v1/attempts/{A_LEARNER}/challenges/C04/hints"
     s, b, _ = m.call("POST", base_path + "/3/unlock")
-    assert s == 409 and b["code"] == "ATT-INVALID-STATE" and b["field"] == "/level"
+    assert s == 409 and b["code"] == "att_invalid_state" and b["field"] == "/level"
     assert m.call("POST", base_path + "/2/unlock")[0] == 409
     assert [h["unlocked"] for h in m.call("GET", base_path)[1]["items"]] == [False, False, False]
     assert _timeline(m, "ada") == []
@@ -707,16 +737,88 @@ def _cursor(text):
     return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
 
-@pytest.mark.parametrize("text", [" 5", "5 ", "1e1", "0x10", "-1", "+1", "05", "1.0", "", "9999999999", "abc"])
-def test_a_cursor_that_is_not_a_plain_decimal_is_422(mock, text):
+@pytest.mark.parametrize("text", [" 5", "5", "1e1", "f.1", "f.0.5", "f.1.0", "f.01.5", "f.1.05", "f.1.5 ", "f.+1.5", "f.1.5.7", "b.1.5", "F.1.5",
+                                  "f.1.1e3", "f.1.0x10", "f.-1.5", "", "f.9999999999.5", "f.1.99999999999999999", "abc", "f.1.1.0"])
+def test_a_cursor_that_is_not_a_canonical_key_is_422(mock, text):
     s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
-    assert s == 422 and b["field"] == "/cursor", text
+    assert s == 422 and b["field"] == "/cursor" and b["code"] == "req_validation", text
 
 
 def test_a_cursor_that_is_not_the_canonical_encoding_is_422(mock):
-    good = _cursor("1")
+    good = _cursor("f.1.1000")
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={good}", "rex")[0] == 200
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={good}%3D", "rex")[0] == 422  # padding is not the form this service makes
+    assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor=!!!", "rex")[0] == 422
+
+
+def test_an_old_offset_cursor_is_refused(mock):
+    assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor('1')}", "rex")[0] == 422  # the decimal offset of contract 0.1.0
+
+
+def fake_late_event(m, body):
+    """The test hook of the mock (not part of the contract): store one event under the key it carries."""
+    req = urllib.request.Request(m.url + "/_fake/late-event", data=json.dumps(body).encode(), method="POST", headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=10) as resp:
+            return resp.status
+    except urllib.error.HTTPError as err:
+        err.close()
+        return err.code
+
+
+def test_a_late_event_with_a_smaller_key_neither_skips_nor_duplicates_a_page_item(fresh):
+    m = fresh()
+    path = f"/api/v1/attempts/{A_CAND}/timeline"
+    everything = m.call("GET", f"{path}?limit=200", "rex")[1]
+    assert everything["has_more"] is False and everything["next_cursor"] is None and len(everything["items"]) == 3
+    s, first, _ = m.call("GET", f"{path}?limit=2", "rex")
+    assert first["items"] == everything["items"][:2] and first["has_more"] is True and first["next_cursor"]
+    # an event of an earlier key arrives late, between the two page requests (it sorts between the first and the second entry)
+    assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 1, "seq": 1500, "type": "flag.submitted", "challenge_key": "C02", "result": "incorrect"}) == 204
+    s, second, _ = m.call("GET", f"{path}?limit=2&cursor={first['next_cursor']}", "rex")
+    assert second["items"] == everything["items"][2:] and second["has_more"] is False and second["next_cursor"] is None
+    seen = first["items"] + second["items"]
+    assert seen == everything["items"]  # no item skipped, none repeated, and the late one is not in the pages that follow
+    # the cursor never moves back: reading again from the start shows the late event in its place
+    again = m.call("GET", f"{path}?limit=200", "rex")[1]["items"]
+    assert len(again) == 4 and again[1]["type"] == "flag.submitted" and again[1]["challenge_key"] == "C02"
+    assert [e for e in again if e != again[1]] == everything["items"]
+    # a late event of an earlier epoch sorts before every event of epoch 1
+    assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 1, "seq": 1500}) == 409  # the key exists
+    assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 2, "seq": 5, "type": "instance.reset"}) == 204
+    last = m.call("GET", f"{path}?limit=200", "rex")[1]["items"]
+    assert last[-1]["type"] == "instance.reset"
+
+
+def test_every_page_of_a_long_timeline_with_late_events_between_pages_is_whole(fresh):
+    m = fresh()
+    for n in range(1, 8):
+        assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 3, "seq": n * 10, "type": "hint.unlocked", "challenge_key": "C02"}) == 204
+    path = f"/api/v1/attempts/{A_CAND}/timeline"
+    full = m.call("GET", f"{path}?limit=200", "rex")[1]["items"]
+    assert len(full) == 10
+    got, cursor, late = [], None, 0
+    for _ in range(20):
+        s, b, _ = m.call("GET", f"{path}?limit=3" + (f"&cursor={cursor}" if cursor else ""), "rex")
+        assert s == 200 and len(b["items"]) <= 3 and b["has_more"] == (b["next_cursor"] is not None)
+        got.extend(b["items"])
+        late += 1  # a late event with a key below every cursor, stored after each page was read
+        assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 1, "seq": 100 + late, "type": "flag.submitted", "result": "incorrect"}) == 204
+        cursor = b["next_cursor"]
+        if cursor is None:
+            break
+    else:
+        pytest.fail("the paging did not end")
+    assert got == full  # no item skipped and none repeated, although events were added in between
+    assert len(m.call("GET", f"{path}?limit=200", "rex")[1]["items"]) == len(full) + late  # a new read from the start shows them all
+
+
+def test_the_late_event_hook_refuses_bad_bodies(fresh):
+    m = fresh()
+    assert fake_late_event(m, {"attempt_id": "a-ZZZZZZZZZZZZZZZZ", "epoch": 1, "seq": 1}) == 404
+    assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 0, "seq": 1}) == 422
+    assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 1, "seq": "1"}) == 422
+    assert fake_late_event(m, {"attempt_id": A_CAND, "epoch": 1, "seq": 9, "type": "nope"}) == 422
 
 
 def test_timeline_pages_do_not_repeat_or_skip_when_the_list_grows_between_pages(fresh):
@@ -752,7 +854,7 @@ GET_PATHS = [f"/api/v1/instances/{I_CAND}", f"/api/v1/attempts/{A_CAND}", f"/api
 def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
     user = "cam" if "instances" in path else "rex"
     s, b, _ = mock.call("GET", path + "?surprise=1", user)
-    assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/surprise"
+    assert s == 422 and b["code"] == "req_validation" and b["field"] == "/surprise"
     s, b, _ = mock.call("GET", path + ("?limit=1&limit=2" if path.endswith("timeline") else "?x=1&x=2"), user)
     assert s == 422 and b["field"] in ("/limit", "/x")
     assert mock.call("GET", path, user)[0] == 200
@@ -772,28 +874,28 @@ def test_the_hints_get_refuses_a_query_parameter_and_a_hostile_name_is_not_echoe
 def test_a_prototype_key_is_not_a_session(mock):
     for name in ("constructor", "__proto__", "toString", "hasOwnProperty"):
         s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}", None, cookie=False, extra_headers={"Cookie": f"__Host-vm_session={name}"})
-        assert s == 401 and b["code"] == "AUTH-SESSION-REQUIRED", name
+        assert s == 401 and b["code"] == "auth_session_required", name
 
 
 def test_a_csrf_header_of_another_length_is_403_not_500(mock):
     for token in ("x", "X" * 200):
         s, b, _ = mock.call("POST", FLAGS, "ada", {"challenge_key": "C01", "flag": "x"}, csrf=token)
-        assert s == 403 and b["code"] == "AUTH-CSRF-FAILED"
+        assert s == 403 and b["code"] == "auth_csrf_failed"
 
 
 @pytest.mark.parametrize("path", ["/api/v1/attempts/%ZZ", "/api/v1/instances/%", "/api/v1/attempts/a-AAAAAAAAAAAAAAAA/challenges/%E0%A4%A/hints"])
 def test_bad_percent_encoding_is_the_uniform_404(mock, path):
     s, b, _ = mock.call("GET", path, "ada")
-    assert s == 404 and b["code"] == "REQ-ROUTE-UNKNOWN"
+    assert s == 404 and b["code"] == "req_route_unknown"
 
 
 def test_reset_and_stop_after_submit_are_409_and_the_freeze_holds(fresh):
     m = fresh()
     assert m.call("POST", f"/api/v1/attempts/{A_CAND}/submit", "cam", {"confirm": True})[0] == 200
     s, b, _ = m.call("POST", f"/api/v1/instances/{I_CAND}/reset", "cam", {"confirm": True})
-    assert s == 409 and b["code"] == "INST-INVALID-STATE"
+    assert s == 409 and b["code"] == "inst_invalid_state"
     s, b, _ = m.call("POST", f"/api/v1/instances/{I_CAND}/stop", "cam")
-    assert s == 409 and b["code"] == "INST-INVALID-STATE"
+    assert s == 409 and b["code"] == "inst_invalid_state"
     inst = m.call("GET", f"/api/v1/instances/{I_CAND}", "cam")[1]
     assert inst["access"] == "frozen" and inst["epoch"] == 1 and inst["state"] == "ready"
 
@@ -807,14 +909,12 @@ def test_the_timer_does_not_reopen_an_instance_of_a_submitted_attempt(fresh):
     assert m.call("POST", f"/api/v1/instances/{iid}/open")[0] == 409
 
 
-def test_the_owner_of_a_learner_attempt_reads_flags_but_cannot_decide(fresh):
+def test_the_owner_of_a_learner_attempt_cannot_decide_and_is_not_told_the_reason(fresh):
     m = fresh()
-    assert m.call("POST", FLAGS, "ada", {"challenge_key": "C01", "flag": flag("B")})[1]["result"] == "decoy"
-    items = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/integrity-flags", "ada")[1]["items"]
-    fid = items[0]["integrity_flag_id"]
-    s, b, _ = m.call("POST", f"/api/v1/attempts/{A_LEARNER}/integrity-flags/{fid}/decision", "ada", {"decision": "accept", "note": "x"})
-    assert s == 404 and b["code"] == "ATT-NOT-FOUND"
-    assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/integrity-flags", "ada")[1]["items"][0]["status"] == "open"
+    assert m.call("POST", FLAGS, "ada", {"challenge_key": "C01", "flag": flag("B")})[1]["result"] == "incorrect"
+    assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/integrity-flags", "ada")[1]["items"] == []
+    s, b, _ = m.call("POST", f"/api/v1/attempts/{A_LEARNER}/integrity-flags/g-AAAAAAAAAAAAAAAA/decision", "ada", {"decision": "accept", "note": "x"})
+    assert s == 404 and b["code"] == "att_not_found"
 
 
 def test_check_fails_when_a_secret_name_is_in_a_post_answer_schema(copy_of_contract):
@@ -852,3 +952,169 @@ def test_a_non_string_valid_manifest_value_is_reported_and_the_check_continues(c
     errors, counts = contract.run(copy_of_contract)
     assert any("entry for score.json is malformed" in e for e in errors), errors
     assert counts["invalid"] >= 60  # the run went on to the invalid examples
+
+
+# ---- story 1.15 part B4: problem details, lists, order of checks, roles, states, the oracle ----
+def test_every_error_is_rfc_9457_problem_details_with_the_extension_members(fresh):
+    m = fresh()
+    cases = [("GET", f"/api/v1/attempts/{A_CAND}", None, None, 401, "auth_session_required"),
+             ("GET", f"/api/v1/attempts/{A_CAND}", "eve", None, 404, "att_not_found"),
+             ("POST", FLAGS, "ada", {"challenge_key": "C01"}, 422, "req_validation"),
+             ("POST", FLAGS, "ada", {"challenge_key": "C01", "flag": "x"}, 200, None),
+             ("GET", "/api/v1/nothing", "ada", None, 404, "req_route_unknown"),
+             ("DELETE", f"/api/v1/instances/{I_CAND}", "cam", None, 405, "req_method_not_allowed")]
+    for method, path, user, body, status, code in cases:
+        s, b, h = m.call(method, path, user, body)
+        assert s == status
+        if code:
+            assert h["content-type"].split(";")[0] == "application/problem+json"
+            assert b["code"] == code and b["type"] == "https://vulnmart.invalid/problems/" + code and b["status"] == status
+    s, b, h = m.call("POST", FLAGS, "ada", {"challenge_key": "C01"})
+    assert b["field"] == "/flag" and b["detail"] and b["title"] and b["instance"].endswith(b["request_id"])
+    assert "message" not in b
+
+
+def test_the_title_is_the_same_for_every_answer_with_one_code_and_the_detail_is_not_a_value(fresh):
+    m = fresh()
+    titles = {m.call("GET", f"/api/v1/attempts/{x}", "eve")[1]["title"] for x in (A_CAND, "a-ZZZZZZZZZZZZZZZZ", "bad")}
+    assert len(titles) == 1
+
+
+def test_the_problem_schema_is_open_but_never_carries_a_stack_trace():
+    schema = SPEC["components"]["schemas"]["Problem"]
+    assert schema.get("additionalProperties", True) is not False
+    validator = Draft202012Validator({"$ref": "#/components/schemas/Problem", "components": SPEC["components"]})
+    good = json.loads((LAB_DIR / "examples" / "valid" / "error.not-found.json").read_text(encoding="utf-8"))
+    assert list(validator.iter_errors({**good, "future_member": {"a": 1}})) == []  # a member we do not know is ignored
+    assert list(validator.iter_errors({**good, "stack": "at x"})) != []
+
+
+def test_a_non_json_post_is_415_before_the_lookup_404(fresh):
+    m = fresh()
+    for path in (f"/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ/flags", f"/api/v1/attempts/{A_CAND}/flags", "/api/v1/instances/i-ZZZZZZZZZZZZZZZZ/reset"):
+        s, b, _ = m.call("POST", path, "eve", raw=b"x=1", ctype="text/plain")
+        assert s == 415 and b["code"] == "req_unsupported_media_type", path
+    # the 403 of CSRF and Origin still comes before the 415, and the 404 comes before the 422
+    assert m.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "eve", raw=b"x=1", ctype="text/plain", csrf=None)[0] == 403
+    assert m.call("POST", f"/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ/flags", "eve", {"nope": 1})[1]["code"] == "att_not_found"
+    # a call that takes no body has no media type to check
+    assert m.call("POST", f"/api/v1/instances/i-ZZZZZZZZZZZZZZZZ/open", "eve")[1]["code"] == "inst_not_found"
+
+
+def test_every_list_answer_has_has_more_and_the_capped_lists_take_a_limit(fresh):
+    m = fresh()
+    for path, user in [(f"/api/v1/attempts/{A_CAND}/challenges", "rex"), (f"/api/v1/attempts/{A_LEARNER}/challenges/C01/hints", "ada"),
+                       (f"/api/v1/attempts/{A_CAND}/evidence", "rex"), (f"/api/v1/attempts/{A_CAND}/integrity-flags", "rex"), (f"/api/v1/attempts/{A_CAND}/timeline", "rex")]:
+        b = m.call("GET", path, user)[1]
+        assert b["has_more"] is False, path
+    # the cap is explicit: default and maximum 100 for evidence and integrity flags, 50 and 200 for the timeline; more is 422
+    for path in (f"/api/v1/attempts/{A_CAND}/evidence", f"/api/v1/attempts/{A_CAND}/integrity-flags"):
+        for bad in ("101", "0", "-1", "x", "1000"):
+            s, b, _ = m.call("GET", f"{path}?limit={bad}", "rex")
+            assert s == 422 and b["field"] == "/limit", (path, bad)
+        assert m.call("GET", f"{path}?limit=100", "rex")[0] == 200
+    assert m.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?limit=201", "rex")[0] == 422
+    assert m.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?limit=200", "rex")[0] == 200
+    # an answer that is cut says so
+    b = m.call("GET", f"/api/v1/attempts/{A_CAND}/integrity-flags?limit=1", "rex")[1]
+    assert len(b["items"]) == 1 and b["has_more"] is True
+    b = m.call("GET", f"/api/v1/attempts/{A_CAND}/integrity-flags?limit=2", "rex")[1]
+    assert len(b["items"]) == 2 and b["has_more"] is False
+    # a fixed list (11 challenges, 3 hints) takes no limit
+    assert m.call("GET", f"/api/v1/attempts/{A_CAND}/challenges?limit=1", "rex")[0] == 422
+    assert SPEC["components"]["parameters"]["ListLimit"]["schema"] == {"type": "integer", "minimum": 1, "maximum": 100, "default": 100}
+    assert SPEC["components"]["parameters"]["Limit"]["schema"] == {"type": "integer", "minimum": 1, "maximum": 200, "default": 50}
+
+
+# The role table of lab-api.md section 1: (user, path, expected status) for each row the table states.
+ROLE_ROWS = [
+    # instances: the owner only
+    ("cam", f"/api/v1/instances/{I_CAND}", 200), ("rex", f"/api/v1/instances/{I_CAND}", 404), ("eve", f"/api/v1/instances/{I_CAND}", 404),
+    # getAttempt, score, challenges, timeline: the owner, and a recruiter of the owning company for a candidate attempt
+    ("cam", f"/api/v1/attempts/{A_CAND}", 200), ("rex", f"/api/v1/attempts/{A_CAND}", 200), ("eve", f"/api/v1/attempts/{A_CAND}", 404),
+    ("cam", f"/api/v1/attempts/{A_CAND}/score", 200), ("rex", f"/api/v1/attempts/{A_CAND}/score", 200), ("eve", f"/api/v1/attempts/{A_CAND}/score", 404),
+    ("cam", f"/api/v1/attempts/{A_CAND}/timeline", 200), ("rex", f"/api/v1/attempts/{A_CAND}/timeline", 200), ("eve", f"/api/v1/attempts/{A_CAND}/timeline", 404),
+    # a recruiter never reads a learner practice attempt
+    ("ada", f"/api/v1/attempts/{A_LEARNER}", 200), ("rex", f"/api/v1/attempts/{A_LEARNER}", 404), ("eve", f"/api/v1/attempts/{A_LEARNER}", 404),
+    # evidence, integrity flags, report: reviewers; the owner of a learner attempt, but not (OI-15) the owner of a candidate attempt
+    ("rex", f"/api/v1/attempts/{A_CAND}/evidence", 200), ("cam", f"/api/v1/attempts/{A_CAND}/evidence", 404), ("eve", f"/api/v1/attempts/{A_CAND}/evidence", 404),
+    ("rex", f"/api/v1/attempts/{A_CAND}/report", 200), ("cam", f"/api/v1/attempts/{A_CAND}/report", 404),
+    ("rex", f"/api/v1/attempts/{A_CAND}/integrity-flags", 200), ("cam", f"/api/v1/attempts/{A_CAND}/integrity-flags", 404),
+    ("ada", f"/api/v1/attempts/{A_LEARNER}/evidence", 200), ("ada", f"/api/v1/attempts/{A_LEARNER}/report", 200), ("rex", f"/api/v1/attempts/{A_LEARNER}/report", 404),
+]
+
+
+@pytest.mark.parametrize("user,path,expected", ROLE_ROWS)
+def test_the_role_table_reads(mock, user, path, expected):
+    assert mock.call("GET", path, user)[0] == expected
+
+
+@pytest.mark.parametrize("user,method,path,body,expected", [
+    # start, submit, flags and hints: the owner only (a recruiter is answered 404 like anyone else)
+    ("rex", "POST", f"/api/v1/attempts/{A_CAND}/flags", {"challenge_key": "C01", "flag": "x"}, 404),
+    ("rex", "POST", f"/api/v1/attempts/{A_CAND}/submit", {"confirm": True}, 404),
+    ("rex", "POST", f"/api/v1/attempts/{A_READY}/start", None, 404),
+    ("eve", "POST", f"/api/v1/attempts/{A_LEARNER}/flags", {"challenge_key": "C01", "flag": "x"}, 404),
+    ("rex", "POST", f"/api/v1/attempts/{A_LEARNER}/challenges/C01/hints/1/unlock", None, 404),
+    # instance calls: the owner only
+    ("rex", "POST", f"/api/v1/instances/{I_CAND}/open", None, 404), ("rex", "POST", f"/api/v1/instances/{I_CAND}/stop", None, 404),
+    ("eve", "POST", f"/api/v1/instances/{I_CAND}/reset", {"confirm": True}, 404),
+    # decision on an integrity flag: a recruiter of the owning company only (OI-38); the owner and others get the 404
+    ("cam", "POST", f"/api/v1/attempts/{A_CAND}/integrity-flags/g-AAAAAAAAAAAAAAAA/decision", {"decision": "accept", "note": "x"}, 404),
+    ("eve", "POST", f"/api/v1/attempts/{A_CAND}/integrity-flags/g-AAAAAAAAAAAAAAAA/decision", {"decision": "accept", "note": "x"}, 404),
+    ("rex", "POST", f"/api/v1/attempts/{A_CAND}/integrity-flags/g-AAAAAAAAAAAAAAAA/decision", {"decision": "accept", "note": "ok"}, 200),
+])
+def test_the_role_table_writes(fresh, user, method, path, body, expected):
+    assert fresh().call(method, path, user, body)[0] == expected
+
+
+# States withdrawn, deleted, cancelled (a proposal to confirm, lab-api.md section 4).
+A_WITHDRAWN, A_CANCELLED, A_DELETED = "a-EEEEEEEEEEEEEEEE", "a-FFFFFFFFFFFFFFFF", "a-GGGGGGGGGGGGGGGG"
+
+
+@pytest.mark.parametrize("attempt,state", [(A_WITHDRAWN, "withdrawn"), (A_CANCELLED, "cancelled")])
+def test_a_withdrawn_or_cancelled_attempt_shows_its_state_and_its_data_is_gone(mock, attempt, state):
+    for user in ("cam", "rex"):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{attempt}", user)
+        assert s == 200 and b["state"] == state
+    for part in ("score", "challenges", "timeline", "evidence", "integrity-flags", "report", "challenges/C01/hints"):
+        s, b, _ = mock.call("GET", f"/api/v1/attempts/{attempt}/{part}", "cam" if part in ("score", "challenges", "timeline", "challenges/C01/hints") else "rex")
+        assert s == 410 and b["code"] == "att_gone" and b["status"] == 410, part
+    assert mock.call("GET", f"/api/v1/attempts/{attempt}/score", "eve")[0] == 404  # ownership is checked first
+    s, b, _ = mock.call("POST", f"/api/v1/attempts/{attempt}/flags", "cam", {"challenge_key": "C01", "flag": "x"})
+    assert s == 409 and b["code"] == "att_invalid_state"
+    assert mock.call("POST", f"/api/v1/attempts/{attempt}/submit", "cam", {"confirm": True})[0] == 409
+    assert mock.call("POST", f"/api/v1/attempts/{attempt}/start", "cam")[0] == 409
+
+
+def test_a_deleted_attempt_is_the_same_404_as_a_missing_one(mock):
+    for user, method, part, body in [("cam", "GET", "", None), ("rex", "GET", "", None), ("cam", "GET", "/score", None), ("rex", "GET", "/report", None),
+                                     ("cam", "POST", "/flags", {"challenge_key": "C01", "flag": "x"}), ("cam", "POST", "/submit", {"confirm": True})]:
+        s, b, _ = mock.call(method, f"/api/v1/attempts/{A_DELETED}{part}", user, body)
+        s2, b2, _ = mock.call(method, f"/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ{part}", user, body)
+        assert (s, b["code"], b["title"]) == (s2, b2["code"], b2["title"]) == (404, "att_not_found", b["title"]), part
+
+
+def test_the_flag_result_never_names_the_reason_and_the_check_forbids_it(copy_of_contract):
+    assert SPEC["components"]["schemas"]["FlagResult"]["enum"] == ["correct", "incorrect"]
+    _edit_spec(copy_of_contract, lambda s: s["components"]["schemas"]["FlagResult"].update({"enum": ["correct", "incorrect", "decoy"]}))
+    errors, _ = contract.run(copy_of_contract)
+    assert any("FlagResult names the reason 'decoy'" in e for e in errors), errors
+
+
+def test_check_fails_when_a_problem_type_does_not_match_its_code(copy_of_contract):
+    f = copy_of_contract / "examples" / "valid" / "error.not-found.json"
+    data = json.loads(f.read_text(encoding="utf-8"))
+    data["type"] = "https://vulnmart.invalid/problems/att_gone"
+    f.write_text(json.dumps(data), encoding="utf-8")
+    errors, _ = contract.run(copy_of_contract)
+    assert any("error.not-found.json: type must be" in e for e in errors), errors
+
+
+def test_check_fails_when_a_problem_example_still_has_the_old_message_member(copy_of_contract):
+    f = copy_of_contract / "examples" / "valid" / "error.not-found.json"
+    data = json.loads(f.read_text(encoding="utf-8"))
+    data["message"] = "x"
+    f.write_text(json.dumps(data), encoding="utf-8")
+    errors, _ = contract.run(copy_of_contract)
+    assert any("old member message" in e for e in errors), errors

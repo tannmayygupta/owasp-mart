@@ -14,10 +14,6 @@
   "flags.request.json": "FlagSubmissionRequest",
   "flags.result.correct.json": "FlagSubmissionResult",
   "flags.result.correct-held.json": "FlagSubmissionResult",
-  "flags.result.wrong.json": "FlagSubmissionResult",
-  "flags.result.decoy.json": "FlagSubmissionResult",
-  "flags.result.other-instance.json": "FlagSubmissionResult",
-  "flags.result.stale-epoch.json": "FlagSubmissionResult",
   "score.json": "Score",
   "challenges.json": "ChallengeProgressList",
   "hints.json": "HintList",
@@ -36,5 +32,9 @@
   "error.invalid-state.json": "Problem",
   "error.instance-not-ready.json": "Problem",
   "error.validation.json": "Problem",
-  "error.rate-limited.json": "Problem"
+  "error.rate-limited.json": "Problem",
+  "error.gone.json": "Problem",
+  "error.unsupported-media.json": "Problem",
+  "flags.result.incorrect.json": "FlagSubmissionResult",
+  "timeline.last-page.json": "Timeline"
 }

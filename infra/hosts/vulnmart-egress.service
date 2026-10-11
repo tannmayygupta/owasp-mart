@@ -1,0 +1,14 @@
+[Unit]
+Description=VulnMart labs host egress rules (DOCKER-USER allowlist, metadata block)
+After=docker.service network-online.target
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=-/etc/vulnmart/egress.env
+ExecStart=/usr/local/sbin/vulnmart-egress.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -19,6 +19,34 @@
     "path": "/seq",
     "rule": "seq is required"
   },
+  "instance-events/epoch-missing.json": {
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "instance-events/epoch-zero.json": {
+    "path": "/epoch",
+    "rule": "epoch is at least 1"
+  },
+  "instance-events/epoch-string.json": {
+    "path": "/epoch",
+    "rule": "epoch is an integer"
+  },
+  "instance-events/orchestrator-seq-1.json": {
+    "path": "/seq",
+    "rule": "an orchestrator event uses the lane 2^40 to 2^41-1"
+  },
+  "instance-events/sidecar-seq-in-reserved-lane.json": {
+    "path": "/seq",
+    "rule": "a sidecar event uses the lane 1 to 2^40-1"
+  },
+  "instance-events/platform-seq-in-orchestrator-lane.json": {
+    "path": "/seq",
+    "rule": "a platform event uses the lane 2^41 to 2^42-1"
+  },
+  "instance-events/orchestrator-seq-in-platform-lane.json": {
+    "path": "/seq",
+    "rule": "an orchestrator event uses the lane 2^40 to 2^41-1"
+  },
   "instance-events/unknown-type.json": {
     "path": "/type",
     "rule": "type must be in the catalogue"
@@ -242,5 +270,9 @@
   "posted/flag-value-in-data.json": {
     "path": "/data/user_id",
     "rule": "no flag-shaped value in posted data"
+  },
+  "posted/includes-epoch.json": {
+    "path": "/epoch",
+    "rule": "the sidecar stamps epoch from its start input; the poster must not send it"
   }
 }

@@ -161,7 +161,8 @@ test('fresh values: new at every run, flags in the contract format, the key obvi
   for (const f of a.flags) assert.match(f.flag, FLAG);
   assert.match(a.instance_id, /^i-[A-Z2-7]{16}$/);
   assert.match(a.event_key, /^FAKE-TEST-KEY-/);
-  assert.ok(a.first_seq > 1);
+  assert.equal(a.first_seq, undefined, 'first_seq is gone (D-42)');
+  assert.equal(a.epoch, 1);
   assert.ok(a.seed.length >= 32 && a.seed.length <= 128);
 });
 
@@ -200,7 +201,7 @@ function fakeStack(values, over = {}) {
     if (p.startsWith('/_stub/planted-flag')) return { status: 200, text: JSON.stringify({ flag: state.served ?? values.flags[2].flag }) };
     const kind = JSON.parse(o.body).kind;
     const answers = { valid: 202, 'too-big': 413, 'wrong-type': 415, 'bad-json': 400, 'forbidden-source': 422, get: 405, ...(state.answers || {}) };
-    if (kind === 'valid') state.ingest = [{ instance_id: values.instance_id, seq: values.first_seq, type: 'shop.catalog_query_error' }];
+    if (kind === 'valid') state.ingest = [{ instance_id: values.instance_id, epoch: values.epoch, seq: 1, type: 'shop.catalog_query_error' }];
     return { status: 200, text: JSON.stringify({ sidecar_status: answers[kind] }) };
   };
   return { runner, get };

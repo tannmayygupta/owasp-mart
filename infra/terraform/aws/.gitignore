@@ -11,3 +11,4 @@ tfplan*
 *.tfvars.json
 *.tfstate.backup
 *.tfplan
+backend.hcl

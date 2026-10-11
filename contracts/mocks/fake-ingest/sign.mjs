@@ -1,5 +1,5 @@
 // Signing helper for instance events (IF-4). Used by the fake ingest, the tests and the example generator.
-// Rule (contracts/events/app-events.md section 4): X-VM-Signature = "v1=" + hex(HMAC-SHA256(key, instance_id + "\n" + seq + "\n" + hex(SHA-256(body)))).
+// Rule (contracts/events/app-events.md section 4): X-VM-Signature = "v1=" + hex(HMAC-SHA256(key, instance_id + "\n" + epoch + "\n" + seq + "\n" + hex(SHA-256(body)))).
 // The body is the exact bytes sent. Node built-ins only.
 import crypto from 'node:crypto';
 
@@ -12,18 +12,18 @@ export function bodyDigest(body) {
   return crypto.createHash('sha256').update(body).digest('hex');
 }
 
-export function signingString(instanceId, seq, body) {
-  return `${instanceId}\n${seq}\n${bodyDigest(body)}`;
+export function signingString(instanceId, epoch, seq, body) {
+  return `${instanceId}\n${epoch}\n${seq}\n${bodyDigest(body)}`;
 }
 
-export function signBody(key, instanceId, seq, body) {
-  return 'v1=' + crypto.createHmac('sha256', key).update(signingString(instanceId, seq, body)).digest('hex');
+export function signBody(key, instanceId, epoch, seq, body) {
+  return 'v1=' + crypto.createHmac('sha256', key).update(signingString(instanceId, epoch, seq, body)).digest('hex');
 }
 
 // Constant-time comparison of a header value with the expected signature.
-export function verifySignature(key, instanceId, seq, body, header) {
+export function verifySignature(key, instanceId, epoch, seq, body, header) {
   if (typeof header !== 'string' || !/^v1=[0-9a-f]{64}$/.test(header)) return false;
-  const want = Buffer.from(signBody(key, instanceId, seq, body));
+  const want = Buffer.from(signBody(key, instanceId, epoch, seq, body));
   const got = Buffer.from(header);
   return want.length === got.length && crypto.timingSafeEqual(want, got);
 }
@@ -33,6 +33,6 @@ export function signEvent(key, event) {
   const body = JSON.stringify(event);
   return {
     body,
-    headers: { 'content-type': 'application/json', [SIGNATURE_HEADER.toLowerCase()]: signBody(key, event.instance_id, event.seq, body) },
+    headers: { 'content-type': 'application/json', [SIGNATURE_HEADER.toLowerCase()]: signBody(key, event.instance_id, event.epoch, event.seq, body) },
   };
 }

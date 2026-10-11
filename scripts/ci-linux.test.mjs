@@ -12,12 +12,14 @@ const ci = readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8
 // The text of each job, cut at the next job key (a line of two spaces and a name ending in a colon).
 const jobsText = ci.split(/^jobs:\n/m)[1];
 const jobs = Object.fromEntries(jobsText.split(/^(?=  [a-z0-9_-]+:\n)/m).map((block) => [block.match(/^  ([a-z0-9_-]+):/)[1], block]));
-const MIRRORED = ['skills', 'scripts', 'installs', 'contract-rules', 'e2e'];
+// contract-rules is not mirrored line by line since story 1.15 (ADR 0026): in CI it runs the checker of the BASE commit against the pull request head, which a local run cannot repeat; ci:linux runs the local form of the same checker.
+const MIRRORED = ['skills', 'scripts', 'installs', 'e2e'];
+const LOCAL_ONLY = new Set(['contract-rules']);
 const runsOf = (job) => [...job.matchAll(/^\s+- run: (.*)$/gm)].map((m) => m[1].trim());
 
 test('every command ci:linux runs is a run line of ci.yml', () => {
   const runs = Object.values(jobs).flatMap(runsOf);
-  for (const [name, command] of STEPS) assert.ok(runs.includes(command), `${name}: ${command}`);
+  for (const [name, command] of STEPS) if (!LOCAL_ONLY.has(name)) assert.ok(runs.includes(command), `${name}: ${command}`);
 });
 
 test('every run command of the jobs skills, scripts, installs and e2e is a step of ci:linux', () => {
@@ -47,14 +49,16 @@ test('the e2e job runs the three files and switches off the nested pytest', () =
   assert.ok(!job.includes('contracts.e2e') && !job.includes('dev.e2e'));
 });
 
-test('the job contract-rules checks out the full history, runs on pull requests only, and ci:linux keeps .git for it', () => {
+test('the job contract-rules runs the base checker on pull requests only, and ci:linux keeps .git for its local form', () => {
   const job = jobs['contract-rules'];
   assert.ok(job, 'job contract-rules exists');
   assert.match(job, /fetch-depth: 0/);
   assert.match(job, /if: github\.event_name == 'pull_request'/);
-  assert.ok(job.indexOf('pnpm install --frozen-lockfile') < job.indexOf('node scripts/check-contract-rules.mjs'));
+  assert.match(job, /github\.event\.pull_request\.base\.sha/);
+  assert.ok(!/^\s*pull_request_target\s*:/m.test(ci), 'the workflow must not use the pull_request_target trigger');
+  assert.ok(job.indexOf('pnpm install --frozen-lockfile') < job.indexOf('node base/scripts/check-contract-rules.mjs'));
   assert.ok(job.includes('pnpm/action-setup'));
-  assert.deepEqual(runsOf(job), ['pnpm install --frozen-lockfile', 'node scripts/check-contract-rules.mjs']);
+  assert.ok(job.includes('node base/scripts/check-contract-rules.mjs --root head'));
   const script = containerScript();
   assert.ok(!script.includes('--exclude=.git '), '.git is copied into the container');
   assert.ok(script.includes('--exclude=tools/.bin'), 'a host oasdiff binary is never copied into the container');

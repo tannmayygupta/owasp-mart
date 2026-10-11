@@ -19,6 +19,8 @@ def make(request):
     for h in started:
         if h.service:
             h.service.stop()
+        if h.receiver:
+            h.receiver.stop()
 
 
 @pytest.fixture(params=["fake", "http"])

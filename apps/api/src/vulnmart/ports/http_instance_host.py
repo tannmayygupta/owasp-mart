@@ -3,8 +3,13 @@
 Implements the `InstanceHost` protocol over HTTP with only the standard library. Every request,
 also a GET, is signed (contract section 4): HMAC-SHA256 over a signing string made of the method,
 the request target, the timestamp, the nonce and the SHA-256 of the body. mTLS, which the contract
-requires in production, is the job of the TLS context handed in (`ssl_context`); the fake service in
-tests speaks plain HTTP on localhost.
+requires in production, is the job of the TLS context handed in (`ssl_context`), which must verify the server
+certificate and its host name (an https URL with a context that does not is refused); the fake service in tests speaks
+plain HTTP on localhost.
+
+Wire rules (ADR 0028): an error answer is `application/problem+json` (RFC 9457; unknown members are ignored, the
+`code` member picks the exception, `detail` is its message); a number in an answer that is not an integer token
+(`1.0`, `1e0`, `NaN`) makes a success answer unusable (`OrchestratorUnavailable`), and a boolean is not an integer.
 
 `sign_request` and `verify_request` are the two halves of the signing scheme; the verifier is what the
 platform API uses on state reports and what the tests use to check what the client sent.
@@ -29,7 +34,7 @@ from datetime import UTC, datetime
 
 from .instance_host import (
     ERRORS_BY_CODE, Access, BadSignature, CreateRequest, HostHealth, HostStatus, InstancePage, InstanceStatus,
-    Outcome, OrchestratorError, OrchestratorUnavailable, ResetRequest, ValidationFailed,
+    Outcome, OrchestratorError, OrchestratorUnavailable, ResetRequest, StateReport, ValidationFailed, is_wire_int,
 )
 
 SIGNATURE_VERSION = "v1"
@@ -41,6 +46,29 @@ NONCE_TTL_SECONDS = 300
 _TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 _NONCE = re.compile(r"^[0-9a-f]{32}\Z")
 _SIG = re.compile(r"^v1=[0-9a-f]{64}\Z")
+
+
+PROBLEM_MEDIA_TYPE = "application/problem+json"
+
+
+def _reject_number(token: str):
+    raise ValueError(f"{token} is a number that is not an integer token")
+
+
+def loads_strict(payload: bytes | str):
+    """json.loads that refuses what the contract refuses: a float token (`1.0`, `1e0`) and NaN or Infinity.
+
+    A boolean stays a boolean (it is not an integer: `is_wire_int` tells them apart). Raises ValueError."""
+    return json.loads(payload, parse_float=_reject_number, parse_constant=_reject_number)
+
+
+def parse_state_report(body: bytes) -> StateReport:
+    """The body of a state report as the platform reads it. Raises ValidationFailed (also for a float token)."""
+    try:
+        data = loads_strict(body)
+    except ValueError as exc:
+        raise ValidationFailed("the body is not valid JSON with integer tokens", field="") from exc
+    return StateReport.from_json(data)
 
 
 def utc_timestamp(now: datetime | None = None) -> str:
@@ -161,6 +189,8 @@ class HttpInstanceHost:
         if parts.scheme == "https":
             if ssl_context is None:
                 raise ValueError("an https base URL needs an explicit ssl_context (mTLS in production)")
+            if ssl_context.verify_mode != ssl.CERT_REQUIRED or not ssl_context.check_hostname:
+                raise ValueError("the ssl_context must verify the server certificate and its host name (verify_mode CERT_REQUIRED, check_hostname True)")
         elif parts.scheme == "http":
             if not _is_loopback(parts.hostname or ""):
                 raise ValueError("a plain http base URL is allowed for a loopback host only")
@@ -184,13 +214,17 @@ class HttpInstanceHost:
         target = path
         if query:
             target += "?" + urllib.parse.urlencode(query)
-        raw = json.dumps(body, separators=(",", ":")).encode() if body is not None else b""
+        try:
+            raw = json.dumps(body, separators=(",", ":"), allow_nan=False).encode() if body is not None else b""
+        except ValueError as exc:  # NaN or Infinity cannot be written as JSON
+            raise ValidationFailed("a number in the request is not finite", field="") from exc
         headers = {"Accept": "application/json, application/problem+json"}
         headers.update(signed_headers(self._key, method, target, raw, timestamp=utc_timestamp(self._clock() if self._clock else None), nonce=self._nonce()))
         if body is not None:
             headers["Content-Type"] = "application/json"
         req = urllib.request.Request(self._base + target, data=raw if body is not None else None, method=method, headers=headers)
         retry_after = None
+        content_type = ""
         try:
             try:
                 with self._opener.open(req, timeout=self._timeout) as resp:
@@ -199,6 +233,7 @@ class HttpInstanceHost:
                 try:
                     status, payload = err.code, err.read(MAX_RESPONSE_BYTES + 1)
                     retry_after = _retry_after(err.headers)
+                    content_type = err.headers.get("Content-Type", "") if err.headers is not None else ""
                 finally:
                     err.close()
         except (http.client.HTTPException, urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
@@ -206,20 +241,27 @@ class HttpInstanceHost:
         if len(payload) > MAX_RESPONSE_BYTES:
             raise OrchestratorUnavailable("the answer is larger than 1 MiB")
         try:
-            data = json.loads(payload) if payload else {}
+            # A success answer holds only integers and text, so it is read strictly. An error answer may carry extension members of any
+            # shape (RFC 9457 section 3.2: ignore what you do not know), so a float inside one is no reason to refuse the problem.
+            data = (json.loads(payload) if status >= 400 else loads_strict(payload)) if payload else {}
         except ValueError as exc:
-            raise OrchestratorUnavailable(f"orchestrator answered {status} with a body that is not JSON") from exc
+            raise OrchestratorUnavailable(f"orchestrator answered {status} with a body that is not JSON with integer tokens") from exc
         if not isinstance(data, dict):
             raise OrchestratorUnavailable(f"orchestrator answered {status} with JSON that is not an object")
         if status >= 400:
+            # RFC 9457: the media type says it is a problem; members we do not know are ignored, `code` picks the exception.
+            if content_type.split(";")[0].strip().lower() != PROBLEM_MEDIA_TYPE:
+                raise OrchestratorUnavailable(f"unexpected answer {status}")
             code = data.get("code")
             cls = ERRORS_BY_CODE.get(code) if isinstance(code, str) else None
             if cls is None:
                 raise OrchestratorUnavailable(f"unexpected answer {status}")
             field = data.get("field")
+            detail = data.get("detail") if isinstance(data.get("detail"), str) else data.get("title")
+            request_id = data.get("request_id")
             raise cls(
-                str(data.get("message", ""))[:500], field=field if isinstance(field, str) else None,
-                request_id=str(data["request_id"]) if "request_id" in data else None, retry_after=retry_after,
+                detail[:500] if isinstance(detail, str) else "", field=field if isinstance(field, str) else None,
+                request_id=request_id if isinstance(request_id, str) else None, retry_after=retry_after,
             )
         if status not in ok:
             raise OrchestratorUnavailable(f"unexpected status {status}")
@@ -262,6 +304,8 @@ class HttpInstanceHost:
     def list_instances(
         self, labels: dict[str, str] | None = None, *, cursor: str | None = None, limit: int = 100
     ) -> InstancePage:
+        if not is_wire_int(limit, 1, 500):
+            raise ValidationFailed("limit is 1 to 500", field="limit")
         query: dict[str, str | int] = dict(labels or {})
         if cursor is not None:
             query["cursor"] = cursor
@@ -269,6 +313,8 @@ class HttpInstanceHost:
             query["limit"] = limit
         data = self._call("GET", "/v1/instances", query=query)[1]
         try:
+            if not isinstance(data["items"], list) or not (data["next_cursor"] is None or isinstance(data["next_cursor"], str)):
+                raise TypeError("not a page")
             return InstancePage(tuple(InstanceStatus.from_json(i) for i in data["items"]), data["next_cursor"])
         except (KeyError, ValueError, TypeError) as exc:
             raise OrchestratorUnavailable("the answer is not an instance page") from exc
@@ -276,12 +322,14 @@ class HttpInstanceHost:
     def host_status(self) -> HostStatus:
         d = self._call("GET", "/v1/host")[1]
         try:
+            if not all(is_wire_int(d[k]) for k in ("capacity_memory_mb", "used_memory_mb", "instances")):
+                raise TypeError("not integers")
             return HostStatus(d["host_id"], d["kind"], d["capacity_memory_mb"], d["used_memory_mb"], d["instances"], HostHealth(d["health"]))
         except (KeyError, ValueError, TypeError) as exc:
             raise OrchestratorUnavailable("the answer is not a host status") from exc
 
 
 __all__ = [
-    "HttpInstanceHost", "NonceCache", "OrchestratorError", "sign_request", "signed_headers", "signing_string",
-    "verify_request",
+    "HttpInstanceHost", "NonceCache", "OrchestratorError", "loads_strict", "parse_state_report", "sign_request",
+    "signed_headers", "signing_string", "verify_request",
 ]

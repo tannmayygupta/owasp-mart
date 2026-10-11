@@ -1,28 +1,40 @@
 #!/bin/sh
-# Adds ACCEPT rules for the VulnMart ports to the host INPUT chain and saves them. Safe to run again.
-# On the AWS Ubuntu image the INPUT policy is ACCEPT and these are only ACCEPT rules, so this script filters NOTHING
-# today: the AWS security groups are the only perimeter. The rules are a placeholder for a later default-drop policy
-# (handoff H-103, tasks L-15 and L-29). On an Oracle image the chain ends in a REJECT, so there they matter.
-# Usage: vulnmart-firewall.sh <private-subnet-cidr>
-# Some cloud Ubuntu images (Oracle) ship an iptables INPUT chain that ends in a REJECT; allow rules must sit before it.
-# Others (AWS) have an empty INPUT chain with policy ACCEPT: the rules are then added at the end and the cloud security groups do the filtering.
-# The cloud network groups are the real filter.
+# Host INPUT filter for the VulnMart ports (D-43, handoff H-103). Safe to run again; it never flushes a chain and never touches FORWARD or the Docker chains.
+# Order: loopback, ESTABLISHED/RELATED, path-MTU ICMP, DHCP replies, the public ports, the private ports from the VPC range; the default policy is set to DROP
+# LAST, so a failure half-way cannot lock the host out. On an image whose INPUT chain ends in a REJECT (Oracle) the allow rules are inserted before it.
+# Docker publishes container ports through its own NAT and FORWARD rules, which this chain never sees: it protects the HOST's own ports only.
+# The AWS security groups and network ACLs stay the perimeter; this is the second layer on the host.
+# The rules are saved with netfilter-persistent ONLY while no Docker chain exists (first boot, before Docker is installed). Saving on a Docker host would
+# write Docker's own rules into the saved file; the script then skips the save and says so (the saved file from the first run keeps applying at boot).
+# Usage: vulnmart-firewall.sh <private-source-cidr>   (AWS: the VPC range; Oracle: the subnet)
 set -eu
-PRIVATE_CIDR="${1:?private subnet cidr required}"
+PRIVATE_CIDR="${1:?private source cidr required}"
 PUBLIC_PORTS="22 80 443"
 PRIVATE_PORTS="9443 9444"
 
-insert_before_reject() {
-  # $@ = the rule, without -I/-A
+# add_rule <rule...>: append (or insert before a final REJECT) unless already present.
+add_rule() {
   if iptables -C INPUT "$@" 2>/dev/null; then return 0; fi
   pos="$(iptables -L INPUT --line-numbers -n | awk '$2 == "REJECT" {print $1; exit}')"
   if [ -n "$pos" ]; then iptables -I INPUT "$pos" "$@"; else iptables -A INPUT "$@"; fi
 }
 
+add_rule -i lo -j ACCEPT
+add_rule -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+add_rule -p icmp --icmp-type destination-unreachable -j ACCEPT
+add_rule -p udp --sport 67 --dport 68 -j ACCEPT
 for p in $PUBLIC_PORTS; do
-  insert_before_reject -p tcp --dport "$p" -m conntrack --ctstate NEW -j ACCEPT
+  add_rule -p tcp --dport "$p" -m conntrack --ctstate NEW -j ACCEPT
 done
 for p in $PRIVATE_PORTS; do
-  insert_before_reject -p tcp -s "$PRIVATE_CIDR" --dport "$p" -m conntrack --ctstate NEW -j ACCEPT
+  add_rule -p tcp -s "$PRIVATE_CIDR" --dport "$p" -m conntrack --ctstate NEW -j ACCEPT
 done
-netfilter-persistent save
+
+# Default policy last. Everything the host needs is accepted above; the cloud network groups remain the first filter.
+iptables -P INPUT DROP
+
+if iptables -n -L DOCKER >/dev/null 2>&1; then
+  echo "vulnmart-firewall: a Docker chain exists, so the rules were NOT saved (that would persist Docker's own rules)" >&2
+else
+  netfilter-persistent save
+fi

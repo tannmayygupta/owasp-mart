@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanSecrets } from './validate-contracts.mjs';
 import { compileEventSchema, createIngest, schemaErrors, LIMITS } from '../contracts/mocks/fake-ingest/ingest.mjs';
+import { deriveEventKey, TEST_MASTER_HEX, EVENT_KEY_SALT, EVENT_KEY_INFO } from '../contracts/mocks/fake-ingest/event-key.mjs';
 import { signEvent, TEST_KEY, TEST_INSTANCE, SIGNATURE_HEADER, signBody, verifySignature } from '../contracts/mocks/fake-ingest/sign.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,6 +19,7 @@ export const SCHEMA_NAME = 'instance-events';
 export const POSTED_FILE = 'instance-events.posted.schema.json';
 export const POSTED_SOURCES = ['shop', 'import', 'mock', 'bot'];
 export const POSTED_EVIDENCE_BODY_CHARS = 2048;
+export const KEY_VECTOR_FILE = 'event-key-vector.json';
 export const HELP = `Validate the instance event contract (IF-4)
 Usage: node scripts/validate-events.mjs [--dir <contracts/events folder>] [--write-posted] [--help]
   --write-posted  regenerate instance-events.posted.schema.json from the wire schema, then exit 0
@@ -33,10 +35,13 @@ export function derivePosted(wire) {
   const s = JSON.parse(JSON.stringify(wire));
   s.$id = 'https://vulnmart.invalid/contracts/events/instance-events.posted.schema.json';
   s.title = 'Event body posted to the sidecar (IF-4, contract 0.1, derived)';
-  s.description = 'DERIVED from instance-events.schema.json by "node scripts/validate-events.mjs --write-posted"; do not edit by hand. The body a shop, import service, mock service or bot posts to POST /v1/events on the sidecar: the wire event without instance_id and seq (the sidecar adds them), source limited to shop, import, mock or bot, at most 4 KiB. A posted evidence.capture body is at most 2 KiB. ' + wire.description;
-  s.required = s.required.filter((k) => k !== 'instance_id' && k !== 'seq');
+  s.description = 'DERIVED from instance-events.schema.json by "node scripts/validate-events.mjs --write-posted"; do not edit by hand. The body a shop, import service, mock service or bot posts to POST /v1/events on the sidecar: the wire event without instance_id, epoch and seq (the sidecar adds them), source limited to shop, import, mock or bot, at most 4 KiB. A posted evidence.capture body is at most 2 KiB. ' + wire.description;
+  s.required = s.required.filter((k) => k !== 'instance_id' && k !== 'epoch' && k !== 'seq');
   delete s.properties.instance_id;
+  delete s.properties.epoch;
   delete s.properties.seq;
+  // the seq lanes (rules on source) belong to the wire event; a posted body has no seq
+  s.allOf = s.allOf.filter((entry) => !(entry.if && entry.if.properties && entry.if.properties.source));
   s.properties.source = { type: 'string', enum: POSTED_SOURCES };
   for (const entry of s.allOf) {
     const t = entry.if && entry.if.properties && entry.if.properties.type && entry.if.properties.type.const;
@@ -127,6 +132,26 @@ export function runMatrix({ schemaFile, events, key = TEST_KEY, instance = TEST_
     changed.ts = '2026-03-03T00:00:00Z';
     expect(ing, 'duplicate with a different body', sign(changed), 409, { stores: 0, code: 'EVT-DUPLICATE-MISMATCH' });
   }
+  // Epoch rules (app-events.md section 6): identity is (instance_id, epoch, seq); a later epoch than the current one is a 401;
+  // an earlier one is late history, stored under its own epoch. Keys are derived per (instance, epoch) from a fake master.
+  {
+    const ing = createIngest({ master: TEST_MASTER_HEX, instances: { [instance]: 2 }, schemaFile });
+    const k = (e) => deriveEventKey(TEST_MASTER_HEX, instance, e);
+    const at = (e, s) => { const x = clone(first); x.epoch = e; x.seq = s; return x; };
+    expect(ing, 'epoch: current epoch, key derived for (instance, epoch)', sign(at(2, 1), k(2)), 202, { stores: 1 });
+    expect(ing, 'epoch: same seq in an older epoch is another event, accepted and stored under its own epoch', sign(at(1, 1), k(1)), 202, { stores: 1 });
+    check('epoch: stored order is (epoch, seq)', ing.ordered().map((s) => s.event.epoch).join() === '1,2', 'ordered() must sort by epoch then seq');
+    expect(ing, 'epoch: identical repeat in the same epoch is a duplicate', sign(at(2, 1), k(2)), 200, { stores: 0 });
+    const diff = at(2, 1); diff.ts = '2026-03-03T00:00:00Z';
+    expect(ing, 'epoch: same (instance, epoch, seq) with another body is a 409', sign(diff, k(2)), 409, { stores: 0, code: 'EVT-DUPLICATE-MISMATCH' });
+    expect(ing, 'epoch: a later epoch than the current one is a 401 even with a valid signature', sign(at(3, 1), k(3)), 401, { stores: 0, code: 'EVT-BAD-SIGNATURE' });
+    expect(ing, 'epoch: signed with the key of another epoch is a 401', sign(at(2, 2), k(1)), 401, { stores: 0 });
+    const noEpoch = at(2, 3); delete noEpoch.epoch;
+    expect(ing, 'epoch: missing epoch is a 422 at /epoch', { headers: { 'content-type': 'application/json' }, body: JSON.stringify(noEpoch) }, 422, { stores: 0, path: '/epoch' });
+    ing.setEpoch(instance, 3);
+    expect(ing, 'epoch: after the reset the later epoch is accepted', sign(at(3, 1), k(3)), 202, { stores: 1 });
+    check('epoch: future_epoch security event noted', ing.security.some((x) => x.kind === 'future_epoch'), 'no future_epoch security event');
+  }
   // Store cap
   {
     const ing = fresh2({ maxStored: 2 });
@@ -147,7 +172,7 @@ export function runMatrix({ schemaFile, events, key = TEST_KEY, instance = TEST_
       return Buffer.concat([Buffer.from(text.slice(0, at)), Buffer.from([0xff]), Buffer.from(text.slice(at + 3))]);
     };
     const textKey = ['route_template', 'route', 'path', 'request_ref'].find((k) => typeof first.data[k] === 'string') || Object.keys(first.data).find((k) => typeof first.data[k] === 'string');
-    const sigOf = (b) => ({ 'content-type': 'application/json', [SIGNATURE_HEADER.toLowerCase()]: signBody(key, first.instance_id, first.seq, b) });
+    const sigOf = (b) => ({ 'content-type': 'application/json', [SIGNATURE_HEADER.toLowerCase()]: signBody(key, first.instance_id, first.epoch, first.seq, b) });
     const body = withByte(first, textKey);
     // Invalid UTF-8 bytes decode to U+FFFD for parsing; the signature covers the original bytes (app-events.md section 4).
     expect(ing, 'raw bytes: a signed body with an invalid UTF-8 byte is accepted when the schema allows it', { headers: sigOf(body), body }, 202, { stores: 1 });
@@ -266,6 +291,32 @@ export function runMatrix({ schemaFile, events, key = TEST_KEY, instance = TEST_
   return out;
 }
 
+// The event key vector (app-events.md section 4): a fake master, instance ids, epochs and the keys that HKDF-SHA256 must give. Recomputed here.
+export function checkKeyVector(file, errors, lines) {
+  const name = `examples/${KEY_VECTOR_FILE}`;
+  if (!fs.existsSync(file)) { errors.push(`${name}: missing`); return; }
+  let v;
+  try { v = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { errors.push(`${name}: cannot parse JSON (${e.message})`); return; }
+  if (v.salt !== EVENT_KEY_SALT) errors.push(`${name}: salt must be ${EVENT_KEY_SALT}`);
+  if (v.info_label !== EVENT_KEY_INFO) errors.push(`${name}: info_label must be ${EVENT_KEY_INFO}`);
+  if (typeof v.master_hex !== 'string' || !/^[0-9a-f]{64}$/.test(v.master_hex) || v.master_hex !== TEST_MASTER_HEX) errors.push(`${name}: master_hex must be the fake test master of contracts/mocks/fake-ingest/event-key.mjs`);
+  if (!Array.isArray(v.cases) || v.cases.length < 3) { errors.push(`${name}: needs at least 3 cases`); return; }
+  const keys = new Set();
+  let ok = 0;
+  for (const c of v.cases) {
+    try {
+      const want = deriveEventKey(v.master_hex, c.instance_id, c.epoch);
+      const info = Buffer.concat([Buffer.from(EVENT_KEY_INFO), Buffer.from([0]), Buffer.from(c.instance_id), Buffer.from([0]), Buffer.from(String(c.epoch))]).toString('hex');
+      if (c.info_hex !== info) errors.push(`${name}: info_hex of ${c.instance_id} epoch ${c.epoch} is wrong`);
+      else if (c.key !== want) errors.push(`${name}: key of ${c.instance_id} epoch ${c.epoch} does not match the HKDF result`);
+      else if (!/^[A-Za-z0-9_-]{43}$/.test(c.key)) errors.push(`${name}: key must be 43 base64url characters`);
+      else { ok++; keys.add(c.key); }
+    } catch (e) { errors.push(`${name}: case ${JSON.stringify(c.instance_id)} epoch ${JSON.stringify(c.epoch)}: ${e.message}`); }
+  }
+  if (keys.size !== ok) errors.push(`${name}: two cases give the same key`);
+  lines.push(`event key vector: ${ok} of ${v.cases.length} cases recomputed`);
+}
+
 // Returns { ok, errors, lines }.
 export function validateEvents({ dir = DEFAULT_DIR } = {}) {
   const errors = [];
@@ -363,6 +414,7 @@ export function validateEvents({ dir = DEFAULT_DIR } = {}) {
   for (const file of walkFiles(exDir)) {
     if (file === manifestFile) continue;
     const r = rel(file);
+    if (r === `examples/${KEY_VECTOR_FILE}`) continue; // checked below
     const parts = r.split('/'); // examples, valid|invalid|, <group>, <file>
     const kind = parts[1];
     const group = parts[2];
@@ -379,7 +431,7 @@ export function validateEvents({ dir = DEFAULT_DIR } = {}) {
       if (ev === null || typeof ev !== 'object') { errors.push(`${r}: body must be a JSON object`); continue; }
       const sigKey = Object.keys(data.headers).find((k) => k.toLowerCase() === 'x-vm-signature');
       const sig = sigKey === undefined ? undefined : data.headers[sigKey];
-      if (!verifySignature(TEST_KEY, ev.instance_id, ev.seq, data.body, sig)) errors.push(`${r}: signature does not verify with the test key`);
+      if (!verifySignature(TEST_KEY, ev.instance_id, ev.epoch, ev.seq, data.body, sig)) errors.push(`${r}: signature does not verify with the test key`);
       else if (validate) {
         const ing = createIngest({ keys: { [TEST_INSTANCE]: TEST_KEY }, schemaFile: schemaPath });
         const res = ing.handle({ headers: data.headers, body: data.body });
@@ -420,11 +472,14 @@ export function validateEvents({ dir = DEFAULT_DIR } = {}) {
   const typeCount = new Map();
   for (const v of validEvents) typeCount.set(v.event.type, (typeCount.get(v.event.type) || 0) + 1);
   for (const [t, n] of typeCount) if (n > 1) errors.push(`examples/valid/${SCHEMA_NAME}: ${n} valid examples for type ${t}, expected one`);
-  const seqs = validEvents.map((v) => `${v.event.instance_id}#${v.event.seq}`);
-  if (new Set(seqs).size !== seqs.length) errors.push(`examples/valid/${SCHEMA_NAME}: two examples share an (instance_id, seq)`);
+  const seqs = validEvents.map((v) => `${v.event.instance_id}#${v.event.epoch}#${v.event.seq}`);
+  if (new Set(seqs).size !== seqs.length) errors.push(`examples/valid/${SCHEMA_NAME}: two examples share an (instance_id, epoch, seq)`);
   if (envelopeCount === 0) errors.push('examples/valid/envelopes: no signed envelope example');
   if (validatePosted && postedCount === 0) errors.push('examples/valid/posted: no valid posted body example');
   if (validatePosted && !Object.keys(manifest).some((k) => k.startsWith('posted/'))) errors.push('examples/invalid/posted: no invalid posted body example');
+
+  // event key vector: the HKDF rule recomputed
+  checkKeyVector(path.join(exDir, KEY_VECTOR_FILE), errors, lines);
 
   // fake ingest, every matrix row
   if (validate) {

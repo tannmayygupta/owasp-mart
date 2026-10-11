@@ -1,5 +1,9 @@
 {
-  "code": "ATT-HINTS-DISABLED",
-  "message": "hints are off for this attempt",
+  "type": "https://vulnmart.invalid/problems/att_hints_disabled",
+  "title": "Hints are off for this attempt.",
+  "status": 404,
+  "detail": "hints are off for this attempt",
+  "instance": "urn:vulnmart:request:req-0123456789ab",
+  "code": "att_hints_disabled",
   "request_id": "req-0123456789ab"
 }

@@ -66,6 +66,18 @@ export function semanticTemplate(d) {
     if (c.flag_delivery_env && c.flag_delivery_env.env_name !== `VM_FLAG_${c.flag_delivery_env.challenge_key}`) {
       add(`${base}/flag_delivery_env/env_name`, 'env_name must be VM_FLAG_ plus challenge_key');
     }
+    // A reason is a sentence, not padding: at least 8 different letters or digits (the schema pattern covers runs and word count).
+    if (c.flag_delivery_env && new Set(c.flag_delivery_env.reason.toLowerCase().replace(/[^a-z0-9]/g, '')).size < 8) {
+      add(`${base}/flag_delivery_env/reason`, 'reason must use at least 8 different letters or digits');
+    }
+    // PORT, when set, is one of the declared ports.
+    if (c.env.PORT !== undefined && !(c.ports || []).includes(Number(c.env.PORT))) add(`${base}/env/PORT`, 'PORT must be one of the ports');
+    // vm.expires, when not the token, is a real calendar date and time.
+    const exp = c.labels['vm.expires'];
+    if (exp !== '{expires}') {
+      const t = new Date(exp);
+      if (Number.isNaN(t.getTime()) || t.toISOString().slice(0, 10) !== exp.slice(0, 10)) add(`${base}/labels/vm.expires`, 'vm.expires must be a real calendar date');
+    }
   });
 
   const injector = byRole.injector;

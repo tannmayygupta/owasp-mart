@@ -202,7 +202,7 @@
   "flag-result-bad-result.json": {
     "schema": "FlagSubmissionResult",
     "path": "/result",
-    "rule": "five results only"
+    "rule": "two results only"
   },
   "flag-result-bad-credit.json": {
     "schema": "FlagSubmissionResult",
@@ -392,7 +392,7 @@
   "problem-bad-code.json": {
     "schema": "Problem",
     "path": "/code",
-    "rule": "code shape"
+    "rule": "code shape: lower-case words with underscores"
   },
   "problem-orch-code.json": {
     "schema": "Problem",
@@ -401,12 +401,107 @@
   },
   "problem-extra-stack.json": {
     "schema": "Problem",
-    "path": "/stack",
-    "rule": "no stack trace"
+    "path": "",
+    "rule": "no stack trace member"
   },
   "problem-message-too-long.json": {
     "schema": "Problem",
-    "path": "/message",
-    "rule": "at most 500 characters"
+    "path": "/detail",
+    "rule": "detail at most 500 characters"
+  },
+  "flag-result-reason-decoy.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/result",
+    "rule": "the reason is never given to the submitter (only correct or incorrect)"
+  },
+  "flag-result-reason-other-instance.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/result",
+    "rule": "the reason is never given to the submitter (only correct or incorrect)"
+  },
+  "flag-result-reason-stale-epoch.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/result",
+    "rule": "the reason is never given to the submitter (only correct or incorrect)"
+  },
+  "flag-result-reason-wrong.json": {
+    "schema": "FlagSubmissionResult",
+    "path": "/result",
+    "rule": "the reason is never given to the submitter (only correct or incorrect)"
+  },
+  "problem-old-upper-code.json": {
+    "schema": "Problem",
+    "path": "/code",
+    "rule": "codes are lower case: an old style code is refused"
+  },
+  "problem-missing-type.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "type is required"
+  },
+  "problem-type-other-host.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "type is on https://vulnmart.invalid/problems/"
+  },
+  "problem-missing-title.json": {
+    "schema": "Problem",
+    "path": "/title",
+    "rule": "title is required"
+  },
+  "problem-status-200.json": {
+    "schema": "Problem",
+    "path": "/status",
+    "rule": "status is 400 to 599"
+  },
+  "problem-old-message-only.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "an old style body (message, no RFC 9457 members) is refused"
+  },
+  "problem-bad-instance.json": {
+    "schema": "Problem",
+    "path": "/instance",
+    "rule": "instance is urn:vulnmart:request:<request_id>"
+  },
+  "timeline-missing-has-more.json": {
+    "schema": "Timeline",
+    "path": "/has_more",
+    "rule": "has_more is required"
+  },
+  "timeline-has-more-string.json": {
+    "schema": "Timeline",
+    "path": "/has_more",
+    "rule": "has_more is a boolean"
+  },
+  "timeline-extra-offset.json": {
+    "schema": "Timeline",
+    "path": "/offset",
+    "rule": "no offset in the answer"
+  },
+  "timeline-cursor-padded.json": {
+    "schema": "Timeline",
+    "path": "/next_cursor",
+    "rule": "cursor characters (no padding)"
+  },
+  "challenges-missing-has-more.json": {
+    "schema": "ChallengeProgressList",
+    "path": "/has_more",
+    "rule": "has_more is required"
+  },
+  "challenges-has-more-true.json": {
+    "schema": "ChallengeProgressList",
+    "path": "/has_more",
+    "rule": "a fixed list is never truncated"
+  },
+  "evidence-missing-has-more.json": {
+    "schema": "EvidenceList",
+    "path": "/has_more",
+    "rule": "has_more is required"
+  },
+  "integrity-missing-has-more.json": {
+    "schema": "IntegrityFlagList",
+    "path": "/has_more",
+    "rule": "has_more is required"
   }
 }

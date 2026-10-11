@@ -26,5 +26,9 @@
 | 0022 | [Hosts on the AWS Free Plan in Sydney (supersedes the provider part of 0021)](0022-aws-free-plan-sydney-hosts.md) | Accepted (provider, region, tooling, sizing; applied and verified live 2026-10-11); Proposed (private ports, sizes, isolation) |
 | 0023 | [Instance event contract: identity, signing, sources](0023-instance-event-contract-identity-signing-source.md) | Accepted (D-38) |
 | 0024 | [Signing of platform-to-orchestrator requests](0024-orchestrator-request-signing.md) | Proposed |
+| 0025 | [IF-4 event identity with epoch, seq lanes and per-epoch event keys](0025-if4-epoch-seq-lanes-and-event-keys.md) | Proposed (decided on delegation, story 1.15) |
+| 0026 | [Trusted base checker for the contract rules](0026-trusted-base-checker-for-contract-rules.md) | Proposed (decided on delegation, story 1.15) |
+| 0027 | [Labs host isolation, IAM guard and remote state](0027-labs-host-isolation-iam-guard-and-remote-state.md) | Proposed (decided on delegation, story 1.15; nothing applied) |
+| 0028 | [IF-5 problem details, state report transition number, strict integers](0028-if5-problem-details-state-report-and-strict-seq.md) | Proposed (decided on delegation, story 1.15) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

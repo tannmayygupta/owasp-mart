@@ -2,7 +2,10 @@
 
 Checks: the OpenAPI 3.1 file is valid; the seven calls and the state report exist; every valid example
 matches its schema; every invalid example fails at the path its manifest names; no GET answer schema can
-hold a secret; the signing vector reproduces; no real-looking flag is in the contract. Run through
+hold a secret; the signing vector reproduces; no real-looking flag is in the contract. Since 0.3.0 (ADR 0028) it also
+checks that every integer schema is `int64` with a minimum and a maximum of at most 2^53 - 1, that the examples are
+read with a strict integer rule (`1.0` and `1e0` are not integers, a boolean is not an integer), that the Problem
+schema is open and has the RFC 9457 members, and that every error response is `application/problem+json`. Run through
 `pnpm run contracts:check` (after the instance contract check) or on its own:
 
     uv run --package vulnmart-api python scripts/check_orchestrator_contract.py [--dir <folder>]
@@ -19,7 +22,7 @@ import sys
 from pathlib import Path
 
 import yaml
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, validators
 from openapi_spec_validator import validate
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,8 +35,12 @@ OPERATIONS = {
     ("post", "/v1/instances/{instance_id}/reset"), ("post", "/v1/instances/{instance_id}/access"),
     ("post", "/v1/instances/{instance_id}/destroy"), ("get", "/v1/host"), ("post", "/internal/v1/orch/state"),
 }
-SECRET_NAMES = {"flags", "flag", "decoys", "decoy", "flag_digests", "sha256", "seed", "event_key", "value", "owner_hash", "first_seq"}
+SECRET_NAMES = {"flags", "flag", "decoys", "decoy", "flag_digests", "sha256", "seed", "event_key", "value", "owner_hash"}
 FREE_FORM = "<free-form object>"
+MAX_INT = 2**53 - 1  # the largest integer every JSON implementation reads back exactly (RFC 7493 section 2.2)
+OPEN_SCHEMAS = {"#/components/schemas/Problem"}  # RFC 9457: open on purpose (extension members), see ADR 0028
+PROBLEM_REQUIRED = {"type", "title", "status", "detail", "instance", "code", "request_id"}
+PROBLEM_MEDIA = "application/problem+json"
 FAKE_FLAG = re.compile(r"^VM\{([A-Z2-7])\1{23}\}$")
 FLAG_LIKE = re.compile(r"VM\{[A-Z2-7]{24}\}")
 
@@ -55,9 +62,33 @@ def error_path(err) -> str:
     return "".join("/" + _esc(p) for p in parts)
 
 
+# JSON Schema calls 1.0 an integer, and Python reads 1.0 and 1e0 as floats. The contract does not: an integer is an integer
+# token (ADR 0028), so the validator used here takes only a real int (a bool is not an int for this purpose either).
+_STRICT_TYPES = Draft202012Validator.TYPE_CHECKER.redefine("integer", lambda checker, instance: type(instance) is int)
+StrictValidator = validators.extend(Draft202012Validator, type_checker=_STRICT_TYPES)
+
+
 def schema_validator(spec: dict, name: str) -> Draft202012Validator:
     # The OpenAPI 3.1 schema dialect is JSON Schema 2020-12; $refs point into this same document.
-    return Draft202012Validator({"$ref": f"#/components/schemas/{name}", "components": spec["components"]})
+    return StrictValidator({"$ref": f"#/components/schemas/{name}", "components": spec["components"]})
+
+
+def integer_problems(node, where: str = ""):
+    """Every `type: integer` schema of the file must say `format: int64`, a minimum and a maximum of at most 2^53 - 1."""
+    if isinstance(node, dict):
+        if node.get("type") == "integer":
+            lo, hi = node.get("minimum"), node.get("maximum")
+            if node.get("format") != "int64":
+                yield f"{where or '/'}: an integer needs format: int64"
+            if type(lo) is not int or type(hi) is not int:
+                yield f"{where or '/'}: an integer needs both a minimum and a maximum"
+            elif hi > MAX_INT or lo > hi or lo < -MAX_INT:
+                yield f"{where or '/'}: the range of an integer must lie within -(2^53 - 1) .. 2^53 - 1"
+        for key, value in node.items():
+            yield from integer_problems(value, f"{where}/{key}")
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            yield from integer_problems(value, f"{where}/{i}")
 
 
 def _resolve(spec: dict, ref: str):
@@ -67,9 +98,10 @@ def _resolve(spec: dict, ref: str):
     return node
 
 
-def _walk_properties(spec: dict, schema, seen=None):
+def _walk_properties(spec: dict, schema, seen=None, open_ok: bool = False):
     """Yield every property name reachable from a schema (follows local $refs), and the marker
-    '<free-form object>' for an object schema that is not closed (additionalProperties is not false)."""
+    '<free-form object>' for an object schema that is not closed (additionalProperties is not false).
+    A schema in OPEN_SCHEMAS (the RFC 9457 Problem) may be open; its declared property names are still walked."""
     seen = seen if seen is not None else set()
     if isinstance(schema, dict):
         ref = schema.get("$ref")
@@ -77,10 +109,10 @@ def _walk_properties(spec: dict, schema, seen=None):
             if ref in seen:
                 return
             seen.add(ref)
-            yield from _walk_properties(spec, _resolve(spec, ref), seen)
+            yield from _walk_properties(spec, _resolve(spec, ref), seen, open_ok=ref in OPEN_SCHEMAS)
         typ = schema.get("type")
         is_object = typ == "object" or (isinstance(typ, list) and "object" in typ)
-        if is_object and schema.get("additionalProperties") is not False:
+        if is_object and schema.get("additionalProperties") is not False and not open_ok:
             yield FREE_FORM
         for key, value in schema.items():
             if key == "properties":
@@ -155,6 +187,38 @@ def run(folder: Path) -> tuple[list[str], dict[str, int]]:
         fail(f"missing operation {missing[0].upper()} {missing[1]}")
     for extra in sorted(found - OPERATIONS):
         fail(f"unexpected operation {extra[0].upper()} {extra[1]}")
+
+    # Every integer is int64 with a range inside 2^53 - 1 (the examples are read with the strict integer rule below).
+    for problem in integer_problems(spec):
+        fail(f"{SPEC} {problem}")
+
+    # RFC 9457 (ADR 0028): every error response is application/problem+json with the Problem schema, and Problem is open.
+    for path, item in spec["paths"].items():
+        for method, op in item.items():
+            if method not in {"get", "post", "put", "delete", "patch"}:
+                continue
+            for status, resp in op["responses"].items():
+                if str(status)[:1] not in "45":
+                    continue
+                if isinstance(resp, dict) and "$ref" in resp:
+                    resp = _resolve(spec, resp["$ref"])
+                media = resp.get("content") or {}
+                if set(media) != {PROBLEM_MEDIA}:
+                    fail(f"{method.upper()} {path} {status}: an error answer must be {PROBLEM_MEDIA} and nothing else (found {sorted(media)})")
+                for body in media.values():
+                    if (body.get("schema") or {}).get("$ref") != "#/components/schemas/Problem":
+                        fail(f"{method.upper()} {path} {status}: an error answer must use the Problem schema")
+    problem_schema = (spec["components"].get("schemas") or {}).get("Problem")
+    if isinstance(problem_schema, dict):
+        if problem_schema.get("additionalProperties") is False:
+            fail("the Problem schema must be open (no additionalProperties: false): extension members can be added later without breaking a client")
+        missing = PROBLEM_REQUIRED - set(problem_schema.get("required") or [])
+        if missing:
+            fail(f"the Problem schema must require {sorted(missing)}")
+        if "message" in (problem_schema.get("required") or []):
+            fail("the Problem schema must not require the old-style message member")
+    else:
+        fail("the Problem schema is missing")
 
     # Every GET answer must be unable to carry a secret.
     for path, item in spec["paths"].items():

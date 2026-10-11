@@ -113,8 +113,8 @@ export async function liveChecks(ctx) {
   const sent = await emit('valid');
   let stored = null;
   for (let i = 0; i < 40; i++) { stored = eventsAtIngest(); if (stored?.length) break; await sleep(250); }
-  add('live-event-stored-and-verified', sent === 202 && Array.isArray(stored) && stored.length === 1 && stored[0].instance_id === v.instance_id && stored[0].seq === v.first_seq && stored[0].type === 'shop.catalog_query_error',
-    `one event must reach the fake ingest with (instance_id, seq=first_seq); sidecar answered ${sent}, ingest holds ${stored ? stored.length : 'unknown'}`);
+  add('live-event-stored-and-verified', sent === 202 && Array.isArray(stored) && stored.length === 1 && stored[0].instance_id === v.instance_id && stored[0].epoch === v.epoch && stored[0].seq === 1 && stored[0].type === 'shop.catalog_query_error',
+    `one event must reach the fake ingest with (instance_id, epoch, seq=1); sidecar answered ${sent}, ingest holds ${stored ? stored.length : 'unknown'}`);
 
   const rows = { 'too-big': 413, 'wrong-type': 415, 'bad-json': 400, 'forbidden-source': 422, get: 405 };
   const bad = [];

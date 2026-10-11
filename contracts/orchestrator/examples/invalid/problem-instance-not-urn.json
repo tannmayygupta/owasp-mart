@@ -1,0 +1,9 @@
+{
+  "type": "https://vulnmart.invalid/problems/orch-busy",
+  "title": "No capacity",
+  "status": 429,
+  "detail": "the host has no capacity",
+  "instance": "/v1/instances/i-AAAAAAAAAAAAAAAA",
+  "code": "ORCH-BUSY",
+  "request_id": "req-0000000006"
+}

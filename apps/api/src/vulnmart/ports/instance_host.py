@@ -9,13 +9,26 @@ no such field.
 
 Secrets (flags, decoys, digests, event key, seed) are marked `repr=False` so they do not leak into logs
 or test output. A status answer never holds one.
+
+Numbers: every integer of the contract is an integer token on the wire (no `1.0`, no `1e0`, no boolean,
+at most 2**53 - 1, ADR 0028). `is_wire_int` is the one test for that in this package.
 """
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from dataclasses import field as dc_field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
+
+# Largest integer every JSON implementation reads back exactly (RFC 7493 section 2.2); the contract's integer maximum.
+MAX_WIRE_INT = 2**53 - 1
+
+
+def is_wire_int(value: object, minimum: int = 0, maximum: int = MAX_WIRE_INT) -> bool:
+    """True for a real integer in range. A boolean, a float (also `1.0`) and a string are not integers on the wire."""
+    return type(value) is int and minimum <= value <= maximum
+
 
 # Labels a list call may filter on (instance contract labels). Anything else is ORCH-LABEL-UNKNOWN.
 LIST_LABELS = frozenset({"instance", "epoch", "component", "template", "kind"})
@@ -115,8 +128,6 @@ class CreateRequest:
     # Opaque vm.owner label value: 64 lowercase hex characters (never an email). Stored by the orchestrator,
     # applied as the label, never returned. A reset keeps it.
     owner_hash: str = dc_field(repr=False)
-    # First event sequence number of the new sidecar: highest stored seq of the instance plus one, 1 at first create.
-    first_seq: int
 
     def to_json(self) -> dict:
         return {
@@ -124,7 +135,6 @@ class CreateRequest:
             "template_id": self.template_id,
             "epoch": self.epoch,
             "owner_hash": self.owner_hash,
-            "first_seq": self.first_seq,
             **self.material.to_json(),
             "hostname": self.hostname,
             "limits": {
@@ -146,10 +156,9 @@ class ResetRequest:
 
     epoch: int
     material: FlagMaterial = dc_field(repr=False)
-    first_seq: int
 
     def to_json(self) -> dict:
-        return {"epoch": self.epoch, "first_seq": self.first_seq, **self.material.to_json()}
+        return {"epoch": self.epoch, **self.material.to_json()}
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +180,8 @@ class InstanceStatus:
 
     @classmethod
     def from_json(cls, d: dict) -> InstanceStatus:
+        if not (is_wire_int(d["epoch"], 1) and is_wire_int(d["access_epoch"], 0)):
+            raise TypeError("epoch and access_epoch are integers")
         return cls(
             instance_id=d["instance_id"], template_id=d["template_id"], epoch=d["epoch"],
             state=InstanceState(d["state"]), access=Access(d["access"]), access_epoch=d["access_epoch"],
@@ -201,6 +212,102 @@ class HostStatus:
     used_memory_mb: int
     instances: int
     health: HostHealth
+
+
+@dataclass(frozen=True, slots=True)
+class StateReport:
+    """One signed state transition report (orchestrator to platform API, section 8 of the contract).
+
+    `transition` is assigned by the orchestrator: 1, 2, 3 ... per `(instance_id, epoch)`. The identity of a report is
+    `(instance_id, epoch, transition)`; `at` has whole-second resolution and is not an identity.
+    """
+
+    instance_id: str
+    epoch: int
+    transition: int
+    from_state: InstanceState | None
+    to_state: InstanceState
+    at: str
+    reason: str
+    error_code: str | None
+    health: Health
+
+    def to_json(self) -> dict:
+        return {
+            "instance_id": self.instance_id, "epoch": self.epoch, "transition": self.transition,
+            "from_state": self.from_state.value if self.from_state else None, "to_state": self.to_state.value,
+            "at": self.at, "reason": self.reason, "error_code": self.error_code, "health": self.health.value,
+        }
+
+    @classmethod
+    def from_json(cls, d: object) -> StateReport:
+        """Strict: a missing member, an unknown member or a number that is not an integer is ValidationFailed."""
+        keys = {"instance_id", "epoch", "transition", "from_state", "to_state", "at", "reason", "error_code", "health"}
+        if not isinstance(d, dict):
+            raise ValidationFailed("the report must be a JSON object", field="")
+        for k in sorted(d.keys() - keys):
+            raise ValidationFailed(f"unknown field {k[:64]}", field="/" + k[:64])
+        for k in sorted(keys - d.keys()):
+            raise ValidationFailed(f"{k} is required", field="/" + k)
+        if not is_wire_int(d["epoch"], 1):
+            raise ValidationFailed("epoch is an integer of at least 1", field="/epoch")
+        if not is_wire_int(d["transition"], 1):
+            raise ValidationFailed("transition is an integer of at least 1", field="/transition")
+        for k in ("instance_id", "at", "reason"):
+            if not isinstance(d[k], str):
+                raise ValidationFailed(f"{k} is a string", field="/" + k)
+        if not (isinstance(d["error_code"], str) or d["error_code"] is None):
+            raise ValidationFailed("error_code is a string or null", field="/error_code")
+        try:
+            frm = None if d["from_state"] is None else InstanceState(d["from_state"])
+        except ValueError as exc:
+            raise ValidationFailed("from_state is not a state", field="/from_state") from exc
+        try:
+            to, health = InstanceState(d["to_state"]), Health(d["health"])
+        except ValueError as exc:
+            raise ValidationFailed("to_state or health is not a known value", field="/to_state") from exc
+        return cls(d["instance_id"], d["epoch"], d["transition"], frm, to, d["at"], d["reason"], d["error_code"], health)
+
+
+class ReportIngest:
+    """The platform side of state reports: what to do with a report that arrives (contract section 8, ADR 0028).
+
+    Identity is `(instance_id, epoch, transition)`. The same body again is a duplicate (answer 200); another body for
+    the same identity is `RequestMismatch` (answer 409). A report whose `(epoch, transition)` is below the highest one
+    seen for the instance is kept as history and never moves the current state backwards. A real re-entrant transition
+    (the same state twice) has a new transition number, so it is not a duplicate. The platform still checks each report
+    against the state machine; that part is not modelled here.
+    """
+
+    def __init__(self) -> None:
+        self._by_key: dict[tuple[str, int, int], StateReport] = {}
+        self._current: dict[str, StateReport] = {}
+        self._lock = threading.Lock()
+
+    def accept(self, report: StateReport) -> bool:
+        """True when the report is new (answer 204), False for an identical repeat (answer 200)."""
+        key = (report.instance_id, report.epoch, report.transition)
+        with self._lock:
+            known = self._by_key.get(key)
+            if known is not None:
+                if known != report:
+                    raise RequestMismatch("same instance, epoch and transition with a different body")
+                return False
+            self._by_key[key] = report
+            top = self._current.get(report.instance_id)
+            if top is None or (report.epoch, report.transition) > (top.epoch, top.transition):
+                self._current[report.instance_id] = report
+            return True
+
+    def current(self, instance_id: str) -> StateReport | None:
+        """The report with the highest `(epoch, transition)` seen for the instance."""
+        with self._lock:
+            return self._current.get(instance_id)
+
+    def history(self, instance_id: str) -> list[StateReport]:
+        """Every stored report of the instance, in `(epoch, transition)` order."""
+        with self._lock:
+            return sorted((r for k, r in self._by_key.items() if k[0] == instance_id), key=lambda r: (r.epoch, r.transition))
 
 
 # ---- errors: one class per code of the contract (placeholders until IF-8) ----
@@ -255,6 +362,10 @@ class BodyTooLarge(OrchestratorError):
     code, http_status = "ORCH-BODY-TOO-LARGE", 413
 
 
+class UnsupportedMediaType(OrchestratorError):
+    code, http_status = "ORCH-UNSUPPORTED-MEDIA-TYPE", 415
+
+
 class FieldForbidden(OrchestratorError):
     code, http_status = "ORCH-FIELD-FORBIDDEN", 422
 
@@ -269,6 +380,12 @@ class LabelUnknown(OrchestratorError):
 
 class ValidationFailed(OrchestratorError):
     code, http_status = "ORCH-VALIDATION", 422
+
+
+class CursorInvalid(OrchestratorError):
+    """A list cursor that is not one this orchestrator handed out (garbage, wrong length, not an instance id)."""
+
+    code, http_status = "ORCH-CURSOR-INVALID", 422
 
 
 class Busy(OrchestratorError):
@@ -293,8 +410,8 @@ ERRORS_BY_CODE: dict[str, type[OrchestratorError]] = {
     cls.code: cls
     for cls in (
         BadSignature, InstanceNotFound, RequestMismatch, InstanceExists, InvalidState, StaleEpoch,
-        StaleAccessEpoch, BodyTooLarge, FieldForbidden, TemplateUnknown, LabelUnknown, ValidationFailed,
-        Busy, RateLimited, MethodNotAllowed, OrchestratorUnavailable,
+        StaleAccessEpoch, BodyTooLarge, UnsupportedMediaType, FieldForbidden, TemplateUnknown, LabelUnknown,
+        ValidationFailed, CursorInvalid, Busy, RateLimited, MethodNotAllowed, OrchestratorUnavailable,
     )
 }
 
@@ -343,7 +460,8 @@ class InstanceHost(Protocol):
     def list_instances(
         self, labels: dict[str, str] | None = None, *, cursor: str | None = None, limit: int = 100
     ) -> InstancePage:
-        """List by label (`LIST_LABELS`), ordered by instance id. Raises LabelUnknown for any other label."""
+        """List by label (`LIST_LABELS`), ordered by instance id. Raises LabelUnknown for any other label and
+        CursorInvalid for a cursor this orchestrator did not hand out."""
         ...
 
     def host_status(self) -> HostStatus:

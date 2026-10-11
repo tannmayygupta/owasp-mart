@@ -1,6 +1,7 @@
 // Black-box end-to-end tests for the instance event contract (IF-4): a real fake-ingest server in a separate process,
-// signed requests built the way app-events.md section 4 says (the helper in the repository is NOT used), and the derived
-// posted-body schema checked with Ajv. Run: node --test "scripts/e2e/events.e2e.test.mjs". Node built-ins and the repo's Ajv only.
+// signed requests built the way app-events.md section 4 says (the signing helper and the key derivation of the repository are NOT
+// used: HKDF-SHA256 is written out here by hand from RFC 5869, so the derivation is not only checked against itself), epoch rules
+// over HTTP, and the derived posted-body schema checked with Ajv. Run: node --test "scripts/e2e/events.e2e.test.mjs". Node built-ins and the repo's Ajv only.
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -17,17 +18,25 @@ import addFormats from 'ajv-formats';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const EVENTS = path.join(ROOT, 'contracts', 'events');
 const SERVER = path.join(ROOT, 'contracts', 'mocks', 'fake-ingest', 'server.mjs');
-const KEY = 'E2E-OWN-FAKE-KEY-NOT-REAL-00000000'; // a throwaway key for this test only
+const MASTER = crypto.randomBytes(32); // a throwaway master K_evt for this test only, new at every run
 const INSTANCE = 'i-AAAAAAAAAAAAAAAA'; // the server's default instance
 // A nested node process must not inherit the parent test runner's context.
 const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== 'NODE_TEST_CONTEXT'));
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const temps = [];
 
+// RFC 5869 HKDF-SHA256, extract and expand written out by hand (L = 32 is one block, so T(1) is the whole output). Independent of
+// contracts/mocks/fake-ingest/event-key.mjs, which uses node:crypto hkdfSync.
+const hmac = (key, data) => crypto.createHmac('sha256', key).update(data).digest();
+const eventKey = (master, instance, epoch) => {
+  const prk = hmac(Buffer.from('vm-evt-salt-v1', 'utf8'), master);
+  const info = Buffer.concat([Buffer.from('vm-event-key-v1', 'utf8'), Buffer.from([0]), Buffer.from(instance, 'utf8'), Buffer.from([0]), Buffer.from(String(epoch), 'utf8')]);
+  return hmac(prk, Buffer.concat([info, Buffer.from([1])])).toString('base64url');
+};
 // The signing rule of app-events.md section 4, written independently of contracts/mocks/fake-ingest/sign.mjs.
-const sign = (body, instance, seq) => {
+const sign = (body, instance, epoch, seq) => {
   const digest = crypto.createHash('sha256').update(body).digest('hex');
-  return 'v1=' + crypto.createHmac('sha256', KEY).update(`${instance}\n${seq}\n${digest}`).digest('hex');
+  return 'v1=' + crypto.createHmac('sha256', eventKey(MASTER, instance, epoch)).update(`${instance}\n${epoch}\n${seq}\n${digest}`).digest('hex');
 };
 
 let child;
@@ -37,34 +46,43 @@ const events = readdirSync(path.join(EVENTS, 'examples', 'valid', 'instance-even
   .sort((a, b) => a.seq - b.seq);
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
-before(async () => {
-  child = spawn(process.execPath, [SERVER, '--key', KEY, '--port', '0'], { cwd: ROOT, env: cleanEnv, stdio: ['ignore', 'pipe', 'pipe'] });
-  base = await new Promise((resolve, reject) => {
+const children = [];
+async function startIngest(extra = []) {
+  const c = spawn(process.execPath, [SERVER, '--master', MASTER.toString('hex'), '--port', '0', ...extra], { cwd: ROOT, env: cleanEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  children.push(c);
+  const url = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('the fake ingest did not start')), 15000);
     let out = '';
-    child.stdout.on('data', (c) => {
-      out += c;
+    c.stdout.on('data', (d) => {
+      out += d;
       const m = out.match(/listening on (http:\/\/[\d.]+:\d+)/);
       if (m) { clearTimeout(timer); resolve(m[1]); }
     });
-    child.once('exit', (code) => reject(new Error(`the fake ingest exited early with code ${code}`)));
+    c.once('exit', (code) => reject(new Error(`the fake ingest exited early with code ${code}`)));
   });
+  return { child: c, base: url };
+}
+
+before(async () => {
+  ({ child, base } = await startIngest());
 });
 
 after(async () => {
-  if (child && child.exitCode === null) {
-    const done = new Promise((r) => child.once('exit', r));
-    child.kill();
-    await done;
+  for (const c of children) {
+    if (c.exitCode === null) {
+      const done = new Promise((r) => c.once('exit', r));
+      c.kill();
+      await done;
+    }
   }
   for (const d of temps) rmSync(d, { recursive: true, force: true });
 });
 
 // POST one event the way a sidecar would. Returns { status, text, json }.
-async function post(body, { instance = INSTANCE, seq, signature } = {}) {
-  const res = await fetch(`${base}/internal/v1/events`, {
+async function post(body, { instance = INSTANCE, epoch = 1, seq, signature, to = base } = {}) {
+  const res = await fetch(`${to}/internal/v1/events`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-vm-signature': signature ?? sign(body, instance, seq) },
+    headers: { 'content-type': 'application/json', 'x-vm-signature': signature ?? sign(body, instance, epoch, seq) },
     body,
   });
   const text = await res.text();
@@ -74,9 +92,9 @@ async function post(body, { instance = INSTANCE, seq, signature } = {}) {
 }
 const postEvent = (ev, opts = {}) => {
   const body = JSON.stringify(ev);
-  return post(body, { instance: ev.instance_id, seq: ev.seq, ...opts });
+  return post(body, { instance: ev.instance_id, epoch: ev.epoch, seq: ev.seq, ...opts });
 };
-const stored = async () => (await (await fetch(`${base}/_fake/events`)).json());
+const stored = async (to = base) => (await (await fetch(`${to}/_fake/events`)).json());
 
 test('every valid example type is accepted (202) and an identical repeat is a duplicate (200)', async () => {
   assert.equal(events.length, 29, 'one valid example per event type');
@@ -91,7 +109,7 @@ test('every valid example type is accepted (202) and an identical repeat is a du
   assert.deepEqual(new Set(list.map((e) => e.type)), new Set(events.map((e) => e.type)));
 });
 
-test('the same (instance_id, seq) with a different body is refused with 409 and nothing new is stored', async () => {
+test('the same (instance_id, epoch, seq) with a different body is refused with 409 and nothing new is stored', async () => {
   const before = (await stored()).length;
   const other = clone(events[0]);
   other.ts = '2026-01-01T00:59:59Z';
@@ -104,7 +122,7 @@ test('a bad signature and a wrong instance are refused with 401 and the answer n
   const ev = clone(events[0]);
   ev.seq = 500;
   const body = JSON.stringify(ev);
-  const good = sign(body, INSTANCE, 500);
+  const good = sign(body, INSTANCE, 1, 500);
   const bad = good.slice(0, -1) + (good.endsWith('0') ? '1' : '0');
   const r1 = await post(body, { signature: bad });
   assert.equal(r1.status, 401, r1.text);
@@ -210,4 +228,55 @@ test('--write-posted leaves the committed posted schema unchanged', () => {
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.ok(Buffer.compare(before, lf(readFileSync(path.join(copy, file)))) === 0, 'regenerating the derived schema must not change it');
   assert.ok(Buffer.compare(lf(readFileSync(path.join(EVENTS, file))), lf(readFileSync(path.join(copy, file)))) === 0, 'and it equals the committed file');
+});
+
+// ---- D-42: epoch, seq lanes, event keys ----
+test('event key vector: the committed vector is reproduced by an independent HKDF, and each epoch has its own key', () => {
+  const v = readJson(path.join(EVENTS, 'examples', 'event-key-vector.json'));
+  const master = Buffer.from(v.master_hex, 'hex');
+  assert.equal(master.length, 32);
+  for (const c of v.cases) {
+    assert.equal(eventKey(master, c.instance_id, c.epoch), c.key, `${c.instance_id} epoch ${c.epoch}`);
+    assert.match(c.key, /^[A-Za-z0-9_-]{43}$/);
+  }
+  assert.notEqual(eventKey(master, 'i-AAAAAAAAAAAAAAAA', 1), eventKey(master, 'i-AAAAAAAAAAAAAAAA', 2));
+  assert.notEqual(eventKey(master, 'i-AAAAAAAAAAAAAAAA', 1), eventKey(master, 'i-BBBBBBBBBBBBBBBB', 1));
+  // epoch 1 and epoch 11 must not collide through the separators
+  assert.notEqual(eventKey(master, 'i-AAAAAAAAAAAAAAAA', 1), eventKey(master, 'i-AAAAAAAAAAAAAAAA', 11));
+});
+
+test('epochs over HTTP: a later epoch is 401, an earlier epoch is history, identity includes the epoch, keys differ per epoch', async () => {
+  const s = await startIngest(['--epoch', '2']);
+  const ev = (epoch, seq, patch = {}) => ({ ...clone(events.find((e) => e.type === 'proxy.request')), epoch, seq, ...patch });
+  const ok2 = await postEvent(ev(2, 1), { to: s.base });
+  assert.equal(ok2.status, 202, ok2.text);
+  assert.equal((await postEvent(ev(2, 1), { to: s.base })).status, 200, 'identical repeat');
+  assert.equal((await postEvent(ev(2, 1, { ts: '2026-05-05T05:05:05Z' }), { to: s.base })).status, 409, 'other body, same identity');
+  const old = await postEvent(ev(1, 1), { to: s.base });
+  assert.equal(old.status, 202, 'the same seq in the older epoch is another event: ' + old.text);
+  assert.equal((await postEvent(ev(1, 9), { to: s.base })).status, 202, 'a late event of the old epoch');
+  const future = await postEvent(ev(3, 1), { to: s.base });
+  assert.equal(future.status, 401, future.text);
+  assert.ok(!future.text.includes('epoch'), 'the answer does not say why');
+  const wrongKey = JSON.stringify(ev(2, 2));
+  assert.equal((await post(wrongKey, { epoch: 2, seq: 2, signature: sign(wrongKey, INSTANCE, 1, 2), to: s.base })).status, 401, 'signed with the key of epoch 1 but stamped epoch 2');
+  assert.deepEqual((await stored(s.base)).map((e) => [e.epoch, e.seq]), [[1, 1], [1, 9], [2, 1]], 'ordered by (epoch, seq); nothing of epoch 3');
+  const set = await fetch(`${s.base}/_fake/epoch`, { method: 'POST', body: JSON.stringify({ instance_id: INSTANCE, epoch: 3 }) });
+  assert.equal(set.status, 200);
+  assert.equal((await postEvent(ev(3, 1), { to: s.base })).status, 202, 'after the platform starts epoch 3');
+  const none = JSON.stringify((({ epoch, ...rest }) => rest)(ev(3, 2)));
+  const r = await post(none, { epoch: 3, seq: 2, to: s.base });
+  assert.equal(r.status, 422, r.text);
+  assert.match(r.text, /\/epoch/);
+});
+
+test('seq lanes over HTTP: the orchestrator lane and the sidecar lane do not mix', async () => {
+  const s = await startIngest();
+  const px = clone(events.find((e) => e.type === 'proxy.request'));
+  const inj = clone(events.find((e) => e.type === 'instance.flags_injected'));
+  assert.ok(inj.seq >= 2 ** 40 && inj.seq < 2 ** 41, 'the valid orchestrator example is in its lane');
+  assert.equal((await postEvent({ ...inj, seq: 1 }, { to: s.base })).status, 422, 'orchestrator event with seq 1');
+  assert.equal((await postEvent({ ...px, seq: 2 ** 40 }, { to: s.base })).status, 422, 'sidecar event with a reserved seq');
+  assert.equal((await postEvent({ ...px, seq: 2 ** 40 - 1 }, { to: s.base })).status, 202, 'the last sidecar seq');
+  assert.equal((await postEvent(inj, { to: s.base })).status, 202);
 });

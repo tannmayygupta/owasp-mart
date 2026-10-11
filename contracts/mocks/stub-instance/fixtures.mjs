@@ -12,7 +12,6 @@ export function freshValues({ keys = CHALLENGE_KEYS } = {}) {
   return {
     instance_id: 'i-' + rand(B32, 16),
     epoch: 1,
-    first_seq: 100 + crypto.randomInt(900), // not 1, so a test sees that first_seq is honoured
     seed: rand('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-', 48),
     event_key: 'FAKE-TEST-KEY-' + rand('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 40),
     flags: keys.map((challenge_key) => ({ challenge_key, flag: fakeFlag() })),
@@ -25,7 +24,6 @@ export const sidecarStartDocument = (v) => ({
   schema_version: '0.1',
   instance_id: v.instance_id,
   epoch: v.epoch,
-  first_seq: v.first_seq,
   event_key: v.event_key,
   flag_digests: v.flags.map((f) => ({ challenge_key: f.challenge_key, kind: 'real', sha256: sha256(f.flag) })),
 });

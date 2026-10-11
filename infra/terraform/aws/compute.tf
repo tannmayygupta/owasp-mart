@@ -12,18 +12,36 @@ locals {
     docker_daemon     = base64encode(file("${local.hosts_dir}/docker-daemon.json"))
     keepalive_py      = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.py"))
     keepalive_unit    = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.service"))
-    private_cidr      = local.rules.subnet_cidr
-    ntp_server        = "169.254.169.123" # Amazon Time Sync Service (link-local)
+    egress_sh         = base64encode(file("${local.hosts_dir}/vulnmart-egress.sh"))
+    egress_unit       = base64encode(file("${local.hosts_dir}/vulnmart-egress.service"))
+    egress_env        = jsonencode(local.egress_env) # a JSON string is a valid YAML double-quoted scalar
+    private_cidr      = local.rules.vcn_cidr         # host INPUT rules for the private ports accept the VPC range; the security groups and ACLs name the exact subnet and host
+    ntp_server        = "169.254.169.123"            # Amazon Time Sync Service (link-local)
     ssh_keys_json     = jsonencode(var.ssh_public_keys)
     keepalive_enabled = var.keepalive_enabled ? "yes" : "no"
   })
 
+  # Read by vulnmart-egress.service. The script acts only on the host whose private address lies in LABS_HOST_SUBNET (the labs host).
+  egress_env = join("\n", [
+    "VPC_CIDR=${local.rules.vcn_cidr}",
+    "VPC_RESOLVER=${trimsuffix(local.resolver_cidr, "/32")}",
+    "PLATFORM_SUBNET=${local.rules.subnet_p_cidr}",
+    "LABS_HOST_SUBNET=${local.rules.subnet_i_cidr}",
+    "LABS_DOCKER_SUBNETS=\"${join(" ", local.rules.labs_docker_subnets)}\"",
+    "INGEST_PORT=${one([for r in local.private_list : r.port if r.from == "vm-i"])}",
+    "",
+  ])
+
   user_data = local.user_data_raw
+
+  # EC2 accepts up to 16384 bytes of user data; the cloud-init text grew past that with the egress files, so the instance gets it gzip-compressed
+  # (cloud-init unpacks gzip by itself). `user_data` stays the plain text for the tests and for reading.
+  user_data_gz = base64gzip(local.user_data_raw)
 
   key_pair_public_key = sort(var.ssh_public_keys)[0]
 
-  # Size in BYTES (not characters): base64 length times 3/4 minus the padding. The EC2 limit is 16384 (unverified).
-  user_data_b64   = textencodebase64(local.user_data_raw, "UTF-8")
+  # Size in BYTES of what is sent (the gzip data): base64 length times 3/4 minus the padding. The EC2 limit is 16384 (unverified).
+  user_data_b64   = local.user_data_gz
   user_data_bytes = length(local.user_data_b64) / 4 * 3 - (endswith(local.user_data_b64, "==") ? 2 : (endswith(local.user_data_b64, "=") ? 1 : 0))
 }
 
@@ -52,11 +70,11 @@ resource "aws_instance" "vm" {
 
   ami                         = data.aws_ssm_parameter.ubuntu[local.arch[each.key]].insecure_value
   instance_type               = var.instance_types[each.key]
-  subnet_id                   = aws_subnet.main.id
+  subnet_id                   = each.key == "vm-i" ? aws_subnet.i.id : aws_subnet.p.id
   vpc_security_group_ids      = [aws_security_group.vm[each.key].id]
   associate_public_ip_address = true # replaced by the Elastic IP below
   key_name                    = aws_key_pair.main.key_name
-  user_data                   = local.user_data
+  user_data_base64            = local.user_data_gz
 
   # IMDSv2 only and one hop: a container (one extra hop) cannot read instance metadata. No instance profile is attached.
   metadata_options {
@@ -81,7 +99,7 @@ resource "aws_instance" "vm" {
   lifecycle {
     # A running host is never replaced for a newer image or a changed startup file
     # (runbook, "Change a host file or add a developer key").
-    ignore_changes = [ami, user_data, key_name]
+    ignore_changes = [ami, user_data, user_data_base64, key_name]
 
     # AWS limits user data to 16 KB before encoding (unverified: read the EC2 user data page in the runbook check).
     precondition {

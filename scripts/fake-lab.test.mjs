@@ -46,6 +46,25 @@ test('a challenge with two open held flags stays held until both are decided', a
   });
 });
 
+test('the reason of an incorrect flag stays on the server; the owner of a learner attempt is not shown the integrity flag it raises', async () => {
+  await withLab(async ({ lab, call }) => {
+    const A = 'a-AAAAAAAAAAAAAAAA';
+    const fake = (c) => 'VM{' + c.repeat(24) + '}';
+    for (const c of ['B', 'C', 'D', 'Z']) {
+      const r = await call('POST', `/api/v1/attempts/${A}/flags`, 'ADA', { challenge_key: 'C04', flag: c === 'Z' ? 'nothing' : fake(c) });
+      assert.deepEqual(r.json, { challenge_key: 'C04', result: 'incorrect', credit: 'none' });
+    }
+    assert.deepEqual(lab.reasonLog.map((e) => e.reason), ['decoy', 'other_instance', 'stale_epoch', 'wrong']);
+    assert.deepEqual(lab.attempts.get(A).integrity.map((f) => f.type), ['decoy', 'sharing']); // kept for a human
+    const own = await call('GET', `/api/v1/attempts/${A}/integrity-flags`, 'ADA');
+    assert.deepEqual(own.json, { items: [], has_more: false });
+    const id = lab.attempts.get(A).integrity[0].id;
+    assert.equal((await call('POST', `/api/v1/attempts/${A}/integrity-flags/${id}/decision`, 'ADA', { decision: 'accept', note: 'x' })).status, 404);
+    assert.equal(lab.attempts.get(A).integrity[0].status, 'open');
+    assert.ok(!JSON.stringify(lab.reasonLog).includes('VM{'), 'no flag text in the log');
+  });
+});
+
 test('listen rejects when the port is in use', async () => {
   const taken = net.createServer();
   await new Promise((r) => taken.listen(0, '127.0.0.1', r));

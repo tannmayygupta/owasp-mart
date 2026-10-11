@@ -16,14 +16,17 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
-from vulnmart.ports.http_instance_host import HttpInstanceHost, signed_headers
+from vulnmart.ports.http_instance_host import (
+    HttpInstanceHost, NonceCache, parse_state_report, signed_headers, verify_request,
+)
 from vulnmart.ports.instance_host import (
-    CreateRequest, DecoyEntry, DigestEntry, FlagEntry, FlagMaterial, InstanceHost, InstanceState, InstanceStatus,
-    Limits, ResetRequest,
+    BadSignature, CreateRequest, DecoyEntry, DigestEntry, FlagEntry, FlagMaterial, InstanceHost, InstanceState,
+    InstanceStatus, Limits, ReportIngest, RequestMismatch, ResetRequest, StateReport, ValidationFailed,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -64,18 +67,18 @@ def owner_hash(tag: str = "A") -> str:
 
 
 def create_request(instance_id: str | None = None, *, epoch: int = 1, template: str = "shop-v0", memory_mb: int = 256,
-                   tag: str = "A", owner_tag: str = "O", first_seq: int = 1) -> CreateRequest:
+                   tag: str = "A", owner_tag: str = "O") -> CreateRequest:
     iid = instance_id or new_id()
     return CreateRequest(
         instance_id=iid, template_id=template, epoch=epoch, material=material(tag),
-        owner_hash=owner_hash(owner_tag), first_seq=first_seq,
+        owner_hash=owner_hash(owner_tag),
         hostname=f"{iid.lower()}.instances.example.invalid",
         limits=Limits(memory_mb=memory_mb, cpu_limit=1.5, pids_limit=512, idle_minutes=30, max_minutes=120),
     )
 
 
-def reset_request(epoch: int = 2, tag: str = "D", first_seq: int = 41) -> ResetRequest:
-    return ResetRequest(epoch=epoch, material=material(tag), first_seq=first_seq)
+def reset_request(epoch: int = 2, tag: str = "D") -> ResetRequest:
+    return ResetRequest(epoch=epoch, material=material(tag))
 
 
 def openssl_path() -> str | None:
@@ -276,6 +279,59 @@ def raw_call(url: str, method: str, target: str, body: bytes | None = None, *, k
         return err.code, data, hdr
 
 
+class ReportReceiver:
+    """A stand-in for the platform API: checks the signature of every state report (orchestrator key), parses it strictly,
+    feeds it to a `ReportIngest` and answers 204 (new), 200 (identical repeat), 409 (same identity, other body) or 422.
+    `reports` holds the parsed new reports in arrival order (a repeat is not added again), `bodies` the raw bytes."""
+
+    def __init__(self) -> None:
+        self.reports: list[StateReport] = []
+        self.bodies: list[bytes] = []
+        self.refused = 0
+        self.ingest = ReportIngest()
+        nonces = NonceCache()
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def _answer(self, status: int, body: bytes = b"", ctype: str = "application/problem+json") -> None:
+                self.send_response(status)
+                if body:
+                    self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self):  # noqa: N802
+                body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                try:
+                    verify_request(ORCH_KEY, "POST", self.path, dict(self.headers), body, nonces=nonces)
+                except BadSignature:
+                    outer.refused += 1
+                    return self._answer(401)
+                try:
+                    report = parse_state_report(body)
+                    new = outer.ingest.accept(report)
+                except RequestMismatch:
+                    return self._answer(409, b"{}")
+                except ValidationFailed:
+                    return self._answer(422, b"{}")
+                if new:  # an identical repeat is answered 200 and kept once
+                    outer.bodies.append(body)
+                    outer.reports.append(report)
+                self._answer(204 if new else 200)
+
+            def log_message(self, *a):
+                pass
+
+        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def stop(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
 @dataclass
 class Harness:
     kind: str
@@ -284,13 +340,18 @@ class Harness:
     set_activity: Callable[[str, InstanceState], None]
     held: bool
     service: ServiceProcess | None = None
+    # the state reports the orchestrator side produced so far (the fake: its own list; HTTP: what the platform stand-in received)
+    reports: Callable[[], list[StateReport]] = field(default=lambda: [])
+    receiver: ReportReceiver | None = None
 
 
-def make_harness(kind: str, *, capacity_mb: int = 8192, hold: bool = False) -> Harness:
+def make_harness(kind: str, *, capacity_mb: int = 8192, hold: bool = False, now: Callable | None = None) -> Harness:
     if kind == "fake":
-        fake = FakeInstanceHost(capacity_memory_mb=capacity_mb, auto_advance=not hold)
-        return Harness("fake", fake, lambda i, s: _poll(fake, i, s), fake.set_activity, hold)
-    svc = ServiceProcess(capacity_mb=capacity_mb, step_delay_ms=600_000 if hold else 0)
+        kw = {"now": now} if now is not None else {}
+        fake = FakeInstanceHost(capacity_memory_mb=capacity_mb, auto_advance=not hold, **kw)
+        return Harness("fake", fake, lambda i, s: _poll(fake, i, s), fake.set_activity, hold, reports=lambda: list(fake.reports))
+    rx = ReportReceiver()
+    svc = ServiceProcess(capacity_mb=capacity_mb, step_delay_ms=600_000 if hold else 0, report_url=rx.url)
     host = HttpInstanceHost(svc.url, PLATFORM_KEY)
 
     def activity(instance_id: str, state: InstanceState) -> None:
@@ -298,7 +359,7 @@ def make_harness(kind: str, *, capacity_mb: int = 8192, hold: bool = False) -> H
                                    json.dumps({"state": state.value}).encode(), sign=False)
         assert status == 200, data
 
-    return Harness("http", host, lambda i, s: _poll(host, i, s), activity, hold, svc)
+    return Harness("http", host, lambda i, s: _poll(host, i, s), activity, hold, svc, reports=lambda: list(rx.reports), receiver=rx)
 
 
 def _poll(host: InstanceHost, instance_id: str, state: InstanceState, timeout: float = 10.0) -> InstanceStatus:

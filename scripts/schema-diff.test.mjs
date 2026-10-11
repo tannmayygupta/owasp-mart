@@ -135,3 +135,10 @@ test('a changed, added or removed if is flagged breaking conservatively and says
   }
   assert.equal(diffSchemas({ then: { required: ['x'] } }, { if: { const: 1 }, then: { required: ['x'] } })[0].path, '#/if');
 });
+test('D-46 e: a middle oneOf/anyOf branch removed is breaking even when the position-by-position walk finds nothing narrower', () => {
+  const base = { anyOf: [{ type: 'string', minLength: 3 }, { type: 'string' }, { type: 'integer' }] };
+  const head = { anyOf: [{ type: 'string' }, { type: 'integer' }] };
+  const found = diffSchemas(base, head);
+  assert.ok(found.length > 0 && found.some((d) => /branch removed/.test(d.change)), JSON.stringify(found));
+  assert.deepEqual(diffSchemas(base, { anyOf: [...base.anyOf, { type: 'boolean' }] }), [], 'adding a branch loosens');
+});

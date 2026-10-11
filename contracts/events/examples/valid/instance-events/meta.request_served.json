@@ -1,6 +1,7 @@
 {
   "schema_version": "0.1",
   "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
   "seq": 25,
   "type": "meta.request_served",
   "source": "mock",

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://vulnmart.invalid/contracts/events/instance-events.posted.schema.json",
   "title": "Event body posted to the sidecar (IF-4, contract 0.1, derived)",
-  "description": "DERIVED from instance-events.schema.json by \"node scripts/validate-events.mjs --write-posted\"; do not edit by hand. The body a shop, import service, mock service or bot posts to POST /v1/events on the sidecar: the wire event without instance_id and seq (the sidecar adds them), source limited to shop, import, mock or bot, at most 4 KiB. A posted evidence.capture body is at most 2 KiB. One event as the ingest receives it: sidecar to edge relay to ingest, one event per request. The event identity is (instance_id, seq). The signature travels in the X-VM-Signature header, not in the body (see app-events.md). Each event type has its own data rule in $defs and its allowed source; data holds ids, classes, counts and hashes only (evidence.capture is the one exception) and never a flag-shaped value. The flag-shaped check is best effort and not a guarantee: the text definitions reject any string holding \"VM{\" in any letter case, \"VM%7B\" or a full-width brace, and the real flag format belongs to FR-FLG-02. The sidecar replaces flag-like strings in evidence.capture with the marker [FLAG-REDACTED] before sending. Rules that depend on two fields: source bot needs session_kind bot; session_kind internal is only for the sources import, orchestrator and platform; proxy.flag_seen needs data.challenge_key for kind real and decoy and forbids it for foreign. The envelope challenge_key and data.challenge_key of proxy.flag_seen must not differ; JSON Schema cannot compare two values, so scripts/validate-events.mjs and the fake ingest check that.",
+  "description": "DERIVED from instance-events.schema.json by \"node scripts/validate-events.mjs --write-posted\"; do not edit by hand. The body a shop, import service, mock service or bot posts to POST /v1/events on the sidecar: the wire event without instance_id, epoch and seq (the sidecar adds them), source limited to shop, import, mock or bot, at most 4 KiB. A posted evidence.capture body is at most 2 KiB. One event as the ingest receives it: sidecar to edge relay to ingest, one event per request. The event identity is (instance_id, epoch, seq): epoch is the flag epoch of IF-5 (at least 1), stamped by the sidecar from its start input, and every epoch restarts the sidecar counter at 1. Each source has its own seq lane (all below 2^53): sidecar, shop, import, mock and bot 1 to 2^40-1, orchestrator 2^40 to 2^41-1, platform 2^41 to 2^42-1; the lane rule is in this schema (allOf, on source). The signature travels in the X-VM-Signature header, not in the body (see app-events.md; the signing string covers instance_id, epoch and seq). Each event type has its own data rule in $defs and its allowed source; data holds ids, classes, counts and hashes only (evidence.capture is the one exception) and never a flag-shaped value. The flag-shaped check is best effort and not a guarantee: the text definitions reject any string holding \"VM{\" in any letter case, \"VM%7B\" or a full-width brace, and the real flag format belongs to FR-FLG-02. The sidecar replaces flag-like strings in evidence.capture with the marker [FLAG-REDACTED] before sending. Rules that depend on two fields: source bot needs session_kind bot; session_kind internal is only for the sources import, orchestrator and platform; proxy.flag_seen needs data.challenge_key for kind real and decoy and forbids it for foreign. The envelope challenge_key and data.challenge_key of proxy.flag_seen must not differ; JSON Schema cannot compare two values, so scripts/validate-events.mjs and the fake ingest check that.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -758,55 +758,6 @@
           },
           "session_kind": {
             "const": "internal"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "const": "bot"
-          }
-        },
-        "required": [
-          "source"
-        ]
-      },
-      "then": {
-        "properties": {
-          "session_kind": {
-            "const": "bot"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "enum": [
-              "sidecar",
-              "shop",
-              "mock",
-              "bot"
-            ]
-          }
-        },
-        "required": [
-          "source"
-        ]
-      },
-      "then": {
-        "properties": {
-          "session_kind": {
-            "enum": [
-              "player",
-              "bot",
-              "anon"
-            ]
           }
         }
       }

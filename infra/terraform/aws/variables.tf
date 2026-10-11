@@ -174,3 +174,9 @@ variable "vm_i_running" {
   type        = bool
   default     = true
 }
+
+variable "apt_http_egress" {
+  description = "Allow outbound tcp 80 on both hosts. Needed while apt uses the Ubuntu mirrors over http (the Ubuntu 24.04 image default). Set false once apt is switched to https and a test host proved it (ADR 0027); the labs host's containers never get port 80 either way (host rules)."
+  type        = bool
+  default     = true
+}

@@ -74,7 +74,7 @@ test('ingest wrapper: takes the key and instance from standard input only; a bad
   const lines = [];
   const s = await runIngest({ stdin: Readable.from([JSON.stringify(sidecarStartDocument(v))]), port: 0, host: '127.0.0.1', log: (m) => lines.push(m) });
   try {
-    const ev = { schema_version: '0.1', instance_id: v.instance_id, seq: 7, type: 'shop.catalog_query_error', source: 'shop', session_kind: 'player', user_id: null, ts: '2026-01-01T00:00:00Z', data: { route: '/a', error_class: 'x' } };
+    const ev = { schema_version: '0.1', instance_id: v.instance_id, epoch: v.epoch, seq: 7, type: 'shop.catalog_query_error', source: 'shop', session_kind: 'player', user_id: null, ts: '2026-01-01T00:00:00Z', data: { route: '/a', error_class: 'x' } };
     const signed = signEvent(v.event_key, ev);
     const r = await request(s.port, { method: 'POST', path: '/internal/v1/events', headers: signed.headers, body: signed.body });
     assert.equal(r.status, 202);
@@ -106,7 +106,8 @@ async function bad(cmd, input, deps = {}) {
 const spy = () => { const calls = []; return { calls, fn: (...a) => { calls.push(a); throw new Error('must not be called'); } }; };
 const BADS = {
   'not JSON': () => 'not json',
-  'a schema violation': (v) => JSON.stringify({ ...sidecarStartDocument(v), first_seq: 0 }),
+  'a schema violation': (v) => JSON.stringify({ ...sidecarStartDocument(v), epoch: 0 }),
+  'the removed first_seq': (v) => JSON.stringify({ ...sidecarStartDocument(v), first_seq: 1 }),
   'a repeated digest': (v) => { const d = sidecarStartDocument(v); d.flag_digests.push(d.flag_digests[0]); return JSON.stringify(d); },
   'trailing data': (v) => JSON.stringify(sidecarStartDocument(v)) + '{}',
   'an array': () => '[1]',
@@ -145,9 +146,10 @@ test('main sidecar: a good start document starts the sidecar (the control case)'
   const made = [];
   const code = await main(['sidecar', '--relay', 'http://x:1/y', '--upstream', 'http://x:2'], {}, {
     stdin: Readable.from([JSON.stringify(sidecarStartDocument(freshValues()))]),
-    deps: { createSidecar: (o) => { made.push(o); return { listen: async () => ({ playerPort: 1, eventsPort: 2 }) }; } },
+    deps: { createSidecar: (o) => { made.push(o); return { nextSeq: () => 1, listen: async () => ({ playerPort: 1, eventsPort: 2 }) }; } },
   });
   assert.equal(code, null);
   assert.equal(made.length, 1);
   assert.equal(made[0].relayUrl, 'http://x:1/y');
+  assert.equal(made[0].statePath, '/tmp/vm-sidecar-seq.json', 'the counter file is in the own /tmp of the sidecar');
 });

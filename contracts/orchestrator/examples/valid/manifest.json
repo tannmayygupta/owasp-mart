@@ -13,5 +13,8 @@
   "state-report.json": "StateReport",
   "error.template-unknown.json": "Problem",
   "error.field-forbidden.json": "Problem",
-  "error.bad-signature.json": "Problem"
+  "error.bad-signature.json": "Problem",
+  "error.cursor-invalid.json": "Problem",
+  "error.unsupported-media-type.json": "Problem",
+  "error.extension-member.json": "Problem"
 }

@@ -135,7 +135,7 @@ services:
       retries: 15
       start_period: 1s
 
-  # Reads its start document (event key, flag digests, first_seq) on standard input at start, once.
+  # Reads its start document (event key, epoch, flag digests) on standard input at start, once.
   sidecar:
     <<: *instance
     container_name: vulnmart-harness-sidecar

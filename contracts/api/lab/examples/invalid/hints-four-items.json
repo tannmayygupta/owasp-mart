@@ -29,5 +29,6 @@
       "cost_pct": 0,
       "text": "Fake hint text, level 1 (example only)."
     }
-  ]
+  ],
+  "has_more": false
 }

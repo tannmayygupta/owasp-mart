@@ -35,6 +35,17 @@ write_files:
     encoding: b64
     permissions: "0644"
     content: ${docker_daemon}
+  - path: /usr/local/sbin/vulnmart-egress.sh
+    encoding: b64
+    permissions: "0755"
+    content: ${egress_sh}
+  - path: /etc/systemd/system/vulnmart-egress.service
+    encoding: b64
+    permissions: "0644"
+    content: ${egress_unit}
+  - path: /etc/vulnmart/egress.env
+    permissions: "0644"
+    content: ${egress_env}
   - path: /usr/local/sbin/vulnmart-keepalive.py
     encoding: b64
     permissions: "0755"

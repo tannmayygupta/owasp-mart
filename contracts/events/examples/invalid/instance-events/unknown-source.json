@@ -1,6 +1,7 @@
 {
   "schema_version": "0.1",
   "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
   "seq": 1,
   "type": "proxy.request",
   "source": "browser",

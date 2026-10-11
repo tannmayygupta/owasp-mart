@@ -22,6 +22,7 @@ STEP=sshd-config-test;     install -d -m 0755 /run/sshd && sshd -t
 STEP=restart-ssh;          systemctl restart ssh
 STEP=firewall;             /usr/local/sbin/vulnmart-firewall.sh "$PRIVATE_CIDR"
 STEP=docker;               /usr/local/sbin/vulnmart-install-docker.sh
+STEP=egress;               systemctl daemon-reload && systemctl enable --now vulnmart-egress.service
 STEP=secrets-dir;          install -d -m 0700 -o root -g root /opt/vulnmart /opt/vulnmart/secrets
 STEP=time-sync;            if systemctl cat systemd-timesyncd.service >/dev/null 2>&1; then systemctl restart systemd-timesyncd; elif systemctl cat chrony.service >/dev/null 2>&1; then systemctl restart chrony; else echo "vulnmart-baseline: no time sync service (systemd-timesyncd or chrony) found" >&2; false; fi
 STEP=keepalive;            systemctl daemon-reload && if [ "$KEEPALIVE" = yes ]; then systemctl enable --now vulnmart-keepalive.service; else systemctl disable --now vulnmart-keepalive.service; fi

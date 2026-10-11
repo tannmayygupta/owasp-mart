@@ -1,4 +1,8 @@
 {
-  "code": "ATT-NOT-FOUND",
-  "message": "x"
+  "type": "https://vulnmart.invalid/problems/att_not_found",
+  "title": "The attempt was not found.",
+  "status": 404,
+  "detail": "no such attempt",
+  "instance": "urn:vulnmart:request:req-0123456789ab",
+  "code": "att_not_found"
 }

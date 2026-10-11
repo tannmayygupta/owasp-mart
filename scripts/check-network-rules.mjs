@@ -41,6 +41,26 @@ export function checkRules(rules) {
   if (!isObject(rules)) return ['the rule file must be a JSON object'];
   if (rules.schema !== 1) add('schema must be 1');
   if (!cidrInside(rules.subnet_cidr, rules.vcn_cidr)) add('subnet_cidr must be a valid IPv4 CIDR inside vcn_cidr');
+  // D-43: two subnets, labs bridge subnets outside the VPC, an outbound allowlist with no all-protocol rule.
+  if (!cidrInside(rules.subnet_p_cidr, rules.vcn_cidr)) add('subnet_p_cidr must be a valid IPv4 CIDR inside vcn_cidr');
+  if (!cidrInside(rules.subnet_i_cidr, rules.vcn_cidr)) add('subnet_i_cidr must be a valid IPv4 CIDR inside vcn_cidr');
+  if (rules.subnet_p_cidr === rules.subnet_i_cidr || cidrInside(rules.subnet_p_cidr, rules.subnet_i_cidr) || cidrInside(rules.subnet_i_cidr, rules.subnet_p_cidr)) add('subnet_p_cidr and subnet_i_cidr must be different and must not overlap');
+  const docker = Array.isArray(rules.labs_docker_subnets) ? rules.labs_docker_subnets : [];
+  if (docker.length === 0) add('labs_docker_subnets must be a non-empty list');
+  for (const d of docker) if (!parseV4(d) || cidrInside(d, rules.vcn_cidr) || cidrInside(rules.vcn_cidr, d)) add(`labs_docker_subnets: ${d} must be a valid IPv4 CIDR that does not overlap vcn_cidr`);
+  if (!isObject(rules.ephemeral_ports) || rules.ephemeral_ports.from !== 1024 || rules.ephemeral_ports.to !== 65535) add('ephemeral_ports must be { from: 1024, to: 65535 }');
+  const egressNames = new Set();
+  if (!Array.isArray(rules.egress_common) || rules.egress_common.length === 0) add('egress_common must be a non-empty list');
+  for (const [i, r] of (Array.isArray(rules.egress_common) ? rules.egress_common : []).entries()) {
+    const n = isObject(r) ? (r.name ?? '(unnamed)') : `#${i}`;
+    if (!isObject(r)) { add(`egress_common[${i}]: entry must be an object`); continue; }
+    if (egressNames.has(n)) add(`egress rule ${n}: duplicate name`);
+    egressNames.add(n);
+    if (r.protocol !== 'tcp' && r.protocol !== 'udp') add(`egress rule ${n}: only tcp or udp (never -1, all)`);
+    if (!validPort(r.port)) add(`egress rule ${n}: port must be a single number`);
+    if (!['internet', 'vpc-resolver', 'time-sync'].includes(r.to)) add(`egress rule ${n}: to must be internet, vpc-resolver or time-sync`);
+    if (r.to === 'internet' && ![80, 443].includes(r.port)) add(`egress rule ${n}: only ports 80 and 443 may go to the internet`);
+  }
   const names = new Set();
   const pub = Array.isArray(rules?.public_ingress) ? rules.public_ingress : [];
   if (!Array.isArray(rules?.public_ingress)) add('public_ingress must be a list');
@@ -95,7 +115,7 @@ export function checkRules(rules) {
 }
 
 /** Blocks of a Terraform file where a literal "0.0.0.0/0" or "::/0" is allowed: egress, ICMP path MTU, default routes, the closed default groups. */
-const EXEMPT_HEADER = /^resource "(aws_vpc_security_group_egress_rule|aws_route_table|oci_core_default_route_table|oci_core_default_security_list)"|^resource "aws_vpc_security_group_ingress_rule" "icmp"|^resource "oci_core_network_security_group_security_rule" "egress"/;
+const EXEMPT_HEADER = /^resource "(aws_vpc_security_group_egress_rule|aws_route_table|aws_network_acl_rule|oci_core_default_route_table|oci_core_default_security_list)"|^resource "aws_vpc_security_group_ingress_rule" "icmp"|^resource "oci_core_network_security_group_security_rule" "egress"/;
 
 /** Static checks of network.tf: it must read the data file and carry no port numbers or open sources of its own. */
 export function checkTerraformReadsRules(tfText) {

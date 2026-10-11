@@ -3,6 +3,7 @@
 // the host firewall has each placeholder rule (ACCEPT rules on a chain whose policy is ACCEPT: they filter nothing, the security groups are the perimeter), the baseline marker says ok, and every baseline file on each host has the same
 // hash as the file in this repository (this also detects drift, because Terraform ignores later startup-file changes).
 // It also proves that instance metadata (IMDSv2, hop limit 1) is reachable from the host but not from a container.
+// On the labs host it then runs throwaway probe containers (bridge, host network non-root, host network root) to prove the isolation of ADR 0027 (D-43): metadata and vm-p:443 time out, vm-p:9444 stays reachable. Skip with --skip-isolation.
 // Usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts <file>] [--user ubuntu]
 //        [--evidence <file>] [--require-listener] [--keepalive] [--skip-metadata]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -22,6 +23,8 @@ export const BASELINE_FILES = [
   { local: 'infra/hosts/vulnmart-install-docker.sh', remote: '/usr/local/sbin/vulnmart-install-docker.sh' },
   { local: 'infra/hosts/vulnmart-baseline.sh', remote: '/usr/local/sbin/vulnmart-baseline.sh' },
   { local: 'infra/hosts/docker-daemon.json', remote: '/etc/docker/daemon.json' },
+  { local: 'infra/hosts/vulnmart-egress.sh', remote: '/usr/local/sbin/vulnmart-egress.sh' },
+  { local: 'infra/hosts/vulnmart-egress.service', remote: '/etc/systemd/system/vulnmart-egress.service' },
   { local: 'infra/hosts/vulnmart-keepalive.py', remote: '/usr/local/sbin/vulnmart-keepalive.py' },
   { local: 'infra/hosts/vulnmart-keepalive.service', remote: '/etc/systemd/system/vulnmart-keepalive.service' },
 ];
@@ -82,7 +85,7 @@ const privatePortsFor = (rules, vm) => rules.private_ingress.filter((r) => r.to 
 export function remoteBaseline(rules, vm) {
   const fw = [];
   for (const p of publicPorts(rules)) fw.push(`if sudo -n iptables -C INPUT -p tcp --dport ${p} -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null; then echo fw_${p}=yes; else echo fw_${p}=no; fi`);
-  for (const p of privatePortsFor(rules, vm)) fw.push(`if sudo -n iptables -C INPUT -p tcp -s ${subnetOf(rules)} --dport ${p} -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null; then echo fw_${p}=yes; else echo fw_${p}=no; fi`);
+  for (const p of privatePortsFor(rules, vm)) fw.push(`if sudo -n iptables -C INPUT -p tcp -s ${subnetOf(rules)} --dport ${p} -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null || sudo -n iptables -C INPUT -p tcp -s ${rules.vcn_cidr} --dport ${p} -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null; then echo fw_${p}=yes; else echo fw_${p}=no; fi`);
   const files = BASELINE_FILES.map((f) => f.remote).join(' ');
   return [
     'set -o pipefail',
@@ -109,7 +112,47 @@ function parseShas(text) {
   return out;
 }
 
-export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, keepalive = false, checkMetadata = true, tempListener = false, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
+// ---- Labs host isolation (D-43, ADR 0027). Run by the developer after the apply; Claude never runs it. ----
+// Throwaway probe containers on the labs host: one on a bridge network, one with host networking and a non-root user, one with host networking as root.
+// A probe is a TCP connect with a 3 second limit (the same test as `curl -m3`: the image has no curl). Each prints key=state, state in open | refused | timeout | error:<Class>.
+export const ISOLATION_PY = [
+  'import socket,sys',
+  'def c(h,p):',
+  ' try:',
+  '  socket.create_connection((h,p),3).close()',
+  '  return "open"',
+  ' except socket.timeout:',
+  '  return "timeout"',
+  ' except ConnectionRefusedError:',
+  '  return "refused"',
+  ' except Exception as e:',
+  '  return "error:"+type(e).__name__',
+  'print("imds="+c("169.254.169.254",80))',
+  'print("vmp443="+c(sys.argv[1],443))',
+  'print("vmp9444="+c(sys.argv[1],int(sys.argv[2])))',
+  'print("self22="+c(sys.argv[3],22))',
+  'print("internet443="+c("download.docker.com",443))',
+].join('\n');
+export const isolationCommand = (vmpPrivate, ingestPort, selfPrivate) => {
+  const args = `${vmpPrivate} ${ingestPort} ${selfPrivate}`;
+  const run = (flags, prefix) => `sudo -n docker run --rm ${flags} ${IMDS_IMAGE} python3 -c '${ISOLATION_PY}' ${args} | sed 's/^/${prefix}_/'`;
+  return [run('', 'bridge'), run('--network host --user 65534:65534', 'hostnet_user'), run('--network host', 'hostnet_root')].join('; ');
+};
+/** Checks from the probe output. The root host-network probe is information only: a root container with host networking can use the host's own network stack. */
+export function isolationChecks(vm, kv, add) {
+  const reach = (s) => s === 'open' || s === 'refused';
+  add(`${vm} a bridge container has network access (control: https to a public site)`, kv.bridge_internet443 === 'open', kv.bridge_internet443 ?? 'no answer');
+  add(`${vm} a bridge container cannot reach instance metadata (curl -m3 http://169.254.169.254 times out)`, kv.bridge_imds === 'timeout', kv.bridge_imds ?? 'no answer');
+  add(`${vm} a bridge container cannot reach vm-p on 443`, kv.bridge_vmp443 === 'timeout', kv.bridge_vmp443 ?? 'no answer');
+  add(`${vm} a bridge container cannot reach this host's own port 22 through its private address`, kv.bridge_self22 === 'timeout', kv.bridge_self22 ?? 'no answer');
+  add(`${vm} a bridge container can reach vm-p on the ingest port (open, or refused while nothing listens yet)`, reach(kv.bridge_vmp9444), kv.bridge_vmp9444 ?? 'no answer');
+  add(`${vm} a non-root host-network container cannot reach instance metadata`, kv.hostnet_user_imds === 'timeout', kv.hostnet_user_imds ?? 'no answer');
+  add(`${vm} a host-network container cannot reach vm-p on 443 (the network ACL of the labs subnet)`, kv.hostnet_user_vmp443 === 'timeout' && kv.hostnet_root_vmp443 === 'timeout', `${kv.hostnet_user_vmp443 ?? 'no answer'} / ${kv.hostnet_root_vmp443 ?? 'no answer'}`);
+  add(`${vm} the host itself can still reach vm-p on the ingest port (from a host-network container)`, reach(kv.hostnet_user_vmp9444), kv.hostnet_user_vmp9444 ?? 'no answer');
+  const rootImds = kv.hostnet_root_imds;
+  add(`${vm} information: a ROOT host-network container ${reach(rootImds) ? 'CAN' : 'cannot'} reach instance metadata`, true, `${rootImds ?? 'no answer'}; known residual risk (ADR 0027): compose files must not use host networking or privileged mode (scripts/check-lab-compose-rules.mjs)`, reach(rootImds));
+}
+export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, keepalive = false, checkMetadata = true, checkIsolation = false, tempListener = false, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
   const checks = [];
   const add = (name, ok, detail = '', warn = false) => checks.push({ name, ok, detail, warn });
   const open = publicPorts(rules);
@@ -154,6 +197,11 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
         add(`${vm} a container cannot read instance metadata (IMDSv2, hop limit 1)`, mk.container_control === 'reachable' && (mk.container_imds ?? '').startsWith('blocked'), mk.container_imds ?? `no answer (exit ${m.code})`);
       }
     }
+    if (login.code === 0 && checkIsolation && vm === 'vm-i') {
+      const ingestPort = rules.private_ingress.find((r) => r.from === 'vm-i').port;
+      const iso = await ssh({ host: a.pub, user, identity, command: isolationCommand(hosts['vm-p'].priv, ingestPort, a.priv), timeoutMs: 240000 });
+      isolationChecks(vm, parseKeyValues(iso.stdout), add);
+    }
     // 2. Public ports, from outside. With the temporary listener the web ports must really answer.
     const webPorts = open.filter((p) => p !== 22);
     let listening = false;
@@ -193,12 +241,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exit(2);
   }
   if (!opts.identity) {
-    console.error('usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts file | --provider aws|oci] [--user ubuntu] [--evidence file] [--require-listener] [--no-temp-listener] [--keepalive] [--skip-metadata]');
+    console.error('usage: node scripts/verify-hosts.mjs --identity <ssh-private-key-path> [--hosts file | --provider aws|oci] [--user ubuntu] [--evidence file] [--require-listener] [--no-temp-listener] [--keepalive] [--skip-metadata] [--skip-isolation]');
     process.exit(2);
   }
   const hosts = loadHosts(resolveHostsFile(opts));
   const rules = JSON.parse(readFileSync(RULES_FILE, 'utf8'));
-  const checks = await verifyHosts({ hosts, tcpProbe: realProbe, ssh: sshRun, identity: opts.identity, user: opts.user ?? 'ubuntu', rules, ...verifyOptions(opts) });
+  const checks = await verifyHosts({ hosts, tcpProbe: realProbe, ssh: sshRun, identity: opts.identity, user: opts.user ?? 'ubuntu', rules, ...verifyOptions(opts), checkIsolation: !opts['skip-isolation'] });
   const lines = [];
   const ok = printChecks(checks, (l) => {
     const r = redact(l, hosts);

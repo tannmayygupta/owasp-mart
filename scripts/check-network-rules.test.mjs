@@ -112,7 +112,7 @@ test('cloud-init runs one baseline script that stops at the first failure and wr
   assert.match(b, /baseline-failed/);
   assert.match(b, /step=\$STEP/);
   const steps = [...b.matchAll(/^STEP=([a-z-]+);[ \t]+.*$/gm)].map((m) => m[1]);
-  assert.deepEqual(steps, ['lock-root', 'sshd-config-test', 'restart-ssh', 'firewall', 'docker', 'secrets-dir', 'time-sync', 'keepalive', 'unattended-upgrades']);
+  assert.deepEqual(steps, ['lock-root', 'sshd-config-test', 'restart-ssh', 'firewall', 'docker', 'egress', 'secrets-dir', 'time-sync', 'keepalive', 'unattended-upgrades']);
   assert.match(b, /passwd -l root/);
   assert.match(b, /install -d -m 0700 -o root -g root \/opt\/vulnmart \/opt\/vulnmart\/secrets/);
   assert.match(b, /install -d -m 0755 \/run\/sshd && sshd -t/, "sshd -t needs /run/sshd, which is missing before the first ssh start on Ubuntu 24.04");
@@ -258,9 +258,9 @@ test('aws: one instance resource for both hosts, IMDSv2 required with hop limit 
   assert.match(tf, /http_tokens\s*=\s*"required"/);
   assert.match(tf, /http_put_response_hop_limit\s*=\s*1\b/);
   assert.ok(!/iam_instance_profile/.test(tf), 'hosts carry no instance profile');
-  assert.equal((tf.match(/^\s*user_data\s*=\s*local\.user_data$/gm) ?? []).length, 1);
+  assert.equal((tf.match(/^\s*user_data_base64\s*=\s*local\.user_data_gz$/gm) ?? []).length, 1);
   assert.match(tf, /\/aws\/service\/canonical\/ubuntu\/server\/24\.04\/stable\/current\//);
-  assert.match(tf, /ignore_changes = \[ami, user_data, key_name\]/);
+  assert.match(tf, /ignore_changes = \[ami, user_data, user_data_base64, key_name\]/);
   assert.match(tf, /resource "aws_eip" "vm"/);
   assert.ok(!/aws_nat_gateway/.test(aws('network.tf') + tf), 'a NAT gateway costs about USD 0.045 per hour');
 });
@@ -329,6 +329,8 @@ const policyActions = () => POLICY().Statement.flatMap((s) => [].concat(s.Action
 const NEEDS = {
   aws_vpc: ['ec2:CreateVpc', 'ec2:DeleteVpc', 'ec2:ModifyVpcAttribute', 'ec2:DescribeVpcs', 'ec2:CreateTags'],
   aws_internet_gateway: ['ec2:CreateInternetGateway', 'ec2:DeleteInternetGateway', 'ec2:AttachInternetGateway', 'ec2:DetachInternetGateway'],
+  aws_network_acl: ['ec2:CreateNetworkAcl', 'ec2:DeleteNetworkAcl', 'ec2:ReplaceNetworkAclAssociation'],
+  aws_network_acl_rule: ['ec2:CreateNetworkAclEntry', 'ec2:DeleteNetworkAclEntry', 'ec2:ReplaceNetworkAclEntry'],
   aws_subnet: ['ec2:CreateSubnet', 'ec2:DeleteSubnet', 'ec2:ModifySubnetAttribute'],
   aws_route_table: ['ec2:CreateRouteTable', 'ec2:DeleteRouteTable', 'ec2:CreateRoute', 'ec2:DeleteRoute', 'ec2:ReplaceRoute'],
   aws_route_table_association: ['ec2:AssociateRouteTable', 'ec2:DisassociateRouteTable'],
@@ -337,7 +339,7 @@ const NEEDS = {
   aws_vpc_security_group_ingress_rule: ['ec2:AuthorizeSecurityGroupIngress', 'ec2:RevokeSecurityGroupIngress', 'ec2:ModifySecurityGroupRules', 'ec2:UpdateSecurityGroupRuleDescriptionsIngress'],
   aws_vpc_security_group_egress_rule: ['ec2:AuthorizeSecurityGroupEgress', 'ec2:RevokeSecurityGroupEgress', 'ec2:UpdateSecurityGroupRuleDescriptionsEgress'],
   aws_key_pair: ['ec2:ImportKeyPair', 'ec2:DeleteKeyPair', 'ec2:CreateTags'],
-  aws_instance: ['ec2:RunInstances', 'ec2:TerminateInstances', 'ec2:ModifyInstanceAttribute', 'ec2:ModifyInstanceMetadataOptions', 'ec2:CreateTags'],
+  aws_instance: ['ec2:RunInstances', 'ec2:TerminateInstances', 'ec2:ModifyInstanceMetadataOptions', 'ec2:CreateTags'],
   aws_ec2_instance_state: ['ec2:StartInstances', 'ec2:StopInstances'],
   aws_eip: ['ec2:AllocateAddress', 'ec2:ReleaseAddress', 'ec2:AssociateAddress', 'ec2:DisassociateAddress', 'ec2:CreateTags', 'ec2:DeleteTags'],
   aws_budgets_budget: ['budgets:ViewBudget', 'budgets:ModifyBudget', 'budgets:TagResource', 'budgets:UntagResource', 'budgets:ListTagsForResource'],
@@ -361,23 +363,27 @@ test('aws: RunInstances is limited to the eligible instance types by an ec2:Inst
   const pol = POLICY();
   const v = aws('variables.tf');
   const eligible = v.match(/contains\(\[([^\]]*)\], t\)/)[1].match(/"([^"]+)"/g).map((s) => s.replaceAll('"', ''));
-  const runs = pol.Statement.filter((s) => [].concat(s.Action).includes('ec2:RunInstances'));
+  const runs = pol.Statement.filter((s) => s.Effect === 'Allow' && [].concat(s.Action).includes('ec2:RunInstances'));
+  const denies = pol.Statement.filter((s) => s.Effect === 'Deny' && [].concat(s.Action).includes('ec2:RunInstances'));
+  assert.equal(denies.length, 1, 'one explicit Deny of RunInstances for other instance types (D-44)');
+  assert.deepEqual(denies[0].Condition.StringNotEquals['ec2:InstanceType'], eligible);
+  assert.match(denies[0].Resource, /:instance\/\*$/);
   const typed = runs.filter((s) => s.Condition?.StringEquals?.['ec2:InstanceType']);
   assert.equal(typed.length, 1, 'one RunInstances statement carries the instance type condition');
   assert.deepEqual(typed[0].Condition.StringEquals['ec2:InstanceType'], eligible);
   assert.match(typed[0].Resource, /:instance\/\*$/);
   assert.equal(typed[0].Condition.StringEquals['aws:RequestedRegion'], 'ap-southeast-2');
   for (const s of runs) assert.equal(s.Condition.StringEquals['aws:RequestedRegion'], 'ap-southeast-2');
-  assert.ok(!pol.Statement.some((s) => !runs.includes(s) && [].concat(s.Action).includes('ec2:RunInstances')));
+  assert.ok(!pol.Statement.some((s) => s.Effect === 'Allow' && !runs.includes(s) && [].concat(s.Action).includes('ec2:RunInstances')));
 });
 
-test('aws: start, stop, terminate and the two modify actions are limited to instances tagged Project=vulnmart (and Sydney), never granted on all resources', () => {
+test('aws: start, stop, terminate and the metadata modify action are limited to instances tagged Project=vulnmart (and Sydney), never granted on all resources', () => {
   const pol = POLICY();
-  const TAGGED = ['ec2:TerminateInstances', 'ec2:StartInstances', 'ec2:StopInstances', 'ec2:ModifyInstanceAttribute', 'ec2:ModifyInstanceMetadataOptions'];
+  const TAGGED = ['ec2:TerminateInstances', 'ec2:StartInstances', 'ec2:StopInstances', 'ec2:ModifyInstanceMetadataOptions'];
   const stmts = pol.Statement.filter((s) => TAGGED.some((a) => [].concat(s.Action).includes(a)));
-  assert.equal(stmts.length, 1, 'the five actions sit in exactly one statement');
+  assert.equal(stmts.length, 1, 'the four actions sit in exactly one statement');
   const s = stmts[0];
-  assert.deepEqual([].concat(s.Action).sort(), [...TAGGED].sort(), 'that statement holds only those five actions');
+  assert.deepEqual([].concat(s.Action).sort(), [...TAGGED].sort(), 'that statement holds only those four actions');
   assert.equal(s.Effect, 'Allow');
   assert.equal(s.Resource, 'arn:aws:ec2:ap-southeast-2:*:instance/*');
   assert.equal(s.Condition.StringEquals['aws:ResourceTag/Project'], 'vulnmart');
@@ -426,7 +432,7 @@ test('aws variables: an IPv4 source is required, CIDRs must be canonical, public
   assert.match(c, /key_name_prefix\s*=\s*"vulnmart-"/);
   assert.match(c, /sort\(var\.ssh_public_keys\)\[0\]/);
   assert.match(c, /local\.user_data_bytes <= 16384/);
-  assert.match(c, /textencodebase64\(/);
+  assert.match(c, /base64gzip\(/);
   assert.match(c, /resource "aws_ec2_instance_state" "vm_i"/);
   assert.match(v, /variable "vm_i_running"[\s\S]*?default\s*=\s*true/);
   assert.match(aws('network.tf'), /"\$\{r\.name\}-\$\{r\.port\}-\$\{r\.source\}"/);

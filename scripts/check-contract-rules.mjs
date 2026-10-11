@@ -1,5 +1,11 @@
 // Contract rules for pull requests (story L-07, architecture 07 section 5 and rules 3, 4, 8, 9). One rule set, read from contracts/registry.json.
 // Usage: node scripts/check-contract-rules.mjs [--base <ref>] [--root <dir>]
+//        CI (D-46, docs/adr/0026): node base/scripts/check-contract-rules.mjs --root head --base <base sha> --tools base/tools/oasdiff.json
+//        --root is the pull request head (only read as data), the script and the pin file come from the base commit; the registry rules come from the
+//        base; a change to the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs the changelog line "registry change: <reason>".
+//        --trusted: trusted mode with the pins of this checkout; --bootstrap: the first pull request, the checker of the head ran (printed as a NOTICE);
+//        --untrusted-only: only the checks that run head code (table owners, Alembic, bundle), for the job contract-rules-untrusted.
+//        Without these options nothing changes: local runs compare the working tree with origin/main as before.
 // Base of the per-pull-request rules (changelog, mock, breaking declared): --base, else origin/$GITHUB_BASE_REF, else origin/main, always the merge
 // base with HEAD. When a tag contracts-v* exists, the breaking comparison is also made against the latest tag (a raised version is then required).
 // The head side is the working tree. If git cannot give the base, the changed files or the merge base, the run FAILs (fetch the full history);
@@ -22,6 +28,21 @@ export const FAIL = 'FAIL';
 export const NA = 'NOT-APPLICABLE';
 const TAG_GLOB = 'contracts-v*';
 const WAIVER = /\bno mock change:\s*\S/;
+// D-46 (d): the one marker of a declared breaking change: a bullet line that starts with `BREAKING:` (case-sensitive) followed by text. A
+// line such as "no BREAKING changes", "not BREAKING" or "BREAKING: none" does not declare anything.
+export const BREAKING_MARKER = /^\s*(?:[-*+]|\d+\.)\s+BREAKING:\s*(\S.*)$/;
+const NEGATED = /^(?:none|no|nothing|n\/a|not applicable|not breaking)\.?\s*$/i;
+export const isBreakingMarker = (line) => {
+  const m = BREAKING_MARKER.exec(line);
+  return !!m && !NEGATED.test(m[1].trim());
+};
+// D-46 (b): a pull request that changes the rules engine itself must say so in a new line of contracts/CHANGELOG.md. A human reads the reason.
+export const REGISTRY_CHANGE_LINE = /^\s*(?:[-*+]|\d+\.)\s+registry change:\s*\S/;
+// Files that make up the rules engine; in trusted mode a change to any of them is reported (FAIL without the declaration above).
+export const GUARDED_FILES = ['contracts/registry.json', 'scripts/check-contract-rules.mjs', 'scripts/schema-diff.mjs', 'scripts/oasdiff.mjs', 'tools/oasdiff.json'];
+export const GUARDED_PREFIXES = ['.github/workflows/'];
+export const isGuarded = (p) => GUARDED_FILES.includes(p) || GUARDED_PREFIXES.some((x) => p.startsWith(x));
+// Marker that CI greps in the base copy of this file to know that it understands --trusted (see .github/workflows/ci.yml): trusted-base-checker-v1
 const NO_MOCK = /^no mock by design:\s*\S/;
 const TIMEOUT_MS = { git: 120_000, python: 300_000, bundle: 300_000 };
 const MOCK_IGNORED = (p) => /\.md$/i.test(p) || /\.(test|spec)\.[cm]?[jt]s$/.test(p) || /(^|\/)test_[^/]*\.py$/.test(p) || /_test\.py$/.test(p) || /(^|\/)__tests__\//.test(p);
@@ -61,7 +82,7 @@ export function resolveBase(root, { base, env = process.env } = {}) {
   if (!sha?.trim()) return { ref, error: `base ref ${ref} does not exist here; ${FULL_HISTORY}` };
   const mb = git(root, ['merge-base', ref, 'HEAD'], { allowFail: true });
   if (!mb?.trim()) return { ref, error: `no merge base between ${ref} and HEAD (shallow or unrelated history); ${FULL_HISTORY}` };
-  return { ref, sha: mb.trim() };
+  return { ref, sha: mb.trim(), tip: sha.trim() };
 }
 
 // The latest contracts-v tag, or null when none exists.
@@ -234,18 +255,43 @@ function checkRegistry(root, reg) {
 // Breaking comparison of one contract's registered files between a commit and the working tree. The lists are the union of the head entry and
 // the entry at that commit, so a file that the pull request also drops from the registry is still compared (and a deleted one is breaking).
 // Dispatch is by registry list (schemas: own diff, openapi: oasdiff), never by file extension.
-async function compareFiles({ root, sha, c, bc, getOasdiff }) {
+// Data files of a contract folder that are neither listed nor examples (D-46 e): a .json file is diffed like a schema, a deletion is breaking, and a
+// changed .yaml/.yml file that no tool can compare is flagged breaking on the safe side (list it under "schemas" or "openapi" to have it compared).
+const ARTEFACT = /\.(json|ya?ml)$/i;
+const artefactSkipped = (p, skip) => /(^|\/)examples\//.test(p) || /(^|\/)bundle\//.test(p) || /\.schema\.json$/.test(p) || /\.openapi\.ya?ml$/.test(p) || skip.some((s) => covers(p, s));
+function unlistedArtefacts(root, sha, folders, listed, skip) {
+  const names = new Set();
+  const inBase = git(root, ['ls-tree', '-r', '-z', '--name-only', sha, '--', ...folders], { allowFail: true });
+  for (const n of (inBase ?? '').split('\0')) if (n) names.add(n);
+  for (const n of git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...folders]).split('\0')) if (n) names.add(n);
+  return [...names].filter((p) => ARTEFACT.test(p) && !listed.has(p) && !artefactSkipped(p, skip));
+}
+
+async function compareFiles({ root, sha, c, bc, getOasdiff, artefacts = true, skip = [] }) {
   const schemas = [...new Set([...c.schemas, ...(bc?.schemas ?? [])])];
   const openapi = [...new Set([...c.openapi, ...(bc?.openapi ?? [])])];
   const breaking = [];
   const notes = [];
   const errors = [];
-  for (const [f, kind] of [...schemas.map((x) => [x, 'schema']), ...openapi.map((x) => [x, 'openapi'])]) {
+  const extra = artefacts ? unlistedArtefacts(root, sha, [...new Set([...c.folders, ...(bc?.folders ?? [])])], new Set([...schemas, ...openapi]), [...skip, ...c.mocks, ...(bc?.mocks ?? [])]) : [];
+  for (const [f, kind] of [...schemas.map((x) => [x, 'schema']), ...openapi.map((x) => [x, 'openapi']), ...extra.map((x) => [x, 'artefact'])]) {
     const bt = baseText(root, sha, f);
     const ht = headText(root, f);
     if (bt === ht) continue;
     if (bt === null) { notes.push(`${f}: new file, not compared (a new file is not a breaking change)`); continue; }
     if (ht === null) { breaking.push(`${f}: file removed`); continue; }
+    if (kind === 'artefact') {
+      if (/\.json$/i.test(f)) {
+        try {
+          for (const d of diffSchemas(JSON.parse(bt), JSON.parse(ht))) breaking.push(`${f} ${d.path}: ${d.change}`);
+        } catch (e) {
+          errors.push(`${f}: could not be compared (${e.message})`);
+        }
+      } else {
+        breaking.push(`${f}: unlisted YAML file changed; it is not machine-comparable here (list it under "schemas" or "openapi" in contracts/registry.json, or declare the change as BREAKING)`);
+      }
+      continue;
+    }
     if (kind === 'schema') {
       try {
         for (const d of diffSchemas(JSON.parse(bt), JSON.parse(ht))) breaking.push(`${f} ${d.path}: ${d.change}`);
@@ -281,6 +327,32 @@ function mockChanged(root, base, changed, mockPaths) {
   });
 }
 
+// Verdicts: a breaking comparison needs the exact marker (D-46 d) and a raised version in a new entry of the section.
+function breakingVerdict(name, heading, cmp, baseSec, headSec, what = '') {
+  const fresh = headSec ? newEntries(baseSec, headSec) : [];
+  const entryLines = fresh.flatMap((e) => e.lines);
+  const baseMax = maxVersion(sectionVersions(baseSec));
+  const headMax = maxVersion(fresh.map((e) => parseVersion(e.heading.match(/^### (\d+\.\d+\.\d+)/)[1])));
+  const marked = entryLines.some(isBreakingMarker);
+  const ok = raised(baseMax, headMax);
+  if (marked && ok) return { name, status: PASS, details: [`BREAKING declared in the new entry with a raised version (${headMax.join('.')}):`, ...cmp.breaking.map((b) => `  notice: ${b}`), ...cmp.notes] };
+  const missing = [!marked && 'a line marked BREAKING in the new entry (a bullet starting with "BREAKING:" and a reason, exact case)', !ok && `a new entry whose version is above ${baseMax?.join('.')} ${raiseText(baseMax)} (the newest new entry is ${headMax?.join('.') ?? 'missing'})`].filter(Boolean);
+  return { name, status: FAIL, details: [...cmp.breaking, `${what ? `${what}: ` : ''}needs ${missing.join(' and ')} in the section "${heading}"`] };
+}
+function sinceVerdict(name, tag, since, headSec) {
+  const headMax = maxVersion(sectionVersions(headSec));
+  if (since.errors.length) return { name, status: FAIL, details: since.errors };
+  if (!since.breaking.length) return { name, status: PASS, details: [`no breaking change since ${tag.tag}`] };
+  // the marker must sit in an entry newer than the tag
+  const marked = sectionEntries(headSec).some((e) => {
+    const v = parseVersion(e.heading.match(/^### (\d+\.\d+\.\d+)/)?.[1] ?? '');
+    return v.length === 3 && cmpVersion(v, tag.version) > 0 && e.lines.some(isBreakingMarker);
+  });
+  if (raised(tag.version, headMax) && marked) return { name, status: PASS, details: [`breaking since ${tag.tag}, and the changelog version ${headMax.join('.')} is raised ${raiseText(tag.version)} with a BREAKING: line`, ...since.breaking.map((b) => `  notice: ${b}`)] };
+  const missing = [!raised(tag.version, headMax) && `the changelog version must be raised ${raiseText(tag.version)} above ${tag.version.join('.')} (newest entry: ${headMax?.join('.') ?? 'none'})`, !marked && `an entry newer than ${tag.tag} needs a line starting with "BREAKING:" and a reason`].filter(Boolean);
+  return { name, status: FAIL, details: [...since.breaking, `breaking since ${tag.tag}: ${missing.join('; and ')}`] };
+}
+
 // Per contract checks ---------------------------------------------------------------------------------------------------------------------
 async function contractChecks({ root, reg, base, tag, changed, getOasdiff }) {
   const results = [];
@@ -289,13 +361,34 @@ async function contractChecks({ root, reg, base, tag, changed, getOasdiff }) {
   const headLog = headText(root, 'contracts/CHANGELOG.md');
   const tagReg = tag?.sha ? registryAt(root, tag.sha) : null;
 
-  // a registry entry of the base that is gone in the head
+  // A registry entry of the base that is gone in the head (D-46 a). Deleting a whole contract is a breaking change: the files it registered are
+  // compared with the base entry (each missing file is "file removed") and the usual declaration is needed. A rename or a merge is not a deletion
+  // only when another head entry lists the same files (and covers the same folders).
+  const listedAnywhere = (f) => reg.contracts.some((c) => c.schemas.includes(f) || c.openapi.includes(f));
+  const folderCarried = (f) => reg.contracts.some((c) => c.folders.some((cf) => covers(f, cf)));
   for (const bc of baseReg?.contracts ?? []) {
     if (reg.contracts.some((c) => c.id === bc.id)) continue;
-    const left = bc.folders.filter((f) => fs.existsSync(path.join(root, f)));
-    results.push(left.length
-      ? { name: `registry-entry[${bc.id}]`, status: FAIL, details: [`the registry entry ${bc.id} of the base was dropped, but its folder(s) ${left.join(', ')} still exist; a dropped entry would switch its checks off`] }
-      : { name: `registry-entry[${bc.id}]`, status: PASS, details: [`notice: contract ${bc.id} was removed together with its folders`] });
+    const carriedFiles = (x) => [...x.schemas, ...x.openapi].filter((f) => listedAnywhere(f) && fs.existsSync(path.join(root, f)));
+    const lostOf = (x) => ({ id: x.id, folders: x.folders, mocks: [], schemas: x.schemas.filter((f) => !carriedFiles(x).includes(f)), openapi: x.openapi.filter((f) => !carriedFiles(x).includes(f)) });
+    const left = bc.folders.filter((f) => fs.existsSync(path.join(root, f)) && !folderCarried(f));
+    const nameOf = `registry-entry[${bc.id}]`;
+    if (left.length) results.push({ name: nameOf, status: FAIL, details: [`the registry entry ${bc.id} of the base was dropped, but its folder(s) ${left.join(', ')} still exist and no other entry covers them; a dropped entry would switch its checks off`] });
+    else if (bc.folders.some((f) => fs.existsSync(path.join(root, f)))) results.push({ name: nameOf, status: PASS, details: [`notice: the entry ${bc.id} no longer exists; its files and folders are carried by other entries`] });
+    else results.push({ name: nameOf, status: PASS, details: [`notice: contract ${bc.id} was removed together with its folders`] });
+
+    const heading = bc.changelog;
+    const lost = lostOf(bc);
+    const cmp = await compareFiles({ root, sha: base.sha, c: lost, bc: undefined, getOasdiff, artefacts: false, skip: reg.generated });
+    const everyFile = [...bc.schemas, ...bc.openapi];
+    if (!everyFile.length && !bc.folders.every(folderCarried)) cmp.breaking.push(`contract ${bc.id} removed from the registry (it listed no schema or OpenAPI file, so no file is compared)`);
+    if (cmp.errors.length) results.push({ name: `breaking[${bc.id}]`, status: FAIL, details: cmp.errors });
+    else if (!cmp.breaking.length) results.push({ name: `breaking[${bc.id}]`, status: PASS, details: [`every file of the removed entry ${bc.id} is listed by another entry and still exists`] });
+    else results.push(breakingVerdict(`breaking[${bc.id}]`, heading, cmp, changelogSection(baseLog, heading), changelogSection(headLog, heading), `contract ${bc.id} was removed (keep its section "## ${heading}" in contracts/CHANGELOG.md and add the entry there)`));
+    const tbc = tagReg?.contracts.find((x) => x.id === bc.id);
+    if (tag?.sha && tbc) {
+      const since = await compareFiles({ root, sha: tag.sha, c: lostOf(tbc), bc: undefined, getOasdiff, artefacts: false, skip: reg.generated });
+      results.push(sinceVerdict(`breaking-since-tag[${bc.id}]`, tag, since, changelogSection(headLog, heading)));
+    }
   }
 
   for (const c of reg.contracts) {
@@ -322,40 +415,24 @@ async function contractChecks({ root, reg, base, tag, changed, getOasdiff }) {
     }
 
     // rule 4: the mock moves with the contract
+    const ruleMocks = c.ruleMocks ?? c.mocks; // trusted mode: the mock paths of the base decide, not a decoy added by the pull request
     const machine = [...c.schemas, ...c.openapi].filter((p) => changed.has(p));
     if (!machine.length) results.push({ name: `mock[${c.id}]`, status: PASS, details: ['no schema or OpenAPI file changed, so no mock change is needed'] });
-    else if (!c.mocks.length) results.push({ name: `mock[${c.id}]`, status: PASS, details: [c.noMock] });
-    else if (mockChanged(root, base, changed, c.mocks)) results.push({ name: `mock[${c.id}]`, status: PASS, details: ['a mock file changed with the contract'] });
+    else if (!ruleMocks.length) results.push({ name: `mock[${c.id}]`, status: PASS, details: [c.noMock] });
+    else if (mockChanged(root, base, changed, ruleMocks)) results.push({ name: `mock[${c.id}]`, status: PASS, details: ['a mock file changed with the contract'] });
     else if (entryLines.some((l) => WAIVER.test(l))) results.push({ name: `mock[${c.id}]`, status: PASS, details: [`waived: ${entryLines.find((l) => WAIVER.test(l)).trim()}`] });
-    else results.push({ name: `mock[${c.id}]`, status: FAIL, details: [`${machine.join(', ')} changed but no code file under the mock path(s) ${c.mocks.join(', ')} changed (Markdown, test files and whitespace-only edits do not count); update the mock or add a line "no mock change: <reason>" to the new changelog entry`] });
+    else results.push({ name: `mock[${c.id}]`, status: FAIL, details: [`${machine.join(', ')} changed but no code file under the mock path(s) ${ruleMocks.join(', ')} changed (Markdown, test files and whitespace-only edits do not count); update the mock or add a line "no mock change: <reason>" to the new changelog entry`] });
 
     // rule 3: breaking changes against the pull request base
-    const cmp = await compareFiles({ root, sha: base.sha, c, bc, getOasdiff });
-    if (cmp.errors.length) {
-      results.push({ name: `breaking[${c.id}]`, status: FAIL, details: cmp.errors });
-    } else if (!cmp.breaking.length) {
-      results.push({ name: `breaking[${c.id}]`, status: PASS, details: cmp.notes.length ? cmp.notes : ['no breaking change in the schema or OpenAPI files'] });
-    } else {
-      const baseMax = maxVersion(sectionVersions(baseSec));
-      const headMax = maxVersion(fresh.map((e) => parseVersion(e.heading.match(/^### (\d+\.\d+\.\d+)/)[1])));
-      const marked = entryLines.some((l) => /\bBREAKING\b/.test(l));
-      const ok = raised(baseMax, headMax);
-      if (marked && ok) {
-        results.push({ name: `breaking[${c.id}]`, status: PASS, details: [`BREAKING declared in the new entry with a raised version (${headMax.join('.')}):`, ...cmp.breaking.map((b) => `  notice: ${b}`), ...cmp.notes] });
-      } else {
-        const missing = [!marked && 'a line marked BREAKING in the new entry', !ok && `a new entry whose version is above ${baseMax?.join('.')} ${raiseText(baseMax)} (the newest new entry is ${headMax?.join('.') ?? 'missing'})`].filter(Boolean);
-        results.push({ name: `breaking[${c.id}]`, status: FAIL, details: [...cmp.breaking, `needs ${missing.join(' and ')} in the section "${c.changelog}"`] });
-      }
-    }
+    const cmp = await compareFiles({ root, sha: base.sha, c, bc, getOasdiff, skip: reg.generated });
+    if (cmp.errors.length) results.push({ name: `breaking[${c.id}]`, status: FAIL, details: cmp.errors });
+    else if (!cmp.breaking.length) results.push({ name: `breaking[${c.id}]`, status: PASS, details: cmp.notes.length ? cmp.notes : ['no breaking change in the schema or OpenAPI files'] });
+    else results.push(breakingVerdict(`breaking[${c.id}]`, c.changelog, cmp, baseSec, headSec));
 
     // the same comparison against the latest contracts-v tag
     if (tag?.sha) {
-      const since = await compareFiles({ root, sha: tag.sha, c, bc: tagReg?.contracts.find((x) => x.id === c.id), getOasdiff });
-      const headMax = maxVersion(sectionVersions(headSec));
-      if (since.errors.length) results.push({ name: `breaking-since-tag[${c.id}]`, status: FAIL, details: since.errors });
-      else if (!since.breaking.length) results.push({ name: `breaking-since-tag[${c.id}]`, status: PASS, details: [`no breaking change since ${tag.tag}`] });
-      else if (raised(tag.version, headMax)) results.push({ name: `breaking-since-tag[${c.id}]`, status: PASS, details: [`breaking since ${tag.tag}, and the changelog version ${headMax.join('.')} is raised ${raiseText(tag.version)}`, ...since.breaking.map((b) => `  notice: ${b}`)] });
-      else results.push({ name: `breaking-since-tag[${c.id}]`, status: FAIL, details: [...since.breaking, `breaking since ${tag.tag}: the changelog version must be raised ${raiseText(tag.version)} above ${tag.version.join('.')} (newest entry: ${headMax?.join('.') ?? 'none'})`] });
+      const since = await compareFiles({ root, sha: tag.sha, c, bc: tagReg?.contracts.find((x) => x.id === c.id), getOasdiff, skip: reg.generated });
+      results.push(sinceVerdict(`breaking-since-tag[${c.id}]`, tag, since, headSec));
     }
   }
   return results;
@@ -438,18 +515,86 @@ function checkBundle(root) {
 }
 
 // Run everything --------------------------------------------------------------------------------------------------------------------------
-export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.env, oasdiffBin, skip = [] } = {}) {
+const within = (child, parent) => { const r = path.relative(path.resolve(parent), path.resolve(child)); return r === '' || (!r.startsWith('..') && !path.isAbsolute(r)); };
+
+// Trusted mode (D-46 b): the checker and its pins come from the base commit, `root` is the pull request head and is only read as data. The registry
+// rules (containers, reserved, generated, mockRoot, noMock, the changelog heading, the existing folders and mocks) are taken from the base tip; the head
+// registry only adds entries and paths (and its change is reported by the guard).
+export function effectiveRegistry(headReg, authority, root) {
+  if (!authority) return headReg;
+  return {
+    ...headReg,
+    containers: authority.containers,
+    reserved: authority.reserved,
+    generated: authority.generated,
+    mockRoot: authority.mockRoot,
+    contracts: headReg.contracts.map((c) => {
+      const a = authority.contracts.find((x) => x.id === c.id);
+      if (!a) return c;
+      const folders = [...new Set([...a.folders, ...c.folders])].filter((f) => fs.existsSync(path.join(root, f)));
+      return { ...c, folders: folders.length ? folders : c.folders, mocks: [...new Set([...a.mocks, ...c.mocks])], ruleMocks: a.mocks, noMock: a.noMock ?? c.noMock, changelog: a.changelog };
+    }),
+  };
+}
+
+function guardCheck(root, base, changed, baseLog, headLog) {
+  const touched = [...changed.keys()].filter(isGuarded);
+  const declared = addedLines((baseLog ?? '').split('\n'), (headLog ?? '').split('\n')).filter((l) => REGISTRY_CHANGE_LINE.test(l));
+  if (!touched.length) return { status: PASS, details: ['the registry, the checker, the diff scripts, the oasdiff pins and the workflows are unchanged by this pull request'] };
+  if (declared.length) return { status: PASS, details: [`notice: this pull request changes the rules engine (${touched.join(', ')}), declared in contracts/CHANGELOG.md: ${declared[0].trim()}`] };
+  return { status: FAIL, details: [`this pull request changes files that define or run the contract rules: ${touched.join(', ')}; the rules of the base were applied. Add a new line "- registry change: <reason>" to a new entry of contracts/CHANGELOG.md; a reviewer (CODEOWNERS) must approve it`] };
+}
+
+export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.env, oasdiffBin, skip = [], trusted = false, bootstrap = false, tools, checkerRoot = REPO_ROOT, untrustedOnly = false } = {}) {
   const results = [];
   const push = (name, r) => results.push({ name, ...r });
-  const { registry: reg, error } = loadRegistry(root);
+  const notices = [];
+  if (trusted) {
+    if (bootstrap) {
+      notices.push('NOTICE: bootstrap run. The base commit has no trusted-mode checker yet (this pull request introduces it), so the checker of the head ran. This run is NOT protected against a pull request that weakens the rules; review the pull request by hand.');
+    } else {
+      const bad = [];
+      if (within(checkerRoot, root)) bad.push(`the checker runs from ${checkerRoot}, inside the tree it grades (${root}); run the copy from the base commit`);
+      if (tools && within(tools, root)) bad.push(`the oasdiff pin file ${tools} is inside the head tree; use the pin file of the base commit`);
+      if (bad.length) { push('trusted-base', { status: FAIL, details: bad }); return results; }
+    }
+  }
+  let base;
+  try {
+    base = resolveBase(root, { base: baseArg, env });
+  } catch (e) {
+    base = { error: `git could not give the comparison (${e.message}); ${FULL_HISTORY}` };
+  }
+  const inBase = (p) => (base?.sha ? existsAt(root, base.sha, p) : false);
+  const untrustedChecks = () => {
+    // `skip` exists for the tests of the other rules (the Python runs are slow); the command line never skips.
+    if (!skip.includes('table-owners')) push('table-owners', deletedInput(runPythonCheck('table-owners', 'check_table_owners.py', root), inBase('contracts/db/table-owners.yaml'), 'contracts/db/table-owners.yaml', base?.ref));
+    if (!skip.includes('alembic')) push('alembic', deletedInput(runPythonCheck('alembic', 'check_alembic_head.py', root), inBase('apps/api/migrations/versions'), 'apps/api/migrations/versions', base?.ref));
+    const bundleInBase = base?.sha ? !!bundleScript(baseText(root, base.sha, 'package.json')) || inBase('contracts/api/bundle/openapi.json') : false;
+    push('bundle', deletedInput(checkBundle(root), bundleInBase, 'the bundle command or contracts/api/bundle/openapi.json', base?.ref));
+  };
+
+  // Head-code checks only (they run package.json scripts and Python of the head): the separate job `contract-rules-untrusted`.
+  if (untrustedOnly) {
+    if (base.error) push('base', { status: FAIL, details: [base.error] });
+    untrustedChecks();
+    return results;
+  }
+
+  const { registry: headReg, error } = loadRegistry(root);
   if (error) {
     push('registry', { status: FAIL, details: [error] });
     return results;
   }
-  let base;
+  let reg = headReg;
+  let authorityNote = null;
+  if (trusted && base.tip) {
+    const authority = registryAt(root, base.tip);
+    if (authority) reg = effectiveRegistry(headReg, authority, root);
+    else authorityNote = 'notice: the base commit has no readable contracts/registry.json, so the head registry stands alone (bootstrap of the registry)';
+  }
   try {
     push('registry', checkRegistry(root, reg));
-    base = resolveBase(root, { base: baseArg, env });
     if (base.error) {
       push('base', { status: FAIL, details: [base.error] });
     } else {
@@ -459,10 +604,15 @@ export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.
         base = { ...base, error: tag.error };
       } else {
         let oasdiff;
-        // `oasdiffBin` (a path, or a function that returns one) lets the tests stand in for the verified binary.
-        const getOasdiff = async () => (oasdiff ??= typeof oasdiffBin === 'function' ? await oasdiffBin() : oasdiffBin ?? (await ensureOasdiff()));
+        // `oasdiffBin` (a path, or a function that returns one) lets the tests stand in for the verified binary; `tools` is the pin file of the base.
+        const getOasdiff = async () => (oasdiff ??= typeof oasdiffBin === 'function' ? await oasdiffBin() : oasdiffBin ?? (await ensureOasdiff(tools ? { config: loadConfig(path.resolve(tools)) } : {})));
         const changed = changedFiles(root, base.sha);
-        push('base', { status: PASS, details: [`compared with ${base.ref} (merge base ${base.sha.slice(0, 10)}); ${changed.size} file(s) differ${tag ? `; breaking changes are also compared with ${tag.tag}` : ''}`] });
+        const detail = [`compared with ${base.ref} (merge base ${base.sha.slice(0, 10)}); ${changed.size} file(s) differ${tag ? `; breaking changes are also compared with ${tag.tag}` : ''}`];
+        if (!tag) detail.push(`NOTICE: no tag ${TAG_GLOB} exists, so the comparison with the latest tag did not run (only the pull request base is compared)`);
+        if (trusted) detail.push('trusted mode: the registry rules come from the base commit; bundle, Alembic and table-owner checks run in the job contract-rules-untrusted', ...(authorityNote ? [authorityNote] : []));
+        detail.push(...notices);
+        push('base', { status: PASS, details: detail });
+        if (trusted) push('trusted-base', guardCheck(root, base, changed, baseText(root, base.sha, 'contracts/CHANGELOG.md'), headText(root, 'contracts/CHANGELOG.md')));
         results.push(...(await contractChecks({ root, reg, base, tag, changed, getOasdiff })));
       }
     }
@@ -471,16 +621,10 @@ export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.
     base = { error: e.message };
   }
 
-  const inBase = (p) => (base?.sha ? existsAt(root, base.sha, p) : false);
-  // `skip` exists for the tests of the other rules (the Python runs are slow); the command line never skips.
-  if (!skip.includes('table-owners')) push('table-owners', deletedInput(runPythonCheck('table-owners', 'check_table_owners.py', root), inBase('contracts/db/table-owners.yaml'), 'contracts/db/table-owners.yaml', base?.ref));
-  if (!skip.includes('alembic')) push('alembic', deletedInput(runPythonCheck('alembic', 'check_alembic_head.py', root), inBase('apps/api/migrations/versions'), 'apps/api/migrations/versions', base?.ref));
   push('compat', deletedInput(checkCompat(root, reg, headText(root, 'contracts/CHANGELOG.md')), inBase('contracts/COMPAT.md'), 'contracts/COMPAT.md', base?.ref));
-  const bundleInBase = base?.sha ? !!bundleScript(baseText(root, base.sha, 'package.json')) || inBase('contracts/api/bundle/openapi.json') : false;
-  push('bundle', deletedInput(checkBundle(root), bundleInBase, 'the bundle command or contracts/api/bundle/openapi.json', base?.ref));
+  if (!trusted) untrustedChecks();
   return results;
 }
-
 export function formatResults(results) {
   const lines = [];
   for (const r of results) {
@@ -498,9 +642,12 @@ export function formatResults(results) {
 async function main(argv) {
   const opt = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
   const root = opt('--root') ? path.resolve(opt('--root')) : REPO_ROOT;
+  const tools = opt('--tools') ? path.resolve(opt('--tools')) : undefined;
+  // --tools implies trusted mode (D-46 b); --trusted alone is the same with the pins of this checkout
+  const trusted = argv.includes('--trusted') || !!tools;
   let results;
   try {
-    results = await runRules({ root, base: opt('--base') });
+    results = await runRules({ root, base: opt('--base'), trusted, bootstrap: argv.includes('--bootstrap'), tools, untrustedOnly: argv.includes('--untrusted-only') });
   } catch (e) {
     process.stderr.write(`contract rules could not run: ${e.message}\n`);
     return 2;

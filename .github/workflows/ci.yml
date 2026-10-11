@@ -47,26 +47,96 @@ jobs:
       - run: pnpm run contracts:check
 
 
+  # D-46 (story 1.15, docs/adr/0026): the rules engine must not be weakenable by the pull request it grades. The job runs the checker, the registry rules
+  # and the oasdiff pins of the BASE commit and reads the pull request head only as data (folder head/). Never pull_request_target (pwn-request risk).
+  # Bootstrap: while the base commit has no trusted-mode checker (the first pull request that introduces it) the head copy runs and says so in a NOTICE.
   contract-rules:
     name: contract rules
     # Pull requests only: it compares the pull request with its base (full history needed).
     if: github.event_name == 'pull_request'
     timeout-minutes: 10
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout the pull request head (data only, never executed here)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: head
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout the base commit (trusted checker, registry rules and pins)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: base/package.json
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .node-version
-      - run: pnpm install --frozen-lockfile
+          node-version-file: base/.node-version
+      - name: Install the dependencies of the base commit
+        working-directory: base
+        run: pnpm install --frozen-lockfile
+      - name: Run the contract rules from the base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -f base/scripts/check-contract-rules.mjs ] && grep -q 'trusted-base-checker-v1' base/scripts/check-contract-rules.mjs; then
+            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --tools base/tools/oasdiff.json
+          else
+            echo "::notice title=contract rules bootstrap::The base commit has no trusted-mode checker yet, so the checker of the pull request head runs. This run does not protect against a pull request that weakens the rules; review it by hand."
+            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --bootstrap --tools head/tools/oasdiff.json
+          fi
+
+  # The checks that must run code of the pull request (the bundle script of package.json, Alembic and table owners with Python). No credentials are kept
+  # (persist-credentials false, contents: read only, no secrets). Its verdict is the check named here; the trusted job above never runs head code.
+  contract-rules-untrusted:
+    name: contract rules (checks that run head code)
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: head
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout the base commit (the checker that decides)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: head/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: head/.node-version
+      - name: Install the dependencies of the pull request head
+        working-directory: head
+        run: pnpm install --frozen-lockfile
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: 0.12.23
-      - run: node scripts/check-contract-rules.mjs
-
+      - name: Run the head-code checks
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -f base/scripts/check-contract-rules.mjs ] && grep -q 'trusted-base-checker-v1' base/scripts/check-contract-rules.mjs; then
+            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --untrusted-only
+          else
+            echo "::notice title=contract rules bootstrap::The base commit has no trusted-mode checker yet, so the checker of the pull request head runs."
+            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --untrusted-only
+          fi
   terraform:
     name: terraform fmt and validate
     # No credentials: init downloads only the pinned provider, validate and test do not contact any cloud (the tests mock the provider).

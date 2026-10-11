@@ -1,7 +1,8 @@
 {
   "schema_version": "0.1",
   "instance_id": "i-AAAAAAAAAAAAAAAA",
-  "seq": 29,
+  "epoch": 1,
+  "seq": 1099511627805,
   "type": "infrastructure_fault",
   "source": "orchestrator",
   "session_kind": "internal",

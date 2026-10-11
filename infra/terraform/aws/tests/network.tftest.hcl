@@ -338,8 +338,8 @@ run "user_data_size_counts_bytes" {
   command = plan
 
   assert {
-    condition     = local.user_data_bytes >= length(local.user_data_raw) && local.user_data_bytes <= 16384
-    error_message = "bytes must be at least the character count and within the limit"
+    condition     = local.user_data_bytes > 0 && local.user_data_bytes < length(local.user_data_raw) && local.user_data_bytes <= 16384
+    error_message = "the compressed user data must be smaller than the text and within the limit"
   }
 }
 

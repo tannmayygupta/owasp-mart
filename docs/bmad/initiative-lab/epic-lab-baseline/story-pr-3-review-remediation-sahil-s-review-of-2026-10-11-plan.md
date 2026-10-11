@@ -3,14 +3,14 @@ title: 'PR 3 review remediation (Sahil review of 2026-10-11)'
 type: 'chore'
 ticket: '15'
 created: '2026-10-11'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '5c05b66'
 route: 'full'
 route_source: 'pinned'
 risk: 'high'
 review: 'thorough'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: [reviewer-pr3]
 review_loop_iteration: 0
 context: []
 ---
@@ -45,16 +45,18 @@ contracts/ (events, orchestrator, instance, lab-api, mocks, registry.json, CHANG
 
 ## Tasks & Acceptance
 
-- [ ] A. Merge main, conflicts, IF-7, ADR renumber, stale sign-off
-- [ ] B1. IF-4 epoch, seq lanes, keys, fake ingest, sidecar volume
-- [ ] B2. IF-6 schema hardening
-- [ ] B3. IF-5 transition number, strict seq, RFC 9457 Problem (story 1.12)
-- [ ] B4. IF-2 stable timeline paging
-- [ ] C. Rules engine
-- [ ] D. Terraform network, IAM, backend, host scripts
-- [ ] Docs, battery, review reply
+- [x] A. Merge main, conflicts, IF-7, ADR renumber, stale sign-off
+- [x] B1. IF-4 epoch, seq lanes, keys, fake ingest, sidecar volume
+- [x] B2. IF-6 schema hardening
+- [x] B3. IF-5 transition number, strict seq, RFC 9457 Problem (story 1.12)
+- [x] B4. IF-2 stable timeline paging
+- [x] C. Rules engine
+- [x] D. Terraform network, IAM, backend, host scripts
+- [x] Docs, battery, review reply
 
 ## Implementation Notes
+
+Built 2026-10-11: part A (merge) by the developer's Claude session; B1 IF-4, B2 IF-6, B3 IF-5, B4 IF-2, C rules engine, D infrastructure by helper agents, verified by the session. Real results are in `docs/dev-log/2026-10-11-tannmayygupta-pr3-review-remediation.md`: unit 515/515, pytest 640, e2e 72/72 after the fix (71/72 first), harness PASS, contract rules 18 PASS. Not done or not proven: the trusted checker has not run on GitHub; infrastructure is not applied; `terraform plan` not run; conformance vs template schema, IF-2 evidence cursor and duplicate-key rejection are open (H-110). Decisions D-42 to D-46 are Proposed (taken on the developer's delegation) and are not in initial.md Section 15 until the developer confirms.
 
 ## Plan Change Log
 

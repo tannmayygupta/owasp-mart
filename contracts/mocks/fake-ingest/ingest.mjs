@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { verifySignature } from './sign.mjs';
+import { deriveEventKey } from './event-key.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_SCHEMA = path.resolve(HERE, '..', '..', 'events', 'instance-events.schema.json');
@@ -68,18 +69,36 @@ const PROBLEM = {
   signature: { status: 401, code: 'EVT-BAD-SIGNATURE', title: 'Signature check failed' },
   schema: { status: 422, code: 'EVT-SCHEMA', title: 'Event does not match the schema' },
   large: { status: 413, code: 'EVT-TOO-LARGE', title: 'Event too large' },
-  mismatch: { status: 409, code: 'EVT-DUPLICATE-MISMATCH', title: 'Same (instance_id, seq) with a different body' },
+  mismatch: { status: 409, code: 'EVT-DUPLICATE-MISMATCH', title: 'Same (instance_id, epoch, seq) with a different body' },
   full: { status: 503, code: 'EVT-STORE-FULL', title: 'Fake ingest store is full' },
 };
 
-// keys: Map or object { instance_id: key }, the per-instance event key of each instance this ingest knows.
-export function createIngest({ keys, schemaFile = DEFAULT_SCHEMA, now = () => Date.now(), limits = {} } = {}) {
+// Two ways to give the ingest its keys (app-events.md section 4):
+//   keys:   Map or object { instance_id: key }, one fixed key per instance for every epoch (used by the harness and the old tests)
+//   master: the fake master K_evt (32 bytes or 64 hex characters); the key of (instance_id, epoch) is then derived with deriveEventKey
+//           (contracts/mocks/fake-ingest/event-key.mjs), the same HKDF rule the platform uses. `instances` lists the instances it knows,
+//           as { instance_id: current epoch } or an array of ids (current epoch 1).
+// currentEpoch per instance is set through setEpoch (the test and harness API of this fake; the real ingest reads it from the platform).
+export function createIngest({ keys, master, instances, schemaFile = DEFAULT_SCHEMA, now = () => Date.now(), limits = {} } = {}) {
   const cfg = { ...LIMITS, ...limits };
-  const keyOf = keys instanceof Map ? keys : new Map(Object.entries(keys || {}));
-  const validate = compileEventSchema(schemaFile);
+  const fixed = keys instanceof Map ? keys : new Map(Object.entries(keys || {}));
+  const epochs = new Map(); // instance_id -> current epoch
+  if (master !== undefined) {
+    const list = Array.isArray(instances) ? Object.fromEntries(instances.map((i) => [i, 1])) : instances || {};
+    for (const [id, e] of Object.entries(list)) epochs.set(id, e);
+  } else for (const id of fixed.keys()) epochs.set(id, 1);
+  const keyFor = (instanceId, epoch) => {
+    if (!epochs.has(instanceId)) return undefined;
+    return master !== undefined ? deriveEventKey(master, instanceId, epoch) : fixed.get(instanceId);
+  };
+  const setEpoch = (instanceId, epoch) => {
+    if (!epochs.has(instanceId)) throw new Error('unknown instance');
+    if (!Number.isSafeInteger(epoch) || epoch < 1) throw new Error('epoch must be an integer of at least 1');
+    epochs.set(instanceId, epoch);
+  };  const validate = compileEventSchema(schemaFile);
   const stored = [];
-  const seen = new Map(); // "instance_id#seq" -> SHA-256 hex of the body that was stored
-  const security = []; // security events raised on 401 (kind, claimed instance, seq); never the body
+  const seen = new Map(); // "instance_id#epoch#seq" -> SHA-256 hex of the body that was stored
+  const security = []; // security events raised on 401 (kind, claimed instance, epoch, seq); never the body
   let requestCounter = 0;
 
   const reply = (status, body, problem = false) => ({
@@ -110,22 +129,29 @@ export function createIngest({ keys, schemaFile = DEFAULT_SCHEMA, now = () => Da
     try { event = JSON.parse(text); } catch { return problem('schema', 'the body is not valid JSON', [{ path: '', message: 'the body is not valid JSON' }]); }
     if (event === null || typeof event !== 'object' || Array.isArray(event)) return problem('schema', 'the body must be a JSON object', [{ path: '', message: 'must be object' }]);
 
-    // The signature covers instance_id and seq, so both must be usable before it can be checked.
+    // The signature covers instance_id, epoch and seq, so all three must be usable before it can be checked.
     const bad = [];
     if (typeof event.instance_id !== 'string' || !INSTANCE_ID.test(event.instance_id)) bad.push({ path: '/instance_id', message: 'must be a string like i-<16 Base32 characters>' });
+    if (!Number.isSafeInteger(event.epoch) || event.epoch < 1) bad.push({ path: '/epoch', message: 'must be an integer of at least 1' });
     if (!Number.isSafeInteger(event.seq) || event.seq < 1) bad.push({ path: '/seq', message: 'must be an integer of at least 1' });
-    if (bad.length) return problem('schema', 'instance_id and seq are needed to check the signature', bad);
+    if (bad.length) return problem('schema', 'instance_id, epoch and seq are needed to check the signature', bad);
 
-    const key = keyOf.get(event.instance_id);
+    const key = keyFor(event.instance_id, event.epoch);
     const sig = header(headers, 'x-vm-signature');
     // Both branches do one HMAC, so an unknown instance costs the same time as a wrong signature.
-    const signatureOk = verifySignature(key === undefined ? DUMMY_KEY : key, event.instance_id, event.seq, raw, sig);
+    const signatureOk = verifySignature(key === undefined ? DUMMY_KEY : key, event.instance_id, event.epoch, event.seq, raw, sig);
     if (key === undefined) {
-      security.push({ kind: 'unknown_instance', instance_id: event.instance_id, seq: event.seq });
+      security.push({ kind: 'unknown_instance', instance_id: event.instance_id, epoch: event.epoch, seq: event.seq });
       return problem('signature', 'the signature does not verify');
     }
     if (!signatureOk) {
-      security.push({ kind: 'bad_signature', instance_id: event.instance_id, seq: event.seq });
+      security.push({ kind: 'bad_signature', instance_id: event.instance_id, epoch: event.epoch, seq: event.seq });
+      return problem('signature', 'the signature does not verify');
+    }
+    // A correctly signed event of an epoch the platform has not started yet cannot be real. An older epoch is late history: accepted and
+    // stored under its own epoch, never credited to the current one (app-events.md section 6).
+    if (event.epoch > epochs.get(event.instance_id)) {
+      security.push({ kind: 'future_epoch', instance_id: event.instance_id, epoch: event.epoch, seq: event.seq });
       return problem('signature', 'the signature does not verify');
     }
 
@@ -138,17 +164,20 @@ export function createIngest({ keys, schemaFile = DEFAULT_SCHEMA, now = () => Da
     if (Number.isNaN(t)) return problem('schema', 'ts is not a usable time', [{ path: '/ts', message: 'ts is not a usable time' }]);
     if (t > now() + cfg.skewMs) return problem('schema', `ts is more than ${cfg.skewMs / 60000} minutes in the future`, [{ path: '/ts', message: 'is too far in the future' }]);
 
-    const id = `${event.instance_id}#${event.seq}`;
+    const id = `${event.instance_id}#${event.epoch}#${event.seq}`;
     const digest = crypto.createHash('sha256').update(raw).digest('hex');
     if (seen.has(id)) {
-      if (seen.get(id) === digest) return reply(200, { status: 'duplicate', instance_id: event.instance_id, seq: event.seq });
-      return problem('mismatch', 'this (instance_id, seq) was already accepted with a different body');
+      if (seen.get(id) === digest) return reply(200, { status: 'duplicate', instance_id: event.instance_id, epoch: event.epoch, seq: event.seq });
+      return problem('mismatch', 'this (instance_id, epoch, seq) was already accepted with a different body');
     }
     if (stored.length >= cfg.maxStored) return problem('full', `the fake ingest keeps at most ${cfg.maxStored} events`);
     seen.set(id, digest);
     stored.push({ received_at: new Date(now()).toISOString(), event });
-    return reply(202, { status: 'accepted', instance_id: event.instance_id, seq: event.seq });
+    return reply(202, { status: 'accepted', instance_id: event.instance_id, epoch: event.epoch, seq: event.seq });
   }
 
-  return { handle, stored, security };
+  // Stored events in the order the platform uses: by (epoch, seq). A late event of an old epoch sorts before every event of a newer one.
+  const ordered = () => [...stored].sort((a, b) => a.event.epoch - b.event.epoch || a.event.seq - b.event.seq);
+
+  return { handle, stored, security, ordered, setEpoch, epochOf: (id) => epochs.get(id), keyFor };
 }

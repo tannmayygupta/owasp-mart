@@ -10,6 +10,7 @@ import { validateEvents, main, catalogueRows, schemaTypes, runMatrix, derivePost
 import { createIngest, LIMITS } from '../contracts/mocks/fake-ingest/ingest.mjs';
 import { startServer, parseArgs } from '../contracts/mocks/fake-ingest/server.mjs';
 import { signEvent, signBody, verifySignature, TEST_KEY, TEST_INSTANCE } from '../contracts/mocks/fake-ingest/sign.mjs';
+import { deriveEventKey, TEST_MASTER_HEX } from '../contracts/mocks/fake-ingest/event-key.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'validate-events.mjs');
 const SCHEMA = path.join(DEFAULT_DIR, SCHEMA_FILE);
@@ -55,10 +56,10 @@ test('the 29 types of the challenge specs plus infrastructure_fault are all list
   for (const t of ['proxy.request', 'proxy.flag_seen', 'evidence.capture', 'bot.visit', 'instance.flags_injected', 'infrastructure_fault', 'kyc.result']) assert.ok(list.includes(t), t);
 });
 
-test('decision 1: the catalogue event_id is gone, identity is (instance_id, seq)', () => {
+test('decision 1 and D-42: the catalogue event_id is gone, identity is (instance_id, epoch, seq)', () => {
   const schema = readJ(SCHEMA);
   assert.equal(schema.properties.event_id, undefined);
-  assert.ok(schema.required.includes('seq') && schema.required.includes('instance_id'));
+  assert.ok(schema.required.includes('seq') && schema.required.includes('instance_id') && schema.required.includes('epoch'));
   assert.equal(schema.additionalProperties, false);
 });
 
@@ -212,9 +213,9 @@ test('schema: source and session kind rules per type', () => {
   assert.equal(post(bot).status, 202);
   const b2 = clone(get('bot.visit')); b2.seq = 100; b2.session_kind = 'anon';
   assert.equal(post(b2).status, 422);
-  const inj = get('instance.flags_injected'); inj.seq = 101; inj.source = 'platform';
+  const inj = get('instance.flags_injected'); inj.seq = 2 ** 41 + 101; inj.source = 'platform';
   assert.equal(post(inj).status, 422);
-  const f = get('infrastructure_fault'); f.seq = 102; f.source = 'platform';
+  const f = get('infrastructure_fault'); f.seq = 2 ** 41 + 102; f.source = 'platform';
   assert.equal(post(f).status, 202);
   const ev = get('evidence.capture'); ev.seq = 103; ev.source = 'mock';
   assert.equal(post(ev).status, 202);
@@ -244,7 +245,7 @@ test('fake ingest: valid -> 202 stored; duplicate -> 200 not stored twice', () =
   const ev = get('proxy.request');
   const first = ing.handle(signEvent(TEST_KEY, ev));
   assert.equal(first.status, 202);
-  assert.deepEqual(first.body, { status: 'accepted', instance_id: TEST_INSTANCE, seq: ev.seq });
+  assert.deepEqual(first.body, { status: 'accepted', instance_id: TEST_INSTANCE, epoch: 1, seq: ev.seq });
   const again = ing.handle(signEvent(TEST_KEY, ev));
   assert.equal(again.status, 200);
   assert.equal(again.body.status, 'duplicate');
@@ -289,7 +290,7 @@ test('fake ingest: 422 names the JSON path and never echoes a flag-like value', 
   assert.equal(noType.status, 422);
   const noSeq = ing.handle({ headers: { 'content-type': 'application/json' }, body: JSON.stringify({ instance_id: TEST_INSTANCE }) });
   assert.equal(noSeq.status, 422);
-  assert.deepEqual(noSeq.body.errors.map((e) => e.path), ['/seq']);
+  assert.deepEqual(noSeq.body.errors.map((e) => e.path), ['/epoch', '/seq']);
 });
 
 test('fake ingest: 413 above 16 KiB and for an evidence body above 8 KiB (bytes, not characters)', () => {
@@ -321,16 +322,17 @@ test('fake ingest: a ts more than 10 minutes ahead is refused, an old ts is acce
   assert.equal(ing.handle(signEvent(TEST_KEY, old)).status, 202);
 });
 
-test('signing helper: format, tamper detection, instance and seq are covered', () => {
+test('signing helper: format, tamper detection, instance, epoch and seq are covered', () => {
   const body = '{"a":1}';
-  const sig = signBody(TEST_KEY, TEST_INSTANCE, 5, body);
+  const sig = signBody(TEST_KEY, TEST_INSTANCE, 2, 5, body);
   assert.match(sig, /^v1=[0-9a-f]{64}$/);
-  assert.ok(verifySignature(TEST_KEY, TEST_INSTANCE, 5, body, sig));
-  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 6, body, sig));
-  assert.ok(!verifySignature(TEST_KEY, 'i-BBBBBBBBBBBBBBBB', 5, body, sig));
-  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 5, body + ' ', sig));
-  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 5, body, undefined));
-  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 5, body, sig.toUpperCase()));
+  assert.ok(verifySignature(TEST_KEY, TEST_INSTANCE, 2, 5, body, sig));
+  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 2, 6, body, sig));
+  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 3, 5, body, sig), 'the epoch is covered');
+  assert.ok(!verifySignature(TEST_KEY, 'i-BBBBBBBBBBBBBBBB', 2, 5, body, sig));
+  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 2, 5, body + ' ', sig));
+  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 2, 5, body, undefined));
+  assert.ok(!verifySignature(TEST_KEY, TEST_INSTANCE, 2, 5, body, sig.toUpperCase()));
 });
 
 // ---- fake ingest over HTTP ----
@@ -354,7 +356,7 @@ test('fake ingest server: POST answers 202, 200, 401, 413, 422; other methods an
     assert.equal((await fetch(url)).status, 405);
     assert.equal((await fetch(`http://127.0.0.1:${port}/other`, { method: 'POST' })).status, 404);
     const list = await (await fetch(`http://127.0.0.1:${port}/_fake/events`)).json();
-    assert.deepEqual(list, [{ instance_id: TEST_INSTANCE, seq: ev.seq, type: 'proxy.request' }]);
+    assert.deepEqual(list, [{ instance_id: TEST_INSTANCE, epoch: 1, seq: ev.seq, type: 'proxy.request' }]);
     assert.equal(ing.stored.length, 1);
   } finally {
     server.close();
@@ -378,7 +380,7 @@ test('raw bytes: the signature covers the received bytes, invalid UTF-8 included
   const text = JSON.stringify(ev);
   const at = text.indexOf('QQQ');
   const body = Buffer.concat([Buffer.from(text.slice(0, at)), Buffer.from([0xff]), Buffer.from(text.slice(at + 3))]);
-  const h = { ...hdrs, 'x-vm-signature': signBody(TEST_KEY, ev.instance_id, ev.seq, body) };
+  const h = { ...hdrs, 'x-vm-signature': signBody(TEST_KEY, ev.instance_id, ev.epoch, ev.seq, body) };
   assert.equal(ing.handle({ headers: h, body }).status, 202); // valid signature, schema allows the replacement character
   const flipped = Buffer.from(body);
   flipped[flipped.indexOf(0xff)] = 0xfe; // decodes to the same U+FFFD
@@ -387,7 +389,7 @@ test('raw bytes: the signature covers the received bytes, invalid UTF-8 included
   assert.equal(ing2.stored.length, 0);
   // signed but with a field the schema refuses: 422, not 401
   const bad = Buffer.concat([body.subarray(0, body.length - 1), Buffer.from(',"x":1}')]);
-  const hb = { ...hdrs, 'x-vm-signature': signBody(TEST_KEY, ev.instance_id, ev.seq, bad) };
+  const hb = { ...hdrs, 'x-vm-signature': signBody(TEST_KEY, ev.instance_id, ev.epoch, ev.seq, bad) };
   assert.equal(ingest().handle({ headers: hb, body: bad }).status, 422);
 });
 
@@ -505,6 +507,8 @@ test('posted-body schema: sources, ids, caps and types the poster may use', () =
   const posted = derivePosted(readJ(SCHEMA));
   assert.equal(posted.properties.instance_id, undefined);
   assert.equal(posted.properties.seq, undefined);
+  assert.equal(posted.properties.epoch, undefined, 'the sidecar stamps epoch; the poster never sends it');
+  assert.ok(!posted.required.includes('epoch'));
   assert.deepEqual(posted.properties.source.enum, POSTED_SOURCES);
   assert.equal(posted.$defs.data_evidence_capture.properties.body.maxLength, POSTED_EVIDENCE_BODY_CHARS);
   const rule = (t) => posted.allOf.find((e) => e.if && e.if.properties && e.if.properties.type && e.if.properties.type.const === t).then.properties.source;
@@ -588,4 +592,126 @@ test('command line: exit 0 on the real contract, 1 on a failure, 2 on a usage er
   const missing = spawnSync(process.execPath, [SCRIPT, '--dir', path.join(os.tmpdir(), 'vm-events-does-not-exist')], { encoding: 'utf8' });
   assert.equal(missing.status, 1);
   assert.match(missing.stdout, /events: FAIL/);
+});
+
+// ---- D-42: epoch, seq lanes, event key derivation (story 1.15) ----
+const LANES = { sidecar: [1, 2 ** 40 - 1], shop: [1, 2 ** 40 - 1], import: [1, 2 ** 40 - 1], mock: [1, 2 ** 40 - 1], bot: [1, 2 ** 40 - 1], orchestrator: [2 ** 40, 2 ** 41 - 1], platform: [2 ** 41, 2 ** 42 - 1] };
+const typeFor = { sidecar: 'proxy.request', shop: 'shop.verbose_error', import: 'import.job', mock: 'collector.hit', bot: 'bot.visit', orchestrator: 'instance.flags_injected', platform: 'infrastructure_fault' };
+
+test('D-42: every source has its own seq lane, checked at both ends and one step outside', () => {
+  let n = 0;
+  for (const [source, [lo, hi]] of Object.entries(LANES)) {
+    const base = clone(get(typeFor[source]));
+    base.source = source;
+    if (source === 'bot') base.session_kind = 'bot';
+    else if (source === 'import' || source === 'orchestrator' || source === 'platform') base.session_kind = 'internal';
+    else base.session_kind = base.session_kind === 'internal' ? 'anon' : base.session_kind;
+    for (const [seq, want] of [[lo, 202], [hi, 202], [lo - 1, 422], [hi + 1, 422]]) {
+      if (seq < 1) continue;
+      const ev = clone(base);
+      ev.seq = seq;
+      const r = ingest().handle(signEvent(TEST_KEY, ev));
+      assert.equal(r.status, want, `${source} seq ${seq}: ${JSON.stringify(r.body.errors)}`);
+      if (want === 422) assert.ok(r.body.errors.some((e) => e.path === '/seq'), `${source} seq ${seq} names /seq`);
+      n++;
+    }
+  }
+  assert.equal(n, 23);
+});
+
+test('D-42: epoch is required, an integer and at least 1 on the wire; the posted body must not have it', () => {
+  const ing = ingest();
+  for (const [label, mutate] of [['missing', (e) => { delete e.epoch; }], ['zero', (e) => { e.epoch = 0; }], ['string', (e) => { e.epoch = '1'; }], ['float', (e) => { e.epoch = 1.5; }]]) {
+    const ev = get('proxy.request');
+    mutate(ev);
+    const r = ing.handle(signEvent(TEST_KEY, ev));
+    assert.equal(r.status, 422, label);
+    assert.ok(r.body.errors.some((e) => e.path === '/epoch'), label);
+  }
+  const posted = derivePosted(readJ(SCHEMA));
+  const sidecarOnly = readJ(path.join(DEFAULT_DIR, 'examples', 'invalid', 'posted', 'includes-epoch.json'));
+  const ajvIng = createIngest({ keys: {}, schemaFile: path.join(DEFAULT_DIR, POSTED_FILE) });
+  assert.ok(sidecarOnly.epoch === 1 && posted.properties.epoch === undefined);
+  assert.ok(ajvIng);
+});
+
+test('D-42: the signature covers the epoch (a valid event cannot be moved to another epoch)', () => {
+  const ing = ingest({ keys: { [TEST_INSTANCE]: TEST_KEY } });
+  ing.setEpoch(TEST_INSTANCE, 5);
+  const ev = get('proxy.request');
+  const s = signEvent(TEST_KEY, ev);
+  const moved = JSON.stringify({ ...ev, epoch: 2 });
+  assert.equal(ing.handle({ headers: s.headers, body: moved }).status, 401);
+});
+
+test('D-42: ingest dedups on (instance_id, epoch, seq), accepts old epochs as history and refuses future epochs', () => {
+  const master = TEST_MASTER_HEX;
+  const ing = createIngest({ master, instances: { [TEST_INSTANCE]: 2 }, schemaFile: SCHEMA });
+  const at = (epoch, seq, patch = {}) => ({ ...get('proxy.request'), epoch, seq, ...patch });
+  const sign = (ev) => signEvent(deriveEventKey(master, TEST_INSTANCE, ev.epoch), ev);
+  assert.equal(ing.handle(sign(at(2, 1))).status, 202);
+  assert.equal(ing.handle(sign(at(2, 1))).status, 200, 'same body: duplicate');
+  assert.equal(ing.handle(sign(at(2, 1, { ts: '2026-04-04T00:00:00Z' }))).status, 409, 'other body: mismatch');
+  assert.equal(ing.handle(sign(at(1, 1))).status, 202, 'same seq, older epoch: another event, history');
+  assert.equal(ing.handle(sign(at(1, 7))).status, 202, 'a late event of the old epoch after the reset');
+  assert.equal(ing.handle(sign(at(3, 1))).status, 401, 'epoch above the current one');
+  assert.equal(ing.security.at(-1).kind, 'future_epoch');
+  assert.deepEqual(ing.ordered().map((s) => [s.event.epoch, s.event.seq]), [[1, 1], [1, 7], [2, 1]], 'ordered by (epoch, seq)');
+  assert.ok(ing.stored.every((s) => s.event.epoch <= 2), 'nothing is credited to a later epoch');
+  ing.setEpoch(TEST_INSTANCE, 3);
+  assert.equal(ing.handle(sign(at(3, 1))).status, 202, 'after the reset the new epoch counts');
+  assert.throws(() => ing.setEpoch('i-ZZZZZZZZZZZZZZZZ', 2), /unknown instance/);
+  // a key of another epoch does not verify
+  const wrong = signEvent(deriveEventKey(master, TEST_INSTANCE, 1), at(3, 2));
+  assert.equal(ing.handle(wrong).status, 401);
+});
+
+test('D-42: HKDF event key vector: the file matches the shared function, an epoch change changes the key, and a wrong vector fails', () => {
+  const v = readJ(path.join(DEFAULT_DIR, 'examples', 'event-key-vector.json'));
+  assert.equal(v.master_hex, TEST_MASTER_HEX);
+  for (const c of v.cases) assert.equal(deriveEventKey(v.master_hex, c.instance_id, c.epoch), c.key);
+  assert.equal(new Set(v.cases.map((c) => c.key)).size, v.cases.length);
+  assert.notEqual(deriveEventKey(v.master_hex, 'i-AAAAAAAAAAAAAAAA', 1), deriveEventKey(v.master_hex, 'i-AAAAAAAAAAAAAAAA', 2));
+  assert.equal(deriveEventKey(v.master_hex, 'i-AAAAAAAAAAAAAAAA', 1).length, 43);
+  assert.throws(() => deriveEventKey('00', 'i-AAAAAAAAAAAAAAAA', 1), /32 bytes/);
+  assert.throws(() => deriveEventKey(v.master_hex, 'i-AAAAAAAAAAAAAAAA', 0), /epoch/);
+  withCopy((dir) => {
+    const f = path.join(dir, 'examples', 'event-key-vector.json');
+    const bad = readJ(f);
+    bad.cases[0].key = bad.cases[1].key;
+    writeJ(f, bad);
+    assert.ok(failsWith(validateEvents({ dir }), /event-key-vector\.json: key of .* does not match the HKDF result/));
+    fs.rmSync(f);
+    assert.ok(failsWith(validateEvents({ dir }), /event-key-vector\.json: missing/));
+  });
+});
+
+test('D-42: the fake ingest server takes --master and --epoch and has a test API to set the epoch', async () => {
+  assert.throws(() => parseArgs(['--master', 'abc']), /bad master/);
+  assert.throws(() => parseArgs(['--epoch', '0']), /bad epoch/);
+  const o = parseArgs(['--master', TEST_MASTER_HEX, '--epoch', '2']);
+  assert.equal(o.epoch, 2);
+  const s = await startServer({ master: o.master, epoch: 2, port: 0, host: '127.0.0.1', log: () => {} });
+  try {
+    const base = `http://127.0.0.1:${s.port}`;
+    const ev = { ...get('proxy.request'), epoch: 3 };
+    const send = (e) => fetch(`${base}/internal/v1/events`, { method: 'POST', ...(({ body, headers }) => ({ body, headers }))(signEvent(deriveEventKey(TEST_MASTER_HEX, e.instance_id, e.epoch), e)) });
+    assert.equal((await send(ev)).status, 401);
+    const set = await fetch(`${base}/_fake/epoch`, { method: 'POST', body: JSON.stringify({ instance_id: TEST_INSTANCE, epoch: 3 }) });
+    assert.equal(set.status, 200);
+    assert.equal((await send(ev)).status, 202);
+    assert.equal((await fetch(`${base}/_fake/epoch`, { method: 'POST', body: '{"instance_id":"i-ZZZZZZZZZZZZZZZZ","epoch":3}' })).status, 422);
+    const list = await (await fetch(`${base}/_fake/events`)).json();
+    assert.deepEqual(list, [{ instance_id: TEST_INSTANCE, epoch: 3, seq: 1, type: 'proxy.request' }]);
+  } finally { await new Promise((r) => s.server.close(r)); }
+});
+
+test('D-42: the new invalid examples exist and each is refused at its manifest path', () => {
+  const man = readJ(path.join(DEFAULT_DIR, 'examples', 'invalid', 'manifest.json'));
+  for (const n of ['epoch-missing', 'epoch-zero', 'epoch-string', 'orchestrator-seq-1', 'sidecar-seq-in-reserved-lane', 'platform-seq-in-orchestrator-lane']) {
+    assert.ok(man[`instance-events/${n}.json`], n);
+    assert.ok(fs.existsSync(path.join(DEFAULT_DIR, 'examples', 'invalid', 'instance-events', `${n}.json`)), n);
+  }
+  assert.equal(man['posted/includes-epoch.json'].path, '/epoch');
+  assert.deepEqual(validateEvents().errors, []);
 });

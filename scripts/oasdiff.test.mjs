@@ -11,6 +11,27 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'vm-od-'));
 const config = loadConfig();
 const key = platformKey();
 
+// The tests that run the real binary need it on disk or a download. When the download is unavailable (offline), they are skipped with a message
+// instead of failing the suite; a wrong checksum or any other error still fails (the checksum logic is untouched).
+let realBinPromise;
+const realBin = async (t) => {
+  realBinPromise ??= ensureOasdiff().then((bin) => ({ bin }), (e) => {
+    if (e instanceof OasdiffError && /^download of .* failed after/.test(e.message)) return { unavailable: e.message };
+    throw e;
+  });
+  const r = await realBinPromise;
+  if (r.unavailable) t.skip(`oasdiff binary not available and the download failed (${r.unavailable}); run once with network access`);
+  return r.bin;
+};
+
+test('D-46 c: every platform pin has 64-hex sha256 values for the archive and the binary, and downloads over https from the pinned release', () => {
+  for (const [k, p] of Object.entries(config.platforms)) {
+    assert.match(p.archiveSha256, /^[0-9a-f]{64}$/, `${k} archiveSha256`);
+    assert.match(p.binarySha256, /^[0-9a-f]{64}$/, `${k} binarySha256`);
+    assert.ok(p.asset.includes(config.version), `${k} asset names the pinned version`);
+  }
+  assert.ok(config.downloadBase.startsWith('https://github.com/oasdiff/oasdiff/releases/download/'));
+});
 test('the pin: exact version above the advisory floors, a checksum for every platform, license', () => {
   assert.match(config.version, /^\d+\.\d+\.\d+$/);
   assert.ok(compareVersions(config.version, '1.26.1') > 0, 'above 1.26.1');
@@ -85,8 +106,9 @@ test('a pin at or below the advisory floor is refused', async () => {
   await assert.rejects(ensureOasdiff({ config: { ...config, version: '1.26.1' } }), /advisory floor/);
 });
 
-test('the real binary: downloaded, verified against both pins, reports the pinned version', async () => {
-  const bin = await ensureOasdiff();
+test('the real binary: downloaded, verified against both pins, reports the pinned version', async (t) => {
+  const bin = await realBin(t);
+  if (!bin) return;
   assert.equal(sha256(fs.readFileSync(bin)), config.platforms[key].binarySha256);
   const v = spawnSync(bin, ['--version'], { encoding: 'utf8' });
   assert.match(v.stdout, new RegExp(config.version.replace(/\./g, '\\.')));
@@ -106,8 +128,9 @@ paths:
               schema: { type: object, required: [x], properties: { x: { type: string } } }
 `;
 
-test('runOasdiff: identical specs pass; a removed response property is ERR; an unreadable spec is an error', async () => {
-  const bin = await ensureOasdiff();
+test('runOasdiff: identical specs pass; a removed response property is ERR; an unreadable spec is an error', async (t) => {
+  const bin = await realBin(t);
+  if (!bin) return;
   const dir = tmp();
   try {
     fs.writeFileSync(path.join(dir, 'a.yaml'), SPEC);
@@ -124,8 +147,9 @@ test('runOasdiff: identical specs pass; a removed response property is ERR; an u
   }
 });
 
-test('an external $ref is not followed (--allow-external-refs=false)', async () => {
-  const bin = await ensureOasdiff();
+test('an external $ref is not followed (--allow-external-refs=false)', async (t) => {
+  const bin = await realBin(t);
+  if (!bin) return;
   const dir = tmp();
   try {
     fs.writeFileSync(path.join(dir, 'ext.yaml'), SPEC.replace('{ type: object, required: [x], properties: { x: { type: string } } }', '{ $ref: "other.yaml#/Thing" }'));
@@ -136,8 +160,9 @@ test('an external $ref is not followed (--allow-external-refs=false)', async () 
   }
 });
 
-test('our two OpenAPI 3.1 files are read by oasdiff and compare clean with themselves', async () => {
-  const bin = await ensureOasdiff();
+test('our two OpenAPI 3.1 files are read by oasdiff and compare clean with themselves', async (t) => {
+  const bin = await realBin(t);
+  if (!bin) return;
   const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   for (const f of ['contracts/orchestrator/orchestrator.openapi.yaml', 'contracts/api/lab/lab.openapi.yaml']) {
     assert.deepEqual(runOasdiff(bin, path.join(here, f), path.join(here, f)).breaking, [], f);
@@ -147,8 +172,9 @@ test('our two OpenAPI 3.1 files are read by oasdiff and compare clean with thems
 // ---- Review batch 2 ----------------------------------------------------------------------------------------------------------------------
 const OPTIONAL_SPEC = SPEC.replace('required: [x], ', '');
 
-test('severity: removing an optional response property, a response enum value or a request property fails (the CHANGELOG rule says removal is breaking)', async () => {
-  const bin = await ensureOasdiff();
+test('severity: removing an optional response property, a response enum value or a request property fails (the CHANGELOG rule says removal is breaking)', async (t) => {
+  const bin = await realBin(t);
+  if (!bin) return;
   const dir = tmp();
   try {
     const cases = {
@@ -171,8 +197,9 @@ test('severity: removing an optional response property, a response enum value or
   }
 });
 
-test('the severity file lists only checks that exist in the pinned oasdiff, one "id err" per line', async () => {
-  const bin = await ensureOasdiff();
+test('the severity file lists only checks that exist in the pinned oasdiff, one "id err" per line', async (t) => {
+  const bin = await realBin(t);
+  if (!bin) return;
   const lines = fs.readFileSync(SEVERITY_FILE, 'utf8').trim().split('\n');
   const known = JSON.parse(spawnSync(bin, ['checks', 'changelog', '-f', 'json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout).map((c) => c.id);
   assert.ok(lines.length >= 5);

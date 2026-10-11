@@ -2,7 +2,6 @@
   "schema_version": "0.1",
   "instance_id": "i-AAAAAAAAAAAAAAAA",
   "epoch": 1,
-  "first_seq": 1,
   "flag_digests": [
     {
       "challenge_key": "C01",

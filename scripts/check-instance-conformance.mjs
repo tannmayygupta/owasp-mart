@@ -17,7 +17,7 @@ export const DOCKERFILE = path.join(ROOT, 'contracts', 'mocks', 'stub-instance',
 export const RUN_USER = '65532:65532';
 export const ENV_ALLOWLIST = ['VM_INSTANCE_ID', 'VM_EPOCH', 'VM_PUBLIC_HOST', 'VM_SIDECAR_EVENTS_URL', 'VM_MOCK_URL', 'VM_IMPORT_SOCKET', 'VM_DB_PATH', 'VM_CATALOG_DB_PATH', 'VM_SNAPSHOT_PATH', 'VM_FLAGS_PATH', 'PORT', 'TZ', 'VM_LOG_LEVEL'];
 // The only services that are not instance roles. Everything else is checked as part of the instance.
-export const HARNESS_HELPERS = ['ingest', 'volume-keeper'];
+export const HARNESS_HELPERS = Object.freeze(['ingest', 'volume-keeper']);
 export const TMPFS_TARGETS = ['/tmp', '/data'];
 // The four named memory-backed volumes and the one target each is mounted at (IF-6 section 7).
 export const VOLUMES = { 'vm-run': '/run/vm', 'vm-import': '/run/import', 'vm-placement-import': '/run/placement/import', 'vm-placement-mock': '/run/placement/mock' };
@@ -102,8 +102,18 @@ export function checkConfig(config, { dockerfile = '' } = {}) {
   if (mounters('/run/import').some((m) => m.n !== 'shop')) bad.push('/run/import: only the shop (and the import service) may mount it');
   results.push({ rule: 'shared-volume-roles', ok: bad.length === 0, detail: bad.join('; ') });
 
+  // The helper names are an allowlist of NAMES, so they must not be a way to skip rules: a helper gets the generic rules above, the
+  // no-outside-network rule below, and these extra limits (no published port, only read-only volumes, no start-order or role exemption).
+  const helpers = names.filter((n) => HARNESS_HELPERS.includes(n));
+  each('harness-helpers-minimal', helpers, (s) => {
+    if (toArray(s.ports).length) return 'a harness helper must not publish a port';
+    if (volumesOf(s).some((v) => v.type === 'volume' && v.read_only !== true)) return 'a harness helper may mount shared volumes read-only only';
+    return Object.keys(s.depends_on || {}).some((k) => !HARNESS_HELPERS.includes(k)) ? 'a harness helper must not depend on instance services' : false;
+  }, '');
+
   const open = Object.entries(config.networks || {}).filter(([, n]) => n.internal !== true).map(([k]) => k);
-  const onOpen = inst.filter((n) => Object.keys(services[n].networks || {}).some((k) => open.includes(k)));
+  // Applies to helpers too: only the edge may sit on a network with outside access.
+  const onOpen = names.filter((n) => Object.keys(services[n].networks || {}).some((k) => open.includes(k)));
   results.push({ rule: 'no-outside-network', ok: onOpen.every((n) => n === 'edge'), detail: `only the edge may sit on a network with outside access; found: ${onOpen.join(', ')}` });
 
   const shop = services.shop;

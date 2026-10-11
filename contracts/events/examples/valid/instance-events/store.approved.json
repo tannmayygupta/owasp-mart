@@ -1,6 +1,7 @@
 {
   "schema_version": "0.1",
   "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
   "seq": 27,
   "type": "store.approved",
   "source": "shop",

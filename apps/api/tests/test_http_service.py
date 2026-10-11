@@ -14,10 +14,10 @@ from pathlib import Path
 import pytest
 
 from support import (
-    CONTRACT_DIR, ORCH_KEY, PLATFORM_KEY, ROOT, WRONG_KEY, ServiceProcess, create_request, material, new_id, raw_call,
-    reset_request,
+    CONTRACT_DIR, PLATFORM_KEY, ROOT, WRONG_KEY, ReportReceiver, ServiceProcess, create_request, material, new_id,
+    raw_call, reset_request,
 )
-from vulnmart.ports.http_instance_host import HttpInstanceHost, NonceCache, utc_timestamp, verify_request
+from vulnmart.ports.http_instance_host import HttpInstanceHost, utc_timestamp
 from vulnmart.ports.instance_host import (
     Access, BadSignature, Busy, InstanceNotFound, InstanceState, OrchestratorUnavailable, RateLimited, ValidationFailed,
 )
@@ -47,10 +47,15 @@ def body_of(req) -> bytes:
 
 
 def problem(status_body: tuple[int, bytes, dict]) -> dict:
+    """The body of an error answer, after the RFC 9457 checks: media type, the standard members agree with the answer."""
     status, body, headers = status_body
     data = json.loads(body)
-    assert headers["content-type"].startswith("application/problem+json")
+    assert headers["content-type"] == "application/problem+json"
     conforms("Problem", data)
+    assert data["status"] == status
+    assert data["type"] == "https://vulnmart.invalid/problems/" + data["code"].lower()
+    assert data["instance"] == "urn:vulnmart:request:" + data["request_id"]
+    assert "message" not in data  # the old-style member is gone (ADR 0028)
     return data
 
 
@@ -122,7 +127,7 @@ def test_the_error_does_not_say_which_check_failed(svc):
     wrong = signed_headers(WRONG_KEY, "GET", "/v1/host", b"")
     a = problem(raw_call(svc.url, "GET", "/v1/host", headers=stale))
     b = problem(raw_call(svc.url, "GET", "/v1/host", headers=wrong))
-    assert a["message"] == b["message"]
+    assert a["detail"] == b["detail"] and a["title"] == b["title"]
 
 
 # ---- what the orchestrator accepts (NFR-SEC-04) ----
@@ -280,45 +285,9 @@ def test_the_python_signer_reproduces_the_fixed_vector():
     assert sign_request(vec["key"].encode(), vec["method"], vec["target"], vec["timestamp"], vec["nonce"], vec["body"].encode()) == vec["signature"]
 
 
-# ---- state reports ----
-class _Receiver:
-    """A stand-in for the platform API: checks every state report's signature and keeps the bodies."""
-
-    def __init__(self):
-        self.reports: list[dict] = []
-        self.refused = 0
-        nonces = NonceCache()
-        outer = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_POST(self):  # noqa: N802
-                body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-                try:
-                    verify_request(ORCH_KEY, "POST", self.path, dict(self.headers), body, nonces=nonces)
-                except BadSignature:
-                    outer.refused += 1
-                    self.send_response(401)
-                    self.send_header("Content-Length", "0")
-                    self.end_headers()
-                    return
-                outer.reports.append(json.loads(body))
-                self.send_response(204)
-                self.end_headers()
-
-            def log_message(self, *a):
-                pass
-
-        self.server = HTTPServer(("127.0.0.1", 0), Handler)
-        self.url = f"http://127.0.0.1:{self.server.server_port}"
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
-
-    def stop(self):
-        self.server.shutdown()
-        self.server.server_close()
-
-
+# ---- state reports (the receiver is in support.py; transition numbers: test_reports.py) ----
 def test_state_reports_are_signed_and_follow_the_state_machine():
-    rx = _Receiver()
+    rx = ReportReceiver()
     svc = ServiceProcess(report_url=rx.url)
     try:
         host = HttpInstanceHost(svc.url, PLATFORM_KEY)
@@ -334,18 +303,18 @@ def test_state_reports_are_signed_and_follow_the_state_machine():
         svc.stop()
         rx.stop()
     assert rx.refused == 0
-    steps = [(r["from_state"], r["to_state"], r["epoch"]) for r in rx.reports]
+    steps = [(r.from_state and r.from_state.value, r.to_state.value, r.epoch, r.transition) for r in rx.reports]
     assert steps == [
-        (None, "requested", 1), ("requested", "provisioning", 1), ("provisioning", "starting", 1), ("starting", "ready", 1),
-        ("ready", "resetting", 2), ("resetting", "provisioning", 2), ("provisioning", "starting", 2), ("starting", "ready", 2),
-        ("ready", "stopping", 2), ("stopping", "destroyed", 2),
+        (None, "requested", 1, 1), ("requested", "provisioning", 1, 2), ("provisioning", "starting", 1, 3), ("starting", "ready", 1, 4),
+        ("ready", "resetting", 2, 1), ("resetting", "provisioning", 2, 2), ("provisioning", "starting", 2, 3), ("starting", "ready", 2, 4),
+        ("ready", "stopping", 2, 5), ("stopping", "destroyed", 2, 6),
     ]
-    for r in rx.reports:
-        conforms("StateReport", r)
+    for body in rx.bodies:
+        conforms("StateReport", json.loads(body))  # every report on the wire matches the schema, `transition` included
 
 
 def test_a_failed_instance_is_reported_with_its_error_code():
-    rx = _Receiver()
+    rx = ReportReceiver()
     svc = ServiceProcess(report_url=rx.url)
     try:
         host = HttpInstanceHost(svc.url, PLATFORM_KEY)
@@ -357,7 +326,7 @@ def test_a_failed_instance_is_reported_with_its_error_code():
         svc.stop()
         rx.stop()
     last = rx.reports[-1]
-    assert last["to_state"] == "failed" and last["error_code"] == "INST-HEALTH-TIMEOUT" and last["health"] == "unhealthy"
+    assert last.to_state is InstanceState.FAILED and last.error_code == "INST-HEALTH-TIMEOUT" and last.health.value == "unhealthy"
 
 
 class _Stub:
@@ -405,6 +374,14 @@ def _truncated(h):
     h.close_connection = True
 
 
+def _problem_body(code: str, status: int, **extra) -> bytes:
+    """An RFC 9457 body as the contract writes it (plus any extension member a test adds)."""
+    return json.dumps({
+        "type": "https://vulnmart.invalid/problems/" + code.lower(), "title": "t", "status": status, "detail": "d",
+        "instance": "urn:vulnmart:request:req-00000001", "code": code, "request_id": "req-00000001", **extra,
+    }).encode()
+
+
 GOOD_STATUS = json.dumps({
     "instance_id": "i-AAAAAAAAAAAAAAAA", "template_id": "shop-v0", "epoch": 1, "state": "ready", "access": "closed",
     "access_epoch": 0, "health": "healthy", "error_code": None, "host_id": "fake-host-1",
@@ -417,7 +394,15 @@ ID = "i-AAAAAAAAAAAAAAAA"
     ("html", lambda h: _reply(h, 200, b"<html>hi</html>", content_type="text/html"), lambda c: c.host_status()),
     ("empty", lambda h: _reply(h, 200), lambda c: c.get(ID)),
     ("empty-create", lambda h: _reply(h, 200), lambda c: c.create(create_request(ID))),
-    ("unlisted-code", lambda h: _reply(h, 500, b'{"code":"ORCH-MYSTERY","message":"x","request_id":"req-00000001"}', content_type="application/problem+json"), lambda c: c.host_status()),
+    ("unlisted-code", lambda h: _reply(h, 500, _problem_body("ORCH-MYSTERY", 500), content_type="application/problem+json"), lambda c: c.host_status()),
+    ("error-not-problem-json", lambda h: _reply(h, 409, _problem_body("ORCH-INVALID-STATE", 409), content_type="application/json"), lambda c: c.host_status()),
+    ("error-without-media-type", lambda h: _reply(h, 409, _problem_body("ORCH-INVALID-STATE", 409), content_type=""), lambda c: c.host_status()),
+    ("float-token-in-an-answer", lambda h: _reply(h, 200, GOOD_STATUS.replace(b'"epoch": 1', b'"epoch": 1.0')), lambda c: c.get(ID)),
+    ("exponent-token-in-an-answer", lambda h: _reply(h, 200, GOOD_STATUS.replace(b'"epoch": 1', b'"epoch": 1e0')), lambda c: c.get(ID)),
+    ("boolean-as-integer-in-an-answer", lambda h: _reply(h, 200, GOOD_STATUS.replace(b'"epoch": 1', b'"epoch": true')), lambda c: c.get(ID)),
+    ("huge-integer-in-an-answer", lambda h: _reply(h, 200, GOOD_STATUS.replace(b'"epoch": 1', b'"epoch": 9007199254740993')), lambda c: c.get(ID)),
+    ("nan-in-an-answer", lambda h: _reply(h, 200, GOOD_STATUS.replace(b'"epoch": 1', b'"epoch": NaN')), lambda c: c.get(ID)),
+    ("float-in-a-host-answer", lambda h: _reply(h, 200, b'{"host_id":"h","kind":"fake","capacity_memory_mb":1.0,"used_memory_mb":0,"instances":0,"health":"ok"}'), lambda c: c.host_status()),
     ("redirect", lambda h: _reply(h, 302, b"", {"Location": "http://127.0.0.1:1/"}), lambda c: c.host_status()),
     ("wrong-success-status", lambda h: _reply(h, 202, GOOD_STATUS), lambda c: c.get(ID)),
     ("not-an-object", lambda h: _reply(h, 200, b"[1,2]"), lambda c: c.host_status()),
@@ -437,7 +422,7 @@ def test_a_bad_answer_is_orchestrator_unavailable(name, behave, call):
 
 def test_busy_and_rate_limited_carry_retry_after():
     for code, cls in [("ORCH-BUSY", Busy), ("ORCH-RATE-LIMITED", RateLimited)]:
-        body = json.dumps({"code": code, "message": "slow down", "request_id": "req-00000001"}).encode()
+        body = _problem_body(code, 429)
         stub = _Stub(lambda h, body=body: _reply(h, 429, body, {"Retry-After": "7"}, "application/problem+json"))
         try:
             with pytest.raises(cls) as err:
@@ -445,7 +430,7 @@ def test_busy_and_rate_limited_carry_retry_after():
             assert err.value.retry_after == 7.0
         finally:
             stub.stop()
-    stub = _Stub(lambda h: _reply(h, 429, json.dumps({"code": "ORCH-BUSY", "message": "x", "request_id": "req-00000001"}).encode()))
+    stub = _Stub(lambda h: _reply(h, 429, _problem_body("ORCH-BUSY", 429), content_type="application/problem+json"))
     try:
         with pytest.raises(Busy) as err:
             HttpInstanceHost(stub.url, PLATFORM_KEY).host_status()
@@ -515,18 +500,15 @@ def test_a_step_delay_makes_the_states_observable():
         svc.stop()
 
 
-# ---- owner_hash and first_seq ----
+# ---- owner_hash; first_seq was removed in D-42 ----
 @pytest.mark.parametrize("mutate,field", [
     (lambda b: b.pop("owner_hash"), "/owner_hash"),
     (lambda b: b.update(owner_hash="F" * 64), "/owner_hash"),
     (lambda b: b.update(owner_hash="a" * 63), "/owner_hash"),
     (lambda b: b.update(owner_hash=None), "/owner_hash"),
-    (lambda b: b.pop("first_seq"), "/first_seq"),
-    (lambda b: b.update(first_seq=0), "/first_seq"),
-    (lambda b: b.update(first_seq="1"), "/first_seq"),
-    (lambda b: b.update(first_seq=True), "/first_seq"),
+    (lambda b: b.update(first_seq=1), "/first_seq"),  # removed in D-42: the closed schema refuses it
 ])
-def test_create_validates_owner_hash_and_first_seq_with_a_json_pointer(svc, mutate, field):
+def test_create_validates_owner_hash_and_refuses_first_seq_with_a_json_pointer(svc, mutate, field):
     body = create_request().to_json()
     mutate(body)
     res = raw_call(svc.url, "POST", "/v1/instances", json.dumps(body).encode())
@@ -534,15 +516,15 @@ def test_create_validates_owner_hash_and_first_seq_with_a_json_pointer(svc, muta
     assert res[0] == 422 and p["code"] == "ORCH-VALIDATION" and p["field"] == field
 
 
-def test_reset_needs_first_seq_and_refuses_an_owner_hash(svc):
+def test_reset_refuses_first_seq_and_an_owner_hash(svc):
     host = HttpInstanceHost(svc.url, PLATFORM_KEY)
     req = create_request()
     host.create(req)
     _wait(host, req.instance_id, InstanceState.READY)
     target = f"/v1/instances/{req.instance_id}/reset"
     body = reset_request(2).to_json()
-    no_seq = {k: v for k, v in body.items() if k != "first_seq"}
-    res = raw_call(svc.url, "POST", target, json.dumps(no_seq).encode())
+    assert "first_seq" not in body
+    res = raw_call(svc.url, "POST", target, json.dumps({**body, "first_seq": 41}).encode())
     assert res[0] == 422 and problem(res)["field"] == "/first_seq"
     res = raw_call(svc.url, "POST", target, json.dumps({**body, "owner_hash": req.owner_hash}).encode())
     p = problem(res)
@@ -550,9 +532,9 @@ def test_reset_needs_first_seq_and_refuses_an_owner_hash(svc):
     assert host.get(req.instance_id).epoch == 1
 
 
-def test_no_get_answer_holds_the_owner_hash_or_the_first_seq(svc):
+def test_no_get_answer_holds_the_owner_hash(svc):
     from support import owner_hash
-    req = create_request(owner_tag="Z", first_seq=777001)
+    req = create_request(owner_tag="Z")
     status, body, _ = raw_call(svc.url, "POST", "/v1/instances", body_of(req))
     assert status == 202
     host = HttpInstanceHost(svc.url, PLATFORM_KEY)
@@ -562,7 +544,7 @@ def test_no_get_answer_holds_the_owner_hash_or_the_first_seq(svc):
         st, b, _ = raw_call(svc.url, "GET", target)
         assert st == 200
         answers.append(b)
-    st, b, _ = raw_call(svc.url, "POST", f"/v1/instances/{req.instance_id}/reset", json.dumps(reset_request(2, first_seq=888002).to_json()).encode())
+    st, b, _ = raw_call(svc.url, "POST", f"/v1/instances/{req.instance_id}/reset", json.dumps(reset_request(2).to_json()).encode())
     assert st == 202
     answers.append(b)
     st, b, _ = raw_call(svc.url, "GET", f"/v1/instances/{req.instance_id}")
@@ -582,7 +564,7 @@ def test_no_get_answer_holds_the_owner_hash_or_the_first_seq(svc):
     for answer in answers:
         seen = list(walk(json.loads(answer)))
         assert not any(isinstance(x, str) and ("owner" in x or x == "first_seq") for x in seen), answer
-        assert owner_hash("Z") not in seen and 777001 not in seen and 888002 not in seen, answer
+        assert owner_hash("Z") not in seen, answer
 
 
 # ---- fake service hardening ----
@@ -599,7 +581,7 @@ def test_an_unknown_key_is_truncated_when_echoed(svc):
     res = raw_call(svc.url, "POST", "/v1/instances", json.dumps(body).encode())
     p = problem(res)
     assert res[0] == 422 and p["code"] == "ORCH-VALIDATION"
-    assert len(p["field"]) <= 65 and len(p["message"]) < 100
+    assert len(p["field"]) <= 65 and len(p["detail"]) < 100
 
 
 @pytest.mark.parametrize("limit", ["0", "501", "1e2", "0x10", "-1", "5000", "1.5", "", "01", " 5"])
@@ -651,7 +633,7 @@ def test_bad_command_line_options_exit_2(args):
 
 
 def test_activity_that_changes_nothing_makes_no_report():
-    rx = _Receiver()
+    rx = ReportReceiver()
     svc = ServiceProcess(report_url=rx.url)
     try:
         host = HttpInstanceHost(svc.url, PLATFORM_KEY)
@@ -667,8 +649,9 @@ def test_activity_that_changes_nothing_makes_no_report():
     finally:
         svc.stop()
         rx.stop()
-    assert [r["to_state"] for r in rx.reports[4:]] == ["active"]
-    assert all(r["from_state"] != r["to_state"] for r in rx.reports)
+    assert [r.to_state.value for r in rx.reports[4:]] == ["active"]
+    assert all(r.from_state != r.to_state for r in rx.reports)
+    assert [r.transition for r in rx.reports] == [1, 2, 3, 4, 5]  # a change that changed nothing took no number
 
 
 def test_a_refused_state_report_is_written_to_stderr():
@@ -725,3 +708,104 @@ def _wait_for(predicate, timeout=10.0):
 
 def test_access_values_are_the_enum():
     assert {a.value for a in Access} == {"open", "frozen", "closed"}
+
+# ---- RFC 9457 problem details (ADR 0028) ----
+def test_every_error_answer_is_problem_json_with_the_standard_members(svc):
+    small = ServiceProcess(capacity_mb=300)
+    try:
+        HttpInstanceHost(small.url, PLATFORM_KEY).create(create_request(memory_mb=256))
+        answers = {
+            401: raw_call(svc.url, "GET", "/v1/host", key=WRONG_KEY),
+            404: raw_call(svc.url, "GET", f"/v1/instances/{new_id()}"),
+            405: raw_call(svc.url, "DELETE", "/v1/host"),
+            415: raw_call(svc.url, "POST", "/v1/instances", body_of(create_request()), headers={"Content-Type": "text/plain"}),
+            422: raw_call(svc.url, "GET", "/v1/instances?colour=red"),
+            429: raw_call(small.url, "POST", "/v1/instances", body_of(create_request(memory_mb=256))),
+        }
+        req = create_request()
+        assert raw_call(svc.url, "POST", "/v1/instances", body_of(req))[0] == 202
+        answers[409] = raw_call(svc.url, "POST", "/v1/instances", body_of(create_request(req.instance_id, tag="E")))
+    finally:
+        small.stop()
+    for status, res in answers.items():
+        assert res[0] == status, (status, res[1])
+        p = problem(res)
+        assert {"type", "title", "status", "detail", "instance", "code", "request_id"} <= set(p)
+        assert p["title"] and p["detail"]
+    assert answers[429][2]["retry-after"] == "5" and answers[405][2]["allow"] == "GET"
+    assert problem(raw_call(svc.url, "GET", "/v1/nothing"))["code"] == "ORCH-ROUTE-UNKNOWN"
+
+
+def test_the_title_of_a_code_does_not_change_between_answers(svc):
+    a = problem(raw_call(svc.url, "GET", f"/v1/instances/{new_id()}"))
+    b = problem(raw_call(svc.url, "GET", f"/v1/instances/{new_id()}"))
+    assert a["title"] == b["title"] and a["type"] == b["type"]
+    assert a["request_id"] != b["request_id"] and a["instance"] != b["instance"]
+
+
+def test_the_client_ignores_problem_members_it_does_not_know():
+    from vulnmart.ports.instance_host import InvalidState
+    stub = _Stub(lambda h: _reply(h, 409, _problem_body("ORCH-INVALID-STATE", 409, surprise={"a": [1, 2.5]}, errors=[{"x": 1}]), content_type="application/problem+json"))
+    try:
+        with pytest.raises(InvalidState) as err:
+            HttpInstanceHost(stub.url, PLATFORM_KEY).host_status()
+        assert err.value.message == "d" and err.value.request_id == "req-00000001" and err.value.field is None
+    finally:
+        stub.stop()
+
+
+def test_the_client_accepts_a_media_type_with_parameters_and_other_case():
+    from vulnmart.ports.instance_host import InvalidState
+    stub = _Stub(lambda h: _reply(h, 409, _problem_body("ORCH-INVALID-STATE", 409), content_type="Application/Problem+JSON; charset=utf-8"))
+    try:
+        with pytest.raises(InvalidState):
+            HttpInstanceHost(stub.url, PLATFORM_KEY).host_status()
+    finally:
+        stub.stop()
+
+
+# ---- order of the checks: signature, call exists, media type (415), shape (422), existence (404), state (409) ----
+@pytest.mark.parametrize("target,body", [
+    ("/v1/instances", None), ("/v1/instances/{id}/reset", None), ("/v1/instances/{id}/access", b'{"access":"open","access_epoch":1}'),
+])
+def test_a_wrong_media_type_is_415_before_an_unknown_instance_is_404(svc, target, body):
+    iid = new_id()  # never created
+    payload = body if body is not None else json.dumps(reset_request(2).to_json() if "reset" in target else create_request().to_json()).encode()
+    res = raw_call(svc.url, "POST", target.format(id=iid), payload, headers={"Content-Type": "text/plain"})
+    assert res[0] == 415 and problem(res)["code"] == "ORCH-UNSUPPORTED-MEDIA-TYPE"
+    # with the right media type the same request reaches the existence check
+    good = raw_call(svc.url, "POST", target.format(id=iid), payload)
+    assert good[0] == (404 if target != "/v1/instances" else 202), good[1]
+
+
+def test_an_unknown_instance_is_404_only_when_the_media_type_and_the_body_are_fine(svc):
+    iid = new_id()
+    ok = b'{"access":"open","access_epoch":1}'
+    assert raw_call(svc.url, "POST", f"/v1/instances/{iid}/access", ok, headers={"Content-Type": "application/x-www-form-urlencoded"})[0] == 415
+    assert raw_call(svc.url, "POST", f"/v1/instances/{iid}/access", ok)[0] == 404
+    # a malformed body is 422 before the instance is looked up (contract order: shape, then existence)
+    bad = raw_call(svc.url, "POST", f"/v1/instances/{iid}/access", b'{"access":"ajar","access_epoch":1}')
+    assert bad[0] == 422 and problem(bad)["field"] == "/access"
+    notjson = raw_call(svc.url, "POST", f"/v1/instances/{iid}/reset", b"{not json")
+    assert notjson[0] == 422
+    # an empty POST (destroy) needs no media type
+    assert raw_call(svc.url, "POST", f"/v1/instances/{iid}/destroy")[0] == 404
+
+
+def test_the_signature_is_checked_before_the_media_type_and_the_call_before_both(svc):
+    res = raw_call(svc.url, "POST", "/v1/instances", b"x", key=WRONG_KEY, headers={"Content-Type": "text/plain"})
+    assert res[0] == 401
+    res = raw_call(svc.url, "POST", "/v1/nothing", b"x", headers={"Content-Type": "text/plain"})
+    assert res[0] == 404 and problem(res)["code"] == "ORCH-ROUTE-UNKNOWN"
+    res = raw_call(svc.url, "PUT", "/v1/instances", b"x", headers={"Content-Type": "text/plain"})
+    assert res[0] == 405
+
+
+@pytest.mark.parametrize("ctype", ["application/json", "application/json; charset=utf-8", "Application/JSON", "application/json ;charset=utf-8"])
+def test_application_json_with_parameters_is_accepted(svc, ctype):
+    assert raw_call(svc.url, "POST", "/v1/instances", body_of(create_request()), headers={"Content-Type": ctype})[0] == 202
+
+
+@pytest.mark.parametrize("ctype", ["application/jsonx", "application/problem+json", "text/json", "application/json5", "json"])
+def test_other_media_types_are_415(svc, ctype):
+    assert raw_call(svc.url, "POST", "/v1/instances", body_of(create_request()), headers={"Content-Type": ctype})[0] == 415

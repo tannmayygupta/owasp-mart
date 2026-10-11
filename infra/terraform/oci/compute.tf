@@ -23,6 +23,9 @@ locals {
     docker_daemon     = base64encode(file("${local.hosts_dir}/docker-daemon.json"))
     keepalive_py      = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.py"))
     keepalive_unit    = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.service"))
+    egress_sh         = base64encode(file("${local.hosts_dir}/vulnmart-egress.sh"))
+    egress_unit       = base64encode(file("${local.hosts_dir}/vulnmart-egress.service"))
+    egress_env        = jsonencode("# Not used on Oracle: no LABS_HOST_SUBNET, so vulnmart-egress.sh does nothing.\n")
     private_cidr      = local.rules.subnet_cidr
     ntp_server        = "169.254.169.254"
     ssh_keys_json     = jsonencode([])

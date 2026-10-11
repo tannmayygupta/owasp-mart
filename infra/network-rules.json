@@ -1,8 +1,19 @@
 {
   "schema": 1,
-  "note": "One source for network rules. Read by Terraform (network.tf) and by scripts/check-network-rules.mjs. Add a public port here only with a decision record. Token $ssh_source_cidrs = the SSH source list; token $public_web_cidrs = the web source list (default: the same as SSH; 0.0.0.0/0 only when set on purpose).",
+  "note": "One source for network rules. Read by Terraform (network.tf) and by scripts/check-network-rules.mjs. Add a public port here only with a decision record. AWS: subnet_p_cidr (platform) and subnet_i_cidr (labs) are two subnets in the VPC (D-43); subnet_cidr is the older single subnet that the Oracle option still uses. egress_common is the outbound allowlist of both hosts; private_ingress rules also become outbound rules on the from-side host. Token $ssh_source_cidrs = the SSH source list; token $public_web_cidrs = the web source list (default: the same as SSH; 0.0.0.0/0 only when set on purpose).",
   "vcn_cidr": "10.0.0.0/16",
   "subnet_cidr": "10.0.0.0/24",
+  "subnet_p_cidr": "10.0.0.0/24",
+  "subnet_i_cidr": "10.0.1.0/24",
+  "labs_docker_subnets": ["172.17.0.0/16", "172.30.0.0/16"],
+  "ephemeral_ports": { "from": 1024, "to": 65535 },
+  "egress_common": [
+    { "name": "https", "protocol": "tcp", "port": 443, "to": "internet", "description": "Image pulls, certificates, apt over https" },
+    { "name": "apt-http", "protocol": "tcp", "port": 80, "to": "internet", "optional": true, "description": "apt mirrors still use http on the Ubuntu image; switched off with labs_apt_http_egress = false" },
+    { "name": "dns-tcp", "protocol": "tcp", "port": 53, "to": "vpc-resolver", "description": "VPC resolver" },
+    { "name": "dns-udp", "protocol": "udp", "port": 53, "to": "vpc-resolver", "description": "VPC resolver" },
+    { "name": "ntp", "protocol": "udp", "port": 123, "to": "time-sync", "description": "Amazon Time Sync Service" }
+  ],
   "public_ingress": [
     { "name": "ssh", "protocol": "tcp", "port": 22, "sources": ["$ssh_source_cidrs"], "description": "SSH, key-only, from the listed source addresses" },
     { "name": "http", "protocol": "tcp", "port": 80, "sources": ["$public_web_cidrs"], "description": "Certificate challenge and redirect" },

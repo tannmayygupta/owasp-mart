@@ -1,6 +1,7 @@
 {
   "schema_version": "0.1",
   "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
   "seq": 20,
   "type": "shop.security_event_written",
   "source": "shop",

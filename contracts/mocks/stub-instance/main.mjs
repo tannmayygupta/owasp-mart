@@ -4,7 +4,7 @@
 import { parseFlags, listen, logLine } from './common.mjs';
 import { createShop } from './shop.mjs';
 import { runInject } from './inject.mjs';
-import { createSidecar, readStartDocument } from './sidecar.mjs';
+import { createSidecar, readStartDocument, DEFAULT_STATE_PATH } from './sidecar.mjs';
 import { createEdge } from './edge.mjs';
 import { createGate } from './gate.mjs';
 import { runIngest } from './ingest.mjs';
@@ -31,9 +31,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, { st
     case 'sidecar': {
       const r = await readStartDocument(stdin);
       if (!r.ok) { console.error('sidecar: bad start document'); return 2; }
-      const sc = makeSidecar({ start: r.start, relayUrl: o.relay, upstreamUrl: o.upstream });
-      const ports = await sc.listen();
-      logLine(`sidecar: listening on ${ports.playerPort} and ${ports.eventsPort}, first seq ${r.start.first_seq}`);
+      let sc;
+      try { sc = makeSidecar({ start: r.start, relayUrl: o.relay, upstreamUrl: o.upstream, statePath: o.state ?? DEFAULT_STATE_PATH }); } catch (e) { console.error(`sidecar: ${e.message}`); return 2; }
+      const ports = await sc.listen({ ...(o['events-port'] ? { eventsPort: Number(o['events-port']) } : {}), ...(o['player-port'] ? { playerPort: Number(o['player-port']) } : {}) });
+      logLine(`sidecar: listening on ${ports.playerPort} and ${ports.eventsPort}, epoch ${r.start.epoch}, next seq ${sc.nextSeq()}`);
       return null;
     }
     case 'edge': {

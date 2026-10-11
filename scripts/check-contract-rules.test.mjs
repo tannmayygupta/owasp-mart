@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { runRules, formatResults, resolveBase, resolveTag, latestTag, spawn, runPythonCheck, validateRegistry, newEntries, changelogSection, addedLines, sectionVersions, PASS, FAIL, NA, REPO_ROOT } from './check-contract-rules.mjs';
+import { isBreakingMarker, REGISTRY_CHANGE_LINE, isGuarded, effectiveRegistry, runRules, formatResults, resolveBase, resolveTag, latestTag, spawn, runPythonCheck, validateRegistry, newEntries, changelogSection, addedLines, sectionVersions, PASS, FAIL, NA, REPO_ROOT } from './check-contract-rules.mjs';
 import { ensureOasdiff } from './oasdiff.mjs';
 
 const SCRIPT = path.join(REPO_ROOT, 'scripts', 'check-contract-rules.mjs');
@@ -116,11 +116,11 @@ function makeRepo(customize = () => {}) {
 const cleanup = (root) => fs.rmSync(root, { recursive: true, force: true });
 
 // Runs the rules after `mutate`; returns the results keyed by name.
-async function scenario(mutate, { skip = ['table-owners', 'alembic'], base = 'main', customize } = {}) {
+async function scenario(mutate, { skip = ['table-owners', 'alembic'], base = 'main', customize, opts = {} } = {}) {
   const root = makeRepo(customize);
   try {
     await mutate(root);
-    const results = await runRules({ root, base, oasdiffBin, skip });
+    const results = await runRules({ root, base, oasdiffBin, skip, ...opts });
     const by = Object.fromEntries(results.map((r) => [r.name, r]));
     return { root, results, by, text: formatResults(results) };
   } finally {
@@ -569,13 +569,14 @@ test('a registered schema deleted together with its registry line is still break
   assert.match(by['breaking[A]'].details[0], /a\.schema\.json: file removed/);
 });
 
-test('a registry entry dropped from the head FAILs while its folder exists, and passes with a notice when the folder is gone too', async () => {
+test('a registry entry dropped from the head FAILs while its folder exists; with the folder gone too the entry itself passes but the deletion is breaking (D-46 a)', async () => {
   const dropB = (root) => { const r = JSON.parse(read(root, 'contracts/registry.json')); r.contracts = r.contracts.filter((c) => c.id !== 'B'); write(root, 'contracts/registry.json', r); };
   const kept = await scenario((root) => dropB(root));
   assert.equal(kept.by['registry-entry[B]'].status, FAIL);
   const gone = await scenario((root) => { dropB(root); fs.rmSync(path.join(root, 'contracts/b'), { recursive: true }); fs.rmSync(path.join(root, 'contracts/mocks/mock-b'), { recursive: true }); });
   assert.equal(gone.by['registry-entry[B]'].status, PASS);
   assert.match(gone.by['registry-entry[B]'].details[0], /removed together with its folders/);
+  assert.equal(gone.by['breaking[B]'].status, FAIL, 'deleting a whole contract is breaking');
 });
 
 test('registry: an unlisted schema or OpenAPI file in a registered folder FAILs; a wrong shape is a clear FAIL, not a TypeError', async () => {
@@ -738,4 +739,204 @@ test('table owners: CODEOWNERS paths without the leading slash or with tabs, a m
   const dupKey = await run((root) => write(root, 'contracts/db/table-owners.yaml', 'version: 1\ntables:\n  - table: users\n    owner: accounts\n    owner: orgs\n'));
   assert.equal(dupKey['table-owners'].status, FAIL);
   assert.match(dupKey['table-owners'].details[0], /^line 5: not valid YAML \(duplicate key 'owner'\)/);
+});
+// ---- D-46 (stories 1.15): the rules engine must not be weakenable by the pull request it grades ---------------------------------------------
+test('D-46 d: the exact BREAKING marker: a bullet line "BREAKING: <reason>", case-sensitive, no negation', () => {
+  assert.equal(isBreakingMarker('- BREAKING: removed field x'), true);
+  assert.equal(isBreakingMarker('* BREAKING: no longer accepts y'), true);
+  assert.equal(isBreakingMarker('- no BREAKING changes'), false);
+  assert.equal(isBreakingMarker('- not BREAKING'), false);
+  assert.equal(isBreakingMarker('- breaking: x'), false);
+  assert.equal(isBreakingMarker('BREAKING: removed field x'), false, 'a bullet is required');
+  assert.equal(isBreakingMarker('- BREAKING:'), false, 'a reason is required');
+  assert.equal(isBreakingMarker('- BREAKING: none'), false);
+  assert.equal(isBreakingMarker('- First draft. BREAKING no mock change: old'), false);
+});
+
+test('D-46 d: a loose BREAKING word in the new entry no longer declares a breaking change', async () => {
+  for (const line of ['- no BREAKING changes', '- not BREAKING', '- breaking: removed kind']) {
+    const { by } = await scenario((root) => breakA(root, `### 0.2.0 (2026-10-10)\n${line}`));
+    assert.equal(by['breaking[A]'].status, FAIL, line);
+  }
+});
+
+const dropContract = (root, id, { files = true } = {}) => {
+  const r = JSON.parse(read(root, 'contracts/registry.json'));
+  r.contracts = r.contracts.filter((c) => c.id !== id);
+  write(root, 'contracts/registry.json', r);
+  if (files) { fs.rmSync(path.join(root, 'contracts/b'), { recursive: true }); fs.rmSync(path.join(root, 'contracts/mocks/mock-b'), { recursive: true }); }
+};
+
+test('D-46 a: deleting a whole contract is breaking: FAIL without a raised version and BREAKING:, PASS with both', async () => {
+  const none = await scenario((root) => dropContract(root, 'B'));
+  assert.equal(none.by['breaking[B]'].status, FAIL, none.text);
+  assert.match(none.by['breaking[B]'].details.join('\n'), /b\.openapi\.yaml: file removed/);
+  const noBump = await scenario((root) => { dropContract(root, 'B'); addChangelog(root, B, '### 0.1.0 again\n- BREAKING: removed contract B.'); });
+  assert.equal(noBump.by['breaking[B]'].status, FAIL, 'version not raised');
+  const noMarker = await scenario((root) => { dropContract(root, 'B'); addChangelog(root, B, '### 0.2.0 (2026-10-10)\n- removed contract B.'); });
+  assert.equal(noMarker.by['breaking[B]'].status, FAIL, 'marker missing');
+  const ok = await scenario((root) => { dropContract(root, 'B'); addChangelog(root, B, '### 0.2.0 (2026-10-10)\n- BREAKING: removed contract B.'); });
+  assert.equal(ok.by['breaking[B]'].status, PASS, ok.text);
+  assert.equal(ok.by['registry-entry[B]'].status, PASS);
+  const gone = await scenario((root) => { dropContract(root, 'B'); write(root, 'contracts/CHANGELOG.md', read(root, 'contracts/CHANGELOG.md').replace(/## Contract B[\s\S]*?(?=## Table)/, '')); });
+  assert.equal(gone.by['breaking[B]'].status, FAIL, 'a section removed with the contract leaves no declaration');
+});
+
+test('D-46 a: a rename or a merge is not a deletion only when another entry lists the same files', async () => {
+  const rename = await scenario((root) => {
+    const r = JSON.parse(read(root, 'contracts/registry.json'));
+    r.contracts.find((c) => c.id === 'B').id = 'B2';
+    write(root, 'contracts/registry.json', r);
+  });
+  assert.equal(rename.by['breaking[B]'].status, PASS, rename.text);
+  assert.match(rename.by['breaking[B]'].details[0], /listed by another entry/);
+  assert.equal(rename.by['registry-entry[B]'].status, PASS);
+  const merge = await scenario((root) => {
+    const r = JSON.parse(read(root, 'contracts/registry.json'));
+    r.contracts = r.contracts.filter((c) => c.id !== 'B');
+    const a = r.contracts.find((c) => c.id === 'A');
+    a.folders.push('contracts/b');
+    a.openapi.push('contracts/b/b.openapi.yaml');
+    a.mocks.push('contracts/mocks/mock-b');
+    write(root, 'contracts/registry.json', r);
+  });
+  assert.equal(merge.by['breaking[B]'].status, PASS, merge.text);
+  const otherFiles = await scenario((root) => {
+    const r = JSON.parse(read(root, 'contracts/registry.json'));
+    const b = r.contracts.find((c) => c.id === 'B');
+    b.id = 'B2';
+    b.openapi = ['contracts/b/other.openapi.yaml'];
+    write(root, 'contracts/registry.json', r);
+    write(root, 'contracts/b/other.openapi.yaml', OPENAPI_B);
+    fs.rmSync(path.join(root, 'contracts/b/b.openapi.yaml'));
+  });
+  assert.equal(otherFiles.by['breaking[B]'].status, FAIL, otherFiles.text);
+  assert.match(otherFiles.by['breaking[B]'].details.join('\n'), /b\.openapi\.yaml: file removed/);
+});
+
+test('D-46 e: unlisted .json and .yaml files in a contract folder are compared too (examples are not)', async () => {
+  const custom = (root) => {
+    write(root, 'contracts/a/data.json', { type: 'object', properties: { p: { type: 'string' } } });
+    write(root, 'contracts/a/notes.yaml', 'a: 1\n');
+    write(root, 'contracts/a/examples/ok.json', { p: 1 });
+  };
+  const del = await scenario((root) => { fs.rmSync(path.join(root, 'contracts/a/data.json')); addChangelog(root, A, '### 0.1.1\n- x\n- no mock change: x'); }, { customize: custom });
+  assert.equal(del.by['breaking[A]'].status, FAIL);
+  assert.match(del.by['breaking[A]'].details[0], /data\.json: file removed/);
+  const edit = await scenario((root) => { write(root, 'contracts/a/data.json', { type: 'object', properties: {} }); addChangelog(root, A, '### 0.1.1\n- x\n- no mock change: x'); }, { customize: custom });
+  assert.match(edit.by['breaking[A]'].details[0], /data\.json #\/properties\/p: property removed/);
+  const yaml = await scenario((root) => { write(root, 'contracts/a/notes.yaml', 'a: 2\n'); addChangelog(root, A, '### 0.1.1\n- x\n- no mock change: x'); }, { customize: custom });
+  assert.match(yaml.by['breaking[A]'].details[0], /unlisted YAML file changed/);
+  const example = await scenario((root) => { write(root, 'contracts/a/examples/ok.json', { p: 2 }); addChangelog(root, A, '### 0.1.1\n- x\n- no mock change: x'); }, { customize: custom });
+  assert.equal(example.by['breaking[A]'].status, PASS, 'examples are data, not contract text');
+});
+
+test('D-46 e: a tag baseline that never runs prints a NOTICE', async () => {
+  const none = await scenario(() => {});
+  assert.match(none.by.base.details.join('\n'), /NOTICE: no tag contracts-v\*/);
+});
+
+// ---- trusted mode ------------------------------------------------------------------------------------------------------------------------
+const trusted = { trusted: true };
+const editRegistry = (root, fn) => { const r = JSON.parse(read(root, 'contracts/registry.json')); fn(r); write(root, 'contracts/registry.json', r); };
+
+test('D-46 b: trusted mode reports any change to the registry, the checker, the diff scripts, the pins or the workflows unless "registry change:" is declared', async () => {
+  assert.ok(['contracts/registry.json', 'scripts/check-contract-rules.mjs', 'scripts/schema-diff.mjs', 'scripts/oasdiff.mjs', 'tools/oasdiff.json', '.github/workflows/ci.yml'].every(isGuarded));
+  assert.equal(isGuarded('contracts/a/a.md'), false);
+  assert.equal(REGISTRY_CHANGE_LINE.test('- registry change: new mock folder'), true);
+  assert.equal(REGISTRY_CHANGE_LINE.test('- no registry change'), false);
+  assert.equal(REGISTRY_CHANGE_LINE.test('- registry change:'), false);
+  const clean = await scenario(() => {}, { opts: trusted });
+  assert.equal(clean.by['trusted-base'].status, PASS);
+  for (const [name, mutate] of Object.entries({
+    registry: (root) => editRegistry(root, (r) => { r.contracts[0].owner = 'X'; }),
+    'checker': (root) => write(root, 'scripts/check-contract-rules.mjs', '// weakened\n'),
+    workflow: (root) => write(root, '.github/workflows/ci.yml', 'name: x\n'),
+    pin: (root) => write(root, 'tools/oasdiff.json', '{}\n'),
+  })) {
+    const bad = await scenario(mutate, { opts: trusted });
+    assert.equal(bad.by['trusted-base'].status, FAIL, name);
+    assert.match(bad.by['trusted-base'].details[0], /registry change:/, name);
+    const declared = await scenario((root) => { mutate(root); addChangelog(root, A, '### 0.1.1\n- registry change: test reason'); }, { opts: trusted });
+    assert.equal(declared.by['trusted-base'].status, PASS, name);
+  }
+});
+
+test('D-46 b: in trusted mode the base registry is the authority: a decoy mock, a reserved folder and a dropped noMock do not weaken the rules', async () => {
+  // a breaking change in A, "mock updated" only in a decoy folder that the pull request added to the registry
+  const decoy = await scenario((root) => {
+    editRegistry(root, (r) => { r.contracts[0].mocks = ['contracts/mocks/decoy']; });
+    write(root, 'contracts/mocks/decoy/server.mjs', '// decoy\n');
+    const s = JSON.parse(read(root, 'contracts/a/a.schema.json')); s.properties.extra = { type: 'string' }; write(root, 'contracts/a/a.schema.json', s);
+    addChangelog(root, A, '### 0.2.0 (2026-10-10)\n- additive\n- registry change: moved the mock');
+  }, { opts: trusted });
+  assert.equal(decoy.by['mock[A]'].status, FAIL, decoy.text);
+  assert.match(decoy.by['mock[A]'].details[0], /contracts\/mocks\/mock-a/);
+  // the same run without trusted mode is fooled by the decoy, which is exactly what trusted mode prevents
+  const plain = await scenario((root) => {
+    editRegistry(root, (r) => { r.contracts[0].mocks = ['contracts/mocks/decoy']; });
+    write(root, 'contracts/mocks/decoy/server.mjs', '// decoy\n');
+    const s = JSON.parse(read(root, 'contracts/a/a.schema.json')); s.properties.extra = { type: 'string' }; write(root, 'contracts/a/a.schema.json', s);
+    addChangelog(root, A, '### 0.2.0 (2026-10-10)\n- additive');
+  });
+  assert.equal(plain.by['mock[A]'].status, PASS);
+  // a folder the pull request declares "reserved" is still unregistered
+  const reserved = await scenario((root) => {
+    editRegistry(root, (r) => { r.reserved.push('contracts/rogue'); });
+    write(root, 'contracts/rogue/x.txt', 'x\n');
+  }, { opts: trusted });
+  assert.equal(reserved.by.registry.status, FAIL);
+  assert.match(reserved.by.registry.details.join('\n'), /contracts\/rogue/);
+  // effectiveRegistry in isolation: base noMock and rules win, head-only entries are kept
+  const eff = effectiveRegistry(
+    { ...REGISTRY, reserved: ['x'], contracts: [{ ...REGISTRY.contracts[2], noMock: 'no mock by design: head', mocks: [] }, { id: 'N', changelog: 'n', folders: ['contracts/n'], schemas: [], openapi: [], mocks: [], noMock: 'no mock by design: y', conformance: [] }] },
+    REGISTRY, os.tmpdir());
+  assert.deepEqual(eff.reserved, REGISTRY.reserved);
+  assert.equal(eff.contracts[0].noMock, REGISTRY.contracts[2].noMock);
+  assert.equal(eff.contracts[1].id, 'N');
+});
+
+test('D-46 b: trusted mode refuses a checker or a pin file that lives inside the head tree, unless this is the declared bootstrap run', async () => {
+  const root = makeRepo();
+  try {
+    const inside = await runRules({ root, base: 'main', oasdiffBin, skip: ['table-owners', 'alembic'], trusted: true, checkerRoot: root });
+    assert.equal(inside.length, 1);
+    assert.equal(inside[0].status, FAIL);
+    assert.match(inside[0].details[0], /inside the tree it grades/);
+    const pins = await runRules({ root, base: 'main', oasdiffBin, skip: ['table-owners', 'alembic'], trusted: true, tools: path.join(root, 'tools', 'oasdiff.json') });
+    assert.equal(pins[0].status, FAIL);
+    assert.match(pins[0].details[0], /pin file .* inside the head tree/);
+    const boot = await runRules({ root, base: 'main', oasdiffBin, skip: ['table-owners', 'alembic'], trusted: true, bootstrap: true, checkerRoot: root });
+    const base = boot.find((r) => r.name === 'base');
+    assert.equal(base.status, PASS);
+    assert.match(base.details.join('\n'), /NOTICE: bootstrap run/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('D-46 b: --untrusted-only runs only the checks that execute head code; trusted mode does not run them', async () => {
+  const root = makeRepo();
+  try {
+    const only = await runRules({ root, base: 'main', skip: ['table-owners', 'alembic'], untrustedOnly: true });
+    assert.deepEqual(only.map((r) => r.name), ['bundle']);
+    const t = await runRules({ root, base: 'main', oasdiffBin, trusted: true });
+    assert.ok(!t.some((r) => ['table-owners', 'alembic', 'bundle'].includes(r.name)), t.map((r) => r.name).join(','));
+    assert.match(t.find((r) => r.name === 'base').details.join('\n'), /contract-rules-untrusted/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('D-46 b: the CLI accepts --root, --base and --tools, and refuses to grade the tree it runs from in trusted mode', () => {
+  const root = makeRepo();
+  try {
+    const r = spawnSync(process.execPath, [SCRIPT, '--root', root, '--base', 'main', '--tools', path.join(root, 'tools', 'oasdiff.json')], { encoding: 'utf8', timeout: 120_000 });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /FAIL\s+trusted-base: .*pin file/);
+    const ok = spawnSync(process.execPath, [SCRIPT, '--root', root, '--base', 'main', '--tools', path.join(REPO_ROOT, 'tools', 'oasdiff.json')], { encoding: 'utf8', timeout: 300_000 });
+    assert.match(ok.stdout, /trusted-base: the registry, the checker/, ok.stdout + ok.stderr);
+  } finally {
+    cleanup(root);
+  }
 });

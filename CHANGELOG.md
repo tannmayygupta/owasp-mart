@@ -5,6 +5,15 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Changed (PR 3 review remediation, story 1.15, 2026-10-11, Tanmay)
+- Merged `origin/main` into the sprint 1 branch: 7 conflicts resolved as unions, IF-7 registered, this branch's ADRs 0017 and 0018 renumbered 0023 and 0024, the IF-4 consumer sign-off flagged stale.
+- IF-4 0.2.0: `epoch` on every event, identity `(instance_id, epoch, seq)`, seq lanes per source, signed epoch, per-epoch HKDF event key with a test vector, `first_seq` removed from IF-5 and the sidecar start input, sidecar counter saved before each event (ADR 0025). Breaking inside 0.x.
+- IF-6 0.2.0: template schema rejects 40 more invalid shapes (fixed network and image per role, limits, env patterns, injector rules, reason quality, dates, user).
+- IF-5 0.3.0: required `transition` on StateReport, strict integers on the wire, RFC 9457 problem details with an open schema, `ssl_context` must verify (ADR 0028).
+- IF-2 0.2.0: stable `(epoch, seq)` cursor, `has_more` and `limit`, RFC 9457 problems, flag answer only `correct` or `incorrect`, role table, 410 for withdrawn and cancelled reads.
+- Contract rules engine: trusted base checker, whole-contract deletion is breaking, exact `BREAKING:` marker, `oneOf` branch removal and unlisted artefacts are compared, `.github/CODEOWNERS` for the checker paths (ADR 0026). The workflow has not run on GitHub yet.
+- Infrastructure as code (nothing applied): two subnets, labs egress allowlist, network ACL, DOCKER-USER and metadata rules, compose lint, IAM policy without `ModifyInstanceAttribute` and with an instance-type deny, S3 backend example and bootstrap script, Terraform 1.11 minimum (ADR 0027).
+
 ### Added (progress page for the guide meeting, story 1.14, 2026-10-11, Tanmay)
 - `scripts/progress-page.mjs` (with `scripts/progress-page.test.mjs`) builds one offline HTML page from the three task files (working tree or a git ref per stream) and can serve it on 127.0.0.1; snapshot in `docs/progress/index.html`, how-to in `docs/progress/README.md`, `pnpm run progress`. Traceability row LX-3 (partial).
 

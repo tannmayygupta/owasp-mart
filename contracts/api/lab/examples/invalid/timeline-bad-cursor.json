@@ -22,5 +22,6 @@
       "result": "correct"
     }
   ],
+  "has_more": true,
   "next_cursor": "a b"
 }

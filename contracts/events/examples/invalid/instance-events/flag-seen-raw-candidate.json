@@ -1,6 +1,7 @@
 {
   "schema_version": "0.1",
   "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
   "seq": 3,
   "type": "proxy.flag_seen",
   "source": "sidecar",

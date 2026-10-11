@@ -128,6 +128,7 @@ export function diffSchemas(base, head) {
       return;
     }
     if (ONE_OF.has(k)) {
+      const before = out.length;
       bv.forEach((s, i) => {
         // match by position first; a branch that no longer exists anywhere is a removal
         const match = hv[i] !== undefined && same(s, hv[i]) ? hv[i] : hv.find((x) => same(x, s));
@@ -136,6 +137,8 @@ export function diffSchemas(base, head) {
           else walk(s, hv[i], `${here}/${i}`);
         }
       });
+      // D-46 e: fewer branches than before is a removal even when the position-by-position walk of an edited branch found nothing narrower
+      if (hv.length < bv.length && out.length === before) add(here, `${k} branch removed (${bv.length} branches before, ${hv.length} now)`);
       return;
     }
     if (k === 'allOf') {

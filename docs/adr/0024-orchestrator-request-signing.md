@@ -23,3 +23,6 @@ Easier: no new dependency, one test vector, symmetrical with the event signing. 
 - [RFC 9421, HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421) (via the IANA registry and secondary articles: parameters `created`, `expires`, `nonce`; the verifier enforces the window and the nonce). The RFC text itself was not read in full.
 - The comparison with custom HMAC schemes and with AWS Signature Version 4 is from general knowledge; no primary source was read (UNVERIFIED).
 - Architecture 06 lines 13, 27, 64 and 84 (mTLS, signed body, timestamp, nonce, separate key).
+
+## Later change
+The signature covers the whole raw body, so the new required 	ransition of the state report (IF-5 0.3.0) and the integer-token rule are covered without a change to the signing string. Error answers are RFC 9457 problem details; see [ADR 0028](0028-if5-problem-details-state-report-and-strict-seq.md). The signing scheme itself is unchanged.

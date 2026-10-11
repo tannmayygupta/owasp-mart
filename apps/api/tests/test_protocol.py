@@ -121,34 +121,25 @@ def test_a_bad_owner_hash_is_a_validation_error(harness, bad):
         harness.host.get(req.instance_id)
 
 
-@pytest.mark.parametrize("bad", [0, -1, "1", True, 1.5, None])
-def test_a_bad_first_seq_is_a_validation_error_on_create_and_reset(harness, bad):
-    req = dataclasses.replace(create_request(), first_seq=bad)
-    with pytest.raises(ValidationFailed) as err:
-        harness.host.create(req)
-    assert err.value.field == "/first_seq"
-    ok = create_request()
-    harness.host.create(ok)
-    harness.settle(ok.instance_id, S.READY)
-    with pytest.raises(ValidationFailed) as err:
-        harness.host.reset(ok.instance_id, dataclasses.replace(reset_request(2), first_seq=bad))
-    assert err.value.field == "/first_seq"
-    assert harness.host.get(ok.instance_id).epoch == 1  # nothing changed
+def test_first_seq_is_gone_from_the_requests_and_their_wire_form(harness):
+    # decision D-42: every epoch restarts the sidecar counter at 1, so IF-5 carries no first_seq
+    assert not hasattr(create_request(), "first_seq") and not hasattr(reset_request(2), "first_seq")
+    assert "first_seq" not in create_request().to_json() and "first_seq" not in reset_request(2).to_json()
+    # the event key stays in the body: the platform derives it per (instance, epoch) and passes it through
+    assert "event_key" in create_request().to_json() and "event_key" in reset_request(2).to_json()
 
 
-def test_owner_hash_and_first_seq_are_part_of_the_request_identity(harness):
-    req = create_request(owner_tag="O", first_seq=1)
+def test_owner_hash_is_part_of_the_request_identity(harness):
+    req = create_request(owner_tag="O")
     harness.host.create(req)
     with pytest.raises(RequestMismatch):
         harness.host.create(dataclasses.replace(req, owner_hash=create_request(owner_tag="P").owner_hash))
-    with pytest.raises(RequestMismatch):
-        harness.host.create(dataclasses.replace(req, first_seq=2))
     assert harness.host.create(req).changed is False  # the identical request is still a repeat
     harness.settle(req.instance_id, S.READY)
-    harness.host.reset(req.instance_id, reset_request(2, first_seq=41))
-    assert harness.host.reset(req.instance_id, reset_request(2, first_seq=41)).changed is False
+    harness.host.reset(req.instance_id, reset_request(2, tag="D"))
+    assert harness.host.reset(req.instance_id, reset_request(2, tag="D")).changed is False
     with pytest.raises(RequestMismatch):
-        harness.host.reset(req.instance_id, reset_request(2, first_seq=42))
+        harness.host.reset(req.instance_id, reset_request(2, tag="E"))  # another secret set for the same epoch is a different request
 
 
 def test_a_reset_keeps_the_instance_and_needs_no_owner(harness):

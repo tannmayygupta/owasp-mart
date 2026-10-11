@@ -5,8 +5,13 @@
 // What it does: the seven calls, the instance state machine, request signing (HMAC, timestamp, nonce),
 // a memory capacity limit, a step delay, and optional signed state reports to the platform.
 // What it never does: answer a flag, decoy, digest, seed or event key. A create or reset body is checked and
-// then reduced to a SHA-256 fingerprint (owner_hash and first_seq are part of it); the secrets, the owner hash and
-// the first sequence number are dropped, never stored and never returned.
+// then reduced to a SHA-256 fingerprint (owner_hash is part of it); the secrets and the owner hash
+// are dropped, never stored and never returned.
+//
+// Wire rules (ADR 0028, contract section 2a and 6): every integer of the contract must be an integer token in the body (no `1.0`,
+// no `1e0`, no boolean, at most 2^53 - 1), so the body is read by the small strict parser below and not by JSON.parse, which cannot tell
+// `1` from `1.0`. Every error answer is RFC 9457 problem details (`application/problem+json`: type, title, status, detail, instance, plus
+// the extension members code, request_id and field). The one non-integer number, limits.cpu_limit, is compared by value (2 equals 2.0).
 //
 // Not part of the contract (test aids): the template name shop-fail-v0, which ends in `failed` with the
 // placeholder code INST-HEALTH-TIMEOUT, and POST /_fake/v1/instances/{id}/activity (unsigned, loopback only).
@@ -31,6 +36,14 @@ export const TEMPLATES = new Set(['shop-v0', 'shop-fail-v0']);
 const COMPONENTS = new Set(['bot-controller', 'import-service', 'injector', 'mock-services', 'shop', 'sidecar']);
 const FORBIDDEN = new Set(['image', 'command', 'cmd', 'entrypoint', 'volume', 'volumes', 'mount', 'mounts', 'port', 'ports', 'network', 'networks', 'env', 'environment']);
 const LABELS = new Set(['instance', 'epoch', 'component', 'template', 'kind']);
+const TITLES = {
+  'ORCH-BAD-SIGNATURE': 'Bad signature', 'ORCH-INSTANCE-NOT-FOUND': 'Instance not found', 'ORCH-METHOD-NOT-ALLOWED': 'Method not allowed',
+  'ORCH-REQUEST-MISMATCH': 'Same identity, different body', 'ORCH-INSTANCE-EXISTS': 'Instance exists', 'ORCH-INVALID-STATE': 'Invalid state',
+  'ORCH-STALE-EPOCH': 'Stale epoch', 'ORCH-STALE-ACCESS-EPOCH': 'Stale access epoch', 'ORCH-BODY-TOO-LARGE': 'Body too large',
+  'ORCH-UNSUPPORTED-MEDIA-TYPE': 'Unsupported media type', 'ORCH-FIELD-FORBIDDEN': 'Field forbidden', 'ORCH-TEMPLATE-UNKNOWN': 'Template unknown',
+  'ORCH-LABEL-UNKNOWN': 'Label unknown', 'ORCH-VALIDATION': 'Validation failed', 'ORCH-CURSOR-INVALID': 'Cursor invalid', 'ORCH-BUSY': 'No capacity',
+  'ORCH-RATE-LIMITED': 'Rate limited', 'ORCH-ROUTE-UNKNOWN': 'No such call', 'ORCH-INTERNAL': 'Internal error',
+};
 const RESETTABLE = new Set(['ready', 'active', 'idle']);
 const TRANSITIONAL = new Set(['requested', 'provisioning', 'starting', 'resetting', 'stopping']);
 
@@ -45,14 +58,97 @@ const RE = {
   ts: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/,
   nonce: /^[0-9a-f]{32}$/,
   sig: /^v1=[0-9a-f]{64}$/,
-  cursor: /^[A-Za-z0-9_-]{1,128}$/,
+  cursor: /^[A-Za-z0-9_-]{24}$/, // base64url, no padding, of an 18-character instance id
 };
 
-const isInt = (v, min, max = Infinity) => Number.isInteger(v) && v >= min && v <= max;
-const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+export const MAX_INT = Number.MAX_SAFE_INTEGER; // 2^53 - 1, the largest integer of the contract (RFC 7493 section 2.2)
+export const PROBLEM_BASE = 'https://vulnmart.invalid/problems/';
+const JSON_TYPE = /^application\/json\s*(;.*)?$/i;
+
+// A number token that is not a plain integer in the safe range: a fraction, an exponent, or too large. Never an integer.
+export class Num {
+  constructor(raw, value) { this.raw = raw; this.value = value; }
+}
+const isInt = (v, min, max = MAX_INT) => typeof v === 'number' && Number.isSafeInteger(v) && v >= min && v <= max;
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Num);
+
+const NUM_RE = /-?(?:0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/y;
+// JSON (RFC 8259) read so that an integer token becomes a JS number and every other number token becomes a Num. Throws SyntaxError.
+export function parseJsonStrict(text) {
+  let i = 0;
+  const fail = (msg) => { throw new SyntaxError(`${msg} at ${i}`); };
+  const ws = () => { while (i < text.length && ' \t\n\r'.includes(text[i])) i++; };
+  const str = () => {
+    const start = i;
+    i++;
+    while (i < text.length) {
+      const ch = text[i];
+      if (ch === '\\') i += 2;
+      else if (ch === '"') { i++; return JSON.parse(text.slice(start, i)); } // JSON.parse checks the escapes and control characters
+      else i++;
+    }
+    return fail('unterminated string');
+  };
+  const value = (depth) => {
+    if (depth > 64) fail('nested too deep');
+    ws();
+    const c = text[i];
+    if (c === '{') {
+      i++;
+      ws();
+      const entries = [];
+      if (text[i] === '}') { i++; return {}; }
+      for (;;) {
+        ws();
+        if (text[i] !== '"') fail('expected a member name');
+        const k = str();
+        ws();
+        if (text[i] !== ':') fail('expected a colon');
+        i++;
+        entries.push([k, value(depth + 1)]);
+        ws();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === '}') { i++; break; }
+        fail('expected a comma or a closing brace');
+      }
+      return Object.fromEntries(entries); // defines own properties, so a member named __proto__ is data
+    }
+    if (c === '[') {
+      i++;
+      ws();
+      const items = [];
+      if (text[i] === ']') { i++; return items; }
+      for (;;) {
+        items.push(value(depth + 1));
+        ws();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === ']') { i++; break; }
+        fail('expected a comma or a closing bracket');
+      }
+      return items;
+    }
+    if (c === '"') return str();
+    for (const [word, v] of [['true', true], ['false', false], ['null', null]]) {
+      if (text.startsWith(word, i)) { i += word.length; return v; }
+    }
+    NUM_RE.lastIndex = i;
+    const m = NUM_RE.exec(text);
+    if (!m || m.index !== i) return fail('unexpected character');
+    i += m[0].length;
+    const n = Number(m[0]);
+    if (m[1] === undefined && m[2] === undefined && Number.isSafeInteger(n)) return n === 0 ? 0 : n; // -0 is the integer 0
+    return new Num(m[0], n);
+  };
+  const out = value(0);
+  ws();
+  if (i !== text.length) fail('unexpected text after the value');
+  return out;
+}
+const numberValue = (v) => (v instanceof Num ? v.value : v);
 const stamp = (ms = Date.now()) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 export function canonical(v) {
+  if (v instanceof Num) return JSON.stringify(numberValue(v)); // by value: 2.0 and 2 are one number
   if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
   if (isObj(v)) return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + canonical(v[k])).join(',') + '}';
   return JSON.stringify(v);
@@ -107,14 +203,13 @@ function checkMaterial(b) {
 }
 
 export function validateCreate(b) {
-  const keys = ['instance_id', 'template_id', 'epoch', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed', 'owner_hash', 'first_seq', 'hostname', 'limits'];
+  const keys = ['instance_id', 'template_id', 'epoch', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed', 'owner_hash', 'hostname', 'limits'];
   const e = checkKeys(b, keys);
   if (e) return e;
   if (typeof b.instance_id !== 'string' || !RE.instanceId.test(b.instance_id)) return bad('/instance_id', 'bad instance id');
   if (typeof b.template_id !== 'string' || !RE.template.test(b.template_id)) return bad('/template_id', 'bad template name');
   if (!isInt(b.epoch, 1)) return bad('/epoch', 'epoch is an integer of at least 1');
   if (typeof b.owner_hash !== 'string' || !RE.hex64.test(b.owner_hash)) return bad('/owner_hash', 'owner_hash is 64 lowercase hex characters');
-  if (!isInt(b.first_seq, 1)) return bad('/first_seq', 'first_seq is an integer of at least 1');
   const m = checkMaterial(b);
   if (m) return m;
   if (typeof b.hostname !== 'string' || b.hostname.length > 253 || !RE.hostname.test(b.hostname)) return bad('/hostname', 'bad host name');
@@ -124,7 +219,8 @@ export function validateCreate(b) {
   for (const k of Object.keys(l)) if (!lk.includes(k)) return bad(`/limits/${k}`, 'unknown limit');
   for (const k of lk) if (!(k in l)) return bad(`/limits/${k}`, `${k} is required`);
   if (!isInt(l.memory_mb, 64, 8192)) return bad('/limits/memory_mb', 'memory_mb is 64 to 8192');
-  if (typeof l.cpu_limit !== 'number' || !(l.cpu_limit > 0 && l.cpu_limit <= 8)) return bad('/limits/cpu_limit', 'cpu_limit is over 0 up to 8');
+  const cpu = numberValue(l.cpu_limit);
+  if (typeof cpu !== 'number' || !(cpu > 0 && cpu <= 8)) return bad('/limits/cpu_limit', 'cpu_limit is over 0 up to 8');
   if (!isInt(l.pids_limit, 16, 4096)) return bad('/limits/pids_limit', 'pids_limit is 16 to 4096');
   if (!isInt(l.idle_minutes, 1, 1440)) return bad('/limits/idle_minutes', 'idle_minutes is 1 to 1440');
   if (!isInt(l.max_minutes, 1, 1440)) return bad('/limits/max_minutes', 'max_minutes is 1 to 1440');
@@ -132,10 +228,9 @@ export function validateCreate(b) {
 }
 
 export function validateReset(b) {
-  const e = checkKeys(b, ['epoch', 'first_seq', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed']);
+  const e = checkKeys(b, ['epoch', 'flags', 'decoys', 'flag_digests', 'event_key', 'seed']);
   if (e) return e;
   if (!isInt(b.epoch, 2)) return bad('/epoch', 'epoch is an integer of at least 2');
-  if (!isInt(b.first_seq, 1)) return bad('/first_seq', 'first_seq is an integer of at least 1');
   return checkMaterial(b);
 }
 
@@ -145,6 +240,15 @@ export function validateAccess(b) {
   if (!['open', 'frozen', 'closed'].includes(b.access)) return bad('/access', 'access is open, frozen or closed');
   if (!isInt(b.access_epoch, 0)) return bad('/access_epoch', 'access_epoch is an integer of at least 0');
   return null;
+}
+
+// A cursor is the base64url of the last instance id of the page. Anything else (any length, any bytes that are not an instance id,
+// a non-canonical spelling) is not a cursor this service handed out: null.
+const encodeCursor = (id) => Buffer.from(id).toString('base64url');
+function decodeCursor(c) {
+  if (!RE.cursor.test(c)) return null;
+  const text = Buffer.from(c, 'base64url').toString('utf8');
+  return RE.instanceId.test(text) && encodeCursor(text) === c ? text : null;
 }
 
 // ---- the service ----
@@ -165,10 +269,16 @@ export function createFakeOrchestrator(options = {}) {
   const nonces = new Map();
   let reportQueue = Promise.resolve();
 
-  const problem = (res, status, code, message, field) => {
-    const body = { code, message, request_id: 'req-' + crypto.randomBytes(6).toString('hex') };
+  // RFC 9457 problem details. type, title, status, detail and instance are the standard members; code, request_id and field are
+  // extension members. `title` is fixed per code, `detail` says what happened this time. Never a stack trace.
+  const problem = (res, status, code, detail, field, extra = {}) => {
+    const requestId = 'req-' + crypto.randomBytes(6).toString('hex');
+    const body = {
+      type: PROBLEM_BASE + code.toLowerCase(), title: TITLES[code] ?? 'Error', status, detail: String(detail).slice(0, 500),
+      instance: 'urn:vulnmart:request:' + requestId, code, request_id: requestId,
+    };
     if (field) body.field = field;
-    send(res, status, body, 'application/problem+json', status === 429 ? { 'retry-after': '5' } : {});
+    send(res, status, body, 'application/problem+json', { ...(status === 429 ? { 'retry-after': '5' } : {}), ...extra });
   };
   const send = (res, status, body, type = 'application/json', extra = {}) => {
     const text = body === undefined ? '' : JSON.stringify(body);
@@ -184,10 +294,13 @@ export function createFakeOrchestrator(options = {}) {
   });
   const usedMb = () => [...records.values()].filter((r) => r.state !== 'destroyed').reduce((n, r) => n + r.memoryMb, 0);
 
+  // `transition` is the number of this state change inside (instance, epoch): 1, 2, 3 ... A reset starts the count again at 1 with
+  // its new epoch. It is counted whether or not a report URL is set, so the numbers do not depend on delivery.
   function report(r, from, to, reason) {
+    const number = ++r.transition;
     if (!cfg.reportUrl) return;
     const body = Buffer.from(JSON.stringify({
-      instance_id: r.id, epoch: r.epoch, from_state: from, to_state: to, at: r.updatedAt, reason,
+      instance_id: r.id, epoch: r.epoch, transition: number, from_state: from, to_state: to, at: r.updatedAt, reason,
       error_code: r.errorCode, health: r.health,
     }));
     const target = '/internal/v1/orch/state';
@@ -290,7 +403,7 @@ export function createFakeOrchestrator(options = {}) {
   }
 
   function parseJson(buf) {
-    try { return [JSON.parse(buf.toString('utf8')), null]; } catch { return [null, bad('', 'the body is not valid JSON')]; }
+    try { return [parseJsonStrict(buf.toString('utf8')), null]; } catch { return [null, bad('', 'the body is not valid JSON')]; }
   }
 
   function getRecord(res, id) {
@@ -319,7 +432,7 @@ export function createFakeOrchestrator(options = {}) {
     const rec = {
       id: body.instance_id, templateId: body.template_id, epoch: body.epoch, state: 'requested', access: 'closed',
       accessEpoch: 0, health: 'unknown', errorCode: null, hostname: body.hostname, createdAt: now, updatedAt: now,
-      memoryMb: body.limits.memory_mb, prints: new Map([[`${body.epoch}:create`, fp]]), timer: null,
+      memoryMb: body.limits.memory_mb, prints: new Map([[`${body.epoch}:create`, fp]]), timer: null, transition: 0,
     };
     records.set(rec.id, rec);
     report(rec, null, 'requested', 'create accepted');
@@ -329,8 +442,6 @@ export function createFakeOrchestrator(options = {}) {
   }
 
   function reset(res, r, body) {
-    const e = validateReset(body);
-    if (e) return fail(res, 422, e);
     const fp = fingerprint(body);
     const known = r.prints.get(`${body.epoch}:reset`);
     if (known !== undefined && body.epoch <= r.epoch) {
@@ -341,6 +452,7 @@ export function createFakeOrchestrator(options = {}) {
     if (body.epoch !== r.epoch + 1) return problem(res, 409, 'ORCH-STALE-EPOCH', 'the new epoch must be the current epoch plus one');
     r.prints.set(`${body.epoch}:reset`, fp);
     r.epoch = body.epoch;
+    r.transition = 0;
     transition(r, 'resetting', 'reset accepted', { health: 'unknown', errorCode: null });
     const answer = view(r);
     schedule(r);
@@ -348,8 +460,6 @@ export function createFakeOrchestrator(options = {}) {
   }
 
   function access(res, r, body) {
-    const e = validateAccess(body);
-    if (e) return fail(res, 422, e);
     if (r.state === 'destroyed') return problem(res, 409, 'ORCH-INVALID-STATE', 'the instance is destroyed');
     if (body.access_epoch < r.accessEpoch || (body.access_epoch === r.accessEpoch && body.access !== r.access)) {
       return problem(res, 409, 'ORCH-STALE-ACCESS-EPOCH', 'the access epoch is older, or equal with another value');
@@ -373,10 +483,10 @@ export function createFakeOrchestrator(options = {}) {
   function list(res, url) {
     const q = url.searchParams;
     for (const name of q.keys()) {
-      if (!LABELS.has(name) && name !== 'cursor' && name !== 'limit') return problem(res, 422, 'ORCH-LABEL-UNKNOWN', `${name} is not a label filter`, name);
+      if (!LABELS.has(name) && name !== 'cursor' && name !== 'limit') return problem(res, 422, 'ORCH-LABEL-UNKNOWN', `${name.slice(0, 64)} is not a label filter`, name.slice(0, 64));
     }
     for (const name of new Set(q.keys())) {
-      if (q.getAll(name).length > 1) return problem(res, 422, 'ORCH-VALIDATION', `${name} is given more than once`, name);
+      if (q.getAll(name).length > 1) return problem(res, 422, 'ORCH-VALIDATION', `${name.slice(0, 64)} is given more than once`, name.slice(0, 64));
     }
     let limit = 100;
     if (q.has('limit')) {
@@ -388,8 +498,8 @@ export function createFakeOrchestrator(options = {}) {
     if (q.has('instance') && !RE.instanceId.test(q.get('instance'))) return problem(res, 422, 'ORCH-VALIDATION', 'bad instance id', 'instance');
     let after = null;
     if (q.has('cursor')) {
-      if (!RE.cursor.test(q.get('cursor'))) return problem(res, 422, 'ORCH-VALIDATION', 'bad cursor', 'cursor');
-      after = Buffer.from(q.get('cursor'), 'base64url').toString('utf8');
+      after = decodeCursor(q.get('cursor'));
+      if (after === null) return problem(res, 422, 'ORCH-CURSOR-INVALID', 'the cursor is not one this orchestrator handed out', 'cursor');
     }
     const items = [...records.keys()].sort().filter((id) => {
       const r = records.get(id);
@@ -402,7 +512,7 @@ export function createFakeOrchestrator(options = {}) {
       return true;
     });
     const page = items.slice(0, limit);
-    const next = items.length > limit ? Buffer.from(page[page.length - 1]).toString('base64url') : null;
+    const next = items.length > limit ? encodeCursor(page[page.length - 1]) : null;
     send(res, 200, { items: page.map((id) => view(records.get(id))), next_cursor: next });
   }
 
@@ -434,40 +544,53 @@ export function createFakeOrchestrator(options = {}) {
     // 2. signature
     if (!verify(req, sha256)) return problem(res, 401, 'ORCH-BAD-SIGNATURE', 'bad signature');
 
+    // Order of checks after the signature (contract section 6): the call exists (404 / 405), the media type of a body (415), the shape of
+    // the path id and of the body (422), the template (422), then the instance exists (404), its state and epoch (409), capacity (429).
+    // So an unsupported media type is answered before an unknown instance, and a malformed body before an unknown instance.
     const route = (m, re) => (method === m ? url.pathname.match(re) : null);
-    if (route('POST', /^\/v1\/instances$/)) {
+    const isCreate = route('POST', /^\/v1\/instances$/);
+    const isList = route('GET', /^\/v1\/instances$/);
+    const isHost = route('GET', /^\/v1\/host$/);
+    const isGet = route('GET', /^\/v1\/instances\/([^/]+)$/);
+    const isAct = route('POST', /^\/v1\/instances\/([^/]+)\/(reset|access|destroy)$/);
+    if (!(isCreate || isList || isHost || isGet || isAct)) {
+      const known = [
+        [/^\/v1\/instances$/, 'GET, POST'], [/^\/v1\/host$/, 'GET'], [/^\/v1\/instances\/[^/]+$/, 'GET'],
+        [/^\/v1\/instances\/[^/]+\/(reset|access|destroy)$/, 'POST'],
+      ].find(([re]) => re.test(url.pathname));
+      if (known) return problem(res, 405, 'ORCH-METHOD-NOT-ALLOWED', `${method.slice(0, 16)} is not allowed here`, undefined, { allow: known[1] });
+      return problem(res, 404, 'ORCH-ROUTE-UNKNOWN', 'no such call (fake orchestrator)');
+    }
+    if (buf.length > 0 && !JSON_TYPE.test(req.headers['content-type'] ?? '')) {
+      return problem(res, 415, 'ORCH-UNSUPPORTED-MEDIA-TYPE', 'the body must be sent as application/json');
+    }
+    if (isCreate) {
       const [body, err] = parseJson(buf);
       return err ? fail(res, 422, err) : create(res, body);
     }
-    if (route('GET', /^\/v1\/instances$/)) return list(res, url);
-    if (route('GET', /^\/v1\/host$/)) {
+    if (isList) return list(res, url);
+    if (isHost) {
       const live = [...records.values()].filter((r) => r.state !== 'destroyed').length;
       return send(res, 200, { host_id: cfg.hostId, kind: 'fake', capacity_memory_mb: cfg.capacityMb, used_memory_mb: usedMb(), instances: live, health: 'ok' });
     }
-    let m;
-    if ((m = route('GET', /^\/v1\/instances\/([^/]+)$/))) {
-      const r = getRecord(res, m[1]);
+    if (isGet) {
+      const r = getRecord(res, isGet[1]);
       return r && send(res, 200, view(r));
     }
-    if ((m = route('POST', /^\/v1\/instances\/([^/]+)\/(reset|access|destroy)$/))) {
-      const r = getRecord(res, m[1]);
-      if (!r) return undefined;
-      if (m[2] === 'destroy') return destroy(res, r);
-      const [body, err] = parseJson(buf);
-      if (err) return fail(res, 422, err);
-      return m[2] === 'reset' ? reset(res, r, body) : access(res, r, body);
+    const [, id, action] = isAct;
+    if (!RE.instanceId.test(id)) return fail(res, 422, bad('/instance_id', 'bad instance id'));
+    if (action === 'destroy') {
+      const r = getRecord(res, id);
+      return r && destroy(res, r);
     }
-    const known = [
-      [/^\/v1\/instances$/, 'GET, POST'], [/^\/v1\/host$/, 'GET'], [/^\/v1\/instances\/[^/]+$/, 'GET'],
-      [/^\/v1\/instances\/[^/]+\/(reset|access|destroy)$/, 'POST'],
-    ].find(([re]) => re.test(url.pathname));
-    if (known) {
-      const body = { code: 'ORCH-METHOD-NOT-ALLOWED', message: `${method} is not allowed here`, request_id: 'req-' + crypto.randomBytes(6).toString('hex') };
-      return send(res, 405, body, 'application/problem+json', { allow: known[1] });
-    }
-    return problem(res, 404, 'ORCH-ROUTE-UNKNOWN', 'no such call (fake orchestrator)');
+    const [body, err] = parseJson(buf);
+    if (err) return fail(res, 422, err);
+    const e = action === 'reset' ? validateReset(body) : validateAccess(body);
+    if (e) return fail(res, 422, e);
+    const r = getRecord(res, id);
+    if (!r) return undefined;
+    return action === 'reset' ? reset(res, r, body) : access(res, r, body);
   }
-
   const onRequest = (req, res) => {
     handle(req, res).catch((err) => {
       process.stderr.write(`fake orchestrator error: ${err.stack}\n`);

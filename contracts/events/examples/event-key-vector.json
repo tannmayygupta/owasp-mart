@@ -1,0 +1,33 @@
+{
+  "description": "Event key vector (app-events.md section 4): FAKE test master, never a real key. key = base64url(HKDF-SHA256(ikm = master, salt, info = info_label 0x00 instance_id 0x00 decimal(epoch), L = 32)). An epoch change gives a different key. Both sides recompute it: scripts/validate-events.mjs and scripts/e2e/events.e2e.test.mjs (an independent re-implementation).",
+  "fake": true,
+  "master_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "salt": "vm-evt-salt-v1",
+  "info_label": "vm-event-key-v1",
+  "cases": [
+    {
+      "instance_id": "i-AAAAAAAAAAAAAAAA",
+      "epoch": 1,
+      "info_hex": "766d2d6576656e742d6b65792d763100692d414141414141414141414141414141410031",
+      "key": "Xn-kmcaItNv5ELovN0gK18juwwtlIdTpbAz_TuTY6xw"
+    },
+    {
+      "instance_id": "i-AAAAAAAAAAAAAAAA",
+      "epoch": 2,
+      "info_hex": "766d2d6576656e742d6b65792d763100692d414141414141414141414141414141410032",
+      "key": "DCD2zudD2uhzpJZq00YyOvq6IjbjimD6YAdfUEB28RA"
+    },
+    {
+      "instance_id": "i-BBBBBBBBBBBBBBBB",
+      "epoch": 1,
+      "info_hex": "766d2d6576656e742d6b65792d763100692d424242424242424242424242424242420031",
+      "key": "UxP-OY-8uWF33xexediiVx5MXw2Bu5zj89TfHWYgK-Q"
+    },
+    {
+      "instance_id": "i-AAAAAAAAAAAAAAAA",
+      "epoch": 12,
+      "info_hex": "766d2d6576656e742d6b65792d763100692d41414141414141414141414141414141003132",
+      "key": "VG9gfeZWHg-HFLQ3jimxPgjRSJU-23EXrb-JGa22jOk"
+    }
+  ]
+}

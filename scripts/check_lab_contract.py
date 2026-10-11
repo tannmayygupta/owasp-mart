@@ -3,7 +3,7 @@
 Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 18 operations exist and no other; every operation
 declares its security; the state, access and health values equal those of IF-5; no GET answer schema or valid answer example
 can hold a secret-looking name; every valid example matches its schema; every invalid example fails at the path its manifest
-names; no real-looking flag is in the contract. Run through `pnpm run contracts:check` (last part) or on its own:
+names; no real-looking flag is in the contract; the flag result names no oracle reason; every problem example is RFC 9457 shaped. Run through `pnpm run contracts:check` (last part) or on its own:
 
     uv run --package vulnmart-api python scripts/check_lab_contract.py [--dir <folder>]
 
@@ -52,6 +52,10 @@ NEEDED = {
     "IntegrityDecisionRequest", "Report", "Timeline", "Problem",
 }
 METHODS = {"get", "post", "put", "delete", "patch"}
+PROBLEM_MEDIA = "application/problem+json"
+PROBLEM_TYPE_PREFIX = "https://vulnmart.invalid/problems/"
+# What the submitter of a flag must never be told (the oracle rule): these may not be values of the answer result.
+ORACLE_REASONS = {"decoy", "other_instance", "stale_epoch", "wrong"}
 
 
 def _keys(data):
@@ -146,8 +150,13 @@ def run(folder: Path, if5_spec: Path = IF5_SPEC) -> tuple[list[str], dict[str, i
                 for name in base._walk_properties(spec, (body or {}).get("schema") or {}):
                     if name in SECRET_NAMES:
                         fail(f"{method.upper()} {path} {status} {media}: the answer schema can carry the secret-looking property {name!r}")
-                    elif name == base.FREE_FORM:
+                    elif name == base.FREE_FORM and media != PROBLEM_MEDIA:  # a problem details body is open on purpose (RFC 9457)
                         fail(f"{method.upper()} {path} {status} {media}: the answer schema has a free-form object (additionalProperties is not false)")
+
+    # The submitter-facing flag result carries no reason that works as an oracle.
+    flag_result = set((schemas.get("FlagResult") or {}).get("enum") or [])
+    for reason in sorted(flag_result & ORACLE_REASONS):
+        fail(f"FlagResult names the reason {reason!r}, which tells the submitter why a value was not correct (only correct and incorrect are allowed)")
 
     # Valid examples.
     vdir = folder / "examples" / "valid"
@@ -169,6 +178,13 @@ def run(folder: Path, if5_spec: Path = IF5_SPEC) -> tuple[list[str], dict[str, i
             continue
         for err in base.schema_validator(spec, schema).iter_errors(data):
             fail(f"valid/{name} does not match {schema}: {base.error_path(err)} {err.message}")
+        if schema == "Problem" and isinstance(data, dict):  # the parts of a problem that a schema cannot tie together
+            if data.get("type") != PROBLEM_TYPE_PREFIX + str(data.get("code")):
+                fail(f"valid/{name}: type must be {PROBLEM_TYPE_PREFIX} plus the code")
+            if data.get("instance") != f"urn:vulnmart:request:{data.get('request_id')}":
+                fail(f"valid/{name}: instance must be urn:vulnmart:request: plus the request_id")
+            if "message" in data:
+                fail(f"valid/{name}: the old member message is gone (use detail)")
         if not schema.endswith(REQUEST_SUFFIX):  # an answer example must not hold a secret-looking name
             for key in sorted(set(_keys(data)) & SECRET_NAMES):
                 fail(f"valid/{name} is an answer example but holds the secret-looking name {key!r}")
@@ -183,7 +199,7 @@ def run(folder: Path, if5_spec: Path = IF5_SPEC) -> tuple[list[str], dict[str, i
         data = base._load_json(vdir / name, f"valid/{name}", fail)
         if isinstance(data, dict):
             seen.add(data.get("result"))
-    for result in ("correct", "wrong", "decoy", "other_instance", "stale_epoch"):
+    for result in ("correct", "incorrect"):
         if result not in seen:
             fail(f"no valid example of the flag result {result}")
 

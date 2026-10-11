@@ -119,36 +119,6 @@
     "path": "/owner_hash",
     "rule": "owner_hash is never an email"
   },
-  "create-missing-first-seq.json": {
-    "schema": "CreateInstanceRequest",
-    "path": "/first_seq",
-    "rule": "first_seq is required"
-  },
-  "create-first-seq-zero.json": {
-    "schema": "CreateInstanceRequest",
-    "path": "/first_seq",
-    "rule": "first_seq is at least 1"
-  },
-  "create-first-seq-string.json": {
-    "schema": "CreateInstanceRequest",
-    "path": "/first_seq",
-    "rule": "first_seq is an integer"
-  },
-  "reset-missing-first-seq.json": {
-    "schema": "ResetInstanceRequest",
-    "path": "/first_seq",
-    "rule": "first_seq is required"
-  },
-  "reset-first-seq-zero.json": {
-    "schema": "ResetInstanceRequest",
-    "path": "/first_seq",
-    "rule": "first_seq is at least 1"
-  },
-  "reset-first-seq-string.json": {
-    "schema": "ResetInstanceRequest",
-    "path": "/first_seq",
-    "rule": "first_seq is an integer"
-  },
   "reset-owner-hash.json": {
     "schema": "ResetInstanceRequest",
     "path": "/owner_hash",
@@ -218,5 +188,160 @@
     "schema": "Problem",
     "path": "/stack",
     "rule": "never a stack trace (NFR-SEC-03)"
+  },
+  "create-first-seq-removed.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq was removed in D-42; a body that still has it is refused"
+  },
+  "reset-first-seq-removed.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq was removed in D-42; a body that still has it is refused"
+  },
+  "problem-message-member.json": {
+    "schema": "Problem",
+    "path": "/message",
+    "rule": "the old-style message member is gone; use detail"
+  },
+  "problem-old-style.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "the standard members type, title, status, detail and instance are required"
+  },
+  "problem-type-real-domain.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "type is a URI under vulnmart.invalid (no real domain)"
+  },
+  "problem-status-string.json": {
+    "schema": "Problem",
+    "path": "/status",
+    "rule": "status is an integer"
+  },
+  "problem-status-float.json": {
+    "schema": "Problem",
+    "path": "/status",
+    "rule": "status is an integer token, not 429.0"
+  },
+  "problem-status-not-an-error.json": {
+    "schema": "Problem",
+    "path": "/status",
+    "rule": "status is 400 to 599"
+  },
+  "problem-missing-instance.json": {
+    "schema": "Problem",
+    "path": "/instance",
+    "rule": "instance is required"
+  },
+  "problem-instance-not-urn.json": {
+    "schema": "Problem",
+    "path": "/instance",
+    "rule": "instance is urn:vulnmart:request: plus the request id"
+  },
+  "problem-missing-title.json": {
+    "schema": "Problem",
+    "path": "/title",
+    "rule": "title is required"
+  },
+  "problem-trace-member.json": {
+    "schema": "Problem",
+    "path": "/trace",
+    "rule": "never a stack trace (NFR-SEC-03)"
+  },
+  "state-report-missing-transition.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition is required (identity is instance, epoch, transition)"
+  },
+  "state-report-transition-zero.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition starts at 1"
+  },
+  "state-report-transition-negative.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition starts at 1"
+  },
+  "state-report-transition-float.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "an integer token, not 1.0"
+  },
+  "state-report-transition-exponent.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "an integer token, not 1e0"
+  },
+  "state-report-transition-string.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition is a number, not a string"
+  },
+  "state-report-transition-boolean.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "a boolean is not an integer"
+  },
+  "state-report-transition-huge.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "at most 2^53 - 1"
+  },
+  "state-report-epoch-float.json": {
+    "schema": "StateReport",
+    "path": "/epoch",
+    "rule": "an integer token, not 1.0"
+  },
+  "create-epoch-float.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "an integer token, not 1.0"
+  },
+  "create-epoch-exponent.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "an integer token, not 1e0"
+  },
+  "create-epoch-boolean.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "a boolean is not an integer"
+  },
+  "create-epoch-huge.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "at most 2^53 - 1"
+  },
+  "create-memory-float.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/limits/memory_mb",
+    "rule": "an integer token, not 1024.0"
+  },
+  "create-decoy-index-float.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/decoys/0/index",
+    "rule": "an integer token, not 0.0"
+  },
+  "reset-epoch-float.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/epoch",
+    "rule": "an integer token, not 2.0"
+  },
+  "access-epoch-float.json": {
+    "schema": "AccessRequest",
+    "path": "/access_epoch",
+    "rule": "an integer token, not 1.0"
+  },
+  "access-epoch-boolean.json": {
+    "schema": "AccessRequest",
+    "path": "/access_epoch",
+    "rule": "a boolean is not an integer"
+  },
+  "host-capacity-float.json": {
+    "schema": "HostStatus",
+    "path": "/capacity_memory_mb",
+    "rule": "an integer token, not 8192.0"
   }
 }

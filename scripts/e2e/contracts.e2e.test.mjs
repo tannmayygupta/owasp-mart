@@ -49,12 +49,12 @@ test('fresh checkout parity: install with a frozen lockfile, then the CI scripts
   assert.ok(!existsSync(path.join(copy, 'node_modules')), 'the copy must start without node_modules');
   const install = run('pnpm', ['install', '--frozen-lockfile'], { cwd: copy });
   assert.equal(install.status, 0, install.stdout + install.stderr);
-  const tests = run(process.execPath, ['--test', 'scripts/*.test.mjs'], { cwd: copy });
+  const tests = run(process.execPath, ['--test', 'scripts/*.test.mjs'], { cwd: copy, timeout: 900000 });
   assert.equal(tests.status, 0, tests.stdout.slice(-3000) + tests.stderr.slice(-1000));
   const ran = Number((tests.stdout.match(/^(?:#|ℹ) tests (\d+)/m) || [])[1]);
   assert.ok(ran >= 30, `the CI scripts job command must run the real unit tests, ran ${ran}`);
   // the CI scripts job also runs the Python tests (needs uv and a lockfile that matches)
-  const py = run('uv', ['run', '--locked', '--package', 'vulnmart-api', 'pytest', '-q'], { cwd: copy });
+  const py = run('uv', ['run', '--locked', '--package', 'vulnmart-api', 'pytest', '-q'], { cwd: copy, timeout: 900000 }); // 640 tests take about 4 minutes here since story 1.15
   assert.equal(py.status, 0, py.stdout.slice(-3000) + py.stderr.slice(-1000));
   assert.match(py.stdout, /\d+ passed/);
   const check = run('pnpm', ['run', 'contracts:check'], { cwd: copy });
@@ -127,7 +127,7 @@ test('the fake ingest runs as a command and answers a signed event over HTTP', a
   }
   const bad = run(process.execPath, [server]);
   assert.equal(bad.status, 2);
-  assert.match(bad.stderr, /--key is required/);
+  assert.match(bad.stderr, /--key or --master is required/);
 });
 
 test('breaking a rule exits 1: removing epoch from the injection schema', () => {

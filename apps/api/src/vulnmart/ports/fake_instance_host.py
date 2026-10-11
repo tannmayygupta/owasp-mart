@@ -16,15 +16,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
 from .instance_host import (
-    LIST_LABELS, RESETTABLE, Access, Busy, CreateRequest, Health, HostHealth, HostStatus, InstanceExists,
-    InstanceNotFound, InstancePage, InstanceState, InstanceStatus, InvalidState, LabelUnknown, Outcome,
-    RequestMismatch, ResetRequest, StaleAccessEpoch, StaleEpoch, TemplateUnknown, ValidationFailed,
+    LIST_LABELS, RESETTABLE, Access, Busy, CreateRequest, CursorInvalid, Health, HostHealth, HostStatus,
+    InstanceExists, InstanceNotFound, InstancePage, InstanceState, InstanceStatus, InvalidState, LabelUnknown,
+    Outcome, RequestMismatch, ResetRequest, StaleAccessEpoch, StaleEpoch, StateReport, TemplateUnknown,
+    ValidationFailed, is_wire_int,
 )
 
 ALLOWED_TEMPLATES = frozenset({"shop-v0", "shop-fail-v0"})
@@ -36,7 +38,7 @@ _FLAG = re.compile(r"^VM\{[A-Z2-7]{24}\}\Z")
 _HEX64 = re.compile(r"^[0-9a-f]{64}\Z")
 _SECRET = re.compile(r"^[A-Za-z0-9_-]{32,128}\Z")
 _HOSTNAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\Z")
-_CURSOR = re.compile(r"^[A-Za-z0-9_-]{1,128}\Z")
+_CURSOR = re.compile(r"^[A-Za-z0-9_-]{24}\Z")  # base64url (no padding) of an 18-character instance id
 _EPOCH_LABEL = re.compile(r"^[1-9][0-9]*\Z")
 _TRANSITIONAL = {
     InstanceState.REQUESTED, InstanceState.PROVISIONING, InstanceState.STARTING,
@@ -44,8 +46,38 @@ _TRANSITIONAL = {
 }
 
 
+def _by_value(node):
+    """Numbers are compared by value, as the service does: `2` and `2.0` are one request (only `cpu_limit` may be a
+    non-integer; every integer field is checked as an integer before a fingerprint is made)."""
+    if isinstance(node, dict):
+        return {k: _by_value(v) for k, v in node.items()}
+    if isinstance(node, (list, tuple)):
+        return [_by_value(v) for v in node]
+    if isinstance(node, float) and node.is_integer():
+        return int(node)
+    return node
+
+
 def fingerprint(body: dict) -> str:
-    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(_by_value(body), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def encode_cursor(instance_id: str) -> str:
+    return base64.urlsafe_b64encode(instance_id.encode()).decode().rstrip("=")
+
+
+def decode_cursor(cursor: str) -> str:
+    """The instance id a cursor stands for. Anything this orchestrator would not have handed out is CursorInvalid."""
+    bad = CursorInvalid("the cursor is not one this orchestrator handed out", field="cursor")
+    if not isinstance(cursor, str) or not _CURSOR.match(cursor):
+        raise bad
+    try:
+        text = base64.urlsafe_b64decode(cursor).decode("ascii")
+    except ValueError as exc:  # binascii.Error and UnicodeDecodeError are both ValueErrors
+        raise bad from exc
+    if not INSTANCE_ID.match(text) or encode_cursor(text) != cursor:
+        raise bad
+    return text
 
 
 def _bad(field: str, message: str) -> ValidationFailed:
@@ -66,7 +98,7 @@ def _check_material(m) -> None:
     for i, d in enumerate(m.decoys):
         if not _CHALLENGE.match(d.challenge_key):
             raise _bad(f"/decoys/{i}/challenge_key", "bad challenge key")
-        if not isinstance(d.index, int) or d.index < 0:
+        if not is_wire_int(d.index, 0):
             raise _bad(f"/decoys/{i}/index", "bad decoy index")
         if not _FLAG.match(d.value):
             raise _bad(f"/decoys/{i}/value", "bad decoy format")
@@ -83,35 +115,28 @@ def _check_material(m) -> None:
         raise _bad("/seed", "bad seed shape")
 
 
-def _check_first_seq(value) -> None:
-    # bool is an int in Python; it is not a sequence number
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise _bad("/first_seq", "first_seq is an integer of at least 1")
-
-
 def _check_create(r: CreateRequest) -> None:
     if not INSTANCE_ID.match(r.instance_id):
         raise _bad("/instance_id", "bad instance id")
     if not _TEMPLATE.match(r.template_id):
         raise _bad("/template_id", "bad template name")
-    if not isinstance(r.epoch, int) or r.epoch < 1:
+    if not is_wire_int(r.epoch, 1):
         raise _bad("/epoch", "epoch is an integer of at least 1")
     if not isinstance(r.owner_hash, str) or not _HEX64.match(r.owner_hash):
         raise _bad("/owner_hash", "owner_hash is 64 lowercase hex characters")
-    _check_first_seq(r.first_seq)
     _check_material(r.material)
     if len(r.hostname) > 253 or not _HOSTNAME.match(r.hostname):
         raise _bad("/hostname", "bad host name")
     lim = r.limits
-    if not 64 <= lim.memory_mb <= 8192:
+    if not is_wire_int(lim.memory_mb, 64, 8192):
         raise _bad("/limits/memory_mb", "memory_mb is 64 to 8192")
-    if not 0 < lim.cpu_limit <= 8:
+    if type(lim.cpu_limit) not in (int, float) or not math.isfinite(lim.cpu_limit) or not 0 < lim.cpu_limit <= 8:
         raise _bad("/limits/cpu_limit", "cpu_limit is over 0 up to 8")
-    if not 16 <= lim.pids_limit <= 4096:
+    if not is_wire_int(lim.pids_limit, 16, 4096):
         raise _bad("/limits/pids_limit", "pids_limit is 16 to 4096")
-    if not 1 <= lim.idle_minutes <= 1440:
+    if not is_wire_int(lim.idle_minutes, 1, 1440):
         raise _bad("/limits/idle_minutes", "idle_minutes is 1 to 1440")
-    if not 1 <= lim.max_minutes <= 1440:
+    if not is_wire_int(lim.max_minutes, 1, 1440):
         raise _bad("/limits/max_minutes", "max_minutes is 1 to 1440")
 
 
@@ -124,6 +149,7 @@ class _Record:
     status: InstanceStatus
     memory_mb: int
     prints: dict[tuple[int, str], str] = field(default_factory=dict)  # (epoch, "create" or "reset") -> fingerprint
+    transition: int = 0  # last transition number of the current epoch; a reset starts the count again
 
 
 class FakeInstanceHost:
@@ -136,6 +162,8 @@ class FakeInstanceHost:
         self.auto_advance = auto_advance
         self._now = now
         self._records: dict[str, _Record] = {}
+        # Every state change, in the order it happened: what the orchestrator would send to the platform (section 8).
+        self.reports: list[StateReport] = []
 
     # ---- helpers ----
     def _stamp(self) -> str:
@@ -143,6 +171,20 @@ class FakeInstanceHost:
 
     def _set(self, rec: _Record, **changes) -> None:
         rec.status = replace(rec.status, updated_at=self._stamp(), **changes)
+
+    def _move(self, rec: _Record, to: InstanceState, reason: str, **changes) -> None:
+        """Change the state and record the report. A new epoch restarts the transition count at 1."""
+        frm = rec.status.state
+        if "epoch" in changes:
+            rec.transition = 0
+        self._set(rec, state=to, **changes)
+        self._report(rec, frm, reason)
+
+    def _report(self, rec: _Record, frm: InstanceState | None, reason: str) -> None:
+        rec.transition += 1
+        st = rec.status
+        self.reports.append(StateReport(
+            st.instance_id, st.epoch, rec.transition, frm, st.state, st.updated_at, reason, st.error_code, st.health))
 
     def _used(self) -> int:
         return sum(r.memory_mb for r in self._records.values() if r.status.state is not InstanceState.DESTROYED)
@@ -159,16 +201,16 @@ class FakeInstanceHost:
         """Move one transitional state forward. Returns False when the state is a resting one."""
         state = rec.status.state
         if state is InstanceState.REQUESTED or state is InstanceState.RESETTING:
-            self._set(rec, state=InstanceState.PROVISIONING)
+            self._move(rec, InstanceState.PROVISIONING, "orchestrator started work")
         elif state is InstanceState.PROVISIONING:
-            self._set(rec, state=InstanceState.STARTING)
+            self._move(rec, InstanceState.STARTING, "networks and containers created")
         elif state is InstanceState.STARTING:
             if rec.status.template_id == "shop-fail-v0":
-                self._set(rec, state=InstanceState.FAILED, health=Health.UNHEALTHY, error_code="INST-HEALTH-TIMEOUT")
+                self._move(rec, InstanceState.FAILED, "health check timed out", health=Health.UNHEALTHY, error_code="INST-HEALTH-TIMEOUT")
             else:
-                self._set(rec, state=InstanceState.READY, health=Health.HEALTHY, error_code=None)
+                self._move(rec, InstanceState.READY, "health ok and flags injected", health=Health.HEALTHY, error_code=None)
         elif state is InstanceState.STOPPING:
-            self._set(rec, state=InstanceState.DESTROYED)
+            self._move(rec, InstanceState.DESTROYED, "everything removed")
         else:
             return False
         return True
@@ -191,7 +233,8 @@ class FakeInstanceHost:
         allowed = {InstanceState.READY, InstanceState.ACTIVE, InstanceState.IDLE}
         if rec.status.state not in allowed or state not in allowed:
             raise InvalidState("activity only moves between ready, active and idle")
-        self._set(rec, state=state)
+        if state is not rec.status.state:  # no change, no report
+            self._move(rec, state, "player activity (fake control)")
 
     # ---- the contract ----
     def create(self, request: CreateRequest) -> Outcome:
@@ -222,6 +265,7 @@ class FakeInstanceHost:
         )
         rec = _Record(status, request.limits.memory_mb, {(request.epoch, "create"): print_})
         self._records[request.instance_id] = rec
+        self._report(rec, None, "create accepted")
         return Outcome(status, True)
 
     def get(self, instance_id: str) -> InstanceStatus:
@@ -231,9 +275,8 @@ class FakeInstanceHost:
     def reset(self, instance_id: str, request: ResetRequest) -> Outcome:
         self._settle()
         rec = self._get(instance_id)
-        if not isinstance(request.epoch, int) or request.epoch < 2:
+        if not is_wire_int(request.epoch, 2):
             raise _bad("/epoch", "epoch is an integer of at least 2")
-        _check_first_seq(request.first_seq)
         _check_material(request.material)
         print_ = fingerprint(request.to_json())
         known = rec.prints.get((request.epoch, "reset"))
@@ -246,7 +289,7 @@ class FakeInstanceHost:
         if request.epoch != rec.status.epoch + 1:
             raise StaleEpoch("the new epoch must be the current epoch plus one")
         rec.prints[(request.epoch, "reset")] = print_
-        self._set(rec, state=InstanceState.RESETTING, epoch=request.epoch, health=Health.UNKNOWN, error_code=None)
+        self._move(rec, InstanceState.RESETTING, "reset accepted", epoch=request.epoch, health=Health.UNKNOWN, error_code=None)
         return Outcome(rec.status, True)
 
     def set_access(self, instance_id: str, access: Access, access_epoch: int) -> InstanceStatus:
@@ -256,8 +299,8 @@ class FakeInstanceHost:
             access = Access(access)
         except ValueError as exc:
             raise _bad("/access", "access is open, frozen or closed") from exc
-        if not isinstance(access_epoch, int) or access_epoch < 0:
-            raise ValidationFailed("access epoch is not negative", field="/access_epoch")
+        if not is_wire_int(access_epoch, 0):
+            raise ValidationFailed("access_epoch is an integer of at least 0", field="/access_epoch")
         if rec.status.state is InstanceState.DESTROYED:
             raise InvalidState("the instance is destroyed")
         current = rec.status
@@ -272,7 +315,7 @@ class FakeInstanceHost:
         rec = self._get(instance_id)
         if rec.status.state in (InstanceState.DESTROYED, InstanceState.STOPPING):
             return Outcome(rec.status, False)
-        self._set(rec, state=InstanceState.STOPPING)
+        self._move(rec, InstanceState.STOPPING, "destroy accepted")
         return Outcome(rec.status, True)
 
     def list_instances(
@@ -283,7 +326,7 @@ class FakeInstanceHost:
         for name in labels:
             if name not in LIST_LABELS:
                 raise LabelUnknown(f"{name} is not a label filter", field=name)
-        if not isinstance(limit, int) or not 1 <= limit <= 500:
+        if not is_wire_int(limit, 1, 500):
             raise ValidationFailed("limit is 1 to 500", field="limit")
         epoch = None
         if "instance" in labels and not INSTANCE_ID.match(str(labels["instance"])):
@@ -294,12 +337,7 @@ class FakeInstanceHost:
             epoch = int(labels["epoch"])
         after = None
         if cursor is not None:
-            if not _CURSOR.match(cursor):
-                raise ValidationFailed("bad cursor", field="cursor")
-            try:
-                after = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
-            except ValueError as exc:
-                raise ValidationFailed("bad cursor", field="cursor") from exc
+            after = decode_cursor(cursor)
         items = []
         for iid in sorted(self._records):
             st = self._records[iid].status
@@ -319,7 +357,7 @@ class FakeInstanceHost:
         page, rest = items[:limit], items[limit:]
         next_cursor = None
         if rest:
-            next_cursor = base64.urlsafe_b64encode(page[-1].instance_id.encode()).decode().rstrip("=")
+            next_cursor = encode_cursor(page[-1].instance_id)
         return InstancePage(tuple(page), next_cursor)
 
     def host_status(self) -> HostStatus:
