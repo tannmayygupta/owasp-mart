@@ -3,7 +3,7 @@ title: 'Project progress page for the guide meeting'
 type: 'feature'
 ticket: '14'
 created: '2026-10-11'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '0cb7b84'
 route: 'full'
 route_source: 'pinned'
@@ -56,11 +56,11 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `scripts/progress-page.mjs` -- parse task files (path or git ref), compute statuses by the rules, render the home, proof and three stream pages as one HTML file with simple navigation (anchors or small inline script-free tabs), `--serve`, `--out`, `--today YYYY-MM-DD` (for tests), help text, exit codes
-- [ ] `scripts/progress-page.test.mjs` -- one test per matrix row on fixture task files in a temporary folder (including a temporary git repository for the ref case and the escaping case)
-- [ ] Content: home text, "how it works" in six plain steps, proof boxes from existing evidence, per-stream purpose lines, "contracts between the streams" table from architecture 07 (names and owners only)
-- [ ] `docs/progress/README.md` and `package.json` script `progress` (`node scripts/progress-page.mjs --serve`); dev-log, CHANGELOG line, traceability row LX-3 (partial), tracker via the plan; generate and commit the snapshot with the current task files
-- [ ] Verify by running the server and fetching the page (real output), then the text check, secret scan and unit tests
+- [x] `scripts/progress-page.mjs` -- parse task files (path or git ref), compute statuses by the rules, render the home, proof and three stream pages as one HTML file with simple navigation (anchors or small inline script-free tabs), `--serve`, `--out`, `--today YYYY-MM-DD` (for tests), help text, exit codes
+- [x] `scripts/progress-page.test.mjs` -- one test per matrix row on fixture task files in a temporary folder (including a temporary git repository for the ref case and the escaping case)
+- [x] Content: home text, "how it works" in six plain steps, proof boxes from existing evidence, per-stream purpose lines, "contracts between the streams" table from architecture 07 (names and owners only)
+- [x] `docs/progress/README.md` and `package.json` script `progress` (`node scripts/progress-page.mjs --serve`); dev-log, CHANGELOG line, traceability row LX-3 (partial), tracker via the plan; generate and commit the snapshot with the current task files
+- [x] Verify by running the server and fetching the page (real output), then the text check, secret scan and unit tests
 
 **Acceptance Criteria:**
 - Given the three task files, when the script runs, then every task of every stream appears once with the right status and nothing else.
@@ -70,6 +70,8 @@ context: []
 - Given the page, when read by a non-technical visitor, then it states what VulnMart is, how a session works in six steps, what already runs, and what each of the three developers is implementing.
 
 ## Implementation Notes
+
+Built 2026-10-11 by a helper agent, verified by the developer's Claude session: `node --test scripts/progress-page.test.mjs` 17/17 pass; full `node --test "scripts/*.test.mjs"` 402/402 pass; `check-text-files` PASS; `scan-secrets` PASS; server fetched on 127.0.0.1:8088 (200 on `/`, 404 on other paths). Run: `node scripts/progress-page.mjs --serve` (add `--dev2 origin/<branch> --dev3 origin/sprint-1-sahil` after `git fetch`). Proof boxes and the six steps are fixed text in the script; update them if a recorded result changes. Story not marked done: waits for the developer's confirmation.
 
 ## Plan Change Log
 

@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (progress page for the guide meeting, story 1.14, 2026-10-11, Tanmay)
+- `scripts/progress-page.mjs` (with `scripts/progress-page.test.mjs`) builds one offline HTML page from the three task files (working tree or a git ref per stream) and can serve it on 127.0.0.1; snapshot in `docs/progress/index.html`, how-to in `docs/progress/README.md`, `pnpm run progress`. Traceability row LX-3 (partial).
+
 ### Fixed (sprint 1 audit remediation, story 1.13, 2026-10-11, Tanmay)
 - False or stale statements corrected (traceability LB-5, LB-6, LB-7, LB-9, LE-1, LE-6, LE-8; dev-log headers with real commit hashes; ADR 0021 and 0022 status and sources; HANDOFFS H-101 and statuses; D-15, D-34, D-38; dated Closed-with notes under L-02, L-04 to L-08), damaged text repaired and a unit test (scripts/check-text-files.mjs) that fails on a control character, BOM or mojibake in a tracked text file; image files outside `docs/assets` and the console URL form refused by scan-secrets (`/image.png` ignored); CI first-run hardening (`scripts` timeout 20 minutes, cancel only pull request runs, dev.e2e in the `compose` job); IAM policy tag conditions on start, stop, terminate and modify; verify-hosts firewall check names say placeholder rule; runbook warnings. Audit record: `docs/bmad/initiative-lab/audit-2026-10-11-sprint-1.md`.
 
