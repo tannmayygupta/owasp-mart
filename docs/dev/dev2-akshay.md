@@ -50,7 +50,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The registry validates and a test shows an API error in the agreed format.
   - Handoffs: H-01, H-02, H-03, H-04, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-03. Domain event schema (IF-3) with fixtures and replay script**
+- [x] **P-03. Domain event schema (IF-3) with fixtures and replay script**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the platform domain events, fixtures and a replay script.

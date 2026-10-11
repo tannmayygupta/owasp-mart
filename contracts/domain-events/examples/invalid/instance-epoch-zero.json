@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "type": "instance.state_changed",
+  "occurred_at": "2026-10-11T09:00:00Z",
+  "data": {
+    "instance_id": "i-LEARNERINSTANCE2",
+    "attempt_id": "a-LEARNERATTEMPTAA",
+    "state": "ready",
+    "access": "open",
+    "health": "healthy",
+    "epoch": 0,
+    "error_code": null
+  }
+}

@@ -14,7 +14,8 @@
     "contracts:rules": "node scripts/check-contract-rules.mjs",
     "events:check": "node scripts/validate-events.mjs",
     "catalog:check": "node scripts/validate-catalog.mjs",
-    "errors:check": "node scripts/validate-errors.mjs && node scripts/generate-error-codes.mjs --check"
+    "errors:check": "node scripts/validate-errors.mjs && node scripts/generate-error-codes.mjs --check",
+    "domain-events:check": "node scripts/validate-domain-events.mjs && node scripts/replay-domain-events.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0",

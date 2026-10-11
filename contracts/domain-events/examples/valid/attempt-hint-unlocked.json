@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "type": "attempt.hint_unlocked",
+  "occurred_at": "2026-10-11T09:00:00Z",
+  "data": {
+    "attempt_id": "a-LEARNERATTEMPTAA",
+    "mode": "learner",
+    "challenge_key": "C05",
+    "level": 3
+  }
+}

@@ -18,7 +18,8 @@ owasp-mart/
     api/platform/*.yaml                         OpenAPI fragments, stream P
     api/lab/*.yaml                              OpenAPI fragments, stream L
     api/bundle/openapi.json                     generated, committed, CI checks it is current
-    events/                                     JSON Schemas: instance events, app events, domain events
+    events/                                     JSON Schemas: instance events, app events (IF-4, stream L)
+    domain-events/                              JSON Schema, audiences and fixtures of the live stream (IF-3, stream P)
     orchestrator/orchestrator.openapi.yaml
     instance/                                   instance contract (env, health, labels, injection, events, errors)
     catalog/challenge.schema.json
@@ -111,7 +112,7 @@ General rules: (1) a contract file exists, is reviewed and merged **before** eit
 |---|---|---|---|---|---|---|
 | IF-1 | Browser-facing platform API (P part) | `contracts/api/platform/*.yaml` | P | Dashboards (P), tests | OpenAPI | Prism mock |
 | IF-2 | Browser-facing lab API (instances, attempts runtime, flag submit, hints, reports) | `contracts/api/lab/*.yaml` | L | Dashboards (P) | OpenAPI | Prism mock |
-| IF-3 | Domain events (what the live stream carries) | `contracts/events/domain-events.schema.json` | P (L adds types by PR) | Dashboards, SSE hub, L publishers | JSON Schema | Event fixtures and a replay script |
+| IF-3 | Domain events (what the live stream carries) | `contracts/domain-events/domain-events.schema.json` | P (L adds types by PR) | Dashboards, SSE hub, L publishers | JSON Schema | Event fixtures and a replay script |
 | IF-4 | Instance events (sidecar and app events to ingest) | `contracts/events/instance-events.schema.json` | L | T (app events), ingest | JSON Schema | Fake ingest that validates and prints |
 | IF-5 | Orchestrator API (platform to orchestrator, orchestrator to platform) | `contracts/orchestrator/orchestrator.openapi.yaml` | L | Workers (L) | OpenAPI | Fake orchestrator |
 | IF-6 | Instance contract (what an instance must look like) | `contracts/instance/*` | L with T | Orchestrator (L), shop and services (T) | Markdown plus JSON Schema for the spec | Stub shop and the lab harness |
@@ -266,7 +267,7 @@ D differs from C by moving the scoring, attempt clock, flags and anti-cheat (the
 |---|---|---|---|---|
 | IF-1 platform API | P (server) to dashboards (P) | `contracts/api/platform/` | P | Prism |
 | IF-2 lab API | L to dashboards (P) | `contracts/api/lab/` | L | Prism |
-| IF-3 domain events | L and P publishers to dashboards via SSE | `contracts/events/domain-events.schema.json` | P | Fixtures |
+| IF-3 domain events | L and P publishers to dashboards via SSE | `contracts/domain-events/domain-events.schema.json` | P | Fixtures |
 | IF-4 instance events | T app events and L sidecar to L ingest | `contracts/events/instance-events.schema.json` | L | Fake ingest |
 | IF-6 instance contract | L to T | `contracts/instance/` | L with T | Stub shop and harness |
 | IF-7 catalogue | T to P and L | `contracts/catalog/` | T | Stub entries |

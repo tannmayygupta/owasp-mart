@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "type": "attempt.score_updated",
+  "occurred_at": "2026-10-11T09:00:00Z",
+  "data": {
+    "attempt_id": "a-LEARNERATTEMPTAA",
+    "mode": "learner",
+    "score": 1000,
+    "computed_at": "2026-10-11T09:00:00Z",
+    "per_challenge": []
+  }
+}

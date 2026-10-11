@@ -1,0 +1,37 @@
+✔ the committed fixtures replay cleanly: every check passes (559.5203ms)
+✔ a fixture that sends learner practice to a company makes the replay fail on the privacy wall (370.7117ms)
+✔ hub ids: same millisecond counts up, an earlier time is clamped, ids never go backwards (3.0779ms)
+✔ the hub answers 400 without audiences or with a malformed one, and 404 for another path (17.9961ms)
+✔ the consumer ignores heartbeat comments and waits for the connection instead of sleeping (71.7112ms)
+✔ a buffer that trims keeps only the newest events and replays them for a valid id (19.078ms)
+✔ CLI: --help exits 0, an unknown argument 2, --dir without a value 2, a folder without fixtures 1, the real contract 0 (246.6288ms)
+✔ the default heartbeat is 15 seconds (FR-LIV-02) (0.489ms)
+✔ publish refuses a time that is not real; ids stay valid (2.3518ms)
+✔ a reset gives buffer_reset to an older id, replays for the barrier id, and ends the connection (11.8668ms)
+✔ a stalled hub is an error, not an empty answer (437.8166ms)
+✔ the consumer parses CRLF frames, skips frames without data, and stops at maxEvents (18.0577ms)
+✔ a fresh connection without replay=all sees nothing of the buffer (10.9757ms)
+✔ the committed contract is valid and every type, example and record is counted (267.0674ms)
+✔ audiences: learner practice never reaches an org, a missing row, an unknown audience and a control row are rejected (1710.8146ms)
+✔ audienceKinds reads the row of the event mode; an instance event has the same row for both (2.0171ms)
+✔ a member that could carry a secret, a flag or personal data is rejected in the schema (1399.4074ms)
+✔ a flag-like value or a byte order mark anywhere in the folder is rejected (486.4982ms)
+✔ drift: every shared enum, in IF-2 and in IF-5, is compared (a value added or removed is reported) (1709.0987ms)
+✔ drift: every shared id and timestamp pattern is compared (648.4696ms)
+✔ the error registry is the source of the INST codes: an unregistered code in a fixture or example is rejected (90.6611ms)
+✔ semanticEvent: failed needs a code, a code needs failed (0.7567ms)
+✔ examples: an invalid one that passes, one failing at another path, one missing from the manifest, one without a file, a bad stage, broken JSON (1591.9259ms)
+✔ fixtures: wrong audiences, learner practice sent to an org, two users for one attempt, out of order, a control event, a bad audience string (1955.153ms)
+✔ errorPath builds JSON Pointers (0.3552ms)
+✔ CLI: --help exits 0, an unknown argument 2, --dir without a value 2, a missing folder 1, a good folder 0 (104.8357ms)
+✔ the schema itself rejects a failed instance without a code and a code on a running one; a timestamp must be a real date (243.0368ms)
+✔ fixtures: one mode per attempt, previous_state follows the attempt, epoch never goes back (976.0933ms)
+✔ audiences.json: modes equal the schema Mode, a wrong shape is a reported problem, a duplicate challenge row is a rule (936.5046ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12892.6709

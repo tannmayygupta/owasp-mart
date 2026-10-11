@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "type": "stream.resync",
+  "occurred_at": "2026-10-11T09:00:00Z",
+  "data": {
+    "reason": "because"
+  }
+}
