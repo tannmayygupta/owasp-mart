@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c11
+title: "Mishandling of Exceptional Conditions"
+status: stub
+owasp:
+  "2021": null
+  "2025": "A10"
+cwe:
+  primary: "CWE-636"
+  related: ["CWE-755", "CWE-396", "CWE-209", "CWE-234"]
+attack: ["T1190"]
+difficulty: 3
+tier: Medium
+flag:
+  placement: sentinel-table
+  delivery: sentinel
+start_state: "a player able to create a seller store and submit KYC (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player saw the verbose KYC error"
+    signal: null
+  m2:
+    summary: "the store was approved by the fail-open fallback"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c11
+fixed_build: challenges/fixed/c11

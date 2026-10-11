@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c05
+title: "Security Misconfiguration"
+status: stub
+owasp:
+  "2021": "A05"
+  "2025": "A02"
+cwe:
+  primary: "CWE-489"
+  related: ["CWE-209"]
+attack: ["T1190", "T1595.003"]
+difficulty: 2
+tier: Easy
+flag:
+  placement: sentinel-table
+  delivery: sentinel
+start_state: "any authenticated customer (placeholder seed)"
+milestones:
+  m1:
+    summary: "a verbose error was served to the player"
+    signal: null
+  m2:
+    summary: "an unauthenticated /_ops/ diagnostics page was served"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c05
+fixed_build: challenges/fixed/c05
