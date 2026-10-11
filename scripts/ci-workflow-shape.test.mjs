@@ -115,3 +115,15 @@ test('CODEOWNERS covers the files that define the rules engine', () => {
     assert.match(line, /@\w+/);
   }
 });
+
+// Story LE-3 (docs/adr/0031): the gate test runs in job `compose` (it needs Docker), and the vm-p compose file pins both images by digest.
+test('compose job runs the Caddy origin e2e test; vm-p compose pins the stock Caddy and the probe node image by digest, with no plugin build', () => {
+  const steps = doc.jobs.compose.steps.map((s) => s.run).filter(Boolean);
+  assert.ok(steps.includes('node --test scripts/e2e/caddy-origin.e2e.test.mjs'));
+  const compose = yaml.load(fs.readFileSync(path.join(ROOT, 'infra', 'caddy', 'compose.p.yaml'), 'utf8'));
+  for (const [name, svc] of Object.entries(compose.services)) {
+    assert.match(svc.image, /@sha256:[0-9a-f]{64}$/, `${name} image is pinned by digest`);
+    assert.ok(!svc.build, `${name} has no build (stock image, D-49)`);
+  }
+  assert.match(compose.services.caddy.image, /^caddy:/);
+});

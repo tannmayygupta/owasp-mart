@@ -20,6 +20,8 @@ const IPV4 = /(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.]*\d)(?
 const BAD_NAMES = [
   /\.pem$/i, /\.key$/i, /\.tfstate(\.|$)/i, /\.tfvars$/i, /\.tfvars\.json$/i, /(^|\/)tfplan[^/]*$/i, /\.tfplan$/i,
   /\.local\.json$/i, /(^|\/)\.oci\//, /(^|\/)\.aws\/(credentials|config)$/, /(^|\/)credentials\.csv$/i, /accessKeys\.csv$/i, /(^|\/)id_(rsa|ed25519|ecdsa|dsa)$/,
+  // Vercel CLI link file: it holds the project and organisation ids (story LE-3); .vercel/ is git-ignored, a tracked copy is refused
+  /(^|\/)\.vercel\//, /(^|\/)\.env[^/]*\.local$/,
 ];
 const SKIP_CONTENT = /(^|\/)(pnpm-lock\.yaml|uv\.lock|\.terraform\.lock\.hcl|package-lock\.json)$|\.(xlsx|png|jpg|jpeg|gif|ico|pdf|woff2?|zip|gz)$/i;
 const IP_SCOPE = [/^infra\//, /^docs\/runbooks\//, /^docs\/assets\//, /^docs\/dev-log\//, /^docs\/research\/s-1[17]/, /^docs\/adr\/002[12]/];

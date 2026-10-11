@@ -126,8 +126,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Waits on: L-05, L-06, L-07 and the sign-offs of Akshay (P-08) and Sahil (T-03).
   - Done when: The tag exists, COMPAT.md lists the versions every stream targets and the approvals check is active.
   - Handoffs: H-58, H-80, H-81, H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
-  - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT ticked: the tag contracts-v1.0.0 waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run 
-ode scripts/tag-contracts.mjs --dry-run.
+  - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT ticked: the tag `contracts-v1.0.0` waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run `node scripts/tag-contracts.mjs --dry-run`.
 
 - [ ] **L-10. DuckDNS names and certificates**
   - Epic: `epic-environments-and-deployment`
@@ -136,7 +135,7 @@ ode scripts/tag-contracts.mjs --dry-run.
   - Covers: LE-2; spike S-16
   - Waits on: L-08.
   - Done when: Real certificates are issued and renew automatically; the S-16 result (wildcard resolution) is recorded.
-  - Status 2026-10-11 (story 2.2): the host scripts, the timer, the pinned lego installer, the cloud-init wiring, the S-16 check script, ADR 0030, decision D-49 (Proposed) and the runbook docs/runbooks/certificates.md are built and tested against stubs (and on Linux in Docker). NOT ticked: the live steps are the developer's (DuckDNS accounts and names, token files on the hosts, staging then production issuance, one real renewal, the S-16 result). Tick L-10 only after the real redacted results are pasted.
+  - Status 2026-10-11 (story 2.2): the host scripts, the timer, the pinned lego installer, the cloud-init wiring, the S-16 check script, ADR 0030, decision D-49 (Proposed) and the runbook `docs/runbooks/certificates.md` are built and tested against stubs (and on Linux in Docker). NOT ticked: the live steps are the developer's (DuckDNS accounts and names, token files on the hosts, staging then production issuance, one real renewal, the S-16 result). Tick L-10 only after the real redacted results are pasted.
 
 - [ ] **L-11. Vercel project, same-origin rewrite and live-stream check**
   - Epic: `epic-environments-and-deployment`
@@ -144,7 +143,9 @@ ode scripts/tag-contracts.mjs --dry-run.
   - Build: Create the Vercel project with the rewrite config from Akshay, the origin secret and the origin-secret check in the platform Caddy; run the SSE-through-rewrite test on the real VM.
   - Covers: LE-3; spike S-14
   - Waits on: L-10 and Akshay's dashboards skeleton (P-07).
+  - Handoffs: H-116, H-117 (see docs/dev/HANDOFFS.md; added by the preparation story, 2026-10-11)
   - Done when: The Vercel site reaches the API through `/api/*`, direct access to the VM without the secret is refused, and the S-14 result is recorded.
+  - Status 2026-10-12 (story 2.3): the Caddy origin-secret gate, the stock Caddy edge for vm-p, the Vercel probe project with the `routes` header transform, the S-14 check script, ADR 0031, decision D-50 (Proposed) and the runbook `docs/runbooks/vercel-and-origin.md` are built and tested with real Caddy in Docker (including TLS) and stand-in proxies. NOT ticked: the live steps are the developer's (Vercel login and project, sensitive environment variable, secret files on vm-p, port 443, the S-14 run) and the real wiring waits for Akshay's P-07 and the live certificates of L-10.
 
 - [ ] **L-12. Image builds for amd64 and arm64 and deploy pipelines**
   - Epic: `epic-environments-and-deployment`

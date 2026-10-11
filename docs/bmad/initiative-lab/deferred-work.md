@@ -92,3 +92,7 @@
 - source_plan: `docs/bmad/initiative-lab/epic-environments-and-deployment/story-duckdns-names-and-certificates-plan.md`
   summary: Confirm the lego v5.5.2 flags `--server`, `--path` and `renew --days` with the real binary.
   evidence: Only `--accept-tos`, the flag order before `run` and the wildcard file names (`_.<name>.crt`) were confirmed from the lego documentation; the rest are standard flags that the scripts exercise against a stub (maybe-false, medium if wrong). The developer's staging run settles it; paste its real output into the S-16 note and fix the script if lego rejects a flag.
+
+- source_plan: `docs/bmad/initiative-lab/epic-environments-and-deployment/story-vercel-project-same-origin-rewrite-and-live-stream-check-plan.md`
+  summary: Prove on the live Vercel project that the `routes` transform expands `$ORIGIN_SECRET` and overwrites a visitor value, that SSE streams unbuffered through the rewrite and for how long, which Host header reaches the origin, and whether rewrite caching is off.
+  evidence: The Vercel side is documented but unproven (maybe-false, medium if wrong): only the developer's S-14 run with `scripts/check-sse-rewrite.mjs` can settle it; the fallback (Routing Middleware) is written in the runbook.

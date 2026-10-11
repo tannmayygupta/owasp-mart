@@ -51,3 +51,8 @@ id_ecdsa
 
 # a root screenshot may show an account id (the developer decides; never committed)
 /image.png
+
+# Vercel CLI link files (project and organisation ids), local env files, and the rendered deploy folder of the S-14 probe (story LE-3)
+.vercel
+.env*.local
+infra/vercel/.deploy/

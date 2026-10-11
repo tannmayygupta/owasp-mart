@@ -1,0 +1,39 @@
+# Origin-secret gate (story LE-3, ADR 0031 D3). Imported INSIDE a site block by Caddyfile.p and Caddyfile.test, so the tests exercise the real gate.
+# A request that carries the current or the previous secret in X-Origin-Secret is proxied; every other request gets 403 and never reaches the upstream.
+# The secrets are files read at request time ({file.}): a rotation needs no reload. The previous file exists only during a rotation. A missing or empty
+# file never matches a header (checked by scripts/e2e/caddy-origin.e2e.test.mjs), so a missing file fails closed: every request is refused.
+# A secret file that is missing when the container starts is worse: Docker then creates a DIRECTORY at the host path, reading it fails and the gate
+# refuses everything too (tested); the runbook preflight is `test -f` on both files. Secrets are exactly 64 lower-case hex characters.
+# Caddy has no constant-time compare. This is the cheap first filter; the application repeats the check with a timing-safe compare (handoff to Akshay).
+log {
+	output stdout
+	format filter {
+		wrap json
+		# the secret must never reach a log (ADR 0031 D3)
+		request>headers>X-Origin-Secret delete
+	}
+}
+
+@origin {
+	header X-Origin-Secret {file./run/secrets/origin_secret_current}
+	header X-Origin-Secret {file./run/secrets/origin_secret_previous}
+	# The header must be exactly 64 lower-case hex characters (openssl rand -hex 32). This also stops a header with an empty value from matching an empty or
+	# missing file, and every shorter or odd secret from ever being accepted.
+	header_regexp X-Origin-Secret ^[0-9a-f]{64}$
+	# Caddy's header matcher treats a file value that starts or ends with * as a wildcard, so a secret file that holds anything but hex characters is refused
+	# whole (an empty previous file is fine: it holds no bad character).
+	not vars_regexp {file./run/secrets/origin_secret_current} [^0-9a-f]
+	not vars_regexp {file./run/secrets/origin_secret_previous} [^0-9a-f]
+}
+handle @origin {
+	reverse_proxy {$UPSTREAM:probe:8080} {
+		# SSE: send each chunk at once, never buffer (ADR 0031 D4)
+		flush_interval -1
+		# Caddy replaces X-Forwarded-For with the address of its direct peer (Vercel). The visitor address that Vercel put there is kept under another name.
+		header_up X-Edge-Forwarded-For {http.request.header.X-Forwarded-For}
+	}
+}
+
+handle {
+	respond "forbidden" 403
+}

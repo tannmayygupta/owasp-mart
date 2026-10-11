@@ -39,6 +39,8 @@ Consequence: a dashboard at `<project>.vercel.app` calling `https://<api>.duckdn
 - Hobby included usage (per month): Fast Data Transfer 100 GB, Fast Origin Transfer 10 GB, CDN requests 1,000,000, function invocations 1,000,000, active CPU 4 hours `[EF-06]`. Which of these a rewritten request and a held-open stream count against is UNVERIFIED (S-14). Hobby is "non-commercial, personal use only" `[EF-06]`; the PRD already lists this as a risk (R-4).
 - Not found in any primary source: whether SSE passes through a rewrite unbuffered, the longest a stream may stay open, whether `Set-Cookie` and large headers pass unchanged, whether an IP-literal destination is accepted `[EF-05]`. These are spike S-14. The design below does not depend on any of them being true: each has a fallback.
 
+> **Update 2026-10-11 (D-50, ADR 0031, story L-11 preparation).** (1) The origin keeps the `/api` prefix: the route destination is `https://<platform host>/api/$1` (the host is filled in at deploy time by `scripts/check-sse-rewrite.mjs --render`, because only transform arguments expand environment variables) and IF-2 uses `/api/v1/`; the prefix-stripping lines in the diagrams below are marked superseded in place. The `routes`-only shape cannot be combined with `rewrites`, `headers` and the like: see ADR 0031 and the S-14 step for the real dashboards. (2) The secret header is set by a `routes` transform from a sensitive environment variable; `caddy-p` accepts two values (rotation), reads them from files, never logs them, and the application repeats the check with a timing-safe compare. (3) Caddy keeps Vercel's visitor address in `X-Edge-Forwarded-For` (it replaces `X-Forwarded-For` with its direct peer). (4) Hosts: the platform host is one DuckDNS name (L-10); vm-p port 443 is open to the internet because Vercel publishes no address range. The facts marked unverified above stay open until the live S-14 run; `infra/caddy/` and `scripts/check-sse-rewrite.mjs` are ready for it.
+
 ### 1.4 Request path (recommended)
 
 ```mermaid
@@ -51,7 +53,7 @@ sequenceDiagram
     B->>V: GET /learner (page, Next.js)
     V-->>B: HTML and JS
     B->>V: POST /api/auth/login (JSON, CSRF header)
-    V->>P: rewrite to https://api.PLATFORM_ZONE/auth/login + x-origin-secret + x-forwarded-for
+    V->>P: rewrite to https://PLATFORM_HOST/api/auth/login (superseded by D-50, the /api prefix is kept, the old line said /auth/login) + x-origin-secret + x-forwarded-for
     alt secret missing or wrong
         P-->>V: 403 (never reaches API)
     else secret valid
@@ -62,7 +64,7 @@ sequenceDiagram
         V-->>B: response, cookie stored for the dashboard origin only
     end
     B->>V: GET /api/me (cookie sent automatically, same origin)
-    V->>P: rewrite
+    V->>P: rewrite (the /api prefix is kept, D-50)
     P->>A: forward
     A-->>B: user data (through the same hops)
 ```
@@ -235,7 +237,7 @@ sequenceDiagram
     participant L as live (SSE hub)
     participant K as Valkey Streams
     B->>V: GET /api/live/stream (cookie, Last-Event-ID if reconnecting)
-    V->>P: rewrite + x-origin-secret
+    V->>P: rewrite + x-origin-secret (the /api prefix is kept, D-50)
     P->>L: forward (no compression, flushed immediately for text/event-stream)
     L->>L: check session, work out allowed audiences from the account, not from the request
     alt not signed in
@@ -266,7 +268,7 @@ Design points:
 - **IDs and replay**: Valkey stream entry IDs (time-sequence) are used directly as SSE `id:`. Streams are trimmed by age or length (`MAXLEN ~` or `MINID`) `[EF-24]`. `XREAD BLOCK <ms>` doubles as the heartbeat timer; `$` is used only for the very first read `[EF-24]`.
 - **Authorisation (FR-LIV-05)**: the hub derives the audience list from the session (the user's own stream; the organisation stream for recruiters; admin streams for admins). A client never names a stream. Publishers decide the audience when they publish. The hub re-checks the session on every heartbeat tick and on a revoke message.
 - **Cap and reconnect**: the hub closes every stream after a fixed age and the browser reconnects with `Last-Event-ID`. This stays correct even if a Vercel or proxy cap exists that we have not found `[EF-05]`, and it re-validates the session regularly.
-- **No buffering**: Caddy flushes `text/event-stream` responses immediately `[EF-23]`; the response also carries `Cache-Control: no-store` and `X-Accel-Buffering: no` (FR-LIV-02); the stream route is excluded from response compression.
+- **No buffering**: Caddy flushes `text/event-stream` responses immediately `[EF-23]`; the response also carries `Cache-Control: no-store` and `X-Accel-Buffering: no` (superseded in part by D-50 for the stream: `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no`, a comment line every 15 s, `flush_interval -1`) (FR-LIV-02); the stream route is excluded from response compression.
 - **Fallback ladder**: (1) rewrite (primary); (2) **plan B, ticketed direct stream**: the dashboard asks `POST /api/live/ticket` and opens `EventSource` directly against the API host with a one-time ticket in the URL; the API host then allows exactly one CORS origin (`DASHBOARD_ORIGIN`, without credentials) on that single route, and the edge does not log the query string; (3) polling of the snapshot endpoint (D-17); (4) dashboards served from the VM. Plan B needs the user's agreement because NFR-SEC-03 says "no open CORS" (an exact allowlist is not open CORS, but it is cross-origin).
 - **HTTP/2**: the browser to Vercel leg is expected to be HTTP/2, which avoids the six-connection limit `[EF-22]`; this is UNVERIFIED for the Hobby plan and checked in S-2. The Vercel to origin protocol is not documented; Caddy accepts HTTP/1.1 and HTTP/2.
 

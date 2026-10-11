@@ -232,6 +232,8 @@ jobs:
       - run: node scripts/dev.mjs harness
       - run: node --test scripts/e2e/harness.e2e.test.mjs
       - run: node --test scripts/e2e/dev.e2e.test.mjs
+      # Story LE-3 (docs/adr/0031): the origin-secret gate and the unbuffered stream, tested with stock Caddy and the probe upstream (digests of infra/caddy/compose.p.yaml).
+      - run: node --test scripts/e2e/caddy-origin.e2e.test.mjs
   e2e:
     name: end-to-end tests (lab, orchestrator, events)
     timeout-minutes: 15
