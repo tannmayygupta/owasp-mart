@@ -1,0 +1,347 @@
+{
+  "create-bad-instance-id.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/instance_id",
+    "rule": "instance id is i- plus 16 Base32"
+  },
+  "create-missing-template.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/template_id",
+    "rule": "template_id is required"
+  },
+  "create-template-bad-format.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/template_id",
+    "rule": "template name shape"
+  },
+  "create-epoch-zero.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "epoch starts at 1"
+  },
+  "create-image-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/image",
+    "rule": "no image (NFR-SEC-04)"
+  },
+  "create-command-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/command",
+    "rule": "no command (NFR-SEC-04)"
+  },
+  "create-volume-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/volumes",
+    "rule": "no volume (NFR-SEC-04)"
+  },
+  "create-port-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/ports",
+    "rule": "no port (NFR-SEC-04)"
+  },
+  "create-network-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/network",
+    "rule": "no network (NFR-SEC-04)"
+  },
+  "create-env-field.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/env",
+    "rule": "no environment value (NFR-SEC-04)"
+  },
+  "create-flag-bad-format.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/flags/0/flag",
+    "rule": "flag format"
+  },
+  "create-empty-flags.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/flags",
+    "rule": "at least one flag"
+  },
+  "create-digest-bad.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/flag_digests/0/sha256",
+    "rule": "digest is 64 hex characters"
+  },
+  "create-event-key-short.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/event_key",
+    "rule": "event key shape"
+  },
+  "create-missing-seed.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/seed",
+    "rule": "seed is required"
+  },
+  "create-bad-hostname.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/hostname",
+    "rule": "DNS name"
+  },
+  "create-memory-too-low.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/limits/memory_mb",
+    "rule": "memory limit lower bound"
+  },
+  "create-missing-limit.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/limits/max_minutes",
+    "rule": "all five limits are required"
+  },
+  "reset-missing-epoch.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "reset-epoch-one.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/epoch",
+    "rule": "a reset epoch is at least 2"
+  },
+  "create-missing-owner-hash.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is required"
+  },
+  "create-owner-hash-short.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is 64 hex characters"
+  },
+  "create-owner-hash-uppercase.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is lowercase hex"
+  },
+  "create-owner-hash-email.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "owner_hash is never an email"
+  },
+  "reset-owner-hash.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/owner_hash",
+    "rule": "a reset keeps the owner of the instance"
+  },
+  "reset-template-field.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/template_id",
+    "rule": "reset cannot change the template"
+  },
+  "access-bad-value.json": {
+    "schema": "AccessRequest",
+    "path": "/access",
+    "rule": "open, frozen or closed"
+  },
+  "access-negative-epoch.json": {
+    "schema": "AccessRequest",
+    "path": "/access_epoch",
+    "rule": "access epoch is not negative"
+  },
+  "status-with-flags.json": {
+    "schema": "InstanceStatus",
+    "path": "/flags",
+    "rule": "a GET answer never holds a flag"
+  },
+  "status-with-digest.json": {
+    "schema": "InstanceStatus",
+    "path": "/flag_digests",
+    "rule": "a GET answer never holds a digest"
+  },
+  "status-with-event-key.json": {
+    "schema": "InstanceStatus",
+    "path": "/event_key",
+    "rule": "a GET answer never holds an event key"
+  },
+  "status-with-seed.json": {
+    "schema": "InstanceStatus",
+    "path": "/seed",
+    "rule": "a GET answer never holds a seed"
+  },
+  "status-bad-state.json": {
+    "schema": "InstanceStatus",
+    "path": "/state",
+    "rule": "state is in the state machine"
+  },
+  "host-bad-health.json": {
+    "schema": "HostStatus",
+    "path": "/health",
+    "rule": "ok, degraded or down"
+  },
+  "state-report-bad-state.json": {
+    "schema": "StateReport",
+    "path": "/to_state",
+    "rule": "state is in the state machine"
+  },
+  "state-report-missing-reason.json": {
+    "schema": "StateReport",
+    "path": "/reason",
+    "rule": "reason is required"
+  },
+  "problem-bad-code.json": {
+    "schema": "Problem",
+    "path": "/code",
+    "rule": "code family and shape"
+  },
+  "problem-stack-trace.json": {
+    "schema": "Problem",
+    "path": "/stack",
+    "rule": "never a stack trace (NFR-SEC-03)"
+  },
+  "create-first-seq-removed.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq was removed in D-42; a body that still has it is refused"
+  },
+  "reset-first-seq-removed.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/first_seq",
+    "rule": "first_seq was removed in D-42; a body that still has it is refused"
+  },
+  "problem-message-member.json": {
+    "schema": "Problem",
+    "path": "/message",
+    "rule": "the old-style message member is gone; use detail"
+  },
+  "problem-old-style.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "the standard members type, title, status, detail and instance are required"
+  },
+  "problem-type-real-domain.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "type is a URI under vulnmart.invalid (no real domain)"
+  },
+  "problem-status-string.json": {
+    "schema": "Problem",
+    "path": "/status",
+    "rule": "status is an integer"
+  },
+  "problem-status-float.json": {
+    "schema": "Problem",
+    "path": "/status",
+    "rule": "status is an integer token, not 429.0"
+  },
+  "problem-status-not-an-error.json": {
+    "schema": "Problem",
+    "path": "/status",
+    "rule": "status is 400 to 599"
+  },
+  "problem-missing-instance.json": {
+    "schema": "Problem",
+    "path": "/instance",
+    "rule": "instance is required"
+  },
+  "problem-instance-not-urn.json": {
+    "schema": "Problem",
+    "path": "/instance",
+    "rule": "instance is urn:vulnmart:request: plus the request id"
+  },
+  "problem-missing-title.json": {
+    "schema": "Problem",
+    "path": "/title",
+    "rule": "title is required"
+  },
+  "problem-trace-member.json": {
+    "schema": "Problem",
+    "path": "/trace",
+    "rule": "never a stack trace (NFR-SEC-03)"
+  },
+  "state-report-missing-transition.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition is required (identity is instance, epoch, transition)"
+  },
+  "state-report-transition-zero.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition starts at 1"
+  },
+  "state-report-transition-negative.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition starts at 1"
+  },
+  "state-report-transition-float.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "an integer token, not 1.0"
+  },
+  "state-report-transition-exponent.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "an integer token, not 1e0"
+  },
+  "state-report-transition-string.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "transition is a number, not a string"
+  },
+  "state-report-transition-boolean.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "a boolean is not an integer"
+  },
+  "state-report-transition-huge.json": {
+    "schema": "StateReport",
+    "path": "/transition",
+    "rule": "at most 2^53 - 1"
+  },
+  "state-report-epoch-float.json": {
+    "schema": "StateReport",
+    "path": "/epoch",
+    "rule": "an integer token, not 1.0"
+  },
+  "create-epoch-float.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "an integer token, not 1.0"
+  },
+  "create-epoch-exponent.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "an integer token, not 1e0"
+  },
+  "create-epoch-boolean.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "a boolean is not an integer"
+  },
+  "create-epoch-huge.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/epoch",
+    "rule": "at most 2^53 - 1"
+  },
+  "create-memory-float.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/limits/memory_mb",
+    "rule": "an integer token, not 1024.0"
+  },
+  "create-decoy-index-float.json": {
+    "schema": "CreateInstanceRequest",
+    "path": "/decoys/0/index",
+    "rule": "an integer token, not 0.0"
+  },
+  "reset-epoch-float.json": {
+    "schema": "ResetInstanceRequest",
+    "path": "/epoch",
+    "rule": "an integer token, not 2.0"
+  },
+  "access-epoch-float.json": {
+    "schema": "AccessRequest",
+    "path": "/access_epoch",
+    "rule": "an integer token, not 1.0"
+  },
+  "access-epoch-boolean.json": {
+    "schema": "AccessRequest",
+    "path": "/access_epoch",
+    "rule": "a boolean is not an integer"
+  },
+  "host-capacity-float.json": {
+    "schema": "HostStatus",
+    "path": "/capacity_memory_mb",
+    "rule": "an integer token, not 8192.0"
+  }
+}

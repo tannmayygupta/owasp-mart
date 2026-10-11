@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // One command to start VulnMart containers on Windows, macOS and Linux. Node built-ins only.
-//   node scripts/dev.mjs hello | up <profile...> | down | doctor | --help
+//   node scripts/dev.mjs hello | up <profile...> | down | doctor | harness [--keep] | harness down | --help
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import net from 'node:net';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runHarness, harnessDown } from './harness.mjs';
 
 export const HELLO_PORT = 18080;
 export const HELLO_CONTAINER = 'vulnmart-hello';
@@ -21,6 +22,8 @@ Usage: node scripts/dev.mjs <command>
   hello             Start the hardened hello container, check it, remove it
   up <profile...>   Start Compose profiles: ${PROFILES.join(', ')}
   down              Stop and remove everything this project started
+  harness [--keep]  Start one full stub instance with the fake ingest, check it against the contracts, remove it (--keep leaves it up)
+  harness down      Remove the harness containers, networks and volumes
   doctor            Print tool versions (Node, pnpm, uv, Docker, Compose) with PASS or FAIL
   --help            Show this text
 `;
@@ -36,6 +39,12 @@ export function parseArgs(argv) {
   if (cmd === 'hello' || cmd === 'down' || cmd === 'doctor') {
     if (rest.length) return { error: `"${cmd}" takes no arguments.` };
     return { cmd };
+  }
+  if (cmd === 'harness') {
+    if (!rest.length) return { cmd, keep: false };
+    if (rest.length === 1 && rest[0] === 'down') return { cmd: 'harness-down' };
+    if (rest.length === 1 && rest[0] === '--keep') return { cmd, keep: true };
+    return { error: '"harness" takes no argument, --keep, or the word down.' };
   }
   if (cmd === 'up') {
     if (!rest.length) return { error: `"up" needs at least one profile (${PROFILES.join(', ')}).` };
@@ -136,6 +145,16 @@ export function down({ runner = run, log = console.log, err = console.error } = 
   return 0;
 }
 
+export async function harness({ keep = false, runner = run, ...rest } = {}) {
+  if (!dockerRunning(runner)) { console.error(MSG_DOCKER_DOWN); return 1; }
+  return runHarness({ keep, runner, ...rest });
+}
+
+export function harnessDownCmd({ runner = run, log = console.log, err = console.error } = {}) {
+  if (!dockerRunning(runner)) { err(MSG_DOCKER_DOWN); return 1; }
+  return harnessDown({ runner, log, err });
+}
+
 export function readPins() {
   const node = readFileSync(path.join(ROOT, '.node-version'), 'utf8').trim();
   const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
@@ -179,6 +198,8 @@ export async function main(argv = process.argv.slice(2)) {
     case 'up': return up(a.profiles);
     case 'down': return down();
     case 'doctor': return doctor();
+    case 'harness': return harness({ keep: a.keep });
+    case 'harness-down': return harnessDownCmd();
     default: return 1;
   }
 }

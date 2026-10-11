@@ -1,0 +1,199 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ReadEc2AndNetwork",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:Describe*",
+                "ec2:GetSecurityGroupsForVpc"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ManageVulnMartEc2InSydneyOnly",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:CreateVpc",
+                "ec2:DeleteVpc",
+                "ec2:ModifyVpcAttribute",
+                "ec2:CreateSubnet",
+                "ec2:DeleteSubnet",
+                "ec2:ModifySubnetAttribute",
+                "ec2:CreateInternetGateway",
+                "ec2:DeleteInternetGateway",
+                "ec2:AttachInternetGateway",
+                "ec2:DetachInternetGateway",
+                "ec2:CreateRouteTable",
+                "ec2:DeleteRouteTable",
+                "ec2:CreateRoute",
+                "ec2:DeleteRoute",
+                "ec2:ReplaceRoute",
+                "ec2:AssociateRouteTable",
+                "ec2:DisassociateRouteTable",
+                "ec2:CreateNetworkAcl",
+                "ec2:DeleteNetworkAcl",
+                "ec2:CreateNetworkAclEntry",
+                "ec2:DeleteNetworkAclEntry",
+                "ec2:ReplaceNetworkAclEntry",
+                "ec2:ReplaceNetworkAclAssociation",
+                "ec2:CreateSecurityGroup",
+                "ec2:DeleteSecurityGroup",
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:AuthorizeSecurityGroupEgress",
+                "ec2:RevokeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupEgress",
+                "ec2:ModifySecurityGroupRules",
+                "ec2:UpdateSecurityGroupRuleDescriptionsIngress",
+                "ec2:UpdateSecurityGroupRuleDescriptionsEgress",
+                "ec2:ImportKeyPair",
+                "ec2:CreateKeyPair",
+                "ec2:DeleteKeyPair",
+                "ec2:RebootInstances",
+                "ec2:AllocateAddress",
+                "ec2:ReleaseAddress",
+                "ec2:AssociateAddress",
+                "ec2:DisassociateAddress",
+                "ec2:CreateTags",
+                "ec2:DeleteTags"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "ap-southeast-2"
+                }
+            }
+        },
+        {
+            "Sid": "ManageTaggedVulnMartInstances",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:TerminateInstances",
+                "ec2:StartInstances",
+                "ec2:StopInstances",
+                "ec2:ModifyInstanceMetadataOptions"
+            ],
+            "Resource": "arn:aws:ec2:ap-southeast-2:*:instance/*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "ap-southeast-2",
+                    "aws:ResourceTag/Project": "vulnmart"
+                }
+            }
+        },
+        {
+            "Sid": "RunOnlyFreePlanEligibleInstanceTypes",
+            "Effect": "Allow",
+            "Action": "ec2:RunInstances",
+            "Resource": "arn:aws:ec2:ap-southeast-2:*:instance/*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "ap-southeast-2",
+                    "ec2:InstanceType": [
+                        "t3.micro",
+                        "t3.small",
+                        "t4g.micro",
+                        "t4g.small",
+                        "c7i-flex.large",
+                        "m7i-flex.large"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "RunInstancesOtherResourcesInSydney",
+            "Effect": "Allow",
+            "Action": "ec2:RunInstances",
+            "Resource": [
+                "arn:aws:ec2:ap-southeast-2::image/*",
+                "arn:aws:ec2:ap-southeast-2:*:subnet/*",
+                "arn:aws:ec2:ap-southeast-2:*:security-group/*",
+                "arn:aws:ec2:ap-southeast-2:*:volume/*",
+                "arn:aws:ec2:ap-southeast-2:*:network-interface/*",
+                "arn:aws:ec2:ap-southeast-2:*:key-pair/*"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "ap-southeast-2"
+                }
+            }
+        },
+        {
+            "Sid": "DenyRunInstancesOfOtherInstanceTypes",
+            "Effect": "Deny",
+            "Action": "ec2:RunInstances",
+            "Resource": "arn:aws:ec2:ap-southeast-2:*:instance/*",
+            "Condition": {
+                "StringNotEquals": {
+                    "ec2:InstanceType": [
+                        "t3.micro",
+                        "t3.small",
+                        "t4g.micro",
+                        "t4g.small",
+                        "c7i-flex.large",
+                        "m7i-flex.large"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "ReadCanonicalUbuntuImageParameter",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameter",
+                "ssm:GetParameters"
+            ],
+            "Resource": "arn:aws:ssm:ap-southeast-2::parameter/aws/service/canonical/ubuntu/server/24.04/*"
+        },
+        {
+            "Sid": "ManageVulnMartBudgets",
+            "Effect": "Allow",
+            "Action": [
+                "budgets:ViewBudget",
+                "budgets:ModifyBudget",
+                "budgets:TagResource",
+                "budgets:UntagResource",
+                "budgets:ListTagsForResource"
+            ],
+            "Resource": "arn:aws:budgets::*:budget/vulnmart-*"
+        },
+        {
+            "Sid": "ListBudgets",
+            "Effect": "Allow",
+            "Action": "budgets:ViewBudget",
+            "Resource": "*"
+        },
+        {
+            "Sid": "TerraformStateBucketReadWrite",
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetBucketVersioning",
+                "s3:GetBucketLocation"
+            ],
+            "Resource": "arn:aws:s3:::vulnmart-tfstate-REPLACE-WITH-YOUR-BUCKET"
+        },
+        {
+            "Sid": "TerraformStateObjects",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": "arn:aws:s3:::vulnmart-tfstate-REPLACE-WITH-YOUR-BUCKET/*"
+        },
+        {
+            "Sid": "BootstrapStateBucketOnceRemoveAfterwards",
+            "Effect": "Allow",
+            "Action": [
+                "s3:CreateBucket",
+                "s3:PutBucketVersioning",
+                "s3:PutEncryptionConfiguration",
+                "s3:PutBucketPublicAccessBlock",
+                "s3:PutBucketPolicy"
+            ],
+            "Resource": "arn:aws:s3:::vulnmart-tfstate-REPLACE-WITH-YOUR-BUCKET"
+        }
+    ]
+}

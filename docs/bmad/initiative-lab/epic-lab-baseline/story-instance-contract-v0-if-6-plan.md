@@ -3,7 +3,7 @@ title: 'Instance contract v0 (IF-6)'
 type: 'feature'
 ticket: '2'
 created: '2026-10-08'
-status: 'built'
+status: done
 baseline_revision: '48f5da2d402c038868ee9556cd0dfebeb5a8928d'
 route: 'full'
 route_source: 'pinned'
@@ -16,6 +16,7 @@ context:
   - '{project-root}/docs/architecture/07-repo-and-workstreams.md'
   - '{project-root}/docs/architecture/04-data-and-state.md'
   - '{project-root}/docs/design/challenge-specs.md'
+assignee: "tannmayygupta"
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">

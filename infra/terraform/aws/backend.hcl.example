@@ -1,0 +1,6 @@
+# Copy to backend.hcl (git-ignored) and write your bucket name. No account ID, no keys here.
+bucket       = "vulnmart-tfstate-REPLACE-WITH-YOUR-BUCKET"
+key          = "vulnmart/aws/terraform.tfstate"
+region       = "ap-southeast-2"
+encrypt      = true
+use_lockfile = true # S3 native locking (Terraform 1.11 or newer): no DynamoDB table

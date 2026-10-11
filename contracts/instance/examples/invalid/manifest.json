@@ -514,5 +514,257 @@
   "instance-template/placement-reader-other-user.json": {
     "path": "/components/3/user",
     "rule": "readers run as the injector user (semantic)"
+  },
+  "sidecar-start/bad-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is the constant 0.1"
+  },
+  "sidecar-start/bad-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance id is i- plus 16 Base32 characters"
+  },
+  "sidecar-start/zero-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch starts at 1"
+  },
+  "sidecar-start/first-seq-removed.json": {
+    "path": "/first_seq",
+    "rule": "first_seq was removed in D-42 (every epoch restarts the counter at 1); a document that still has it is refused"
+  },
+  "sidecar-start/missing-event-key.json": {
+    "path": "/event_key",
+    "rule": "event_key is required"
+  },
+  "sidecar-start/short-event-key.json": {
+    "path": "/event_key",
+    "rule": "event_key has 32 to 128 characters"
+  },
+  "sidecar-start/event-key-with-space.json": {
+    "path": "/event_key",
+    "rule": "event_key is printable ASCII without spaces"
+  },
+  "sidecar-start/missing-flag-digests.json": {
+    "path": "/flag_digests",
+    "rule": "flag_digests is required"
+  },
+  "sidecar-start/empty-flag-digests.json": {
+    "path": "/flag_digests",
+    "rule": "flag_digests has at least one item"
+  },
+  "sidecar-start/digest-not-hex.json": {
+    "path": "/flag_digests/0/sha256",
+    "rule": "digest is 64 lowercase hex characters"
+  },
+  "sidecar-start/digest-uppercase.json": {
+    "path": "/flag_digests/0/sha256",
+    "rule": "digest is lowercase hex"
+  },
+  "sidecar-start/digest-bad-kind.json": {
+    "path": "/flag_digests/0/kind",
+    "rule": "kind is real or decoy"
+  },
+  "sidecar-start/digest-bad-challenge-key.json": {
+    "path": "/flag_digests/0/challenge_key",
+    "rule": "challenge key is C01 to C11"
+  },
+  "sidecar-start/digest-repeated.json": {
+    "path": "/flag_digests/1/sha256",
+    "rule": "a digest appears once"
+  },
+  "sidecar-start/digest-key-and-kind-repeated.json": {
+    "path": "/flag_digests/1/challenge_key",
+    "rule": "one real digest per challenge key (semantic rule)"
+  },
+  "sidecar-start/extra-property.json": {
+    "path": "/seed",
+    "rule": "no extra fields; the seed never goes to the sidecar"
+  },
+  "sidecar-start/event-key-too-long.json": {
+    "path": "/event_key",
+    "rule": "event_key has at most 128 characters"
+  },
+  "sidecar-start/event-key-non-ascii.json": {
+    "path": "/event_key",
+    "rule": "event_key is printable ASCII"
+  },
+  "sidecar-start/too-many-flag-digests.json": {
+    "path": "/flag_digests",
+    "rule": "flag_digests has at most 64 items"
+  },
+  "sidecar-start/missing-instance-id.json": {
+    "path": "/instance_id",
+    "rule": "instance_id is required"
+  },
+  "sidecar-start/missing-epoch.json": {
+    "path": "/epoch",
+    "rule": "epoch is required"
+  },
+  "sidecar-start/missing-schema-version.json": {
+    "path": "/schema_version",
+    "rule": "schema_version is required"
+  },
+  "sidecar-start/digest-lowercase-challenge-key.json": {
+    "path": "/flag_digests/0/challenge_key",
+    "rule": "challenge key is uppercase C01 to C11"
+  },
+  "instance-template/shop-network-none.json": {
+    "path": "/components/0/network_mode",
+    "rule": "a shop must be on the instance network"
+  },
+  "instance-template/sidecar-network-none.json": {
+    "path": "/components/1/network_mode",
+    "rule": "the sidecar must be on the instance network"
+  },
+  "instance-template/bot-controller-network-none.json": {
+    "path": "/components/5/network_mode",
+    "rule": "the bot controller must be on the instance network"
+  },
+  "instance-template/mock-services-network-none.json": {
+    "path": "/components/4/network_mode",
+    "rule": "mock-services must be on the instance network"
+  },
+  "instance-template/shop-image-injector.json": {
+    "path": "/components/0/image",
+    "rule": "the shop uses only the shop image"
+  },
+  "instance-template/injector-image-shop.json": {
+    "path": "/components/2/image",
+    "rule": "the injector uses only the injector image"
+  },
+  "instance-template/sidecar-image-bot-controller.json": {
+    "path": "/components/1/image",
+    "rule": "the sidecar uses only the sidecar image"
+  },
+  "instance-template/import-service-image-shop.json": {
+    "path": "/components/3/image",
+    "rule": "the import service uses only its own image"
+  },
+  "instance-template/image-not-a-placeholder.json": {
+    "path": "/components/0/image",
+    "rule": "image is a placeholder of the role, never a real reference"
+  },
+  "instance-template/component-name-unknown.json": {
+    "path": "/components/0/name",
+    "rule": "component name is one of the six role names"
+  },
+  "instance-template/component-name-other-role.json": {
+    "path": "/components/1/name",
+    "rule": "component name equals its role"
+  },
+  "instance-template/env-sidecar-url-external.json": {
+    "path": "/components/0/env/VM_SIDECAR_EVENTS_URL",
+    "rule": "VM_SIDECAR_EVENTS_URL is the sidecar on port 9000 only"
+  },
+  "instance-template/env-mock-url-external.json": {
+    "path": "/components/0/env/VM_MOCK_URL",
+    "rule": "VM_MOCK_URL is mock-services only"
+  },
+  "instance-template/env-db-path-outside-data.json": {
+    "path": "/components/0/env/VM_DB_PATH",
+    "rule": "VM_DB_PATH is a database file under /data"
+  },
+  "instance-template/env-flags-path-traversal.json": {
+    "path": "/components/0/env/VM_FLAGS_PATH",
+    "rule": "VM_FLAGS_PATH is /run/vm/flags.json only"
+  },
+  "instance-template/env-import-socket-elsewhere.json": {
+    "path": "/components/0/env/VM_IMPORT_SOCKET",
+    "rule": "VM_IMPORT_SOCKET is /run/import/import.sock only"
+  },
+  "instance-template/env-public-host-with-path.json": {
+    "path": "/components/0/env/VM_PUBLIC_HOST",
+    "rule": "VM_PUBLIC_HOST is a host name or the token"
+  },
+  "instance-template/env-tz-path.json": {
+    "path": "/components/0/env/TZ",
+    "rule": "TZ is UTC"
+  },
+  "instance-template/env-log-level-unknown.json": {
+    "path": "/components/0/env/VM_LOG_LEVEL",
+    "rule": "VM_LOG_LEVEL is one of four levels"
+  },
+  "instance-template/env-empty.json": {
+    "path": "/components/2/env",
+    "rule": "every component sets at least one variable"
+  },
+  "instance-template/env-port-not-in-ports.json": {
+    "path": "/components/0/env/PORT",
+    "rule": "PORT is one of the ports (semantic)"
+  },
+  "instance-template/shop-healthcheck-healthz.json": {
+    "path": "/components/0/healthcheck/path",
+    "rule": "the shop healthcheck path is /readyz"
+  },
+  "instance-template/shop-healthcheck-other-path.json": {
+    "path": "/components/0/healthcheck/path",
+    "rule": "the shop healthcheck path is /readyz"
+  },
+  "instance-template/memory-limit-too-large.json": {
+    "path": "/components/0/memory_mb",
+    "rule": "memory_mb at most 1024"
+  },
+  "instance-template/cpu-limit-too-large.json": {
+    "path": "/components/0/cpu_limit",
+    "rule": "cpu_limit at most 2"
+  },
+  "instance-template/pids-limit-too-large.json": {
+    "path": "/components/0/pids_limit",
+    "rule": "pids_limit at most 512"
+  },
+  "instance-template/pids-limit-fractional.json": {
+    "path": "/components/0/pids_limit",
+    "rule": "pids_limit is an integer"
+  },
+  "instance-template/volume-size-too-large.json": {
+    "path": "/volumes/0/size_mb",
+    "rule": "volume size_mb at most 64"
+  },
+  "instance-template/tmpfs-size-too-large.json": {
+    "path": "/components/0/mounts/1/size_mb",
+    "rule": "tmpfs size_mb at most 512"
+  },
+  "instance-template/injector-with-ports.json": {
+    "path": "/components/2/ports",
+    "rule": "the injector declares no ports"
+  },
+  "instance-template/injector-with-healthcheck.json": {
+    "path": "/components/2/healthcheck",
+    "rule": "the injector has no healthcheck"
+  },
+  "instance-template/user-other-nonroot.json": {
+    "path": "/components/0/user",
+    "rule": "the run user is 65532:65532"
+  },
+  "instance-template/user-out-of-range.json": {
+    "path": "/components/0/user",
+    "rule": "uid and gid below 65536"
+  },
+  "instance-template/label-expires-month-13.json": {
+    "path": "/components/0/labels/vm.expires",
+    "rule": "vm.expires is a real UTC date-time"
+  },
+  "instance-template/label-expires-feb-30.json": {
+    "path": "/components/0/labels/vm.expires",
+    "rule": "vm.expires is a real calendar date (semantic)"
+  },
+  "instance-template/flag-delivery-env-reason-padded.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason is not one repeated character"
+  },
+  "instance-template/flag-delivery-env-reason-space-padded.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason has no padding with spaces"
+  },
+  "instance-template/flag-delivery-env-reason-alternating.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason has enough different characters"
+  },
+  "instance-template/flag-delivery-env-reason-repeated-word.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason is not one repeated word"
+  },
+  "instance-template/flag-delivery-env-reason-no-words.json": {
+    "path": "/components/0/flag_delivery_env/reason",
+    "rule": "reason holds words"
   }
 }

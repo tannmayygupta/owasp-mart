@@ -1,0 +1,6 @@
+Local check of the mutual-TLS helper programs (SERVER_PY, CLIENT_PY of scripts/private-link-check.mjs), 2026-10-10.
+Run in an alpine:3 container on loopback with a throwaway CA and node certificate made at run time (not a check of the Oracle hosts).
+latency mode: ok true, n 20, median 0.4 ms, p95 0.62 ms
+mTLS with client certificate: ok true, TLSv1.3, handshake 10.04 ms
+client without certificate: ok false (SSLError), refused
+Server log: listening, then one rejected line per plain TCP latency connection and for the no-certificate client.

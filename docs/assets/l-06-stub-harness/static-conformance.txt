@@ -1,0 +1,18 @@
+PASS  run-user-65532
+PASS  read-only-root
+PASS  no-new-privileges
+PASS  cap-drop-all
+PASS  not-privileged
+PASS  no-bind-mounts
+PASS  ports-loopback-only
+PASS  resource-limits
+PASS  writable-places-memory-backed
+PASS  named-volumes-memory-backed
+PASS  env-allowlist-and-no-secrets
+PASS  injector-network-none
+PASS  start-order-injector-first
+PASS  shared-volume-roles
+PASS  no-outside-network
+PASS  shop-health-is-readyz
+PASS  base-image-pinned-by-digest
+conformance: PASS (17 rules)

@@ -1,0 +1,40 @@
+(node:24116) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ fresh checkout parity: install with a frozen lockfile, then the CI scripts job command passes (190530.3899ms)
+✔ pnpm run contracts:check passes in the real repository and prints the counts of both contracts (5199.0714ms)
+✔ pnpm run events:check passes alone, and validate-events exits 1 on a broken copy of the event contract (4873.13ms)
+✔ the fake ingest runs as a command and answers a signed event over HTTP (1395.4836ms)
+✔ breaking a rule exits 1: removing epoch from the injection schema (930.694ms)
+✔ breaking a rule exits 1: the injector and the shop use different /run/vm volumes (936.0314ms)
+✔ breaking a rule exits 1: a real-looking flag in an example (893.0924ms)
+✔ usage: --help exits 0, an unknown argument exits 2, a missing folder fails with exit 1 (1206.1993ms)
+✔ the contract document has sections 1 to 11 in order and an open-points table (3.2175ms)
+✔ every valid example type is accepted (202) and an identical repeat is a duplicate (200) (1277.3262ms)
+✔ the same (instance_id, seq) with a different body is refused with 409 and nothing new is stored (9.0944ms)
+✔ a bad signature and a wrong instance are refused with 401 and the answer never repeats the signature (6.1157ms)
+✔ an oversize body is refused with 413 and the server keeps working (19.2743ms)
+✔ a flag-like string in data is refused with 422 in any letter case, and the answer never echoes it (9.062ms)
+✔ an unknown type and an extra field are refused with 422 and the answer names a JSON path (6.8519ms)
+✔ GET is answered 405 and a client that aborts in the middle of a body does not stop the server (111.7697ms)
+✔ the posted-body schema accepts every valid posted example and refuses source sidecar (375.4622ms)
+✔ --write-posted leaves the committed posted schema unchanged (747.0956ms)
+✔ the signing rule written here reproduces the signing vector of the contract (444.1599ms)
+✔ create: 202, the instance reaches ready, a repeat is 200, another body with the same identity is 409 (178.3148ms)
+✔ no GET answer contains a flag, decoy, digest, seed or event key (58.4977ms)
+✔ owner_hash and first_seq: required and checked on create, first_seq on reset, no owner_hash in a reset, nothing returned by a GET (120.9972ms)
+✔ a body that names an image, command, volume, port or env is refused with 422 and nothing is created; an unknown template is 422 (30.1944ms)
+✔ a bad signature, a stale timestamp and a replayed nonce are refused with 401 and change nothing (19.1561ms)
+✔ access: open, frozen and closed with a growing access epoch work; an older access epoch is 409 (38.5679ms)
+✔ reset: a ready instance gets epoch + 1 and goes through resetting and provisioning back to ready; a wrong epoch is 409 (1088.8048ms)
+✔ destroy: 202 then 200 on a repeat, and a destroyed id cannot be created again (409) (42.7112ms)
+✔ list: label filters, cursor paging, an unknown label is 422; host answers capacity (316.7237ms)
+✔ a host with little capacity answers 429 ORCH-BUSY with Retry-After and creates nothing (293.7972ms)
+✔ the Python suite (protocol on both hosts, HTTP service, contract) still passes (120121.2123ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 207854.3265

@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
+  "seq": 1099511627804,
+  "type": "instance.flags_injected",
+  "source": "orchestrator",
+  "session_kind": "internal",
+  "user_id": null,
+  "ts": "2026-01-01T00:00:27Z",
+  "data": {
+    "challenge_ids": []
+  }
+}

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { readFileSync } from 'node:fs';
-import { parseArgs, hello, up, down, doctor, portFree, MSG_DOCKER_DOWN, msgPortBusy, HELLO_PORT, PROFILES, COMPOSE_FILE } from './dev.mjs';
+import { parseArgs, hello, up, down, doctor, harness, harnessDownCmd, HELP, portFree, MSG_DOCKER_DOWN, msgPortBusy, HELLO_PORT, PROFILES, COMPOSE_FILE } from './dev.mjs';
 
 function assertHelloCompose(calls) {
   const upCall = calls.find((c) => c.includes('up -d --wait'));
@@ -175,4 +175,39 @@ test('portFree: false when something listens', async () => {
   assert.equal(await portFree(port), false);
   await new Promise((r) => srv.close(r));
   assert.equal(await portFree(port), true);
+});
+
+test('parseArgs: harness forms', () => {
+  assert.deepEqual(parseArgs(['harness']), { cmd: 'harness', keep: false });
+  assert.deepEqual(parseArgs(['harness', '--keep']), { cmd: 'harness', keep: true });
+  assert.deepEqual(parseArgs(['harness', 'down']), { cmd: 'harness-down' });
+  assert.match(parseArgs(['harness', 'up']).error, /harness/);
+  assert.match(parseArgs(['harness', 'down', 'x']).error, /harness/);
+});
+test('help lists harness and harness down', () => {
+  assert.match(HELP, /harness \[--keep\]/);
+  assert.match(HELP, /harness down/);
+});
+test('harness: Docker down gives exit 1 with the Docker message and nothing is started', async () => {
+  const calls = [];
+  const e = collect();
+  const orig = console.error;
+  console.error = (m) => e.out.push(String(m));
+  try { assert.equal(await harness({ runner: (c, a) => { calls.push(a.join(' ')); return dockerDown(c, a); } }), 1); } finally { console.error = orig; }
+  assert.equal(e.out[0], MSG_DOCKER_DOWN);
+  assert.ok(calls.every((c) => c.startsWith('info')), 'only the Docker check ran');
+});
+test('harness down: Docker down exits 1; otherwise removes the project with its volumes', () => {
+  const e = collect();
+  assert.equal(harnessDownCmd({ runner: dockerDown, err: e.fn, log: () => {} }), 1);
+  assert.equal(e.out[0], MSG_DOCKER_DOWN);
+  const calls = [];
+  const runner = (c, a) => { calls.push(a.join(' ')); return { status: 0, stdout: '29.0.0\n', stderr: '' }; };
+  assert.equal(harnessDownCmd({ runner, log: () => {}, err: () => {} }), 0);
+  assert.ok(calls.some((c) => c.includes('-p vulnmart-harness down --volumes --remove-orphans')));
+});
+test('harness compose file: the harness is a separate project from the hello and profile services', () => {
+  const y = readFileSync(COMPOSE_FILE.replace('compose.yaml', 'harness.yaml'), 'utf8');
+  assert.match(y, /^name: vulnmart-harness$/m);
+  assert.ok(!y.includes('profiles:'));
 });

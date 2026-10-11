@@ -1,0 +1,84 @@
+{
+  "attempt_id": "a-AAAAAAAAAAAAAAAA",
+  "score": 109,
+  "computed_at": "2026-10-09T12:00:00Z",
+  "per_challenge": [
+    {
+      "challenge_key": "C01",
+      "best_milestone": "M4",
+      "held": true,
+      "hints_used": 0,
+      "points": 90
+    },
+    {
+      "challenge_key": "C02",
+      "best_milestone": "M1",
+      "held": false,
+      "hints_used": 1,
+      "points": 18
+    },
+    {
+      "challenge_key": "C03",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C04",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C05",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C06",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C07",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C08",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C09",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C10",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    },
+    {
+      "challenge_key": "C11",
+      "best_milestone": "none",
+      "held": false,
+      "hints_used": 0,
+      "points": 0
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+verify-hosts 2026-10-10T21:21:06.729Z
+PASS vm-p key login works
+PASS vm-p Ubuntu 24.04 (x86_64 or aarch64) - os=24.04 arch=x86_64
+PASS vm-p sshd refuses passwords - authenticationmethods:publickey,kbdinteractiveauthentication:no,passwordauthentication:no,permitrootlogin:no,
+PASS vm-p sshd refuses root login
+PASS vm-p sshd allows only public keys
+PASS vm-p secrets folder is 700 and owned by root - 700:root
+PASS vm-p Docker installed - Docker_version_29.9.0
+PASS vm-p keep-alive service off (as configured) - inactive
+WARN vm-p cloud-init finished - cloud-init recorded an error from an earlier run; the baseline marker is ok (repaired and rerun by hand)
+PASS vm-p baseline marker says ok - ok
+PASS vm-p host firewall accepts port 22 - yes
+PASS vm-p host firewall accepts port 80 - yes
+PASS vm-p host firewall accepts port 443 - yes
+PASS vm-p host firewall accepts port 9444 - yes
+PASS vm-p /etc/ssh/sshd_config.d/00-vulnmart.conf matches the repository file
+PASS vm-p /usr/local/sbin/vulnmart-firewall.sh matches the repository file
+PASS vm-p /usr/local/sbin/vulnmart-install-docker.sh matches the repository file
+PASS vm-p /usr/local/sbin/vulnmart-baseline.sh matches the repository file
+PASS vm-p /etc/docker/daemon.json matches the repository file
+PASS vm-p /usr/local/sbin/vulnmart-keepalive.py matches the repository file
+PASS vm-p /etc/systemd/system/vulnmart-keepalive.service matches the repository file
+PASS vm-p metadata probe image pulled (pinned by digest)
+PASS vm-p instance metadata is reachable from the host (control) - reachable
+PASS vm-p a container has network access (control) - reachable
+PASS vm-p a container cannot read instance metadata (IMDSv2, hop limit 1) - blocked:TimeoutError
+PASS vm-p temporary listener on 80 and 443 started (serves nothing, stopped after the probes)
+PASS vm-p port 22 reachable from outside - open
+PASS vm-p port 80 reachable from outside - open
+PASS vm-p port 443 reachable from outside - open
+PASS vm-p port 21 closed from outside - timeout
+PASS vm-p port 23 closed from outside - timeout
+PASS vm-p port 25 closed from outside - timeout
+PASS vm-p port 53 closed from outside - timeout
+PASS vm-p port 111 closed from outside - timeout
+PASS vm-p port 2375 closed from outside - timeout
+PASS vm-p port 2376 closed from outside - timeout
+PASS vm-p port 3000 closed from outside - timeout
+PASS vm-p port 3306 closed from outside - timeout
+PASS vm-p port 5432 closed from outside - timeout
+PASS vm-p port 6379 closed from outside - timeout
+PASS vm-p port 8080 closed from outside - timeout
+PASS vm-p port 8443 closed from outside - timeout
+PASS vm-p port 9000 closed from outside - timeout
+PASS vm-p port 9443 closed from outside - timeout
+PASS vm-p port 9444 closed from outside - timeout
+PASS vm-p password login attempt refused - offered: publickey
+PASS vm-p root login attempt refused - root@<ip>: Permission denied (publickey).
+PASS vm-i key login works
+PASS vm-i Ubuntu 24.04 (x86_64 or aarch64) - os=24.04 arch=x86_64
+PASS vm-i sshd refuses passwords - authenticationmethods:publickey,kbdinteractiveauthentication:no,passwordauthentication:no,permitrootlogin:no,
+PASS vm-i sshd refuses root login
+PASS vm-i sshd allows only public keys
+PASS vm-i secrets folder is 700 and owned by root - 700:root
+PASS vm-i Docker installed - Docker_version_29.9.0
+PASS vm-i keep-alive service off (as configured) - inactive
+WARN vm-i cloud-init finished - cloud-init recorded an error from an earlier run; the baseline marker is ok (repaired and rerun by hand)
+PASS vm-i baseline marker says ok - ok
+PASS vm-i host firewall accepts port 22 - yes
+PASS vm-i host firewall accepts port 80 - yes
+PASS vm-i host firewall accepts port 443 - yes
+PASS vm-i host firewall accepts port 9443 - yes
+PASS vm-i /etc/ssh/sshd_config.d/00-vulnmart.conf matches the repository file
+PASS vm-i /usr/local/sbin/vulnmart-firewall.sh matches the repository file
+PASS vm-i /usr/local/sbin/vulnmart-install-docker.sh matches the repository file
+PASS vm-i /usr/local/sbin/vulnmart-baseline.sh matches the repository file
+PASS vm-i /etc/docker/daemon.json matches the repository file
+PASS vm-i /usr/local/sbin/vulnmart-keepalive.py matches the repository file
+PASS vm-i /etc/systemd/system/vulnmart-keepalive.service matches the repository file
+PASS vm-i metadata probe image pulled (pinned by digest)
+PASS vm-i instance metadata is reachable from the host (control) - reachable
+PASS vm-i a container has network access (control) - reachable
+PASS vm-i a container cannot read instance metadata (IMDSv2, hop limit 1) - blocked:TimeoutError
+PASS vm-i temporary listener on 80 and 443 started (serves nothing, stopped after the probes)
+PASS vm-i port 22 reachable from outside - open
+PASS vm-i port 80 reachable from outside - open
+PASS vm-i port 443 reachable from outside - open
+PASS vm-i port 21 closed from outside - timeout
+PASS vm-i port 23 closed from outside - timeout
+PASS vm-i port 25 closed from outside - timeout
+PASS vm-i port 53 closed from outside - timeout
+PASS vm-i port 111 closed from outside - timeout
+PASS vm-i port 2375 closed from outside - timeout
+PASS vm-i port 2376 closed from outside - timeout
+PASS vm-i port 3000 closed from outside - timeout
+PASS vm-i port 3306 closed from outside - timeout
+PASS vm-i port 5432 closed from outside - timeout
+PASS vm-i port 6379 closed from outside - timeout
+PASS vm-i port 8080 closed from outside - timeout
+PASS vm-i port 8443 closed from outside - timeout
+PASS vm-i port 9000 closed from outside - timeout
+PASS vm-i port 9443 closed from outside - timeout
+PASS vm-i port 9444 closed from outside - timeout
+PASS vm-i password login attempt refused - offered: publickey
+PASS vm-i root login attempt refused - root@<ip>: Permission denied (publickey).
+RESULT PASS (94 checks)

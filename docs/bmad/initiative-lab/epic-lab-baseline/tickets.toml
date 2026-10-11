@@ -47,6 +47,39 @@ hitl = false
 risk = "medium"
 
 [[entry]]
+id = 10
+type = "story"
+title = "L-04 limits: mTLS test, Akshay handoff and CI check"
+description = "Closes three limits left by story 4. A test shows the orchestrator client works over mutual TLS against the fake orchestrator with a throwaway certificate authority made inside the test (no key or certificate committed). A team-chat message and a HANDOFFS.md row tell Akshay about the open points of IF-5, the apps/api skeleton and ADR 0024. The CI result of the pull request is read, failures are fixed and the real result is recorded. A person opens the pull request and pastes the message."
+verify = "The mTLS tests pass with real output (a client without a certificate, with the wrong authority or for another host name is refused); the message and the handoff row exist; CI of the pull request is green, or each failure is fixed and recorded."
+covers = ["LB-5"]
+after = [4]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Close the review gaps of L-04, L-05 and story 1.10"
+description = "Fixes by cause the gaps left open by the reviews: reads the sources behind ADR 0019 and corrects the ADR and the IF-2 text where they disagree; runs the Node end-to-end tests in CI (without their duplicate nested Python run) after proving them on Linux with Docker here; adds the P-04 handoff pointer; fixes the recorded mock and test weaknesses (duplicate timeline rows, held-flag clearing, hint order, strict cursor and query parameters, listen errors, exact counts, order-independent tests, the 413 test accepting a reset, expired and wrong-usage certificate cases, the missing-openssl CI branch)."
+verify = "ADR 0019 cites sources that were read and its decisions match them; the end-to-end tests pass on Linux in Docker and run in a CI job; every deferred item of stories 1.9 and 1.10 is fixed with a test that fails before the fix, or re-recorded with a reason; all suites pass."
+covers = ["LB-5", "LB-9"]
+after = [4, 9, 10]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 12
+type = "story"
+title = "Adopt RFC 9457 problem details in IF-5 and IF-2"
+description = "Moves the error body of the orchestrator API (IF-5) and the lab API (IF-2) to RFC 9457 problem details: standard members type, title, status, detail and instance, with code, request_id and field kept as extension members, media type application/problem+json. Updates both OpenAPI files, examples, both mocks, the checkers, the Python client and fake host, the contract texts, ADRs 0024 and 0019, the contract changelog and the handoffs for Akshay (H-81, H-91). Decided by the developer on 2026-10-09 after the ADR 0019 source research."
+verify = "Both contracts validate with the new Problem schema; every error answer of both mocks and of the Python host is a valid problem details body with the right media type; no old-style body (message member) remains; all suites pass, including on Linux in Docker."
+covers = ["LB-5", "LB-9"]
+after = [4, 9, 11]
+hitl = false
+risk = "medium"
+
+[[entry]]
 id = 9
 type = "story"
 title = "Lab fragment of the platform API (IF-2)"
@@ -101,3 +134,38 @@ covers = []
 after = [1, 2, 3, 4, 5, 6, 7, 9]
 hitl = false
 risk = "low"
+
+[[entry]]
+id = 13
+type = "story"
+title = "Sprint 1 audit remediation before the pull request"
+description = "Fixes what the brutal audit of 2026-10-11 found that must not reach the pull request: stale or false statements in traceability, dev-logs, ADR 0022, CHANGELOG and the task list (ticks that outran their Done-when now carry dated notes), control characters and BOM files, handoff register gaps, CI first-run hardening, image and secret hygiene, IAM tag conditions and the other small safety fixes. The audit record is docs/bmad/initiative-lab/audit-2026-10-11-sprint-1.md; the larger findings stay in its backlog."
+verify = "Every stale statement named by the audit is corrected against real evidence; the tree has no control characters or BOM in tracked text files; all suites and the Linux proof pass on the final tree; the audit record lists what was fixed and what is left."
+covers = ["LB-1", "LB-3", "LB-4", "LB-5", "LB-6", "LB-7", "LB-9", "LE-1", "LE-6", "LE-8"]
+after = [11]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 14
+type = "story"
+title = "Project progress page for the guide meeting"
+description = "A small local website (node scripts/progress-page.mjs --serve) that tells a visitor what VulnMart is, shows that it is achievable through what already runs, and lists, for the Lab, the Platform and the Target stream, what is done, what is being implemented and what is next. It is generated from the three developers' task files (each can be read from the developer's own branch), no dependency, no charts, no secrets. Needed for the college guide meeting."
+verify = "The page serves on 127.0.0.1 and shows all three streams with task statuses taken from the task files; statuses follow the ticks and the sprint dates; the text check, secret scan and unit tests pass."
+covers = ["LX-3"]
+after = [13]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 15
+type = "story"
+title = "PR 3 review remediation (Sahil's review of 2026-10-11)"
+description = "Fixes everything the consumer review of pull request 3 named, in one push. Part A (must fix before merge): merge origin/main into sprint-1-tanmay and resolve the 7 conflicts as unions; put IF-7 in the contract registry and the contracts CHANGELOG; renumber ADR 0017 and 0018 of this branch to 0023 and 0024 with every reference; mark the consumer sign-off of IF-4 as stale. Part B (contracts): IF-4 sequence, epoch and event key lifecycle (the design is confirmed by the developer before it is built), IF-6 template schema hardening, IF-5 StateReport transition number, strict seq and open Problem, IF-2 stable timeline paging. Part C (rules engine): whole-contract deletion is a breaking change, the checker and its pins are read from the base branch, the oasdiff pin is verified, the BREAKING marker match is exact. Part D (hosts, code and tests only, the developer applies): isolation of the labs host (H-103), instance-type guard in the IAM policy, remote encrypted Terraform state with locking. A person must confirm the design points and apply the infrastructure."
+verify = "The merge of origin/main is clean and every suite, the contract-rules check and the text and secret checks pass on the merged tree; each finding of the review has a test that failed before the fix (or a recorded reason it cannot be a test); the review reply lists each finding with its fix and evidence."
+covers = ["LB-3", "LB-4", "LB-5", "LB-7", "LB-9", "LE-1", "LE-6", "LE-8"]
+after = [13]
+hitl = true
+risk = "high"
+references = ["docs/bmad/initiative-lab/audit-2026-10-11-sprint-1.md"]
+unknown = "Design points to settle with the developer before they are built: IF-4 sequence and epoch rule, event key derivation and distribution (H-09, H-10), the isolation design for H-103, the remote state backend, and whether story 1.12 (RFC 9457) is folded in because it also changes the IF-5 and IF-2 Problem schema."

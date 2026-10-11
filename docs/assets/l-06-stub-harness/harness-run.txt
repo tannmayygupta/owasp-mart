@@ -1,0 +1,54 @@
+command: node scripts/dev.mjs harness
+exit code: 0
+
+step build: ok
+PASS  run-user-65532
+PASS  read-only-root
+PASS  no-new-privileges
+PASS  cap-drop-all
+PASS  not-privileged
+PASS  no-bind-mounts
+PASS  ports-loopback-only
+PASS  resource-limits
+PASS  writable-places-memory-backed
+PASS  named-volumes-memory-backed
+PASS  env-allowlist-and-no-secrets
+PASS  injector-network-none
+PASS  start-order-injector-first
+PASS  shared-volume-roles
+PASS  no-outside-network
+PASS  shop-health-is-readyz
+PASS  base-image-pinned-by-digest
+step conformance-config: ok (conformance: PASS (17 rules))
+step create: ok
+step start volume-keeper: ok
+step start ingest: ok
+step injector: exit 0, marker written
+step start instance: shop, gate, sidecar and edge healthy
+PASS  live-healthz
+PASS  live-readyz-after-marker
+PASS  live-version
+PASS  live-planted-flag
+PASS  live-flags-file-and-marker-modes
+PASS  live-event-stored-and-verified
+PASS  live-event-error-answers
+PASS  live-no-secret-in-logs
+PASS  live-no-secret-in-answers
+PASS  live-no-secret-in-files
+PASS  live-no-secret-in-container-settings
+PASS  live-run-user
+PASS  live-read-only-root
+PASS  live-no-new-privileges
+PASS  live-cap-drop-all
+PASS  live-not-privileged
+PASS  live-no-bind-mounts
+PASS  live-ports-loopback-only
+PASS  live-injector-no-network
+PASS  live-no-secret-in-env
+conformance: PASS (20 rules)
+harness: PASS
+
+docker ps -a --filter label=com.docker.compose.project=vulnmart-harness:
+docker network ls (filter project):
+docker volume ls (filter project):
+(empty lists above = nothing remains)

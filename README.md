@@ -33,7 +33,10 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 | `uv run --directory apps/api pytest` | Runs the API unit tests (needs `uv`; no Docker) |
 | `docker compose -f infra/compose/compose.yaml --profile platform --profile web down -v` | Resets the platform stack: `dev.mjs down` keeps the named volumes (database data, the dashboards' `node_modules` and `.next`), so use this when you change the dev database password or want a clean database |
 | `node scripts/dev.mjs down` | Stops and removes the project's containers |
-| `pnpm run contracts:check` | Validates the instance contract (IF-6): schemas, examples, semantic rules (needs `pnpm install` once) |
+| `pnpm run contracts:check` | Validates all three contracts: instance (IF-6), instance events (IF-4) and orchestrator (IF-5); needs `pnpm install` and `uv` once |
+| `uv run --package vulnmart-api pytest` | Runs the Python tests: the orchestrator API (IF-5) protocol suite against `FakeInstanceHost` and against the HTTP client plus the fake orchestrator `contracts/mocks/fake-orchestrator/server.mjs` (needs Node and uv) |
+| `pnpm run events:check` | Validates only the instance event contract (IF-4, `contracts/events/`) |
+| `node contracts/mocks/fake-ingest/server.mjs --key <test key> --port <n>` | Starts the fake ingest (stand-in for the real one; answers 202, 200, 401, 413, 422; use a throwaway key, never a real one) |
 | `pnpm run catalog:check` | Validates the challenge catalogue (IF-7): the 11 stubs against the schema and the semantic rules (needs `pnpm install` once) |
 | `node --test "scripts/*.test.mjs"` | Runs the script tests (no Docker needed; needs `pnpm install` once) |
 | `pnpm run test:e2e` | Runs `node --test --test-concurrency=1 "scripts/e2e/*.test.mjs"`, the end-to-end tests, one file at a time: real Docker engine and contract copies (a few minutes; needs ports 3000, 8000 and 8025 free; the contract tests also install dependencies in a temporary copy) |

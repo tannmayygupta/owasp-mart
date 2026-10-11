@@ -1,0 +1,14 @@
+{
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "attempt_id": "a-AAAAAAAAAAAAAAAA",
+  "state": "ready",
+  "access": "open",
+  "health": "healthy",
+  "epoch": 1,
+  "error_code": null,
+  "requested_at": "2026-10-09T12:00:00Z",
+  "ready_at": "2026-10-09T12:00:09Z",
+  "expires_at": "2026-10-09T16:00:00Z",
+  "updated_at": "2026-10-09T12:00:09Z",
+  "event_key": "x"
+}

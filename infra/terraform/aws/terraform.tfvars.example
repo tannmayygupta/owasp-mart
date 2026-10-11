@@ -1,0 +1,25 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Values here are placeholders, not real.
+# AWS credentials are NOT set here: use an AWS CLI profile or environment variables (runbook Part A).
+region = "ap-southeast-2"
+
+# Addresses allowed to reach SSH (port 22), for example your own /32. Never 0.0.0.0/0.
+ssh_source_cidrs = ["PASTE-YOUR-ADDRESS/32"]
+
+# Public keys of Tanmay, Akshay and Sahil (public halves only).
+ssh_public_keys = [
+  "ssh-ed25519 AAAA... tanmay",
+  "ssh-ed25519 AAAA... akshay",
+  "ssh-ed25519 AAAA... sahil",
+]
+
+budget_email = "owner@example.invalid"
+
+# Free Plan eligible types only (t3.micro, t3.small, t4g.micro, t4g.small, c7i-flex.large, m7i-flex.large).
+# Performance first: labs host m7i-flex.large. If credits run low use for example vm-i = "t3.small".
+instance_types = {
+  "vm-p" = "t3.small"
+  "vm-i" = "m7i-flex.large"
+}
+
+root_volume_gb    = 30
+keepalive_enabled = false

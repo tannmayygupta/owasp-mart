@@ -1,0 +1,12 @@
+{
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "epoch": 1,
+  "event_key": "FAKE-EVENT-KEY-NOT-REAL-0000000000000000",
+  "flag_digests": [
+    {
+      "challenge_key": "C01",
+      "kind": "real",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001"
+    }
+  ]
+}

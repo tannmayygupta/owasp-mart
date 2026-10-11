@@ -1,0 +1,9 @@
+{
+  "type": "https://vulnmart.invalid/problems/att_flag_rate_limited",
+  "title": "Too many incorrect submissions.",
+  "status": 429,
+  "detail": "too many incorrect submissions for this challenge",
+  "instance": "urn:vulnmart:request:req-0123456789ab",
+  "code": "att_flag_rate_limited",
+  "request_id": "req-0123456789ab"
+}
