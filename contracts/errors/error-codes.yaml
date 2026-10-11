@@ -23,6 +23,7 @@ families:
 codes:
   - { code: ATT-CHALLENGE-NOT-FOUND, status: 404, title: "Challenge not found.", retryable: false }
   - { code: ATT-FLAG-RATE-LIMITED, status: 429, title: "Too many attempts. Try again later.", retryable: true }
+  - { code: ATT-GONE, status: 410, title: "This attempt is no longer available.", retryable: false }
   - { code: ATT-HINTS-DISABLED, status: 404, title: "Hints are not available for this attempt.", retryable: false }
   - { code: ATT-INVALID-STATE, status: 409, title: "This action is not allowed in the attempt's current state.", retryable: false }
   - { code: ATT-NOT-FOUND, status: 404, title: "Attempt not found.", retryable: false }

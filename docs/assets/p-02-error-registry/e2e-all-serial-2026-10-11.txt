@@ -1,4 +1,4 @@
-﻿pnpm.exe : $ node --test --test-concurrency=1 "scripts/e2e/*.test.mjs"
+pnpm.exe : $ node --test --test-concurrency=1 "scripts/e2e/*.test.mjs"
 At C:\Users\gupta\AppData\Roaming\npm\pnpm.ps1:14 char:3
 +   & "$basedir/node_modules/pnpm/pnpm.exe"   $args
 +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,4 +1,4 @@
-﻿============================= test session starts =============================
+============================= test session starts =============================
 platform win32 -- Python 3.14.8, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\gupta\OneDrive\Desktop\mp\owasp-mart\.venv\Scripts\python.exe
 cachedir: .pytest_cache
 rootdir: C:\Users\gupta\OneDrive\Desktop\mp\owasp-mart\apps\api

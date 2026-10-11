@@ -18,7 +18,7 @@ There is now one list of error codes (48, with HTTP status, a fixed generic text
 Sprint zero needs one registry and one body before contracts 2 to 6 are built on it (architecture 07 section 7.7, row 1). Tanmay's unmerged contracts named the registry as the place the final names are fixed (handoffs H-81 and H-91) and recorded the decision to adopt RFC 9457 as "awaiting Akshay" (ADR 0019, M1).
 
 ## What was built
-- `contracts/errors/`: `error-codes.yaml` (48 codes in the families AUTH, ATT, EVT, INST, ORCH, REQ), `error-codes.schema.json`, `problem.schema.json`, 7 valid and 24 invalid example bodies with a manifest of the path where each invalid one must fail, and a README.
+- `contracts/errors/`: `error-codes.yaml` (49 codes in the families AUTH, ATT, EVT, INST, ORCH, REQ), `error-codes.schema.json`, `problem.schema.json`, 7 valid and 24 invalid example bodies with a manifest of the path where each invalid one must fail, and a README.
 - `scripts/validate-errors.mjs`: registry schema and rules (sorted, unique, family listed, fixed ASCII titles with no placeholder or flag-like text, exit codes only on never-HTTP INST-INJECT codes), body schema, and every example against both.
 - `scripts/generate-error-codes.mjs`: writes `packages/py-models/src/vulnmart_models/error_codes.py` (`ErrorCode`, `ERRORS`) and `packages/ts-client/src/error-codes.ts`; `--check` fails when either is stale. Both packages are new workspace members.
 - `apps/api/src/vulnmart/problem.py`: answers unknown route (404), wrong method (405), invalid body (422 with a list of pointers) and unhandled error (500) in the contract format; `ProblemError(code)` lets route code raise a registry code.
@@ -40,7 +40,7 @@ No ADR: no architecture decision beyond the contract. By the developer on 2026-1
 
 ## Tests
 All on the developer's Windows 11 PC, Docker 28.5.1, Node 24.11.0, uv 0.12.23, pnpm 12.10.1. Outputs in `docs/assets/p-02-error-registry/`.
-- `pnpm run errors:check`: OK, 48 codes, 7 valid and 24 invalid example bodies; generated files current.
+- `pnpm run errors:check`: OK, 49 codes, 7 valid and 24 invalid example bodies; generated files current.
 - `node --test "scripts/*.test.mjs"`: 89 pass (35 are the new validator and generator tests, including registries and examples broken on purpose).
 - `uv run --frozen --package vulnmart-api pytest apps/api`: 81 passed (71 are new: every HTTP code builds a schema-valid body, never-HTTP codes are refused, unknown route, wrong method, invalid and non-JSON bodies, nested, escaped and over-long pointers, the 50-entry cap, 413, 415, the unmapped fallback, header handling, no echo of values or internals).
 - `node --test "apps/*/test/*.test.mjs"`: 55 pass.
@@ -50,6 +50,12 @@ All on the developer's Windows 11 PC, Docker 28.5.1, Node 24.11.0, uv 0.12.23, p
 - NOT run: CI on the pull request (it runs after the push), Linux or macOS, stream L's own tests against the registry.
 - Traceability row: PB-1 in `docs/traceability.md`.
 
+**After merging `origin/main` (stream L's sprint 1, 57 commits), same PC:**
+- `node --test "scripts/*.test.mjs"`: 497 of 497 pass. `uv run --locked --package vulnmart-api pytest -q` (all of `apps/api`, stream L's and mine): 721 passed. `node --test "apps/*/test/*.test.mjs"`: 55 pass; stub-instance tests: 55 pass.
+- `node scripts/check-contract-rules.mjs` (stream L's rules engine): 11 PASS, 0 FAIL, 4 NOT-APPLICABLE, with IF-8 registered. `pnpm run errors:check`: OK, 49 codes.
+- `pnpm run test:e2e` (serial, 82 tests): 81 pass, 1 fails: `contracts.e2e.test.mjs` "fresh checkout parity". That test copies the tracked files into a temp folder without `.git` and then runs stream L's new `check-text-files` and `oasdiff` tests, which call `git`; so it fails inside stream L's story 1.15 independent of this work (not run on `main` itself). All platform and IF-8 end-to-end tests pass.
+- Not run: `pnpm run ci:linux` (Linux container mirror of CI).
+
 ## Evidence
 `docs/assets/p-02-error-registry/`. Review log: Code Review section of the story plan; deferred items in `docs/bmad/initiative-platform/deferred-work.md`.
 
@@ -57,6 +63,7 @@ All on the developer's Windows 11 PC, Docker 28.5.1, Node 24.11.0, uv 0.12.23, p
 - Stream L's branches hold three different body shapes and about 45 placeholder codes; the registry keeps all names and a change request lists the body change (their stories).
 - A regex that collected code names missed single-word codes (`ORCH-BUSY`, `EVT-SCHEMA`); redone, then every ambiguous string was traced to where it is used (prefix, test value, base-class label, real code).
 - A non-JSON body gave the pointer `/0` (FastAPI's location); fixed to the whole body with a fixed text.
+- Merging `main` into the branch: 7 conflicts (CI file, changelog, traceability, two `pyproject.toml`, `package.json`, `uv.lock`) resolved as unions; stream L had meanwhile created the same `apps/api` package for its ports, so there is one package with both. Stream L's new rules engine required IF-8 to be registered in `contracts/registry.json` (it was a reserved folder) and a `registry change:` changelog line. Stream L's contracts had moved to their own RFC 9457 shape and lower-case codes (IF-2) after my seed: 19 of 20 codes already matched, `att_gone` was added as `ATT-GONE` (410), and the change request was rewritten against the merged contracts. Three test fixes in stream L's area, listed in the change request: the ports-package contents test, a CRLF-safe read of the oasdiff severity file, and the byte order marks PowerShell had written into my evidence files.
 - Independent code review (4 reviewers): 9 patch groups applied (unmapped framework statuses answered as 500, a way for route code to raise a registry code, over-long pointers, a loose pointer pattern, validator gaps, thin examples, hard-coded counts, README guidance, an image build in CI), 4 deferred, 13 rejected (details in the plan).
 
 ## Security notes (vulnerable parts only)

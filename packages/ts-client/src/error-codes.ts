@@ -7,6 +7,7 @@ export const PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:";
 export const ERROR_CODES = {
   ATT_CHALLENGE_NOT_FOUND: "ATT-CHALLENGE-NOT-FOUND",
   ATT_FLAG_RATE_LIMITED: "ATT-FLAG-RATE-LIMITED",
+  ATT_GONE: "ATT-GONE",
   ATT_HINTS_DISABLED: "ATT-HINTS-DISABLED",
   ATT_INVALID_STATE: "ATT-INVALID-STATE",
   ATT_NOT_FOUND: "ATT-NOT-FOUND",
@@ -69,6 +70,7 @@ export interface ErrorInfo {
 export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "ATT-CHALLENGE-NOT-FOUND": { status: 404, title: "Challenge not found.", retryable: false },
   "ATT-FLAG-RATE-LIMITED": { status: 429, title: "Too many attempts. Try again later.", retryable: true },
+  "ATT-GONE": { status: 410, title: "This attempt is no longer available.", retryable: false },
   "ATT-HINTS-DISABLED": { status: 404, title: "Hints are not available for this attempt.", retryable: false },
   "ATT-INVALID-STATE": { status: 409, title: "This action is not allowed in the attempt's current state.", retryable: false },
   "ATT-NOT-FOUND": { status: 404, title: "Attempt not found.", retryable: false },

@@ -1,4 +1,4 @@
-﻿---
+---
 title: 'Platform stack runs end to end locally (tracer bullet)'
 type: 'feature'
 ticket: '1'

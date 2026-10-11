@@ -374,7 +374,8 @@ def test_the_ports_package_holds_only_the_three_modules():
     ports = ROOT / "apps" / "api" / "src" / "vulnmart" / "ports"
     names = sorted(p.name for p in ports.glob("*.py"))
     assert names == ["__init__.py", "fake_instance_host.py", "http_instance_host.py", "instance_host.py"]
-    assert sorted(p.name for p in (ROOT / "apps" / "api" / "src" / "vulnmart").iterdir() if p.name != "__pycache__") == ["__init__.py", "ports", "py.typed"]
+    # The package holds the ports (stream L) and the platform API modules (stream P: main.py, problem.py); a new module is added here on purpose.
+    assert sorted(p.name for p in (ROOT / "apps" / "api" / "src" / "vulnmart").iterdir() if p.name != "__pycache__") == ["__init__.py", "main.py", "ports", "problem.py", "py.typed"]
 
 
 def test_both_implementations_are_instance_hosts():

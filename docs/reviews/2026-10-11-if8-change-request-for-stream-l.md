@@ -1,35 +1,57 @@
 # IF-8 change request for streams L and T
 
-Date: 2026-10-11. From: Akshay (stream P, owner of IF-8), story P-02. To: Tanmay (stream L), Sahil (stream T, event consumer).
-Status: **proposed**. IF-8 0.1.0 is in pull request #6 (branch `sprint-1-akshay`); nothing in streams L or T was changed by it.
+Date: 2026-10-11 (revised after merging `origin/main` with stream L's story 1.15). From: Akshay (stream P, owner of IF-8), story P-02. To: Tanmay (stream L), Sahil (stream T, event consumer).
+Status: **proposed**. IF-8 0.1.0 is in pull request #6 (branch `sprint-1-akshay`). It changes nothing in streams L or T except small test adjustments listed at the end.
 
-## What IF-8 now says
+## What IF-8 says
 
-- One registry, `contracts/errors/error-codes.yaml`, with 48 codes. Every code your contracts name today is in it **under the same name**.
-- One error body (RFC 9457 members `type`, `title`, `status` plus `code`, `request_id`, optional `field` and `errors`), schema `contracts/errors/problem.schema.json`. This is Tanmay's decision M1 (ADR 0019): the body moves to RFC 9457 members.
+- One registry, `contracts/errors/error-codes.yaml`, with 49 codes. Every code your contracts name is in it; only the spelling differs where listed below.
+- One error body, schema `contracts/errors/problem.schema.json`, in RFC 9457 style (your decision M1, ADR 0019): `type`, `title`, `status`, `code`, `request_id`, optional `field` or `errors`. It is **closed** and does **not** use `detail` or `instance` (so a path or a submitted value cannot leak).
 - Generated constants: `packages/py-models/src/vulnmart_models/error_codes.py` (`ErrorCode`, `ERRORS`) and `packages/ts-client/src/error-codes.ts`.
+
+## How your merged contracts differ (after story 1.15)
+
+IF-2 0.2.0, IF-5 0.3.0 and IF-4 0.2.0 each state that their error names stay placeholders until IF-8 ("IF-8 may rename the codes"). Today:
+
+| | IF-2 (lab API) | IF-5 (orchestrator) | IF-4 (events) | **IF-8 0.1.0** |
+|---|---|---|---|---|
+| `code` | lower case, underscores (`auth_session_required`) | upper case, hyphens (`ORCH-STALE-EPOCH`) | upper case, hyphens | **upper case, hyphens** (`AUTH-SESSION-REQUIRED`) |
+| `type` | `https://vulnmart.invalid/problems/<lower_code>` | `https://vulnmart.invalid/problems/<lower-code>` | (own) | `urn:vulnmart:error:<CODE>` |
+| `title` | fixed sentence per code | fixed sentence per code | `title` and `message` | the registry's fixed sentence |
+| `detail` | yes (this occurrence) | yes | `message` | **not used** |
+| `instance` | `urn:vulnmart:request:<request_id>` | same | no | **not used** |
+| schema | open | open | closed | **closed** |
+| 422 details | `field` (one pointer) | `field` | `errors` as `{ path, message }` | `field` (one pointer) **or** `errors` as `{ pointer, detail }`, never both |
+
+The code names map one to one (`att_not_found` is `ATT-NOT-FOUND`); 19 of the 20 lower-case codes in IF-2 were already in the seed and the twentieth, `att_gone`, was added as `ATT-GONE` (410).
 
 ## What streams L and T change (in their own stories, not in P-02)
 
-1. **Body shape.** Three shapes exist today:
-   - IF-2 and IF-5 (`lab.openapi.yaml`, `orchestrator-api.md`): `code`, `message`, `request_id`, `field`. Change to `type`, `title`, `status`, `code`, `request_id`, optional `field`, optional `errors`. `message` becomes `title` (the registry's fixed text); the pattern of the `ErrorCode` schema becomes `^[A-Z]{2,6}(-[A-Z]+)+$` or a reference to the registry.
-   - IF-4 (`contracts/events/app-events.md`, fake ingest): `type`, `title`, `status`, `code`, `message`, `request_id`, `errors` as `{ path, message }`. Drop `message`; `errors` entries become `{ pointer, detail }` (the pointer replaces `path`).
-   - The `Problem` schema and the example error bodies of all three contracts, and the fake lab, fake orchestrator and fake ingest mocks. This is the story 1.12 of ADR 0019.
-2. **Placeholder wording.** Remove "placeholder until IF-8" from `lab-api.md` section 5, `orchestrator-api.md` section 6, `app-events.md` (items 5 and 21 of its open points) and `instance-contract.md` (open point 5): the names are final in IF-8 0.1.0. Where a document lists "INST-*" as a family, point to the registry.
-3. **Titles.** The registry holds the fixed generic text of each code; mocks and real services use it (through the generated constants) instead of their own message strings.
-4. **Request IDs.** `request_id` is 8 to 64 letters, digits and hyphens, as in IF-2 today.
+1. **IF-2:** `ProblemCode` becomes the registry code (upper case, hyphens); `type` is the URN; drop `detail` and `instance`; close the `Problem` schema; update `lab-api.md` section 5, the examples and the fake lab. The failed-instance `ErrorCode` already uses the registry spelling.
+2. **IF-5:** same shape change (drop `detail` and `instance`, URN `type`, closed schema); the codes already use the registry spelling. The `ORCH-*` codes stay out of browser answers.
+3. **IF-4:** drop `message`; `errors` entries become `{ pointer, detail }`; the fake ingest follows.
+4. **Wording:** remove "placeholder until IF-8" in `lab-api.md`, `orchestrator-api.md`, `app-events.md` and `instance-contract.md`; the names are final in IF-8 0.1.0.
+5. **Mocks and services** take their `title` from the registry (through the generated constants) rather than their own strings; `detail` text, if you still want it for debugging, goes in logs, not in the answer.
+
+If you prefer to keep `detail` and `instance` or an open schema, say so in review: those are the points where IF-8 chose the stricter option (no free text reaches a client) and I would change the contract rather than have two shapes.
 
 ## Migration
 
-Contracts are `0.x` until `contracts-v1.0.0`, so this body change is allowed as a breaking minor bump (`contracts/CHANGELOG.md`); expand-then-contract applies from v1.0.0. There is no overlap period: each stream moves its contract, its mock and its tests in one story, and the platform dashboards read `code` and `request_id` only (nothing in `apps/web` reads `message` today). Suggested order: IF-5 and IF-2 together with Tanmay's story 1.12, IF-4 with the fake ingest, before the contract tag.
+Contracts are `0.x` until `contracts-v1.0.0`, so this body change is allowed as a breaking minor bump (`contracts/CHANGELOG.md`); expand-then-contract applies from v1.0.0. There is no overlap period: each stream moves its contract, its mock and its tests in one story. The dashboards read `code` and `request_id` only (nothing in `apps/web` reads `message` or `detail` today). Suggested order: IF-5 and IF-2 together, IF-4 with the fake ingest, before the contract tag.
 
 ## Please check in review (my proposals)
 
 - The **HTTP status** and **retryable** flag of each code, and the generic **title** texts.
 - `status: null` for codes that never travel as an HTTP answer: `INST-HEALTH-TIMEOUT`, `INST-LOST`, `INST-INJECT-*`.
-- `ORCH-UNAVAILABLE` (503): the orchestrator client's own "could not reach or understand the orchestrator". It is in the registry because `apps/api/tests/test_contract.py` on your branch counts it; say if the client should keep it private.
+- `ORCH-UNAVAILABLE` (503): the orchestrator client's own "could not reach or understand the orchestrator". It is in the registry because `apps/api/tests/test_contract.py` counts it; say if the client should keep it private.
 - Not seeded, on purpose: `INST-INJECT` (a prefix), `ORCH-ERROR` (base-class label in `ports/instance_host.py`), `ORCH-MYSTERY` (a test value for an unlisted code).
 - The injector exit codes 10 to 13 are recorded as `exit_code` on the four `INST-INJECT-*` codes; "any other exit" is `INST-INJECT-FAILED` with no fixed number.
+
+## Small changes this pull request makes in your files
+
+- `apps/api/tests/test_contract.py`: the package-contents test now also allows the platform API modules `main.py` and `problem.py` next to `ports` (stream P shares the package).
+- `scripts/oasdiff.test.mjs`: the severity file is read with `split(/\r?\n/)` so the test passes on a Windows checkout (`core.autocrlf=true`).
+- `contracts/registry.json`: IF-8 is registered (`contracts/errors` was reserved); `scripts/ci-linux.mjs`: the new `errors-check` step.
 
 ## Adding a code later
 

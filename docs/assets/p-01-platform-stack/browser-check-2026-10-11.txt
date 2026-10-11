@@ -1,4 +1,4 @@
-﻿--- page text ---
+--- page text ---
 VulnMart platform
 API: ok
 Postgres: ok

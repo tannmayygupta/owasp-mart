@@ -200,7 +200,7 @@ test('severity: removing an optional response property, a response enum value or
 test('the severity file lists only checks that exist in the pinned oasdiff, one "id err" per line', async (t) => {
   const bin = await realBin(t);
   if (!bin) return;
-  const lines = fs.readFileSync(SEVERITY_FILE, 'utf8').trim().split('\n');
+  const lines = fs.readFileSync(SEVERITY_FILE, 'utf8').trim().split(/\r?\n/);
   const known = JSON.parse(spawnSync(bin, ['checks', 'changelog', '-f', 'json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout).map((c) => c.id);
   assert.ok(lines.length >= 5);
   for (const l of lines) {

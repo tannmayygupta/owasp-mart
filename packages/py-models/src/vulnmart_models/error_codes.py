@@ -13,6 +13,7 @@ PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:"
 class ErrorCode(StrEnum):
     ATT_CHALLENGE_NOT_FOUND = "ATT-CHALLENGE-NOT-FOUND"
     ATT_FLAG_RATE_LIMITED = "ATT-FLAG-RATE-LIMITED"
+    ATT_GONE = "ATT-GONE"
     ATT_HINTS_DISABLED = "ATT-HINTS-DISABLED"
     ATT_INVALID_STATE = "ATT-INVALID-STATE"
     ATT_NOT_FOUND = "ATT-NOT-FOUND"
@@ -73,6 +74,7 @@ class ErrorInfo:
 ERRORS: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.ATT_CHALLENGE_NOT_FOUND: ErrorInfo(ErrorCode.ATT_CHALLENGE_NOT_FOUND, 404, "Challenge not found.", False),
     ErrorCode.ATT_FLAG_RATE_LIMITED: ErrorInfo(ErrorCode.ATT_FLAG_RATE_LIMITED, 429, "Too many attempts. Try again later.", True),
+    ErrorCode.ATT_GONE: ErrorInfo(ErrorCode.ATT_GONE, 410, "This attempt is no longer available.", False),
     ErrorCode.ATT_HINTS_DISABLED: ErrorInfo(ErrorCode.ATT_HINTS_DISABLED, 404, "Hints are not available for this attempt.", False),
     ErrorCode.ATT_INVALID_STATE: ErrorInfo(ErrorCode.ATT_INVALID_STATE, 409, "This action is not allowed in the attempt's current state.", False),
     ErrorCode.ATT_NOT_FOUND: ErrorInfo(ErrorCode.ATT_NOT_FOUND, 404, "Attempt not found.", False),

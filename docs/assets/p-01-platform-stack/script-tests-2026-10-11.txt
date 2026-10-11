@@ -1,4 +1,4 @@
-﻿✔ parseArgs: help forms (1.9229ms)
+✔ parseArgs: help forms (1.9229ms)
 ✔ parseArgs: simple commands and extra args (0.4543ms)
 ✔ parseArgs: up needs valid profiles, dedupes (1.9752ms)
 ✔ parseArgs: unknown command (0.1859ms)

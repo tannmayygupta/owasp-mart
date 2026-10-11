@@ -1,4 +1,4 @@
-﻿(node:31584) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:31584) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ✔ createUser stores a strong password hash, not the password (232.2719ms)
 ✔ authenticate returns the user on the right password, null otherwise (698.4342ms)
