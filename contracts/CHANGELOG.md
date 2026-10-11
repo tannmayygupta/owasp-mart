@@ -163,6 +163,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Table owners (DB), `contracts/db/`
 
+### 0.2.0 (2026-10-12, Akshay, story P-05)
+- Additive: `table-owners.yaml` written (H-95 shape confirmed as proposed): all 42 tables of architecture 04 sections 2.1 to 2.8 plus `deks` of the `vm_keystore` database, each with its owning module. Stream P: kernel, accounts, orgs, assessments, privacy, admin, notifications, live. Stream L rows (attempts, instances, scoring, ingest, flags) are proposals marked "To confirm by Tanmay"; the catalogue tables belong to `admin` (the sync job), to confirm by Sahil and Tanmay. The 13 module folders exist now (empty packages), so every owner passes `scripts/check_table_owners.py`.
+- The schema is unchanged.
+- no mock change: nothing runs against the table-owners list (`noMock` in the registry).
+
 ### 0.1.0 (2026-10-10, Tanmay, story L-07)
 - First draft, a proposal for Akshay to confirm (tasks P-05 and P-06): `table-owners.schema.json`, the shape of `contracts/db/table-owners.yaml` (a `tables` list of `table` and `owner`, the owner being a module folder of `apps/api/src/vulnmart/` named in CODEOWNERS). The YAML file itself is Akshay's and does not exist yet; `scripts/check_table_owners.py` reports NOT-APPLICABLE until it does, then checks shape, owner names and duplicate tables.
 - The registry has no mock for this contract (`no mock change: nothing runs against it`).
