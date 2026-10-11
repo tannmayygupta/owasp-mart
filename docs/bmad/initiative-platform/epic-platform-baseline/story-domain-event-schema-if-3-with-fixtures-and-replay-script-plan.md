@@ -3,7 +3,7 @@ title: 'Domain event schema (IF-3) with fixtures and replay script'
 type: 'feature'
 ticket: '3'
 created: '2026-10-11'
-status: 'built'
+status: done
 baseline_revision: 'd5e520cf2252ad9e9101c10e847a01ed40277539'
 route: 'full'
 route_source: 'pinned'
