@@ -49,4 +49,5 @@ Stream T's share of sprint zero. Not the harness and the fakes themselves (initi
 - Tracer bullet: entry 1, the thinnest path: the shop skeleton runs in a container on Sahil's PC and answers its health endpoint.
 - Decision: no closing end-to-end suite for this epic; the exploit test runner skeleton plays that role (2026-10-08).
 - Waits on initiative-lab epic-lab-baseline entries 2, 3 and 5 (instance contract, instance events, lab harness); entries 3 and 4 here carry that as unknowns.
+- Decision (2026-10-09): entry 2 (story 1.2, T-02) unknown settled. L-01 (repository skeleton) is merged to `main`, so the catalogue folders `contracts/catalog/` and `challenges/catalog/` exist. Unknown removed; story 1.2 is ready. Built on the EARLY PR branch `shared-T-02`.
 - Draft written 2026-10-08 by Claude Code for the user to approve; not yet confirmed.

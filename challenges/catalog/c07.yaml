@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c07
+title: "Authentication Failures"
+status: stub
+owasp:
+  "2021": "A07"
+  "2025": "A07"
+cwe:
+  primary: "CWE-307"
+  related: ["CWE-640"]
+attack: ["T1110.001", "T1078"]
+difficulty: 2
+tier: Easy
+flag:
+  placement: database-seed
+  delivery: db
+start_state: "a customer who knows the finance account exists (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player requested a password reset for the finance account"
+    signal: null
+  m2:
+    summary: "the finance password was changed through the reset flow"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c07
+fixed_build: challenges/fixed/c07

@@ -1,0 +1,40 @@
+# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
+# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
+# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
+# delivery are provisional and confirmed in this challenge's own story.
+schema_version: "0.1"
+key: c04
+title: "Insecure Design"
+status: stub
+owasp:
+  "2021": "A04"
+  "2025": "A06"
+cwe:
+  primary: "CWE-840"
+  related: ["CWE-841", "CWE-799"]
+attack: ["T1657"]
+difficulty: 3
+tier: Medium
+flag:
+  placement: database-seed
+  delivery: db
+start_state: "a customer with a seeded order eligible for the instant-refund path (placeholder seed)"
+milestones:
+  m1:
+    summary: "the player used the instant-refund rule on the seeded order"
+    signal: null
+  m2:
+    summary: "two or more quick refunds were auto-approved on one order"
+    signal: null
+  m3:
+    summary: "flag captured"
+    signal: null
+hints:
+  - level: 1
+    text: null
+  - level: 2
+    text: null
+  - level: 3
+    text: null
+exploit_test: challenges/tests/c04
+fixed_build: challenges/fixed/c04
