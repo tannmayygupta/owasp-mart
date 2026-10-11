@@ -158,7 +158,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Waits on: T-07.
   - Done when: Each role works as the matrix says in tests.
 
-- [ ] **T-16. Seeded accounts for the challenges**
+- [x] **T-16. Seeded accounts for the challenges**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Seeded accounts for every challenge.
