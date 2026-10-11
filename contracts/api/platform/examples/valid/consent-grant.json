@@ -1,0 +1,9 @@
+{
+  "schema": "ConsentRequest",
+  "body": {
+    "attempt_id": "a-CANDIDATEATTEMPT",
+    "notice_version": "2026-10-01.1",
+    "notice_text_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "decision": "granted"
+  }
+}

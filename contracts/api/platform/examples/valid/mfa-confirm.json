@@ -1,0 +1,6 @@
+{
+  "schema": "MfaCodeRequest",
+  "body": {
+    "code": "654321"
+  }
+}

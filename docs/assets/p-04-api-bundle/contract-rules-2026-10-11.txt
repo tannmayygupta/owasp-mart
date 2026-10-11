@@ -1,0 +1,26 @@
+PASS            registry: 9 contracts, 15 folders under contracts/ all registered
+PASS            base: compared with origin/main (merge base 0364107418); 76 file(s) differ
+                NOTICE: no tag contracts-v* exists, so the comparison with the latest tag did not run (only the pull request base is compared)
+PASS            contract[IF-6]: no file of this contract changed
+PASS            contract[IF-4]: no file of this contract changed
+PASS            contract[IF-5]: no file of this contract changed
+PASS            contract[IF-2]: no file of this contract changed
+PASS            changelog[IF-1]: new entry for IF-1: 0.1.0 (2026-10-11, Akshay, story P-04)
+PASS            mock[IF-1]: a mock file changed with the contract
+PASS            breaking[IF-1]: contracts/api/platform/platform.openapi.yaml: new file, not compared (a new file is not a breaking change)
+PASS            contract[DB]: no file of this contract changed
+PASS            contract[IF-7]: no file of this contract changed
+PASS            changelog[IF-8]: new entries for IF-8: 0.3.0 (2026-10-11, Akshay, story P-04, code review); 0.2.0 (2026-10-11, Akshay, story P-04)
+PASS            mock[IF-8]: no schema or OpenAPI file changed, so no mock change is needed
+PASS            breaking[IF-8]: BREAKING declared in the new entry with a raised version (0.3.0):
+                  notice: contracts/errors/error-codes.yaml: unlisted YAML file changed; it is not machine-comparable here (list it under "schemas" or "openapi" in contracts/registry.json, or declare the change as BREAKING)
+PASS            contract[IF-3]: no file of this contract changed
+NOT-APPLICABLE  compat: contracts/COMPAT.md does not exist yet
+NOT-APPLICABLE  table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE  alembic: apps/api/migrations/versions does not exist yet
+PASS            bundle: contracts:bundle:check passed
+
+SUMMARY: 16 PASS, 0 FAIL, 3 NOT-APPLICABLE
+NOT-APPLICABLE: compat: contracts/COMPAT.md does not exist yet
+NOT-APPLICABLE: table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE: alembic: apps/api/migrations/versions does not exist yet

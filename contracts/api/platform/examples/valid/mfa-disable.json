@@ -1,0 +1,6 @@
+{
+  "schema": "PasswordConfirmRequest",
+  "body": {
+    "password": "correct-horse-battery-staple"
+  }
+}

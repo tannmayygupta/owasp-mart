@@ -44,6 +44,7 @@ jobs:
       - run: node --test "scripts/*.test.mjs"
       - run: pnpm run errors:check
       - run: pnpm run domain-events:check
+      - run: pnpm run api:check
       - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"
       - run: uv run --locked --package vulnmart-api pytest -q
       - run: pnpm run contracts:check

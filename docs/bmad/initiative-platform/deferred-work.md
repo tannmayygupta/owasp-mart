@@ -32,3 +32,12 @@
 - The replay script has its own hub and consumer and cannot be pointed at another one; a `--url` mode to drive the real hub is a follow-up for P-22. No code resolves an audience from an attempt yet (the relay, P-05 and P-22); the fixtures supply the resolved audiences and the validator compares them with the table.
 - Streams are not size-limited in the contract (trim age or length, connection caps, slow consumers): decided with the hub in P-22 and spike S-2.
 
+## Deferred from: code review of story-platform-and-lab-api-fragments-bundle-mock-and-generated-cli-plan (2026-10-11)
+
+- Mock lab half: lab operations are proxied to the fake lab and tested only for reachability; a bundle-level comparison with the bundle's lab examples is a later hardening (stream L's `test_lab_contract.py` covers the fake lab against IF-2).
+- Mock parameter validation: path, query and header parameters are not validated (`limit=1000` gives 200, not 422); add when P-07 needs a failure path.
+- IF-1 has no account-deletion or email-change route; later stories (FR-PRV, P-25).
+- Client has no `/live` helper (reconnect, `Last-Event-ID`, `stream.resync` then snapshot); write with the dashboards (P-07).
+- Client does not throw when an authenticated write has no CSRF token; a dashboards decision (P-07).
+
+- Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.

@@ -1,0 +1,10 @@
+{
+  "schema": "SignupRequest",
+  "body": {
+    "email": "ada@example.invalid",
+    "password": "correct-horse-battery-staple",
+    "display_name": "Ada Learner"
+  },
+  "path": "/age_declaration",
+  "rule": "the declaration is required"
+}

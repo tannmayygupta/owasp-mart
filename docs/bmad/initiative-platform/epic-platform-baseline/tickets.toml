@@ -43,7 +43,6 @@ covers = ["PB-3"]
 after = [2, 3]
 hitl = false
 risk = "medium"
-unknown = "Needs the lab API fragment (initiative-lab epic-lab-baseline entry 9) and the catalogue stubs (initiative-target epic-target-baseline entry 2) merged; agree the fragment layout with Tanmay."
 
 [[entry]]
 id = 5

@@ -10,7 +10,7 @@
 #  - `status` is the HTTP status when the code is sent as an HTTP answer, or null when it only appears inside an
 #    event or in `error_code` of a failed instance (never as an HTTP answer).
 #  - Entries are sorted by code so a diff shows exactly what changed.
-registry_version: "0.1.0"
+registry_version: "0.3.0"
 
 families:
   AUTH: { owner: P, description: "Sign-in, session and request-origin checks on the browser API." }
@@ -22,14 +22,20 @@ families:
 
 codes:
   - { code: ATT-CHALLENGE-NOT-FOUND, status: 404, title: "Challenge not found.", retryable: false }
+  - { code: ATT-CONSENT-STALE, status: 409, title: "The consent text has changed. Read it again.", retryable: false }
   - { code: ATT-FLAG-RATE-LIMITED, status: 429, title: "Too many attempts. Try again later.", retryable: true }
   - { code: ATT-GONE, status: 410, title: "This attempt is no longer available.", retryable: false }
   - { code: ATT-HINTS-DISABLED, status: 404, title: "Hints are not available for this attempt.", retryable: false }
   - { code: ATT-INVALID-STATE, status: 409, title: "This action is not allowed in the attempt's current state.", retryable: false }
   - { code: ATT-NOT-FOUND, status: 404, title: "Attempt not found.", retryable: false }
   - { code: AUTH-CSRF-FAILED, status: 403, title: "The request could not be verified.", retryable: false }
+  - { code: AUTH-EMAIL-NOT-VERIFIED, status: 403, title: "Verify your email address to continue.", retryable: false }
+  - { code: AUTH-INVALID-CREDENTIALS, status: 401, title: "The email address or password is not correct.", retryable: false }
+  - { code: AUTH-MFA-INVALID, status: 401, title: "The code is not correct.", retryable: false }
+  - { code: AUTH-MFA-STATE, status: 409, title: "The second factor cannot be changed in its current state.", retryable: false }
   - { code: AUTH-ORIGIN-FORBIDDEN, status: 403, title: "The request origin is not allowed.", retryable: false }
   - { code: AUTH-SESSION-REQUIRED, status: 401, title: "Sign in to continue.", retryable: false }
+  - { code: AUTH-TOKEN-INVALID, status: 400, title: "This link is no longer valid.", retryable: false }
   - { code: EVT-BAD-SIGNATURE, status: 401, title: "The event could not be authenticated.", retryable: false }
   - { code: EVT-DUPLICATE-MISMATCH, status: 409, title: "An event with this identity was already accepted with different content.", retryable: false }
   - { code: EVT-SCHEMA, status: 422, title: "The event is not valid.", retryable: false }
@@ -67,6 +73,7 @@ codes:
   - { code: ORCH-VALIDATION, status: 422, title: "The request is not valid.", retryable: false }
   - { code: REQ-INTERNAL, status: 500, title: "Something went wrong. Try again later.", retryable: true }
   - { code: REQ-METHOD-NOT-ALLOWED, status: 405, title: "Method not allowed.", retryable: false }
+  - { code: REQ-RATE-LIMITED, status: 429, title: "Too many requests. Try again later.", retryable: true }
   - { code: REQ-ROUTE-UNKNOWN, status: 404, title: "Route not found.", retryable: false }
   - { code: REQ-TOO-LARGE, status: 413, title: "The request body is too large.", retryable: false }
   - { code: REQ-UNSUPPORTED-MEDIA-TYPE, status: 415, title: "The request must be JSON.", retryable: false }

@@ -1,0 +1,9 @@
+{
+  "schema": "UpdateMeRequest",
+  "body": {
+    "display_name": "Ada",
+    "account_type": "admin"
+  },
+  "path": "/account_type",
+  "rule": "the account type is never changed through the profile"
+}

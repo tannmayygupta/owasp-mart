@@ -1,0 +1,9 @@
+{
+  "schema": "MfaLoginRequest",
+  "body": {
+    "mfa_ticket": "short",
+    "code": "123456"
+  },
+  "path": "/mfa_ticket",
+  "rule": "a ticket is URL-safe, 32 to 128 characters"
+}
