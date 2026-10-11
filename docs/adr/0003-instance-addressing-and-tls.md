@@ -1,6 +1,7 @@
 # 0003. Instance addressing and TLS
 
 - **Status:** Accepted by the user (D-28); refinements marked Proposed
+- **Note:** Superseded in part by D-49/ADR 0030 (2026-10-11): the mechanism of issuing certificates (lego on the host instead of the Caddy plugin); names, wildcard and DNS-01 stand.
 - **Date:** 2026-10-08
 - **Deciders:** the user (D-28)
 - **Requirements:** D-16, C03/D-18, NFR-SEC-06, FR-INS-10; OI-9

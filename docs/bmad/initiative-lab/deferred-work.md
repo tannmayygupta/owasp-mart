@@ -88,3 +88,7 @@
 - source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
   summary: The header of contracts/instance/instance-contract.md still says "Version: 0.1.0" while the contract is at 0.3.1.
   evidence: Found by the story 1.7 review pass; it was stale before the story and does not refer to the changes made here. A text change under contracts/instance/ needs a contracts changelog entry, so it is fixed together with the next IF-6 change or the 1.0.0 release commit.
+
+- source_plan: `docs/bmad/initiative-lab/epic-environments-and-deployment/story-duckdns-names-and-certificates-plan.md`
+  summary: Confirm the lego v5.5.2 flags `--server`, `--path` and `renew --days` with the real binary.
+  evidence: Only `--accept-tos`, the flag order before `run` and the wildcard file names (`_.<name>.crt`) were confirmed from the lego documentation; the rest are standard flags that the scripts exercise against a stub (maybe-false, medium if wrong). The developer's staging run settles it; paste its real output into the S-16 note and fix the script if lego rejects a flag.

@@ -386,7 +386,7 @@ Instance capacity on a host is `floor((host memory − platform reserve − OS a
 |---|---|---|
 | S-14 | Vercel external rewrite to the VM: `Set-Cookie` passthrough, SSE unbuffered, longest stream before cut, headers and body limits, whether an IP-literal or sslip.io destination is accepted, Hobby usage counting (extends S-2) | `[EF-05]` is UNVERIFIED; the whole same-origin design rests on it |
 | S-15 | Labs edge attached to many `front-*` networks: attach and detach time, behaviour after container restart versus recreate, address pool size, number of attachments before trouble | ADR 0005 depends on it |
-| S-16 | Wildcard A record and DNS-01 TXT on DuckDNS for `*.LABS_ZONE`; the Caddy DuckDNS plugin and an on-demand-TLS `ask` check (UNVERIFIED) | `[EF-14]` leaves wildcard resolution unstated |
+| S-16 | Wildcard A record and DNS-01 TXT on DuckDNS for `*.LABS_ZONE`; ~~the Caddy DuckDNS plugin~~ (amended by D-49, ADR 0030: lego on the host issues the certificates, stock Caddy loads the files; the plugin is not used) and an on-demand-TLS `ask` check (UNVERIFIED) | `[EF-14]` leaves wildcard resolution unstated |
 | S-17 | Two-VM private link: mTLS between VMs through the VCN, latency, Oracle security list rules | ADR 0007 |
 | S-18 | Dramatiq on Valkey: acknowledgement, retries and delayed jobs under a worker kill (extends S-13) | Compatibility UNVERIFIED |
 | S-19 | Keystore snapshot rule: delete a key, restore an old data backup plus the latest keystore snapshot, prove the data is unreadable (extends S-10) | ADR 0008 |

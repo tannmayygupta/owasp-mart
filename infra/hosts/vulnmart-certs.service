@@ -1,0 +1,13 @@
+[Unit]
+Description=VulnMart certificate renewal (lego, DNS-01 with DuckDNS; D-49)
+After=network-online.target
+Wants=network-online.target
+# A host without /etc/vulnmart/certs.env (not configured yet) skips the run instead of failing.
+ConditionPathExists=/etc/vulnmart/certs.env
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/vulnmart/certs.env
+ExecStart=/usr/local/sbin/vulnmart-certs.sh renew
+TimeoutStartSec=30min
+# After a successful renewal, a container that reads the files can be told to reload here (L-12 adds the line for Caddy).

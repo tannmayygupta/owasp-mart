@@ -100,6 +100,8 @@ C03's stored XSS runs script inside the shop origin. If the shop shares an origi
 
 ### 2.3 What the labs zone looks like for each D-16 route
 
+> Superseded in part by D-49/ADR 0030 (2026-10-11): the mechanism of issuing certificates (lego on the host instead of the Caddy plugin); names, wildcard and DNS-01 stand.
+
 D-16 order of preference: (1) free domain, (2) free dynamic-DNS name, with sslip.io-style names tested on Let's Encrypt staging, (3) the Oracle VM's IP with an IP certificate. Never plain HTTP.
 
 | | Route 1: free domain (GitHub Student Pack, unconfirmed) | Route 2: DuckDNS names | Route 3: sslip.io names (or IP certificate) |

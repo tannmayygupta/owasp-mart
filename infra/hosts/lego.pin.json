@@ -1,0 +1,8 @@
+{
+  "version": "v5.5.2",
+  "url_prefix": "https://github.com/go-acme/lego/releases/download/v5.5.2/",
+  "amd64_file": "lego_v5.5.2_linux_amd64.tar.gz",
+  "amd64_sha256": "2a35505089e7772c92e1e9ac144df91151ef2eca8568630db0ff91fca06d9bef",
+  "arm64_file": "lego_v5.5.2_linux_arm64.tar.gz",
+  "arm64_sha256": "15b14ec2ab14fde69cc8396eb0204c5ce4327e31a486953225a6059b26db3e8c"
+}

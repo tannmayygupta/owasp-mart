@@ -136,6 +136,7 @@ ode scripts/tag-contracts.mjs --dry-run.
   - Covers: LE-2; spike S-16
   - Waits on: L-08.
   - Done when: Real certificates are issued and renew automatically; the S-16 result (wildcard resolution) is recorded.
+  - Status 2026-10-11 (story 2.2): the host scripts, the timer, the pinned lego installer, the cloud-init wiring, the S-16 check script, ADR 0030, decision D-49 (Proposed) and the runbook docs/runbooks/certificates.md are built and tested against stubs (and on Linux in Docker). NOT ticked: the live steps are the developer's (DuckDNS accounts and names, token files on the hosts, staging then production issuance, one real renewal, the S-16 result). Tick L-10 only after the real redacted results are pasted.
 
 - [ ] **L-11. Vercel project, same-origin rewrite and live-stream check**
   - Epic: `epic-environments-and-deployment`
