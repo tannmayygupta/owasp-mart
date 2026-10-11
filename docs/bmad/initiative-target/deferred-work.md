@@ -17,3 +17,9 @@
 ## Deferred from: code review of story-customer-flows-plan (2026-10-11)
 
 - No login throttling/lockout or security-event emission on `/login` (T-14). Deferred: the attempt-logging and lockout model is entangled with C09 (what gets logged) and C07 (password reset); design it alongside the C09 logging story. The `security_events`/`alerts` tables and the `needsRehash` seam are ready.
+
+## Deferred from: code review of story-support-finance-and-admin-flows-plan (2026-10-11)
+
+- `setUserStatus` (admin manage-users) has no self-suspend / last-admin guard, so an admin can lock themselves or the last admin out. Deferred: out of FR-SHP-07 scope (correct-flow role screens); add the guard with the richer admin user-management screen.
+- The service layer calls `can(role, action, {})` with an empty ctx. Safe today because every staff-reachable matrix cell is unscoped (`true`/`amounts_only`); if a staff action ever gains a scoped rule (`own`/`own_store`), pass real ctx so the matrix check is not a no-op behind `requireRole`.
+- `assignTicket` and `holdPayout` endpoints exist and are gated but have no UI control yet (reachable only by direct POST). Add the buttons with the fuller staff screens.

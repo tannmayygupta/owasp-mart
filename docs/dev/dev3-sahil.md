@@ -150,7 +150,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Waits on: T-07, T-08.
   - Done when: A customer can complete the whole flow in a fresh instance.
 
-- [ ] **T-15. Support, finance and admin flows**
+- [x] **T-15. Support, finance and admin flows**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Support, finance and admin screens following the permission matrix.

@@ -40,6 +40,17 @@ export function requireCustomer(req, res, next) {
   next();
 }
 
+// Require a logged-in, active user whose role is one of `roles` (staff gates).
+export function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user) return res.redirect('/login');
+    if (req.user.status !== 'active' || !roles.includes(req.user.role)) {
+      return res.status(403).render('message', { title: 'Forbidden', message: 'You do not have access to this area.' });
+    }
+    next();
+  };
+}
+
 // Reject a POST whose form CSRF token does not match the session token
 // (constant-time compare, matching the cookie-signature check).
 export function checkCsrf(req, res, next) {

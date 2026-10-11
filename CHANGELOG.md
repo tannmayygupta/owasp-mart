@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-15 support/finance/admin flows, 2026-10-11, Sahil)
+- `apps/shop/` staff experience (FR-SHP-07): a `staff-service` domain layer and server-rendered staff screens over the T-06 model, reusing the T-14 session/Nunjucks/CSRF layer. Support handles tickets (reply/assign/resolve), moves disputes through their state machine and moderates reviews; finance approves payouts, sees commissions and reads orders with personal data redacted (amounts only); admin approves sellers/products, manages user status, resolves escalated disputes and reads the audit log and alerts. Each area is role-scoped by a new `requireRole` guard and each action re-checked against the RS-G 1.2 matrix via `can()`; status changes drive the T-06 state machines (illegal moves → 400); every mutation writes an attributed `audit_log` row; a suspended account is cut off on its next request. `/login` now admits any active account (route guards enforce role). Staff suite brings the shop to 79 end-to-end tests. Correct flow only; C05/C09 weaknesses are later.
+
 ### Added (T-14 customer flows, 2026-10-11, Sahil)
 - `apps/shop/` customer experience (FR-SHP-05): server-rendered Nunjucks pages (autoescape) and Express routes over the data model, identity and seed, with a signed-cookie session (Node crypto), CSRF on every POST, and a `shop-service` domain layer. A customer can log in, browse/search, fill a cart, check out with simulated payment (atomic: product/stock re-validation, commission, stock decrement), track orders, review purchased items, request refunds, open disputes and create tickets — all permission-checked and per-customer scoped. `nunjucks` 3.2.4 added; CI app-tests run `apps/*/test/**`. 18 end-to-end tests. Correct flow only; C01/C03/C04 weaknesses are later.
 

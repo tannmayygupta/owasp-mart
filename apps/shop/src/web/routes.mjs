@@ -39,8 +39,10 @@ export function registerRoutes(app, db) {
   // Auth
   app.get('/login', (req, res) => res.render('login', {}));
   app.post('/login', h((req, res) => {
+    // Any role may log in; route guards (requireCustomer / requireRole) enforce
+    // what each role may reach. A suspended account cannot sign in.
     const user = authenticate(db, req.body.email, req.body.password);
-    if (!user || user.role !== 'customer') {
+    if (!user || user.status !== 'active') {
       return res.status(401).render('login', { error: 'Wrong email or password.' });
     }
     setSession(res, { uid: user.id, csrf: req.session.csrf });
