@@ -156,3 +156,16 @@ covers = ["LX-3"]
 after = [13]
 hitl = false
 risk = "low"
+
+[[entry]]
+id = 15
+type = "story"
+title = "PR 3 review remediation (Sahil's review of 2026-10-11)"
+description = "Fixes everything the consumer review of pull request 3 named, in one push. Part A (must fix before merge): merge origin/main into sprint-1-tanmay and resolve the 7 conflicts as unions; put IF-7 in the contract registry and the contracts CHANGELOG; renumber ADR 0017 and 0018 of this branch to 0023 and 0024 with every reference; mark the consumer sign-off of IF-4 as stale. Part B (contracts): IF-4 sequence, epoch and event key lifecycle (the design is confirmed by the developer before it is built), IF-6 template schema hardening, IF-5 StateReport transition number, strict seq and open Problem, IF-2 stable timeline paging. Part C (rules engine): whole-contract deletion is a breaking change, the checker and its pins are read from the base branch, the oasdiff pin is verified, the BREAKING marker match is exact. Part D (hosts, code and tests only, the developer applies): isolation of the labs host (H-103), instance-type guard in the IAM policy, remote encrypted Terraform state with locking. A person must confirm the design points and apply the infrastructure."
+verify = "The merge of origin/main is clean and every suite, the contract-rules check and the text and secret checks pass on the merged tree; each finding of the review has a test that failed before the fix (or a recorded reason it cannot be a test); the review reply lists each finding with its fix and evidence."
+covers = ["LB-3", "LB-4", "LB-5", "LB-7", "LB-9", "LE-1", "LE-6", "LE-8"]
+after = [13]
+hitl = true
+risk = "high"
+references = ["docs/bmad/initiative-lab/audit-2026-10-11-sprint-1.md"]
+unknown = "Design points to settle with the developer before they are built: IF-4 sequence and epoch rule, event key derivation and distribution (H-09, H-10), the isolation design for H-103, the remote state backend, and whether story 1.12 (RFC 9457) is folded in because it also changes the IF-5 and IF-2 Problem schema."
