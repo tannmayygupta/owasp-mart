@@ -59,6 +59,8 @@ Command output as above; no screenshots.
 
 - The AWS console refused the new IAM policy: the statement ID `BootstrapStateBucketOnce_RemoveAfterwards` had an underscore (IDs allow letters and digits only). Found when the developer pasted the policy; renamed `BootstrapStateBucketOnceRemoveAfterwards`; a test now checks every ID and the size limit (`node --test scripts/infra-isolation.test.mjs`: 13 of 13 pass).
 
+- Process finding (2026-10-11, from the reviewer's analysis of his blocked tasks T-04, T-09, T-10): my task file marks L-01, L-02, L-03, L-05, L-06 and L-13 as EARLY PR. L-01 and L-02 went through their own pull requests (#1, #2); for L-03 the branch `shared-L-03` was pushed but no pull request was opened; for L-05 and L-06 no own branch was made. All of them were batched into the sprint pull request #3, so the harness, the fake ingest and IF-4 stayed off `main` while Sahil (T-04) and Akshay (P-04, needs L-05) waited. Fix: pull request 3 merged as soon as CI is green; handoff H-112; message `docs/dev/messages/2026-10-11-sahil-pr3-and-t04.md`; L-13 will get its own `shared-L-13` branch and pull request from fresh `main` as soon as it is done. Suggested reminder for CLAUDE.md step 4 of the task cycle (not applied, needs the team): "If the task is marked EARLY PR, create `shared-<task-id>` from fresh `main` and open its own small pull request before starting another task."
+
 ## Security notes (vulnerable parts only)
 No flag values or secrets were written. The event key vector uses a fake master marked as a test value.
 
