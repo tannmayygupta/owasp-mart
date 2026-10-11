@@ -20,8 +20,10 @@ WORKDIR /src
 # Dependencies first (cached until a manifest or the lockfile changes).
 COPY pyproject.toml uv.lock .python-version ./
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
+COPY packages/py-models/pyproject.toml packages/py-models/pyproject.toml
 RUN uv sync --frozen --no-dev --no-editable --package vulnmart-api --no-install-workspace
 # Then the application code.
+COPY packages/py-models/src packages/py-models/src
 COPY apps/api/src apps/api/src
 RUN uv sync --frozen --no-dev --no-editable --package vulnmart-api
 

@@ -1,0 +1,10 @@
+[project]
+name = "vulnmart-models"
+version = "0.0.0"
+description = "VulnMart shared Python models generated from the contracts. Today: the error registry constants (IF-8)."
+requires-python = "==3.14.*"
+dependencies = []
+
+[build-system]
+requires = ["uv_build==0.12.23"]
+build-backend = "uv_build"

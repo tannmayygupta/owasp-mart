@@ -41,7 +41,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Waits on: L-01 (repository skeleton and Compose profiles).
   - Done when: A hello request works through the whole local stack and the developer environment on your Mac is verified.
 
-- [ ] **P-02. Error registry and problem-details format (IF-8)**
+- [x] **P-02. Error registry and problem-details format (IF-8)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the shared error codes and the problem-details response format.

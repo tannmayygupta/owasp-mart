@@ -1,0 +1,213 @@
+{
+  "type": "urn:vulnmart:error:REQ-VALIDATION",
+  "title": "The request is not valid.",
+  "status": 422,
+  "code": "REQ-VALIDATION",
+  "request_id": "req-0a1b2c3d",
+  "errors": [
+    {
+      "pointer": "/f0",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f1",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f2",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f3",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f4",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f5",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f6",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f7",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f8",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f9",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f10",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f11",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f12",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f13",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f14",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f15",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f16",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f17",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f18",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f19",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f20",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f21",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f22",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f23",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f24",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f25",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f26",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f27",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f28",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f29",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f30",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f31",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f32",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f33",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f34",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f35",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f36",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f37",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f38",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f39",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f40",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f41",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f42",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f43",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f44",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f45",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f46",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f47",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f48",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f49",
+      "detail": "This value is not valid."
+    },
+    {
+      "pointer": "/f50",
+      "detail": "This value is not valid."
+    }
+  ]
+}

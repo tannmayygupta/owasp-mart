@@ -1,4 +1,4 @@
-# uv workspace root (Python side). No members yet; stream L and P add them (apps/api, packages/py-models).
+# uv workspace root (Python side). Members: apps/api (stream P) and packages/py-models (generated contract models); stream L adds apps/orchestrator.
 [project]
 name = "vulnmart"
 version = "0.0.0"
@@ -10,4 +10,4 @@ dependencies = []
 package = false
 
 [tool.uv.workspace]
-members = ["apps/api"]
+members = ["apps/api", "packages/py-models"]

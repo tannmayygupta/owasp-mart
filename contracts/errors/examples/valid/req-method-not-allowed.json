@@ -1,0 +1,7 @@
+{
+  "type": "urn:vulnmart:error:REQ-METHOD-NOT-ALLOWED",
+  "title": "Method not allowed.",
+  "status": 405,
+  "code": "REQ-METHOD-NOT-ALLOWED",
+  "request_id": "req-0a1b2c3d"
+}

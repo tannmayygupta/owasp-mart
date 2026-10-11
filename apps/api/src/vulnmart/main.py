@@ -16,6 +16,8 @@ import valkey.asyncio
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from vulnmart.problem import install_problem_handlers
+
 logger = logging.getLogger("vulnmart.healthz")
 
 CHECK_TIMEOUT_SECONDS = 2.0
@@ -68,6 +70,7 @@ def create_app(
         else {"postgres": check_postgres, "valkey": check_valkey}
     )
     app = FastAPI(title="VulnMart platform API")
+    install_problem_handlers(app)
 
     @app.get("/healthz")
     async def healthz() -> JSONResponse:

@@ -6,5 +6,7 @@
 !.python-version
 !apps/api/pyproject.toml
 !apps/api/src/**
+!packages/py-models/pyproject.toml
+!packages/py-models/src/**
 **/__pycache__
 **/*.pyc

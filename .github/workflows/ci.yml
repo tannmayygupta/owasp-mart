@@ -36,6 +36,7 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: node --test "scripts/*.test.mjs"
+      - run: pnpm run errors:check
 
   apps:
     name: app tests
@@ -105,4 +106,6 @@ jobs:
           node-version-file: .node-version
       - run: docker compose -f infra/compose/compose.yaml config -q
       - run: docker compose -f infra/compose/compose.yaml --profile platform --profile web config -q
+      # The API image copies packages/py-models: build it so a broken Dockerfile or .dockerignore fails here.
+      - run: docker compose -f infra/compose/compose.yaml --profile platform build api
       - run: node scripts/dev.mjs hello

@@ -9,7 +9,8 @@
     "test:e2e": "node --test --test-concurrency=1 \"scripts/e2e/*.test.mjs\"",
     "dev": "node scripts/dev.mjs",
     "contracts:check": "node scripts/validate-contracts.mjs",
-    "catalog:check": "node scripts/validate-catalog.mjs"
+    "catalog:check": "node scripts/validate-catalog.mjs",
+    "errors:check": "node scripts/validate-errors.mjs && node scripts/generate-error-codes.mjs --check"
   },
   "devDependencies": {
     "ajv": "8.20.0",

@@ -90,6 +90,26 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(mail.status, 200);
   });
 
+  test('API errors follow the IF-8 format through the web origin: unknown route and wrong method', async () => {
+    const unknown = await fetch('http://127.0.0.1:3000/api/no-such-route', { headers: { 'X-Request-ID': 'e2e-req-0001' }, signal: AbortSignal.timeout(20000) });
+    assert.equal(unknown.status, 404);
+    assert.match(unknown.headers.get('content-type'), /application\/problem\+json/);
+    assert.match(unknown.headers.get('cache-control'), /no-store/);
+    assert.deepEqual(await unknown.json(), {
+      type: 'urn:vulnmart:error:REQ-ROUTE-UNKNOWN',
+      title: 'Route not found.',
+      status: 404,
+      code: 'REQ-ROUTE-UNKNOWN',
+      request_id: 'e2e-req-0001',
+    });
+    const wrong = await fetch('http://127.0.0.1:3000/api/healthz', { method: 'POST', signal: AbortSignal.timeout(20000) });
+    assert.equal(wrong.status, 405);
+    assert.match(wrong.headers.get('content-type'), /application\/problem\+json/);
+    const body = await wrong.json();
+    assert.equal(body.code, 'REQ-METHOD-NOT-ALLOWED');
+    assert.match(body.request_id, /^[A-Za-z0-9-]{8,64}$/, 'a request id is generated when none is sent');
+  });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

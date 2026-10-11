@@ -18,3 +18,10 @@
 - Two lockfiles for the web app can drift (see above).
 - `up web` without `platform` fails with Compose's raw error (see above).
 
+## Deferred from: code review of story-error-registry-and-problem-details-format-if-8-plan (2026-10-11)
+
+- The end-to-end test (which proves the API image and the web-origin pass-through of error bodies) is not run in CI; only the image build is (added in this review). Would be medium. Settle with a CI job that runs `pnpm run test:e2e`. Source plan: `docs/bmad/initiative-platform/epic-platform-baseline/story-error-registry-and-problem-details-format-if-8-plan.md`.
+- Nothing reads the instance contract's exit-code table or stream L's contracts to compare with the registry: the registry matches them today by construction (seeded 2026-10-11) and can drift. Settle with a check that parses `contracts/instance/instance-contract.md` section 5 and, once stream L's contracts are merged, their code lists.
+- Registry gaps: no generic `REQ-RATE-LIMITED` (429), `REQ-UNAVAILABLE` (503), `REQ-TIMEOUT`, `AUTH-FORBIDDEN` (403 for a signed-in user) or sign-in failure code, and `retryable` is in the registry but not in the body (no `Retry-After` convention). Add them with the stories that need them (accounts, P-11 and P-12); each is an additive change.
+- The generated TypeScript file is not type-checked in CI (it was checked once with `tsc --strict`, exit 0). Add when `apps/web` imports `@vulnmart/ts-client`.
+
