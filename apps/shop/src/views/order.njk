@@ -1,0 +1,16 @@
+{% extends "layout.njk" %}
+{% block title %}Order #{{ order.id }}{% endblock %}
+{% block body %}
+<h1>Order #{{ order.id }}</h1>
+<p>Status: <strong>{{ order.status }}</strong> · Total {{ order.total_cents | cents }}</p>
+<table><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Status</th><th></th></tr>
+{% for it in order.items %}
+<tr><td>{{ it.title }}</td><td>{{ it.qty }}</td><td>{{ it.unit_price_cents | cents }}</td><td>{{ it.status }}</td>
+<td>
+  <form class="inline" method="post" action="/refunds"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order_item_id" value="{{ it.id }}"><button>Refund</button></form>
+  <form class="inline" method="post" action="/disputes"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order_item_id" value="{{ it.id }}"><button>Dispute</button></form>
+  <form class="inline" method="post" action="/reviews"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="product_id" value="{{ it.product_id }}"><input name="rating" type="number" min="1" max="5" value="5" style="width:3.5rem"><button>Review</button></form>
+</td></tr>
+{% endfor %}</table>
+<p><a href="/orders">All orders</a></p>
+{% endblock %}

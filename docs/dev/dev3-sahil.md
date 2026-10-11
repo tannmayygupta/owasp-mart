@@ -142,7 +142,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Waits on: T-11.
   - Done when: The bot visits an allowed page, refuses others and its memory per instance is measured (S-5).
 
-- [ ] **T-14. Customer flows**
+- [x] **T-14. Customer flows**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Browse, search, cart, checkout with the simulated payment, orders, reviews and support tickets.

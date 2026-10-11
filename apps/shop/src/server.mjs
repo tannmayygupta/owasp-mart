@@ -5,6 +5,9 @@
 // only; the shop has no egress of its own (that boundary is enforced in T-09).
 
 import { createApp } from './app.mjs';
+import { openDb } from './db/index.mjs';
+import { migrate } from './db/migrate.mjs';
+import { seedAll } from '../seed/registry.mjs';
 
 // Resolve PORT once. An unset value defaults to 3000; a set-but-invalid value is
 // a misconfiguration we fail loudly on rather than binding a random port. The
@@ -21,7 +24,15 @@ function resolvePort(raw) {
 const PORT = resolvePort(process.env.PORT);
 const HOST = '0.0.0.0';
 
-const app = createApp();
+// Open the shop database. In an instance the injector supplies a seeded snapshot
+// at VM_DB_PATH (T-04/T-09); for local running we migrate and seed a fresh db.
+const db = openDb(process.env.VM_DB_PATH ?? ':memory:');
+migrate(db);
+if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
+  await seedAll(db);
+}
+
+const app = createApp({ db });
 const server = app.listen(PORT, HOST, () => {
   console.log(`vulnmart-shop listening on http://${HOST}:${PORT}`);
 });

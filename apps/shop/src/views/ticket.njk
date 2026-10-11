@@ -1,0 +1,8 @@
+{% extends "layout.njk" %}
+{% block title %}Ticket #{{ ticket.id }}{% endblock %}
+{% block body %}
+<h1>{{ ticket.subject }}</h1>
+<p class="muted">Status: {{ ticket.status }}</p>
+{% for m in ticket.messages %}<div class="card">{{ m.body }}</div>{% endfor %}
+<p><a href="/orders">Back</a></p>
+{% endblock %}

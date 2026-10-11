@@ -9,6 +9,9 @@
 // section 6: /version carries no secrets).
 
 import express from 'express';
+import { configureViews } from './web/views.mjs';
+import { loadUser, checkCsrf } from './web/middleware.mjs';
+import { registerRoutes } from './web/routes.mjs';
 
 // Build id and catalogue version are supplied by the environment at run time.
 // They default to "dev" so the skeleton answers even outside an instance.
@@ -23,7 +26,9 @@ function isReady() {
   return true;
 }
 
-export function createApp() {
+// Build the app. Pass { db } to mount the customer-facing shop (T-14); without
+// a db only the health endpoints are served (the T-01 skeleton / health tests).
+export function createApp({ db } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -48,6 +53,15 @@ export function createApp() {
   app.get('/version', (_req, res) => {
     res.status(200).json({ build: BUILD_ID, catalogue_version: CATALOGUE_VERSION });
   });
+
+  // The customer-facing marketplace (T-14), mounted only when a db is given.
+  if (db) {
+    configureViews(app);
+    app.use(express.urlencoded({ extended: false }));
+    app.use(loadUser(db));
+    app.use(checkCsrf);
+    registerRoutes(app, db);
+  }
 
   // Terminal handler: unknown routes return a JSON body, never a stack trace
   // (instance contract error-body style: code, message).

@@ -13,3 +13,7 @@
 
 - No brute-force throttling, lockout, or attempt accounting in `authenticate`. Deferred: lockout and security-event emission belong to the login flow (T-14) and interact with C07 (weak password reset) and C09 (unlogged legacy login). The `needsRehash` seam and `security_events`/`alerts` tables are in place for that work.
 - Rehash-on-successful-login (using `needsRehash`) is wired by the login flow (T-14), not the identity primitives.
+
+## Deferred from: code review of story-customer-flows-plan (2026-10-11)
+
+- No login throttling/lockout or security-event emission on `/login` (T-14). Deferred: the attempt-logging and lockout model is entangled with C09 (what gets logged) and C07 (password reset); design it alongside the C09 logging story. The `security_events`/`alerts` tables and the `needsRehash` seam are ready.

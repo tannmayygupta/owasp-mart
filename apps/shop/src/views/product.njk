@@ -1,0 +1,20 @@
+{% extends "layout.njk" %}
+{% block title %}{{ product.title }}{% endblock %}
+{% block body %}
+<div class="card">
+  <h1>{{ product.title }}</h1>
+  <p class="muted">{{ product.description }}</p>
+  <p class="price">{{ product.price_cents | cents }}</p>
+  {% if user %}
+  <form method="post" action="/cart/add">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="product_id" value="{{ product.id }}">
+    <input type="number" name="qty" value="1" min="1" style="width:4rem">
+    <button>Add to cart</button>
+  </form>
+  {% else %}<p><a href="/login">Log in</a> to buy.</p>{% endif %}
+  <h3>Reviews</h3>
+  {% for r in reviews %}<div class="card"><strong>{{ r.rating }}/5</strong><p>{{ r.body }}</p></div>
+  {% else %}<p class="muted">No reviews yet.</p>{% endfor %}
+</div>
+{% endblock %}

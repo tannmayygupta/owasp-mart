@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "VulnMart target shop (Express marketplace). T-01 skeleton: health endpoints only.",
+  "description": "VulnMart target shop (Express marketplace, SQLite, server-rendered).",
   "main": "src/server.mjs",
   "scripts": {
     "start": "node src/server.mjs",
@@ -12,7 +12,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "express": "5.2.1"
+    "express": "5.2.1",
+    "nunjucks": "3.2.4"
   },
   "engines": {
     "node": ">=24 <25"

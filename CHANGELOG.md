@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-14 customer flows, 2026-10-11, Sahil)
+- `apps/shop/` customer experience (FR-SHP-05): server-rendered Nunjucks pages (autoescape) and Express routes over the data model, identity and seed, with a signed-cookie session (Node crypto), CSRF on every POST, and a `shop-service` domain layer. A customer can log in, browse/search, fill a cart, check out with simulated payment (atomic: product/stock re-validation, commission, stock decrement), track orders, review purchased items, request refunds, open disputes and create tickets — all permission-checked and per-customer scoped. `nunjucks` 3.2.4 added; CI app-tests run `apps/*/test/**`. 18 end-to-end tests. Correct flow only; C01/C03/C04 weaknesses are later.
+
 ### Added (T-08 snapshot seeding mechanism, 2026-10-09, Sahil)
 - `apps/shop/seed/`: a per-epic seed registry that discovers `contributions/NNN-*.mjs` in numeric order and runs them in one transaction, a deterministic baseline world (users, stores, categories, products with fixed timestamps), and a `build-snapshot` CLI (`pnpm run snapshot`) that migrates a fresh SQLite db, seeds it, and reports dynamic row counts and build time (~320 ms). Later epics add seed data by dropping a file, no shared-file edits. Snapshot is a gitignored CI artifact. 7 tests. Covers FR-SHP-12.
 
