@@ -597,6 +597,10 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 ### D-47 - IF-5 and IF-2 error bodies are RFC 9457 problem details; IF-5 reports carry a transition number; integers are strict (story 1.15, ADR 0028)
 - **Decision (developer's delegation, 2026-10-11; the RFC 9457 adoption itself was decided by the developer on 2026-10-09, story 1.12, now folded into story 1.15):** error bodies use `application/problem+json` with an open schema (`type`, `title`, `status`, `detail`, `instance` plus `code`, `request_id`, `field`); `StateReport` has a required `transition` number per instance and epoch; integers on the wire must be integer tokens (no `1.0`, `1e0`, booleans); IF-2 uses a stable `(epoch, seq)` cursor and answers the flag oracle only `correct` or `incorrect`. **Open:** the signed, session-bound CSRF token of 1.12 (H-90, H-91) is not built.
 
+### D-52 - Orchestrator engine: Docker SDK builder, in-memory state plus labels, volume keeper (story L-13 part 1, ADR 0033)
+- **Decision (developer's delegation, 2026-10-12: best free option, least tokens):** the engine lives in `apps/orchestrator` (uv workspace member, Docker SDK 7.1.0 pinned in `uv.lock`). Containers are built only from a validated IF-6 template, the fixed runtime profile and an image allowlist (`{image:<role>}` to a digest, source: release manifest of L-12). Create order: network and volumes, volume keeper, injector (document on standard input once, `StdinOnce`), then the other components only after the injector exited 0; `ready` needs that exit and healthy components. State is in memory plus Docker labels (no database; reconciler is story 3.5). States and codes mirror IF-5 and are compared with the OpenAPI enum in a test. Real-Docker tests skip locally without a daemon and fail in CI.
+- **Open:** HTTP service, mTLS, signing and socket proxy (story 3.2); reset and reconciler (3.3, L-14); real release manifest (L-12); healthcheck tools in product images (wget, nc, test).
+
 ---
 
 ## 16. Next steps

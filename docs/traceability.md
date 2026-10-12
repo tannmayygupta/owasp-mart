@@ -104,3 +104,11 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |
 |---|---|---|---|---|---|---|
 | FR-SHP-12 | Deterministic seeded world built as a CI snapshot; per-epic seed mechanism | Done (mechanism + baseline; in-container copy T-09, injector T-04) | `apps/shop/seed/registry.mjs`, `seed/contributions/000-baseline.mjs`, `seed/build-snapshot.mjs` | `apps/shop/test/seed.test.mjs` | snapshot builds in ~320 ms; world deterministic across builds; later epics add seed files without editing shared code | [2026-10-09-sahillroy-t08-snapshot-seeding](dev-log/2026-10-09-sahillroy-t08-snapshot-seeding.md) |
+
+## Orchestrator engine (L-13 part 1)
+| ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |
+|---|---|---|---|---|---|---|
+| FR-INS-01 | Create a private instance from a template (touches H-60, H-61, H-69, H-70, H-71) | Partly done (engine; HTTP service story 3.2) | `apps/orchestrator/src/vulnmart_orchestrator/` | `apps/orchestrator/tests/` (`uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests`) | 92 passed (3 on real Docker), 2026-10-12 | `docs/dev-log/2026-10-12-tannmayygupta-orchestrator-engine.md` |
+| FR-INS-02 | Fixed runtime profile, no request-controlled container (touches NFR-SEC-04) | Done for the builder | `builder.py`, `images.py` | `test_builder.py` (forbidden fields, profile, allowlist) | passed | same |
+| FR-INS-11 | Never ready before flag injection finished | Done in the engine, proven on real Docker with the stub image | `engine.py`, `backend.py` | `test_engine.py`, `test_docker_integration.py` | passed | same |
+| D-52 | Engine design: Docker SDK, in-memory state plus labels, volume keeper (ADR 0033) | Decided on delegation | `docs/adr/0033-orchestrator-engine-docker-builder.md` | as above | n/a | same |

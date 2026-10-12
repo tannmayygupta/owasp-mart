@@ -160,6 +160,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Waits on: L-04, L-08.
   - Done when: An instance is never shown ready before flag injection finished and the cold-start time is measured and recorded (S-4).
   - Handoffs: H-57, H-58, H-59, H-60, H-61, H-64, H-66, H-67, H-68, H-69, H-70, H-71, H-72, H-79 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status (2026-10-12): engine done (state machine, builder, Docker backend, create and destroy; tests on a fake and on real Docker). NOT ticked: story 3.2 (HTTP service), story 3.3 and the cold-start measurement S-4 are open.
 
 - [ ] **L-14. Reset, teardown, timing defaults and reconciler**
   - Epic: `epic-orchestrator-and-instance-lifecycle`

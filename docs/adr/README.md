@@ -30,5 +30,6 @@
 | 0026 | [Trusted base checker for the contract rules](0026-trusted-base-checker-for-contract-rules.md) | Accepted (D-46); not yet proven on GitHub |
 | 0027 | [Labs host isolation, IAM guard and remote state](0027-labs-host-isolation-iam-guard-and-remote-state.md) | Accepted (D-43, D-44; applied and verified live); S3 state prepared (D-45) |
 | 0028 | [IF-5 problem details, state report transition number, strict integers](0028-if5-problem-details-state-report-and-strict-seq.md) | Accepted (D-47) |
+| 0033 | [Orchestrator engine and Docker instance builder](0033-orchestrator-engine-docker-builder.md) | Proposed (D-52, decided on the developer's delegation 2026-10-12) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

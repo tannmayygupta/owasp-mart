@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { preflight, STEPS, NEEDS_INSTALL, NESTED_PYTEST_SWITCH, containerScript, dockerfile, NODE_IMAGE, UV_IMAGE, PNPM_VERSION } from './ci-linux.mjs';
+import { preflight, STEPS, NEEDS_INSTALL, NESTED_PYTEST_SWITCH, SKIP_DOCKER_TESTS_SWITCH, containerScript, dockerfile, NODE_IMAGE, UV_IMAGE, PNPM_VERSION } from './ci-linux.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ci = readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -97,4 +97,10 @@ test('preflight: no .git, a .git file (worktree) and a missing origin/main fail 
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the orchestrator tests run in the job scripts and in ci:linux, which skips the real-Docker ones (no daemon in the container)', () => {
+  assert.ok(jobs.scripts.includes('uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests'));
+  assert.ok(STEPS.some(([name]) => name === 'pytest-orchestrator'));
+  assert.equal(SKIP_DOCKER_TESTS_SWITCH, 'VULNMART_SKIP_DOCKER_TESTS');
 });

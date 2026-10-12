@@ -47,6 +47,7 @@ jobs:
       - run: pnpm run api:check
       - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"
       - run: uv run --locked --package vulnmart-api pytest -q
+      - run: uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
       - run: pnpm run contracts:check
 
 

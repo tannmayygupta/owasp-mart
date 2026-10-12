@@ -1,0 +1,21 @@
+$ uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
+........................................................................ [ 78%]
+....................                                                     [100%]
+92 passed in 22.07s
+$ uv lock --check
+Resolved 67 packages in 3ms
+$ node --test scripts/ci-linux.test.mjs scripts/ci-workflow-shape.test.mjs
+✔ CODEOWNERS covers the files that define the rules engine (1.0006ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 469.2347
+$ node scripts/check-text-files.mjs
+PASS no control character, BOM or mojibake in the tracked text files
+$ node scripts/scan-secrets.mjs
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree
+$ docker ps -a (after the run)
