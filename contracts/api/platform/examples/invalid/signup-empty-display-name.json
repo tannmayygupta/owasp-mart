@@ -1,0 +1,11 @@
+{
+  "schema": "SignupRequest",
+  "body": {
+    "email": "ada@example.invalid",
+    "password": "correct-horse-battery-staple",
+    "display_name": "",
+    "age_declaration": true
+  },
+  "path": "/display_name",
+  "rule": "a name is 1 to 60 characters"
+}

@@ -1,0 +1,8 @@
+{
+  "schema": "MfaCodeRequest",
+  "body": {
+    "code": "abcdef"
+  },
+  "path": "/code",
+  "rule": "six digits"
+}

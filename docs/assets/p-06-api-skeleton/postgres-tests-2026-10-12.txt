@@ -1,0 +1,17 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.8, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\gupta\AppData\Local\vulnmart-venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\gupta\OneDrive\Desktop\mp\owasp-mart
+configfile: pyproject.toml
+plugins: anyio-4.15.1, platformdirs-4.13.0, typeguard-4.6.0
+collecting ... collected 7 items
+
+apps/api/tests/test_kernel_postgres.py::test_the_schema_matches_the_models PASSED [ 14%]
+apps/api/tests/test_kernel_postgres.py::test_the_app_role_owns_nothing_and_cannot_bypass_row_level_security PASSED [ 28%]
+apps/api/tests/test_kernel_postgres.py::test_row_level_security_shows_only_the_organisation_of_the_transaction PASSED [ 42%]
+apps/api/tests/test_kernel_postgres.py::test_the_session_sets_the_scope_per_transaction_and_a_pooled_connection_keeps_nothing PASSED [ 57%]
+apps/api/tests/test_kernel_postgres.py::test_the_settings_and_quota_tables_need_no_scope_and_hold_their_rules PASSED [ 71%]
+apps/api/tests/test_kernel_postgres.py::test_downgrade_to_empty_and_upgrade_again PASSED [ 85%]
+apps/api/tests/test_kernel_postgres.py::test_the_migration_stops_when_the_app_role_does_not_exist PASSED [100%]
+
+============================== 7 passed in 2.64s ==============================

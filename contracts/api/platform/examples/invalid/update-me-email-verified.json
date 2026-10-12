@@ -1,0 +1,8 @@
+{
+  "schema": "UpdateMeRequest",
+  "body": {
+    "email_verified": true
+  },
+  "path": "/email_verified",
+  "rule": "verification is never set by the client"
+}

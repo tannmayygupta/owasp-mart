@@ -1,0 +1,6 @@
+{
+  "schema": "EmailRequest",
+  "body": {
+    "email": "ada@example.invalid"
+  }
+}

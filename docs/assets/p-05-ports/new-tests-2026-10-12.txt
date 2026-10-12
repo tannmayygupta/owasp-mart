@@ -1,0 +1,13 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.8, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\gupta\OneDrive\Desktop\mp\owasp-mart
+configfile: pyproject.toml
+plugins: anyio-4.15.1, platformdirs-4.13.0, typeguard-4.6.0
+collected 80 items
+
+apps\api\tests\test_ports_platform.py .................................. [ 42%]
+...............                                                          [ 61%]
+apps\api\tests\test_ports_lab.py ..........................              [ 93%]
+apps\api\tests\test_table_owners.py .....                                [100%]
+
+============================= 80 passed in 10.08s =============================

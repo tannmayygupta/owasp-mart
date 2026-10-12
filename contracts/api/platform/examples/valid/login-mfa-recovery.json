@@ -1,0 +1,7 @@
+{
+  "schema": "MfaLoginRequest",
+  "body": {
+    "mfa_ticket": "ZmFrZS10b2tlbi1mb3ItZG9jdW1lbnRhdGlvbi1vbmx5",
+    "code": "AAAAAAAAAA"
+  }
+}

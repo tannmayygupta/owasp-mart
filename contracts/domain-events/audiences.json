@@ -1,0 +1,15 @@
+{
+  "contract_version": "0.1.0",
+  "description": "Who may receive which domain event (FR-LIV-05, FR-DSH-06). Decided on the server from the session and the data, never by a client. `user` is the owner of the attempt, `org` the company that owns the assessment of a candidate attempt, `admin` every signed-in admin. The relay resolves these from the attempt; a publisher never names a user or a company by hand. Learner practice never reaches an org (D-05, the privacy wall). While OI-15 (when a candidate sees results) is open, the candidate does not receive their own milestones, captures or score live; the recruiter does.",
+  "audiences": ["user", "org", "admin"],
+  "modes": ["learner", "candidate"],
+  "types": {
+    "instance.state_changed": { "learner": ["user", "admin"], "candidate": ["user", "admin"] },
+    "attempt.state_changed": { "learner": ["user"], "candidate": ["user", "org"] },
+    "attempt.milestone_reached": { "learner": ["user"], "candidate": ["org"] },
+    "attempt.flag_captured": { "learner": ["user"], "candidate": ["org"] },
+    "attempt.score_updated": { "learner": ["user"], "candidate": ["org"] },
+    "attempt.hint_unlocked": { "learner": ["user"], "candidate": ["user", "org"] }
+  },
+  "control": ["stream.resync"]
+}

@@ -1,0 +1,7 @@
+{
+  "type": "urn:vulnmart:error:AUTH-SESSION-REQUIRED",
+  "title": "Your session expired at 10:02",
+  "status": 401,
+  "code": "AUTH-SESSION-REQUIRED",
+  "request_id": "req-0a1b2c3d"
+}

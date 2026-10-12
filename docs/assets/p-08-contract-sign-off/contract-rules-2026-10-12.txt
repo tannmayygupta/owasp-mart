@@ -1,0 +1,18 @@
+PASS            registry: 9 contracts, 15 folders under contracts/ all registered
+PASS            base: compared with origin/main (merge base 768a26b862); 8 file(s) differ
+                NOTICE: no tag contracts-v* exists, so the comparison with the latest tag did not run (only the pull request base is compared)
+PASS            contract[IF-6]: no file of this contract changed
+PASS            contract[IF-4]: no file of this contract changed
+PASS            contract[IF-5]: no file of this contract changed
+PASS            contract[IF-2]: no file of this contract changed
+PASS            contract[IF-1]: no file of this contract changed
+PASS            contract[DB]: no file of this contract changed
+PASS            contract[IF-7]: no file of this contract changed
+PASS            contract[IF-8]: no file of this contract changed
+PASS            contract[IF-3]: no file of this contract changed
+PASS            compat: 9 row(s), every listed version exists
+PASS            table-owners: 43 tables, every owner is a module in CODEOWNERS
+PASS            alembic: one head 0001 in 1 revisions
+PASS            bundle: contracts:bundle:check passed
+
+SUMMARY: 15 PASS, 0 FAIL, 0 NOT-APPLICABLE

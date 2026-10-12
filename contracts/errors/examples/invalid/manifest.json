@@ -1,0 +1,122 @@
+{
+  "missing-request-id.json": {
+    "path": "/request_id",
+    "rule": "request_id is required",
+    "stage": "schema"
+  },
+  "missing-title.json": {
+    "path": "/title",
+    "rule": "title is required",
+    "stage": "schema"
+  },
+  "extra-detail-member.json": {
+    "path": "/detail",
+    "rule": "detail is not used: it could echo input",
+    "stage": "schema"
+  },
+  "extra-stack-trace-member.json": {
+    "path": "/trace",
+    "rule": "no stack trace, no other member (NFR-SEC-03)",
+    "stage": "schema"
+  },
+  "status-200.json": {
+    "path": "/status",
+    "rule": "status is 400 to 599",
+    "stage": "schema"
+  },
+  "status-not-integer.json": {
+    "path": "/status",
+    "rule": "status is an integer",
+    "stage": "schema"
+  },
+  "code-lowercase.json": {
+    "path": "/code",
+    "rule": "code is capitals and hyphens",
+    "stage": "schema"
+  },
+  "type-wrong-prefix.json": {
+    "path": "/type",
+    "rule": "type is urn:vulnmart:error: plus the code",
+    "stage": "schema"
+  },
+  "request-id-too-short.json": {
+    "path": "/request_id",
+    "rule": "request_id is 8 to 64 letters, digits and hyphens",
+    "stage": "schema"
+  },
+  "field-not-a-pointer.json": {
+    "path": "/field",
+    "rule": "field is a JSON Pointer",
+    "stage": "schema"
+  },
+  "errors-empty.json": {
+    "path": "/errors",
+    "rule": "errors has at least one entry",
+    "stage": "schema"
+  },
+  "errors-echoes-value.json": {
+    "path": "/errors/0/value",
+    "rule": "an error entry never carries the submitted value",
+    "stage": "schema"
+  },
+  "unknown-code.json": {
+    "path": "/code",
+    "rule": "the code is not in the registry",
+    "stage": "registry"
+  },
+  "status-differs-from-registry.json": {
+    "path": "/status",
+    "rule": "status must equal the registry status of the code",
+    "stage": "registry"
+  },
+  "title-differs-from-registry.json": {
+    "path": "/title",
+    "rule": "title must equal the registry title of the code",
+    "stage": "registry"
+  },
+  "type-differs-from-code.json": {
+    "path": "/type",
+    "rule": "type must be urn:vulnmart:error: plus the same code",
+    "stage": "registry"
+  },
+  "status-600.json": {
+    "path": "/status",
+    "rule": "status is 400 to 599",
+    "stage": "schema"
+  },
+  "request-id-illegal-chars.json": {
+    "path": "/request_id",
+    "rule": "request_id is 8 to 64 letters, digits and hyphens",
+    "stage": "schema"
+  },
+  "errors-too-many.json": {
+    "path": "/errors",
+    "rule": "errors has at most 50 entries",
+    "stage": "schema"
+  },
+  "field-bad-escape.json": {
+    "path": "/field",
+    "rule": "a JSON Pointer escapes only ~0 and ~1",
+    "stage": "schema"
+  },
+  "errors-pointer-bad-escape.json": {
+    "path": "/errors/0/pointer",
+    "rule": "a JSON Pointer escapes only ~0 and ~1",
+    "stage": "schema"
+  },
+  "errors-on-a-non-422.json": {
+    "path": "/errors",
+    "rule": "errors is only for a 422",
+    "stage": "registry"
+  },
+  "field-on-a-non-422.json": {
+    "path": "/field",
+    "rule": "field is only for a 422",
+    "stage": "registry"
+  },
+  "field-and-errors-together.json": {
+    "path": "/field",
+    "rule": "field and errors are exclusive",
+    "stage": "registry"
+  }
+}

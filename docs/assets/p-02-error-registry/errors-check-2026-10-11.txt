@@ -1,0 +1,10 @@
+pnpm.exe : $ node scripts/validate-errors.mjs && node scripts/generate-error-codes.mjs --check
+At C:\Users\gupta\AppData\Roaming\npm\pnpm.ps1:14 char:3
++   & "$basedir/node_modules/pnpm/pnpm.exe"   $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ($ node scripts/...des.mjs --check:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+OK: 48 codes, 7 valid and 24 invalid example bodies.
+OK: generated files are current (48 codes).
+

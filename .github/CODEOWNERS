@@ -7,12 +7,14 @@
 /contracts/api/platform/            @akshaay29
 /contracts/api/lab/                 @tannmayygupta
 /contracts/events/                  @tannmayygupta
+/contracts/domain-events/           @akshaay29 @tannmayygupta
 /contracts/orchestrator/            @tannmayygupta
 /contracts/instance/                @tannmayygupta @sahillroy
 /contracts/catalog/                 @sahillroy
 /contracts/errors/                  @akshaay29
 /contracts/db/                      @akshaay29
 /contracts/mocks/                   @tannmayygupta
+/contracts/mocks/platform-mock/      @akshaay29
 /apps/api/src/vulnmart/kernel/      @akshaay29
 /apps/api/src/vulnmart/ports/       @akshaay29 @tannmayygupta
 /apps/api/src/vulnmart/accounts/    @akshaay29

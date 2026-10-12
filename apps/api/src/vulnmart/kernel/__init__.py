@@ -1,0 +1,1 @@
+"""Session and organisation scope, audit, outbox, key service and settings: the small shared core (architecture 07 section 1). Owned by stream P; its tables are listed in contracts/db/table-owners.yaml."""
