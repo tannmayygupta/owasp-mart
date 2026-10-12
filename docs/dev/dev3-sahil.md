@@ -61,7 +61,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Done when: Review comments are merged or answered and you have signed the versions you build against.
   - Handoffs: H-24 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-04. Shop skeleton meets the instance contract in the lab harness**
+- [x] **T-04. Shop skeleton meets the instance contract in the lab harness**
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.4` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Make the skeleton ready only after the injector marker, serve a planted flag and emit one app event inside the lab harness.

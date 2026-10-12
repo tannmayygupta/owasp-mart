@@ -33,7 +33,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton exist and are signed off.
 
-- [ ] **P-01. Platform stack runs end to end locally (tracer bullet)**
+- [x] **P-01. Platform stack runs end to end locally (tracer bullet)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Postgres, API, worker, Valkey and the dashboards start with `node scripts/dev.mjs`, and a request passes dashboards, API and database.
@@ -41,7 +41,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Waits on: L-01 (repository skeleton and Compose profiles).
   - Done when: A hello request works through the whole local stack and the developer environment on your Mac is verified.
 
-- [ ] **P-02. Error registry and problem-details format (IF-8)**
+- [x] **P-02. Error registry and problem-details format (IF-8)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the shared error codes and the problem-details response format.
@@ -50,7 +50,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The registry validates and a test shows an API error in the agreed format.
   - Handoffs: H-01, H-02, H-03, H-04, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-03. Domain event schema (IF-3) with fixtures and replay script**
+- [x] **P-03. Domain event schema (IF-3) with fixtures and replay script**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the platform domain events, fixtures and a replay script.
@@ -59,7 +59,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: Every fixture validates, the replay script emits them in order to a local consumer and the validation runs in CI.
   - Handoffs: H-22 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-04. Platform and lab API fragments, bundle, mock and generated clients (IF-1, IF-2)**
+- [x] **P-04. Platform and lab API fragments, bundle, mock and generated clients (IF-1, IF-2)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.4` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Write the platform API fragment, bundle it with the lab fragment, a mock server and generated clients.
@@ -68,7 +68,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The bundle validates, the mock answers every endpoint and clients are generated in CI.
   - Handoffs: H-12, H-13, H-14, H-16, H-17, H-19, H-20, H-23, H-84, H-85, H-86, H-87, H-88, H-89, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
+- [x] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the ports the platform provides (AuditPort, OutboxPort, KeyPort, ScopePort, SettingsPort, QuotaPort) as Python protocols with in-memory fakes, fakes of the lab ports and the table-owners file.
@@ -77,7 +77,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: Tests run against the fakes and the table-owners file validates (the CI ownership check is Tanmay's L-07).
   - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21, H-83, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-06. API skeleton: kernel and single-head migrations**
+- [x] **P-06. API skeleton: kernel and single-head migrations**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.6` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Settings, session and organisation scope, audit, outbox and key-service stubs, request IDs and structured logs, health, readiness and version endpoints, one Alembic history.
@@ -86,7 +86,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The API starts against Postgres, `alembic heads` shows one head and a scope test refuses a query without an organisation filter.
   - Handoffs: H-05, H-07, H-16, H-19, H-22, H-23 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-07. Dashboards skeleton with the same-origin proxy (local)**
+- [x] **P-07. Dashboards skeleton with the same-origin proxy (local)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.7` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Next.js skeleton with the `/api/*` proxy, origin secret header, no-store and security headers, run locally.

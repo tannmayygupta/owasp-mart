@@ -9,7 +9,7 @@
 | Report tag | contracts, change rules, CI |
 
 ## Requirements covered
-LB-8, D-37, D-46, D-48 (new), EF-30, handoffs H-58, H-80, H-81, H-82 and the other Tanmay rows, H-113, H-114.
+LB-8, D-37, D-46, D-48 (new), EF-30, handoffs H-58, H-80, H-81, H-82 and the other Tanmay rows, H-120, H-121.
 
 ## Summary
 The contracts cannot be tagged until Akshay (P-08) and Sahil (T-03) sign off. Everything that does not need them is built and tested: `contracts/COMPAT.md`, a CI rule that checks approvals after the tag, a tag script, closed handoffs and the documents. The tag is the last open box.
@@ -24,7 +24,7 @@ Architecture 07 rules 2 and 3 need approvals after the tag, and branch protectio
 - CI: a step with `pull-requests: read` writes the reviews with `gh api --paginate --slurp`; the checker gets `--reviews`, `--require-reviews`, `--pr-author`.
 - `scripts/tag-contracts.mjs`: preconditions, `--dry-run` (default), `--create` (local tag only), never pushes.
 - Contract text: IF-6 duplicate `0.2.0` renumbered `0.3.0`; entries IF-4 0.2.1 and IF-6 0.3.1; IF-4 open point 4 corrected (epoch checks, store-full); owners of IF-4 points 3, 4, 13, 14, 19, 20, 22, 27, 28 and IF-6 points 20, 21, 26 marked confirmed.
-- HANDOFFS: Tanmay's rows answered, stale rows H-04, H-07, H-08, H-09, H-59, H-83, H-93, H-94 corrected, H-61 and H-72 moved to the after-the-tag list (need a host check or spikes), H-113 and H-114 added, 13 checklist boxes ticked.
+- HANDOFFS: Tanmay's rows answered, stale rows H-04, H-07, H-08, H-09, H-59, H-83, H-93, H-94 corrected, H-61 and H-72 moved to the after-the-tag list (need a host check or spikes), H-120 and H-121 added, 13 checklist boxes ticked.
 - ADR 0029, ADR 0024 revisit note, runbook, message for Akshay and Sahil, D-48.
 
 ## How it works
@@ -63,7 +63,7 @@ No vulnerable part. Threat model of the token step and the reviews file:
 After review: the rule approvals now FAILs when nobody but the author is listed, when another listed person's latest review requests changes, and when a tag exists but the base has no COMPAT.md; loadReviews skips comments and pending reviews before checking fields; contracts/COMPAT.md is a guarded file with a CODEOWNERS entry; the reviews step has continue-on-error; the shape test parses the workflow with js-yaml; tag-contracts has the preconditions up-to-date and release-labels (all contracts 1.0.0, one release commit before the tag, decided on delegation, ADR 0029); docs wording and runbook content updated. IF-6 renumbering check: the live references to the template hardening were root CHANGELOG, handoff H-108 and the message to Sahil (fixed to 0.3.0); ADR 0025 and H-93/H-94 refer to the real 0.2.0 (sidecar start) and stay; contracts/instance/instance-contract.md still says Version 0.1.0 in its header (stale before this story, not changed); schemas and the examples manifest carry no contract version.
 
 ## Limitations and follow-ups
-- The tag is not made. Waits for H-113, H-114 and the unticked boxes (H-01 to H-23 etc., H-79, H-81, H-80).
+- The tag is not made. Waits for H-120, H-121 and the unticked boxes (H-01 to H-23 etc., H-79, H-81, H-80).
 - Not run on GitHub: `gh api --paginate --slurp` and the review JSON shape are from general knowledge.
 - Open: renumber contracts to 1.0.0 at the tag? Does branch protection enforce reviews? Is a consumer-author excused from the BREAKING list (chosen: yes)?
 - A stricter check than the plan: an approval is also stale if the working tree differs from the reviewed commit (same result in CI).

@@ -42,6 +42,8 @@ After the tag, a pull request that changes the files of a contract needs: one ap
 | DB | L | @tannmayygupta | consumer | 0.1.0 | - | pending |
 | DB | T | @sahillroy | consumer | 0.1.0 | - | pending |
 
+Stream P recorded its review in story P-08 (`docs/reviews/2026-10-12-p08-contract-sign-off.md`) against IF-4 0.2.0, IF-6 0.2.0 and DB 0.2.0, which are older than the versions above, and with a condition (F-2: the IF-2, IF-4 and IF-5 error bodies move to IF-8 before the tag). The Akshay rows stay `pending` until he confirms the current versions.
+
 ## Tag preconditions
 
 `node scripts/tag-contracts.mjs --dry-run` checks all of these and lists every one that fails. It never pushes.

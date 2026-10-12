@@ -1,0 +1,7 @@
+{
+  "schema": "LoginRequest",
+  "body": {
+    "email": "ada@example.invalid",
+    "password": "correct-horse-battery-staple"
+  }
+}

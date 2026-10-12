@@ -1,0 +1,326 @@
+$ node scripts/validate-contracts.mjs && node scripts/validate-events.mjs && uv run --locked --package vulnmart-api python scripts/check_orchestrator_contract.py && uv run --locked --package vulnmart-api python scripts/check_lab_contract.py && uv run --locked --package vulnmart-api python scripts/check_platform_contract.py
+schema ok: injection-document.schema.json
+schema ok: flags-file.schema.json
+schema ok: instance-template.schema.json
+schema ok: sidecar-start.schema.json
+contract text checked: instance-contract.md
+invalid example rejected at /flags/0/flag: examples/invalid/flags-file/bad-flag-format.json
+invalid example rejected at /instance_id: examples/invalid/flags-file/bad-instance-id.json
+invalid example rejected at /schema_version: examples/invalid/flags-file/bad-schema-version.json
+invalid example rejected at /flags/1/challenge_key: examples/invalid/flags-file/duplicate-challenge-key.json
+invalid example rejected at /event_key: examples/invalid/flags-file/extra-property.json
+invalid example rejected at /epoch: examples/invalid/flags-file/missing-epoch.json
+invalid example rejected at /flags/0/challenge_key: examples/invalid/injection-document/bad-challenge-key.json
+invalid example rejected at /decoys/0/value: examples/invalid/injection-document/bad-decoy-format.json
+invalid example rejected at /flags/0/flag: examples/invalid/injection-document/bad-flag-format.json
+invalid example rejected at /instance_id: examples/invalid/injection-document/bad-instance-id.json
+invalid example rejected at /issued_at: examples/invalid/injection-document/bad-issued-at.json
+invalid example rejected at /schema_version: examples/invalid/injection-document/bad-schema-version.json
+invalid example rejected at /decoys/2/challenge_key: examples/invalid/injection-document/decoy-challenge-not-in-flags.json
+invalid example rejected at /decoys/0/value: examples/invalid/injection-document/decoy-equals-flag.json
+invalid example rejected at /decoys/1/value: examples/invalid/injection-document/decoy-value-repeated.json
+invalid example rejected at /flags/1/challenge_key: examples/invalid/injection-document/duplicate-challenge-key.json
+invalid example rejected at /decoys/1/index: examples/invalid/injection-document/duplicate-decoy-index.json
+invalid example rejected at /flags: examples/invalid/injection-document/empty-flags.json
+invalid example rejected at /event_key: examples/invalid/injection-document/extra-property.json
+invalid example rejected at /flags/1/flag: examples/invalid/injection-document/flag-value-repeated.json
+invalid example rejected at /flags/0/flag: examples/invalid/injection-document/lowercase-flag.json
+invalid example rejected at /epoch: examples/invalid/injection-document/missing-epoch.json
+invalid example rejected at /seed: examples/invalid/injection-document/missing-seed.json
+invalid example rejected at /decoys/0/index: examples/invalid/injection-document/negative-decoy-index.json
+invalid example rejected at /epoch: examples/invalid/injection-document/non-numeric-epoch.json
+invalid example rejected at /seed: examples/invalid/injection-document/seed-bad-characters.json
+invalid example rejected at /seed: examples/invalid/injection-document/short-seed.json
+invalid example rejected at /flags: examples/invalid/injection-document/twelve-flags.json
+invalid example rejected at /epoch: examples/invalid/injection-document/zero-epoch.json
+invalid example rejected at /components/0/mounts/2/source: examples/invalid/instance-template/anonymous-volume.json
+invalid example rejected at /components/0/labels/vm.owner: examples/invalid/instance-template/bad-owner-label.json
+invalid example rejected at /schema_version: examples/invalid/instance-template/bad-schema-version.json
+invalid example rejected at /template_id: examples/invalid/instance-template/bad-template-id.json
+invalid example rejected at /components/5/mounts/1/target: examples/invalid/instance-template/bot-controller-mounts-run-import.json
+invalid example rejected at /components/5/network_mode: examples/invalid/instance-template/bot-controller-network-none.json
+invalid example rejected at /components/0/cap_add: examples/invalid/instance-template/cap-add.json
+invalid example rejected at /components/0/cap_drop: examples/invalid/instance-template/cap-drop-empty.json
+invalid example rejected at /components/0/cap_drop: examples/invalid/instance-template/cap-drop-missing.json
+invalid example rejected at /components/1/name: examples/invalid/instance-template/component-name-other-role.json
+invalid example rejected at /components/0/name: examples/invalid/instance-template/component-name-unknown.json
+invalid example rejected at /components/0/cpu_limit: examples/invalid/instance-template/cpu-limit-too-large.json
+invalid example rejected at /components/0/cpu_limit: examples/invalid/instance-template/cpu-limit-zero.json
+invalid example rejected at /components/1/name: examples/invalid/instance-template/duplicate-component-name.json
+invalid example rejected at /components/0/mounts/1/target: examples/invalid/instance-template/duplicate-mount-target.json
+invalid example rejected at /components/0/ports: examples/invalid/instance-template/duplicate-port.json
+invalid example rejected at /components: examples/invalid/instance-template/duplicate-role.json
+invalid example rejected at /volumes/1/name: examples/invalid/instance-template/duplicate-volume-name.json
+invalid example rejected at /components/0/egress: examples/invalid/instance-template/egress-true.json
+invalid example rejected at /components/0/env/VM_DB_PATH: examples/invalid/instance-template/env-db-path-outside-data.json
+invalid example rejected at /components/2/env: examples/invalid/instance-template/env-empty.json
+invalid example rejected at /components/0/env/VM_LOG_LEVEL: examples/invalid/instance-template/env-flag-in-value.json
+invalid example rejected at /components/0/env/VM_FLAG_C01: examples/invalid/instance-template/env-flag-name.json
+invalid example rejected at /components/0/env/VM_FLAGS_PATH: examples/invalid/instance-template/env-flags-path-traversal.json
+invalid example rejected at /components/0/env/VM_IMPORT_SOCKET: examples/invalid/instance-template/env-import-socket-elsewhere.json
+invalid example rejected at /components/0/env/EVENT_KEY: examples/invalid/instance-template/env-key-suffix.json
+invalid example rejected at /components/0/env/VM_LOG_LEVEL: examples/invalid/instance-template/env-log-level-unknown.json
+invalid example rejected at /components/0/env/VM_MOCK_URL: examples/invalid/instance-template/env-mock-url-external.json
+invalid example rejected at /components/0/env/ADMIN_PASSWORD: examples/invalid/instance-template/env-password-suffix.json
+invalid example rejected at /components/0/env/PORT: examples/invalid/instance-template/env-port-not-in-ports.json
+invalid example rejected at /components/0/env/VM_PUBLIC_HOST: examples/invalid/instance-template/env-public-host-with-path.json
+invalid example rejected at /components/0/env/DB_SECRET: examples/invalid/instance-template/env-secret-suffix.json
+invalid example rejected at /components/0/env/VM_SIDECAR_EVENTS_URL: examples/invalid/instance-template/env-sidecar-url-external.json
+invalid example rejected at /components/0/env/API_TOKEN: examples/invalid/instance-template/env-token-suffix.json
+invalid example rejected at /components/0/env/TZ: examples/invalid/instance-template/env-tz-path.json
+invalid example rejected at /components/0/env/DATABASE_URL: examples/invalid/instance-template/env-unlisted-name.json
+invalid example rejected at /components/0/env/PORT: examples/invalid/instance-template/env-value-not-string.json
+invalid example rejected at /components/0/env/VM_LOG_LEVEL: examples/invalid/instance-template/env-value-too-long.json
+invalid example rejected at /components/0/flag_delivery_env/env_name: examples/invalid/instance-template/flag-delivery-env-bad-name.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-blank-reason.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-missing-reason.json
+invalid example rejected at /components/0/flag_delivery_env/env_name: examples/invalid/instance-template/flag-delivery-env-name-mismatch.json
+invalid example rejected at /components/1/flag_delivery_env: examples/invalid/instance-template/flag-delivery-env-on-sidecar.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-reason-alternating.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-reason-no-words.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-reason-padded.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-reason-repeated-word.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-reason-space-padded.json
+invalid example rejected at /components/0/flag_delivery_env/reason: examples/invalid/instance-template/flag-delivery-env-short-reason.json
+invalid example rejected at /components/0/healthcheck/path: examples/invalid/instance-template/healthcheck-http-without-path.json
+invalid example rejected at /components/0/healthcheck/path: examples/invalid/instance-template/healthcheck-path-traversal.json
+invalid example rejected at /components/0/healthcheck/port: examples/invalid/instance-template/healthcheck-port-not-in-ports.json
+invalid example rejected at /components/0/healthcheck/timeout_s: examples/invalid/instance-template/healthcheck-timeout-over-interval.json
+invalid example rejected at /components/0/healthcheck/kind: examples/invalid/instance-template/healthcheck-unknown-kind.json
+invalid example rejected at /components/0/mounts/0/type: examples/invalid/instance-template/host-bind-mount.json
+invalid example rejected at /components/0/image: examples/invalid/instance-template/image-not-a-placeholder.json
+invalid example rejected at /components/3/healthcheck/kind: examples/invalid/instance-template/import-service-healthcheck-http.json
+invalid example rejected at /components/3/image: examples/invalid/instance-template/import-service-image-shop.json
+invalid example rejected at /components/3/mounts: examples/invalid/instance-template/import-service-missing-placement.json
+invalid example rejected at /components/3/mounts: examples/invalid/instance-template/import-service-missing-run-import.json
+invalid example rejected at /components/3/mounts: examples/invalid/instance-template/import-service-missing-tmp.json
+invalid example rejected at /components/3/network_mode: examples/invalid/instance-template/import-service-on-instance-network.json
+invalid example rejected at /components/2/image: examples/invalid/instance-template/injector-image-shop.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-placement-import.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-placement-mock.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-run-vm.json
+invalid example rejected at /components/2/mounts: examples/invalid/instance-template/injector-missing-tmp.json
+invalid example rejected at /components/2/network_mode: examples/invalid/instance-template/injector-on-instance-network.json
+invalid example rejected at /components/2/healthcheck: examples/invalid/instance-template/injector-with-healthcheck.json
+invalid example rejected at /components/2/ports: examples/invalid/instance-template/injector-with-ports.json
+invalid example rejected at /components/0/labels/vm.component: examples/invalid/instance-template/label-component-mismatch.json
+invalid example rejected at /components/0/labels/vm.expires: examples/invalid/instance-template/label-expires-bad.json
+invalid example rejected at /components/0/labels/vm.expires: examples/invalid/instance-template/label-expires-feb-30.json
+invalid example rejected at /components/0/labels/vm.expires: examples/invalid/instance-template/label-expires-month-13.json
+invalid example rejected at /components/2/labels/vm.host: examples/invalid/instance-template/label-host-differs.json
+invalid example rejected at /components/1/labels/vm.instance: examples/invalid/instance-template/label-instance-differs.json
+invalid example rejected at /components/0/labels/vm.kind: examples/invalid/instance-template/label-kind-front.json
+invalid example rejected at /components/0/labels/vm.schema: examples/invalid/instance-template/label-schema-other.json
+invalid example rejected at /components/0/labels/vm.template: examples/invalid/instance-template/label-template-mismatch.json
+invalid example rejected at /components/0/memory_mb: examples/invalid/instance-template/memory-below-memory-backed-sizes.json
+invalid example rejected at /components/0/memory_mb: examples/invalid/instance-template/memory-limit-below-16.json
+invalid example rejected at /components/0/memory_mb: examples/invalid/instance-template/memory-limit-too-large.json
+invalid example rejected at /components/0/cpu_limit: examples/invalid/instance-template/missing-cpu-limit.json
+invalid example rejected at /components/0/healthcheck: examples/invalid/instance-template/missing-healthcheck.json
+invalid example rejected at /components: examples/invalid/instance-template/missing-injector-role.json
+invalid example rejected at /components/0/memory_mb: examples/invalid/instance-template/missing-memory-limit.json
+invalid example rejected at /components/0/network_mode: examples/invalid/instance-template/missing-network-mode.json
+invalid example rejected at /components/0/labels/vm.owner: examples/invalid/instance-template/missing-owner-label.json
+invalid example rejected at /components/0/pids_limit: examples/invalid/instance-template/missing-pids-limit.json
+invalid example rejected at /components/1/ports: examples/invalid/instance-template/missing-ports.json
+invalid example rejected at /components: examples/invalid/instance-template/missing-shop-role.json
+invalid example rejected at /components/4/mounts: examples/invalid/instance-template/mock-services-missing-placement.json
+invalid example rejected at /components/4/network_mode: examples/invalid/instance-template/mock-services-network-none.json
+invalid example rejected at /components/0/mounts/1/target: examples/invalid/instance-template/mount-traversal-target.json
+invalid example rejected at /components/0/mounts/1/target: examples/invalid/instance-template/mount-unlisted-target.json
+invalid example rejected at /components/0/no_new_privileges: examples/invalid/instance-template/no-new-privileges-false.json
+invalid example rejected at /components/0/pids_limit: examples/invalid/instance-template/pids-limit-fractional.json
+invalid example rejected at /components/0/pids_limit: examples/invalid/instance-template/pids-limit-too-large.json
+invalid example rejected at /components/0/mounts/4/target: examples/invalid/instance-template/placement-import-mounted-by-shop.json
+invalid example rejected at /components/3/mounts/2/source: examples/invalid/instance-template/placement-import-separate-volume.json
+invalid example rejected at /components/3/mounts/2/read_only: examples/invalid/instance-template/placement-import-writable.json
+invalid example rejected at /components/5/mounts/1/target: examples/invalid/instance-template/placement-mock-mounted-by-bot-controller.json
+invalid example rejected at /components/3/mounts/3/target: examples/invalid/instance-template/placement-mock-mounted-by-import-service.json
+invalid example rejected at /components/4/mounts/1/source: examples/invalid/instance-template/placement-mock-separate-volume.json
+invalid example rejected at /components/3/user: examples/invalid/instance-template/placement-reader-other-user.json
+invalid example rejected at /components/2/mounts/4/source: examples/invalid/instance-template/placement-volumes-same-source.json
+invalid example rejected at /components/0/ports/0: examples/invalid/instance-template/port-out-of-range.json
+invalid example rejected at /components/0/privileged: examples/invalid/instance-template/privileged-missing.json
+invalid example rejected at /components/0/privileged: examples/invalid/instance-template/privileged-true.json
+invalid example rejected at /components/0/read_only: examples/invalid/instance-template/read-only-false.json
+invalid example rejected at /components/3/mounts/1/source: examples/invalid/instance-template/run-import-separate-volumes.json
+invalid example rejected at /components/2/mounts/2/read_only: examples/invalid/instance-template/run-vm-injector-read-only.json
+invalid example rejected at /components/0/mounts/2/source: examples/invalid/instance-template/run-vm-separate-volumes.json
+invalid example rejected at /components/0/mounts/2/read_only: examples/invalid/instance-template/run-vm-shop-writable.json
+invalid example rejected at /components/0/healthcheck/path: examples/invalid/instance-template/shop-healthcheck-healthz.json
+invalid example rejected at /components/0/healthcheck/path: examples/invalid/instance-template/shop-healthcheck-other-path.json
+invalid example rejected at /components/0/healthcheck/kind: examples/invalid/instance-template/shop-healthcheck-tcp.json
+invalid example rejected at /components/0/image: examples/invalid/instance-template/shop-image-injector.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-data.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-run-import.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-run-vm.json
+invalid example rejected at /components/0/mounts: examples/invalid/instance-template/shop-missing-tmp.json
+invalid example rejected at /components/0/network_mode: examples/invalid/instance-template/shop-network-none.json
+invalid example rejected at /components/1/image: examples/invalid/instance-template/sidecar-image-bot-controller.json
+invalid example rejected at /components/1/mounts/1/target: examples/invalid/instance-template/sidecar-mounts-run-vm.json
+invalid example rejected at /components/1/network_mode: examples/invalid/instance-template/sidecar-network-none.json
+invalid example rejected at /extra: examples/invalid/instance-template/template-extra-property.json
+invalid example rejected at /components/0/mounts/2/target: examples/invalid/instance-template/tmpfs-at-run-vm.json
+invalid example rejected at /components/0/mounts/1/size_mb: examples/invalid/instance-template/tmpfs-size-too-large.json
+invalid example rejected at /components/0/mounts/0/read_only: examples/invalid/instance-template/tmpfs-with-read-only.json
+invalid example rejected at /components/0/mounts/2/source: examples/invalid/instance-template/unknown-volume-source.json
+invalid example rejected at /volumes/4: examples/invalid/instance-template/unused-volume.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-group-root.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-name.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-other-nonroot.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-out-of-range.json
+invalid example rejected at /components/0/user: examples/invalid/instance-template/user-root.json
+invalid example rejected at /volumes/2: examples/invalid/instance-template/volume-at-two-targets.json
+invalid example rejected at /volumes/0/memory_backed: examples/invalid/instance-template/volume-not-memory-backed.json
+invalid example rejected at /volumes/0/size_mb: examples/invalid/instance-template/volume-size-too-large.json
+invalid example rejected at /instance_id: examples/invalid/sidecar-start/bad-instance-id.json
+invalid example rejected at /schema_version: examples/invalid/sidecar-start/bad-schema-version.json
+invalid example rejected at /flag_digests/0/challenge_key: examples/invalid/sidecar-start/digest-bad-challenge-key.json
+invalid example rejected at /flag_digests/0/kind: examples/invalid/sidecar-start/digest-bad-kind.json
+invalid example rejected at /flag_digests/1/challenge_key: examples/invalid/sidecar-start/digest-key-and-kind-repeated.json
+invalid example rejected at /flag_digests/0/challenge_key: examples/invalid/sidecar-start/digest-lowercase-challenge-key.json
+invalid example rejected at /flag_digests/0/sha256: examples/invalid/sidecar-start/digest-not-hex.json
+invalid example rejected at /flag_digests/1/sha256: examples/invalid/sidecar-start/digest-repeated.json
+invalid example rejected at /flag_digests/0/sha256: examples/invalid/sidecar-start/digest-uppercase.json
+invalid example rejected at /flag_digests: examples/invalid/sidecar-start/empty-flag-digests.json
+invalid example rejected at /event_key: examples/invalid/sidecar-start/event-key-non-ascii.json
+invalid example rejected at /event_key: examples/invalid/sidecar-start/event-key-too-long.json
+invalid example rejected at /event_key: examples/invalid/sidecar-start/event-key-with-space.json
+invalid example rejected at /seed: examples/invalid/sidecar-start/extra-property.json
+invalid example rejected at /first_seq: examples/invalid/sidecar-start/first-seq-removed.json
+invalid example rejected at /epoch: examples/invalid/sidecar-start/missing-epoch.json
+invalid example rejected at /event_key: examples/invalid/sidecar-start/missing-event-key.json
+invalid example rejected at /flag_digests: examples/invalid/sidecar-start/missing-flag-digests.json
+invalid example rejected at /instance_id: examples/invalid/sidecar-start/missing-instance-id.json
+invalid example rejected at /schema_version: examples/invalid/sidecar-start/missing-schema-version.json
+invalid example rejected at /event_key: examples/invalid/sidecar-start/short-event-key.json
+invalid example rejected at /flag_digests: examples/invalid/sidecar-start/too-many-flag-digests.json
+invalid example rejected at /epoch: examples/invalid/sidecar-start/zero-epoch.json
+valid example ok: examples/valid/flags-file/full.json
+valid example ok: examples/valid/injection-document/full.json
+valid example ok: examples/valid/injection-document/minimal.json
+valid example ok: examples/valid/instance-template/shop-template-flag-delivery-env.json
+valid example ok: examples/valid/instance-template/shop-template.json
+valid example ok: examples/valid/sidecar-start/full.json
+valid example ok: examples/valid/sidecar-start/minimal.json
+checked 4 schemas, 7 valid and 192 invalid examples
+contracts: PASS
+schema ok: instance-events.schema.json
+schema ok: instance-events.posted.schema.json
+catalogue table: 29 types, schema: 29 types
+invalid example rejected at /data/route: examples/invalid/instance-events/auth-attempt-bad-route.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/bad-challenge-key.json
+invalid example rejected at /instance_id: examples/invalid/instance-events/bad-instance-id.json
+invalid example rejected at /schema_version: examples/invalid/instance-events/bad-schema-version.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/bot-source-with-player-session.json
+invalid example rejected at /source: examples/invalid/instance-events/bot-visit-from-shop.json
+invalid example rejected at /data/anomaly_score: examples/invalid/instance-events/crs-match-score-negative.json
+invalid example rejected at /data: examples/invalid/instance-events/data-not-object.json
+invalid example rejected at /epoch: examples/invalid/instance-events/epoch-missing.json
+invalid example rejected at /epoch: examples/invalid/instance-events/epoch-string.json
+invalid example rejected at /epoch: examples/invalid/instance-events/epoch-zero.json
+invalid example rejected at /data/body: examples/invalid/instance-events/evidence-body-too-long.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/evidence-missing-challenge-key.json
+invalid example rejected at /data/note: examples/invalid/instance-events/extra-data-field.json
+invalid example rejected at /actor_role: examples/invalid/instance-events/extra-envelope-field-actor-role.json
+invalid example rejected at /event_id: examples/invalid/instance-events/extra-envelope-field-event-id.json
+invalid example rejected at /data/detail_code: examples/invalid/instance-events/fault-bad-detail-code.json
+invalid example rejected at /data/kind: examples/invalid/instance-events/flag-seen-bad-kind.json
+invalid example rejected at /challenge_key: examples/invalid/instance-events/flag-seen-challenge-key-mismatch.json
+invalid example rejected at /data/challenge_key: examples/invalid/instance-events/flag-seen-foreign-with-challenge-key.json
+invalid example rejected at /data/candidate: examples/invalid/instance-events/flag-seen-raw-candidate.json
+invalid example rejected at /data/challenge_key: examples/invalid/instance-events/flag-seen-real-without-challenge-key.json
+invalid example rejected at /data/candidate_sha256: examples/invalid/instance-events/flag-seen-uppercase-hash.json
+invalid example rejected at /data/body: examples/invalid/instance-events/flag-value-in-evidence-body.json
+invalid example rejected at /data/headers_redacted/cookie: examples/invalid/instance-events/flag-value-in-header.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-in-route.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-lowercase.json
+invalid example rejected at /data/route_template: examples/invalid/instance-events/flag-value-url-encoded.json
+invalid example rejected at /data/challenge_ids: examples/invalid/instance-events/flags-injected-duplicate-keys.json
+invalid example rejected at /data/challenge_ids: examples/invalid/instance-events/flags-injected-empty.json
+invalid example rejected at /source: examples/invalid/instance-events/flags-injected-from-shop.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/flags-injected-player-session.json
+invalid example rejected at /data/result: examples/invalid/instance-events/giftcard-bad-result.json
+invalid example rejected at /data/url_class: examples/invalid/instance-events/importer-bad-url-class.json
+invalid example rejected at /data/outcome: examples/invalid/instance-events/kyc-bad-outcome.json
+invalid example rejected at /data/status: examples/invalid/instance-events/missing-data-field.json
+invalid example rejected at /data: examples/invalid/instance-events/missing-data.json
+invalid example rejected at /instance_id: examples/invalid/instance-events/missing-instance-id.json
+invalid example rejected at /user_id: examples/invalid/instance-events/missing-user-id.json
+invalid example rejected at /seq: examples/invalid/instance-events/orchestrator-seq-1.json
+invalid example rejected at /seq: examples/invalid/instance-events/orchestrator-seq-in-platform-lane.json
+invalid example rejected at /seq: examples/invalid/instance-events/platform-seq-in-orchestrator-lane.json
+invalid example rejected at /data/amount: examples/invalid/instance-events/refund-negative-amount.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-missing.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-string.json
+invalid example rejected at /seq: examples/invalid/instance-events/seq-zero.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/session-kind-internal-from-shop.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/session-kind-internal-from-sidecar.json
+invalid example rejected at /seq: examples/invalid/instance-events/sidecar-seq-in-reserved-lane.json
+invalid example rejected at /source: examples/invalid/instance-events/source-not-allowed-for-type.json
+invalid example rejected at /data/status: examples/invalid/instance-events/status-out-of-range.json
+invalid example rejected at /ts: examples/invalid/instance-events/ts-not-a-date.json
+invalid example rejected at /ts: examples/invalid/instance-events/ts-not-utc.json
+invalid example rejected at /session_kind: examples/invalid/instance-events/unknown-session-kind.json
+invalid example rejected at /source: examples/invalid/instance-events/unknown-source.json
+invalid example rejected at /type: examples/invalid/instance-events/unknown-type.json
+invalid example rejected at /user_id: examples/invalid/instance-events/user-id-number.json
+invalid example rejected at /data/status: examples/invalid/instance-events/wrong-data-type.json
+invalid example rejected at /data/body: examples/invalid/posted/evidence-body-over-2-kib.json
+invalid example rejected at /data/user_id: examples/invalid/posted/flag-value-in-data.json
+invalid example rejected at /epoch: examples/invalid/posted/includes-epoch.json
+invalid example rejected at /instance_id: examples/invalid/posted/includes-instance-id.json
+invalid example rejected at /seq: examples/invalid/posted/includes-seq.json
+invalid example rejected at /type: examples/invalid/posted/missing-type.json
+invalid example rejected at /source: examples/invalid/posted/shop-posts-bot-visit.json
+invalid example rejected at /source: examples/invalid/posted/shop-posts-proxy-request.json
+invalid example rejected at /source: examples/invalid/posted/source-orchestrator-refused.json
+invalid example rejected at /source: examples/invalid/posted/source-sidecar-refused.json
+invalid example rejected at /type: examples/invalid/posted/unknown-type.json
+envelope example accepted (202): examples/valid/envelopes/evidence-capture.json
+envelope example accepted (202): examples/valid/envelopes/proxy-flag_seen.json
+envelope example accepted (202): examples/valid/envelopes/proxy-request.json
+valid example ok: examples/valid/instance-events/auth.attempt.json
+valid example ok: examples/valid/instance-events/auth.password_reset_completed.json
+valid example ok: examples/valid/instance-events/auth.reset_confirm_batch.json
+valid example ok: examples/valid/instance-events/auth.reset_requested.json
+valid example ok: examples/valid/instance-events/bot.visit.json
+valid example ok: examples/valid/instance-events/collector.hit.json
+valid example ok: examples/valid/instance-events/evidence.capture.json
+valid example ok: examples/valid/instance-events/gateway.ledger_entry.json
+valid example ok: examples/valid/instance-events/import.job.json
+valid example ok: examples/valid/instance-events/importer.fetch_attempt.json
+valid example ok: examples/valid/instance-events/infrastructure_fault.json
+valid example ok: examples/valid/instance-events/instance.flags_injected.json
+valid example ok: examples/valid/instance-events/kyc.result.json
+valid example ok: examples/valid/instance-events/meta.request_served.json
+valid example ok: examples/valid/instance-events/ops.page_served.json
+valid example ok: examples/valid/instance-events/order.paid.json
+valid example ok: examples/valid/instance-events/proxy.crs_match.json
+valid example ok: examples/valid/instance-events/proxy.flag_seen.json
+valid example ok: examples/valid/instance-events/proxy.request.json
+valid example ok: examples/valid/instance-events/shop.catalog_query_error.json
+valid example ok: examples/valid/instance-events/shop.cross_store_order_read.json
+valid example ok: examples/valid/instance-events/shop.giftcard_attempt.json
+valid example ok: examples/valid/instance-events/shop.refund_decision.json
+valid example ok: examples/valid/instance-events/shop.refund_invariant_broken.json
+valid example ok: examples/valid/instance-events/shop.security_event_written.json
+valid example ok: examples/valid/instance-events/shop.ticket_markup_stored.json
+valid example ok: examples/valid/instance-events/shop.verbose_error.json
+valid example ok: examples/valid/instance-events/store.approved.json
+valid example ok: examples/valid/instance-events/webhook.received.json
+valid posted body ok: examples/valid/posted/bot.visit.json
+valid posted body ok: examples/valid/posted/collector.hit.json
+valid posted body ok: examples/valid/posted/evidence.capture.json
+valid posted body ok: examples/valid/posted/import.job.json
+valid posted body ok: examples/valid/posted/shop.cross_store_order_read.json
+valid posted body ok: examples/valid/posted/shop.refund_decision.json
+event key vector: 4 of 4 cases recomputed
+fake ingest: 44 of 44 matrix checks as expected
+checked 1 schema, 29 event types, 29 valid events, 3 signed envelopes, 6 valid posted bodies and 69 invalid examples
+events: PASS
+orchestrator contract: checked 8 operations, 18 valid and 69 invalid examples
+orchestrator contract: PASS
+lab contract: checked 18 operations, 38 valid and 101 invalid examples
+lab contract: PASS
+OK: platform fragment 25 operations; bundle valid.

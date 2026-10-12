@@ -1,0 +1,11 @@
+{
+  "schema": "SignupRequest",
+  "body": {
+    "email": "not-an-email",
+    "password": "correct-horse-battery-staple",
+    "display_name": "Ada Learner",
+    "age_declaration": true
+  },
+  "path": "/email",
+  "rule": "an email address"
+}

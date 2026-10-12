@@ -20,6 +20,8 @@ Three documents described an instance event differently: architecture 07 section
 ## Consequences
 Easier: one contract that every component can be built and tested against; a fake ingest and a check command exist before any real component. Harder: Akshay widens the `events.source` column and drops `event_id` from the milestones reference in a migration; the sidecar must number events across resets without repeating a `seq` (open points 8 and 9). Challenge specs section 10 still shows the older envelope; IF-4 supersedes it (the file itself was not edited by this task).
 
+Update 2026-10-12 (story P-08, decision F-1): the `events` table is owned by stream L (`contracts/db/table-owners.yaml`), so Tanmay writes its migration in the one Alembic history and Akshay approves it; the identity is `(instance_id, epoch, seq)` (D-42). The sentence above that Akshay widens the column is superseded on this point.
+
 ## Evidence
 - Architecture 02, 03, 04 (events table, section 11), 05 (lines 160 to 185), 06, 07 section 3.2 item 6 and 3.6; challenge specs section 10; ADR 0005 and 0009; `docs/research/RS-B-isolation-orchestration.md` lines 166 to 175 (HMAC header idea, research only).
 - HMAC over a body digest with an instance-scoped key is the usual signed-webhook pattern; no primary source was read for it. UNVERIFIED: the exact key derivation (ADR 0009), clock skew and size caps.

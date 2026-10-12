@@ -3,7 +3,7 @@
 Decision: `docs/adr/0029-contract-approvals-by-ci-and-tag-procedure.md`. Table of versions and approvers: `contracts/COMPAT.md`. Owner: Tanmay.
 
 ## Before the tag
-1. Akshay (P-08, handoff H-113) and Sahil (T-03, handoff H-114) read the contracts and confirm their handoff rows.
+1. Akshay (P-08, handoff H-120) and Sahil (T-03, handoff H-121) read the contracts and confirm their handoff rows.
 2. Tanmay confirms the remaining handoffs and ticks each line of "Done checklist before contracts-v1.0.0 (L-09)" in `docs/dev/HANDOFFS.md`. The last line, H-80, is the tag decision.
 3. **Release commit (one pull request).** Relabel every contract 1.0.0: each contract's section in `contracts/CHANGELOG.md` gets a `1.0.0` entry "first stable release, no content change"; the Versions table and the Approvals versions in `contracts/COMPAT.md` become `1.0.0`; the edit of COMPAT.md needs a `registry change:` line in `contracts/CHANGELOG.md`. The approvers confirm by approving this pull request: set their own Approvals rows to `approved` with the date in it (the rows of the base copy count, so each approver's own row is set in this pull request and merged with it).
    - A review must be "Approve" (not "Comment"), given after the last push to the contract files. There is no review trigger: after approving, someone must re-run the job `contract-rules`. Merging `main` into the branch after an approval can make that approval stale; approve again.

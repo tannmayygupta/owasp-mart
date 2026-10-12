@@ -1,0 +1,7 @@
+{
+  "type": "urn:vulnmart:error:REQ-INTERNAL",
+  "title": "Something went wrong. Try again later.",
+  "status": 500,
+  "code": "REQ-INTERNAL",
+  "request_id": "req-0a1b2c3d"
+}

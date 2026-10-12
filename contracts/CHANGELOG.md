@@ -10,6 +10,48 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
 
+## Platform API (IF-1), `contracts/api/platform/`
+
+### 0.1.0 (2026-10-11, Akshay, story P-04)
+- registry change: IF-1 is registered in `contracts/registry.json` (new contract; `contracts/api/platform` was a reserved folder, now owned by stream P with its OpenAPI file, mock, conformance scripts and generated code).- First draft: `platform.openapi.yaml` (OpenAPI 3.1, 25 operations on 21 paths under `/api/v1/`): health; account creation and e-mail verification; session (sign in, MFA step, read, sign out); profile, password and MFA enrolment; password reset; consent notice and record; challenge catalogue; own attempts; live stream (`GET /live` as SSE, `GET /live/snapshot`, `POST /live/ticket` marked `x-pending` until story S-14). Session cookie `__Host-vm_session`, CSRF header `X-CSRF-Token` on every authenticated unsafe call (public ones have no session and no token, but the Origin check and a rate limit), every error is the closed IF-8 body (`application/problem+json`), public operations say `security: []`, every answer says `Cache-Control: private, no-store`. Every authenticated state-changing route that takes a body also declares 429.
+- Bundle: `contracts/api/bundle/openapi.json` (43 operations: this fragment plus IF-2, written by `node scripts/bundle-openapi.mjs`, proven current by `pnpm run contracts:bundle:check`). IF-2 components that differ from a platform component of the same name are renamed with the prefix `Lab`; IF-2 keeps its own error bodies in the bundle (see the change request to stream L).
+- Generated code, checked in CI (`pnpm run api:check`): `packages/ts-client/src/api.d.ts` and `packages/py-models/src/vulnmart_models/api.py`, from the bundle by `scripts/generate-api-code.mjs`. In the Python models an e-mail address is a plain string, and an object that must have at least one member is not expressed; the bundle and the API validate both.
+- Mock: `contracts/mocks/platform-mock/server.mjs` (a Node server of the bundle: cookies, CSRF, origin and size checks, another declared answer through `Prefer: code=NNN` or `Prefer: example=NAME`, a fake SSE stream, an optional fake lab) with `scripts/platform-mock.test.mjs`.
+- Checked by `scripts/check_platform_contract.py` (fragment and bundle rules, 14 valid and 21 invalid request examples), `scripts/check_api_models.py` and the type test of the client.
+- Status: awaiting review by Tanmay (lab prefix in the bundle, IF-2 error bodies) and Sahil (catalogue fields the dashboards read).
+
+## Domain events (IF-3), `contracts/domain-events/`
+
+### 0.1.0 (2026-10-11, Akshay, story P-03)
+- registry change: IF-3 is registered in `contracts/registry.json` (new contract in its own folder: `contracts/events/` is IF-4's folder in the registry, so the architecture's path `contracts/events/domain-events.schema.json` moved to `contracts/domain-events/`; `docs/architecture/07-repo-and-workstreams.md` is updated).
+- First draft: `domain-events.schema.json` (one closed JSON Schema, seven types: `instance.state_changed`, `attempt.state_changed`, `attempt.milestone_reached`, `attempt.flag_captured`, `attempt.score_updated`, `attempt.hint_unlocked` and the control event `stream.resync`), `audiences.json` (who may receive what by attempt mode: learner practice never reaches a company; the candidate does not receive their own milestones, captures or score while OI-15 is open), the SSE wire format and the `Last-Event-ID` and `resync` rules (README), `fixtures/session.json` (18 ordered records), 8 valid and 25 invalid example events. The schema rejects impossible dates and a failed instance without an `error_code` (or a code on another state).
+- State vocabularies and id shapes are copied from IF-2 and IF-5; `INST-*` codes come from IF-8. Handoff H-22 answered: `seq` is 64-bit, orchestrator and platform events use a reserved range from 2^40 up to 2^53 - 1, an infrastructure fault is shown as `instance.state_changed` with state `failed`. Stream layout (`live:user:<id>`, `live:org:<id>`, `live:admin`, one `event` field per entry), delivery rules and the `resync` loop are in the README.
+- Checked by `scripts/validate-domain-events.mjs` and `scripts/replay-domain-events.mjs` (`pnpm run domain-events:check`, in CI) with tests.
+- no mock change: the fixtures and the replay script are the stub of this contract (`noMock` in the registry).
+- Status: awaiting review by Tanmay (publisher side, `stream.resync`, audience table).
+
+## Error codes and error format (IF-8), `contracts/errors/`
+
+### 0.3.0 (2026-10-11, Akshay, story P-04, code review)
+- Additive: `AUTH-MFA-STATE` (409: the second factor is already active, or an admin turns it off) and `ATT-CONSENT-STALE` (409: the consent notice the person saw is not the current one). They replace the use of `ATT-INVALID-STATE` for these two cases in IF-1. Constants regenerated (56 codes).
+- BREAKING: none in substance, see 0.2.0 (the rules engine flags any change to `error-codes.yaml`). Checked by hand: 2 added, 0 removed, 0 changed.
+- no mock change: the generated constants are the stub of this contract (`noMock` in the registry).
+
+### 0.2.0 (2026-10-11, Akshay, story P-04)
+- Additive: five codes for the platform routes of IF-1: `AUTH-EMAIL-NOT-VERIFIED` (403), `AUTH-INVALID-CREDENTIALS` (401), `AUTH-MFA-INVALID` (401), `AUTH-TOKEN-INVALID` (400) and `REQ-RATE-LIMITED` (429, the generic rate limit that the deferred-work list of P-02 named). Constants regenerated (54 codes).
+- BREAKING: none in substance. This line only satisfies the rules engine, which cannot compare `error-codes.yaml` (a YAML file outside `schemas` and `openapi`) and flags any change to it as breaking on the safe side. Checked by hand against `origin/main`: 5 codes added, 0 removed, 0 changed.
+- no mock change: the generated constants are the stub of this contract (`noMock` in the registry).
+
+### 0.1.0 (2026-10-11, Akshay, story P-02)
+- registry change: IF-8 is registered in `contracts/registry.json` (new contract; `contracts/errors` was a reserved folder, now owned by stream P with its schemas, conformance scripts and a stated reason for having no mock).
+- First draft: `error-codes.yaml` (49 codes in six families: `AUTH`, `ATT`, `EVT`, `INST`, `ORCH`, `REQ`; every code named in the merged contracts and in stream L's in-flight branches, under the names those contracts use), `error-codes.schema.json`, `problem.schema.json` (RFC 9457 members `type`, `title`, `status` plus `code`, `request_id`, optional `field` and `errors`; closed shape), 7 valid and 24 invalid example bodies, and `README.md`.
+- `ATT-GONE` (410) is in the seed because IF-2 0.2.0 uses it (`att_gone`).
+- Generated constants: `packages/py-models/src/vulnmart_models/error_codes.py` and `packages/ts-client/src/error-codes.ts` (`node scripts/generate-error-codes.mjs`).
+- Checked by `scripts/validate-errors.mjs` and `scripts/generate-error-codes.mjs --check` (`pnpm run errors:check`, in CI) with tests.
+- The injector exit codes 10 to 13 are `exit_code` on the four `INST-INJECT-*` codes.
+- Streams L and T move their error bodies to this shape in their own stories: see `docs/reviews/2026-10-11-if8-change-request-for-stream-l.md`.
+- Status: awaiting review by Tanmay (statuses, titles, the body shape change for IF-2, IF-4 and IF-5).
+
 ## Instance contract (IF-6), `contracts/instance/`
 
 ### 0.3.1 (2026-10-11, Tanmay, story L-09 preparation)
@@ -126,6 +168,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: names and open points await Sahil's review (optional under D-37) and Akshay's note on the `EVT-*` placeholders.
 
 ## Table owners (DB), `contracts/db/`
+
+### 0.2.0 (2026-10-12, Akshay, story P-05)
+- Additive: `table-owners.yaml` written (H-95 shape confirmed as proposed): all 42 tables of architecture 04 sections 2.1 to 2.8 plus `deks` of the `vm_keystore` database, each with its owning module. Stream P: kernel, accounts, orgs, assessments, privacy, admin, notifications, live. Stream L rows (attempts, instances, scoring, ingest, flags) are proposals marked "To confirm by Tanmay"; the catalogue tables belong to `admin` (the sync job), to confirm by Sahil and Tanmay. The 13 module folders exist now (empty packages), so every owner passes `scripts/check_table_owners.py`.
+- The schema is unchanged.
+- no mock change: nothing runs against the table-owners list (`noMock` in the registry).
 
 ### 0.1.0 (2026-10-10, Tanmay, story L-07)
 - First draft, a proposal for Akshay to confirm (tasks P-05 and P-06): `table-owners.schema.json`, the shape of `contracts/db/table-owners.yaml` (a `tables` list of `table` and `owner`, the owner being a module folder of `apps/api/src/vulnmart/` named in CODEOWNERS). The YAML file itself is Akshay's and does not exist yet; `scripts/check_table_owners.py` reports NOT-APPLICABLE until it does, then checks shape, owner names and duplicate tables.

@@ -6,7 +6,7 @@ The contracts are tagged `contracts-v1.0.0` only after both of you sign off the 
 
 **What to do**
 1. Read `contracts/COMPAT.md`. The Versions table lists the version of each contract. The Approvals table lists who owns and who consumes each one. You are Akshay (`@akshaay29`, stream P) or Sahil (`@sahillroy`, stream T).
-2. Confirm or change the handoff rows on the done checklist that are yours (`docs/dev/HANDOFFS.md`, section "Done checklist before contracts-v1.0.0"). Akshay: H-113. Sahil: H-114 (and re-read IF-4 0.2.1 and IF-6 0.3.1, your old IF-4 sign-off is stale, H-108).
+2. Confirm or change the handoff rows on the done checklist that are yours (`docs/dev/HANDOFFS.md`, section "Done checklist before contracts-v1.0.0"). Akshay: H-120. Sahil: H-121 (and re-read IF-4 0.2.1 and IF-6 0.3.1, your old IF-4 sign-off is stale, H-108).
 3. Sign off on the release pull request: before the tag all contracts are relabelled 1.0.0 in one commit (changelog entry "first stable release, no content change", COMPAT.md versions), and you confirm by approving that pull request and setting your own rows in the Approvals table to `approved` with the date. If a handle or role is wrong, say so there. Tasks P-08 (Akshay) and T-03 (Sahil).
    - Your GitHub review must be "Approve", not "Comment", and given after the last push to the contract files. There is no review trigger, so after you approve, someone must re-run the job `contract-rules`. If `main` is merged into the branch afterwards, the approval can become stale: approve again.
 

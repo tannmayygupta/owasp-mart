@@ -126,7 +126,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Covers: LB-8
   - Waits on: L-05, L-06, L-07 and the sign-offs of Akshay (P-08) and Sahil (T-03).
   - Done when: The tag exists, COMPAT.md lists the versions every stream targets and the approvals check is active.
-  - Handoffs: H-58, H-80, H-81, H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-58, H-80, H-81, H-82, H-114 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT ticked: the tag `contracts-v1.0.0` waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run `node scripts/tag-contracts.mjs --dry-run`.
 
 - [x] **L-10. DuckDNS names and certificates**
@@ -148,6 +148,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Waits on: L-10 and Akshay's dashboards skeleton (P-07).
   - Handoffs: H-116, H-117 (see docs/dev/HANDOFFS.md; added by the preparation story, 2026-10-11)
   - Done when: The Vercel site reaches the API through `/api/*`, direct access to the VM without the secret is refused, and the S-14 result is recorded.
+  - Handoffs: H-113 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status 2026-10-12 (story 2.3): the Caddy origin-secret gate, the stock Caddy edge for vm-p, the Vercel probe project with the `routes` header transform, the S-14 check script, ADR 0031, decision D-50 (Proposed) and the runbook `docs/runbooks/vercel-and-origin.md` are built and tested with real Caddy in Docker (including TLS) and stand-in proxies. NOT ticked: the live steps are the developer's (Vercel login and project, sensitive environment variable, secret files on vm-p, port 443, the S-14 run) and the real wiring waits for Akshay's P-07 and the live certificates of L-10.
 
 - [x] **L-12. Image builds for amd64 and arm64 and deploy pipelines**

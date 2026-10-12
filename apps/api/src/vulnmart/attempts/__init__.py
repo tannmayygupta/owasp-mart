@@ -1,0 +1,1 @@
+"""The attempt state machine and its server clock. Owned by stream L; its tables are listed in contracts/db/table-owners.yaml. Folder created by stream P in story P-05 so the table-owners file can name it; stream L fills it."""

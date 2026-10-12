@@ -1,0 +1,12 @@
+{
+  "schema": "SignupRequest",
+  "body": {
+    "email": "ada@example.invalid",
+    "password": "correct-horse-battery-staple",
+    "display_name": "Ada Learner",
+    "age_declaration": true,
+    "account_type": "admin"
+  },
+  "path": "/account_type",
+  "rule": "no privilege member can be set at signup: the account type is never in a body"
+}

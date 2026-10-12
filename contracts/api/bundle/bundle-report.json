@@ -1,0 +1,113 @@
+{
+  "fragments": [
+    {
+      "name": "platform",
+      "version": "0.1.0",
+      "operations": 25
+    },
+    {
+      "name": "lab",
+      "version": "0.2.0",
+      "operations": 18
+    }
+  ],
+  "operations": 43,
+  "shared_components": [
+    {
+      "section": "headers",
+      "name": "Allow"
+    },
+    {
+      "section": "headers",
+      "name": "CacheControl"
+    },
+    {
+      "section": "headers",
+      "name": "RetryAfter"
+    },
+    {
+      "section": "parameters",
+      "name": "ChallengeKeyPath"
+    },
+    {
+      "section": "schemas",
+      "name": "AttemptId"
+    },
+    {
+      "section": "schemas",
+      "name": "ChallengeKey"
+    },
+    {
+      "section": "schemas",
+      "name": "InstanceId"
+    },
+    {
+      "section": "schemas",
+      "name": "Timestamp"
+    },
+    {
+      "section": "securitySchemes",
+      "name": "csrfHeader"
+    },
+    {
+      "section": "securitySchemes",
+      "name": "sessionCookie"
+    }
+  ],
+  "renamed_components": [
+    {
+      "section": "responses",
+      "name": "Conflict",
+      "renamed_to": "LabConflict",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "responses",
+      "name": "CsrfFailed",
+      "renamed_to": "LabCsrfFailed",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "responses",
+      "name": "Invalid",
+      "renamed_to": "LabInvalid",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "responses",
+      "name": "NotFound",
+      "renamed_to": "LabNotFound",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "responses",
+      "name": "RateLimited",
+      "renamed_to": "LabRateLimited",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "responses",
+      "name": "TooLarge",
+      "renamed_to": "LabTooLarge",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "responses",
+      "name": "Unauthenticated",
+      "renamed_to": "LabUnauthenticated",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "responses",
+      "name": "UnsupportedMedia",
+      "renamed_to": "LabUnsupportedMedia",
+      "reason": "differs from the platform definition of the same name"
+    },
+    {
+      "section": "schemas",
+      "name": "Problem",
+      "renamed_to": "LabProblem",
+      "reason": "differs from the platform definition of the same name"
+    }
+  ]
+}

@@ -373,8 +373,17 @@ def test_the_open_points_table_has_rows_and_the_traceable_proposals():
 def test_the_ports_package_holds_only_the_three_modules():
     ports = ROOT / "apps" / "api" / "src" / "vulnmart" / "ports"
     names = sorted(p.name for p in ports.glob("*.py"))
-    assert names == ["__init__.py", "fake_instance_host.py", "http_instance_host.py", "instance_host.py"]
-    assert sorted(p.name for p in (ROOT / "apps" / "api" / "src" / "vulnmart").iterdir() if p.name != "__pycache__") == ["__init__.py", "ports", "py.typed"]
+    # InstanceHost (stream L) and, since story P-05, the IF-9 ports with their fakes (stream P's six, stream L's three as P's proposal)
+    assert names == [
+        "__init__.py", "attempts.py", "audit.py", "errors.py", "fake_instance_host.py", "fakes.py", "http_instance_host.py",
+        "instance_host.py", "instances.py", "keys.py", "lab_fakes.py", "outbox.py", "quota.py", "reports.py", "scope.py", "settings.py",
+    ]
+    # The package holds the ports, the platform API modules (stream P: main.py, problem.py) and, since story P-05, the module folders
+    # named in contracts/db/table-owners.yaml (P: kernel ... live; L: attempts, instances, scoring, ingest, flags); a new module is added here on purpose.
+    assert sorted(p.name for p in (ROOT / "apps" / "api" / "src" / "vulnmart").iterdir() if p.name != "__pycache__") == [
+        "__init__.py", "accounts", "admin", "assessments", "attempts", "flags", "ingest", "instances", "kernel", "live", "main.py",
+        "notifications", "orgs", "ports", "privacy", "problem.py", "py.typed", "scoring",
+    ]
 
 
 def test_both_implementations_are_instance_hosts():

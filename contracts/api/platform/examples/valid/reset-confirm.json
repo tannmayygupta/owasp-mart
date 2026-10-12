@@ -1,0 +1,7 @@
+{
+  "schema": "ResetPasswordRequest",
+  "body": {
+    "token": "ZmFrZS10b2tlbi1mb3ItZG9jdW1lbnRhdGlvbi1vbmx5",
+    "new_password": "correct-horse-battery-staple"
+  }
+}

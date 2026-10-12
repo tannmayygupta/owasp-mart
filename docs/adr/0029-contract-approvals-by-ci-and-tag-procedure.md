@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (decided on the developer's delegation 2026-10-11; open: the author-who-is-consumer rule and the branch protection fact)
 - **Date:** 2026-10-11
-- **Deciders:** Tanmay (stream L), on delegation (decision D-48). Akshay and Sahil sign off the contracts they consume (handoffs H-113, H-114).
+- **Deciders:** Tanmay (stream L), on delegation (decision D-48). Akshay and Sahil sign off the contracts they consume (handoffs H-120, H-121).
 - **Requirements:** LB-8, D-37, D-46, architecture 07 sections 7.7 and 7.8 (rules 1, 2, 3 and 9), EF-30, ADR 0026
 
 ## Context

@@ -1,0 +1,15 @@
+Scope: all 3 workspace projects
+✓ Lockfile passes supply-chain policies (verified 11m ago)
+Lockfile is up to date, resolution step is skipped
+Done in 573ms using pnpm v12.10.1
+✓ Lockfile passes supply-chain policies (verified 30m ago)
+Lockfile is up to date, resolution step is skipped
+Done in 91ms using pnpm v12.10.1
+uv : Resolved 30 packages in 22ms
+At line:8 char:124
++ ... s/web install --frozen-lockfile --ignore-workspace; uv lock --check }
++                                                         ~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Resolved 30 packages in 22ms:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
