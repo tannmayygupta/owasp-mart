@@ -118,7 +118,8 @@ Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosti
 
 Goal: Instances start, reset, tear down and are isolated; the deployment pipeline works (Vercel, certificates, image builds).
 
-- [ ] **L-09. Tag contracts v1.0.0 and start the change rules**
+- [x] **L-09. Tag contracts v1.0.0 and start the change rules**
+  - Closed 2026-10-12 on the developer's instruction. Still open, needs others: tag `contracts-v1.0.0` waits for Akshay P-08, Sahil T-03/H-108 re-review, release commit relabelling to 1.0.0, handoff checklist lines.
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.7` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - Build: Collect every contract owner approval, write COMPAT.md, tag `contracts-v1.0.0` and turn the change rules on. Settle branch protection on the private repository (EF-30) or use the CI approvals check.
@@ -128,7 +129,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Handoffs: H-58, H-80, H-81, H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT ticked: the tag `contracts-v1.0.0` waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run `node scripts/tag-contracts.mjs --dry-run`.
 
-- [ ] **L-10. DuckDNS names and certificates**
+- [x] **L-10. DuckDNS names and certificates**
+  - Closed 2026-10-12 on the developer's instruction. Still open (developer, live): DuckDNS names, lego staging then production, renewal, S-16 result.
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Register the platform and labs DuckDNS names, issue a certificate for the platform host and a wildcard certificate for the labs name (DNS-01), automatic renewal.
@@ -137,7 +139,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Done when: Real certificates are issued and renew automatically; the S-16 result (wildcard resolution) is recorded.
   - Status 2026-10-11 (story 2.2): the host scripts, the timer, the pinned lego installer, the cloud-init wiring, the S-16 check script, ADR 0030, decision D-49 (Proposed) and the runbook `docs/runbooks/certificates.md` are built and tested against stubs (and on Linux in Docker). NOT ticked: the live steps are the developer's (DuckDNS accounts and names, token files on the hosts, staging then production issuance, one real renewal, the S-16 result). Tick L-10 only after the real redacted results are pasted.
 
-- [ ] **L-11. Vercel project, same-origin rewrite and live-stream check**
+- [x] **L-11. Vercel project, same-origin rewrite and live-stream check**
+  - Closed 2026-10-12 on the developer's instruction. Still open: live Vercel S-14 run; wiring with Akshay P-07; port 443 via public_web_cidrs.
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Create the Vercel project with the rewrite config from Akshay, the origin secret and the origin-secret check in the platform Caddy; run the SSE-through-rewrite test on the real VM.
@@ -147,7 +150,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Done when: The Vercel site reaches the API through `/api/*`, direct access to the VM without the secret is refused, and the S-14 result is recorded.
   - Status 2026-10-12 (story 2.3): the Caddy origin-secret gate, the stock Caddy edge for vm-p, the Vercel probe project with the `routes` header transform, the S-14 check script, ADR 0031, decision D-50 (Proposed) and the runbook `docs/runbooks/vercel-and-origin.md` are built and tested with real Caddy in Docker (including TLS) and stand-in proxies. NOT ticked: the live steps are the developer's (Vercel login and project, sensitive environment variable, secret files on vm-p, port 443, the S-14 run) and the real wiring waits for Akshay's P-07 and the live certificates of L-10.
 
-- [ ] **L-12. Image builds for amd64 and arm64 and deploy pipelines**
+- [x] **L-12. Image builds for amd64 and arm64 and deploy pipelines**
+  - Closed 2026-10-12 on the developer's instruction. Still open (developer, live): run images workflow on GitHub, make the hello package public, deploy to both VMs and laptop.
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: CI builds images for amd64 and natively for arm64 on the VM, and a deploy step puts them on both VMs.

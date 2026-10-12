@@ -3,7 +3,7 @@ title: 'Image builds in CI and the human-run deploy script (hello stack on both 
 type: 'feature'
 ticket: '4'
 created: '2026-10-12'
-status: 'built'
+status: 'done'
 baseline_revision: '49f7f4feed57873c1cd1dcbeb0a0567e6346c910'
 route: 'full'
 route_source: 'pinned'
