@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-04 shop meets the instance contract, 2026-10-11, Sahil)
+- `apps/shop/` instance integration (TB-3), completing Sprint 1: the real shop joins a VulnMart instance per IF-6/IF-4. `/readyz` returns 200 only after the injector marker `/run/vm/injected` exists and the injected snapshot is copied to writable `/data` and opened (`src/instance/instance.mjs`, readiness injected into `createApp`); the shop reads a planted flag from `/run/vm/flags.json` for sentinel logic only (never a served route); and it posts a best-effort, IF-4-posted-schema-valid event to the sidecar (unsigned — the sidecar stamps and signs). Proven by a shop-owned integration test (real seeded snapshot + flags + marker + a fake sidecar validating against the posted schema); 61 shop tests pass. The live docker-compose swap, runtime profile and full sidecar→signing→fake-ingest chain are T-09.
+
 ### Added (P-08 contract sign-off for contracts v1.0.0, 2026-10-12, Akshay)
 - `docs/reviews/2026-10-12-p08-contract-sign-off.md`: stream P's sign-off as provider (IF-1, IF-3, IF-8, DB) and consumer (IF-2, IF-4, IF-5, IF-6, IF-7); all fifteen of its rows on the contracts-v1.0.0 checklist answered in `docs/dev/HANDOFFS.md` (H-01 to H-04, H-07, H-08, H-10 to H-18, H-83). Decisions: the events table has the identity `(instance_id, epoch, seq)` and stream L writes its migration; the sign-off requires IF-2, IF-4 and IF-5 to move to the IF-8 error body before the tag (new handoff H-114); an impossible state report is stored, not applied, and alerted. `contracts/COMPAT.md` created with stream P's nine versions (the `compat` check passes). The approval of the L-09 pull request remains. Covers PB-9 (partly).
 
