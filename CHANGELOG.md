@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Release commit for contracts v1.0.0 (L-09): every contract labelled 1.0.0 (changelog entries, COMPAT.md, document and OpenAPI labels, bundle); the approvals of stream P and stream T are still to be signed by them.
 - Error bodies of IF-2 (0.3.0), IF-4 (0.3.0) and IF-5 (0.4.0) are now the closed IF-8 body (no `detail`, `instance` or `message`; title and status from the registry; `field` is a pointer, query parameters `/query/<name>`); IF-8 0.4.0 adds `ORCH-CURSOR-INVALID`, `ORCH-UNSUPPORTED-MEDIA-TYPE` and `ORCH-NOT-IMPLEMENTED`; Node mocks share `contracts/mocks/shared/problem.mjs`; the Python orchestrator and client follow (condition F-2, handoff H-114, 2026-10-12, Tanmay).
 - S-4 measurement tool for the orchestrator (story 3.3, L-13 part 3): `vulnmart_orchestrator.measure` measures cold start and memory per instance with the real engine and Docker, runbook `docs/runbooks/measure-instances.md`, research note with the result table still pending the developer run on vm-i.
 

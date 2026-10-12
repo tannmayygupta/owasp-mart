@@ -1,6 +1,6 @@
 # Orchestrator API v0 (IF-5)
 
-- **Version:** 0.4.0 (draft, 0.x until the tag `contracts-v1.0.0` in story L-09). See [../CHANGELOG.md](../CHANGELOG.md).
+- **Version:** 1.0.0 (first stable release, tag `contracts-v1.0.0`; the history is in [the changelog](../CHANGELOG.md))
 - **Owner:** stream L (Tanmay). Consumer: the platform workers (stream P, Akshay). Under D-37 the review by Akshay is optional during initial development; the proposals below are for him to confirm in the team chat.
 - **Source:** `docs/architecture/07-repo-and-workstreams.md` sections 3.1, 3.3, 3.5 and 3.6 (the seven calls, the ports, the errors), `05-key-flows.md` (provision, reset, access, destroy, reconcile), `06-security.md` (mTLS, signed body with timestamp and nonce, template-ID-only, TB-5), `04-data-and-state.md` section 10.2 (the instance state machine).
 - **Machine-checkable part:** [orchestrator.openapi.yaml](orchestrator.openapi.yaml) (OpenAPI 3.1), examples in `examples/`. Check it: `pnpm run contracts:check` (the second half of that command) or `uv run --package vulnmart-api python scripts/check_orchestrator_contract.py`.

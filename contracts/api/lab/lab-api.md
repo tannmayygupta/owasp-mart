@@ -1,6 +1,6 @@
 # Lab API v0 (IF-2): the browser-facing routes the lab owns
 
-- **Version:** 0.3.0 (draft, 0.x until the tag `contracts-v1.0.0` in story L-09). See [../../CHANGELOG.md](../../CHANGELOG.md).
+- **Version:** 1.0.0 (first stable release, tag `contracts-v1.0.0`; the history is in [the changelog](../../CHANGELOG.md))
 - **Owner:** stream L (Tanmay). Consumer: the dashboards (stream P, Akshay, story P-04). Under D-37 the review by Akshay is optional during initial development; the proposals below are for him to confirm in the team chat.
 - **Source:** `docs/architecture/07-repo-and-workstreams.md` sections 3.1, 3.4 and 3.5 (the catalogue row of IF-2, composition, the ports; the older citation "arch 07 s3.3" for IF-2 is stale), `03-origins-and-access.md` (cookies, CSRF, the one-time ticket), `04-data-and-state.md` sections 2.5, 2.6, 10 and 11 (tables, state machines, flag verification), `05-key-flows.md`, and the PRD requirements FR-SES, FR-INS, FR-FLG, FR-HNT, FR-ACH, FR-SCR, FR-DSH, FR-DET.
 - **Machine-checkable part:** [lab.openapi.yaml](lab.openapi.yaml) (OpenAPI 3.1), examples in `examples/`. Check it: `pnpm run contracts:check` (the last part of that command) or `uv run --package vulnmart-api python scripts/check_lab_contract.py`.

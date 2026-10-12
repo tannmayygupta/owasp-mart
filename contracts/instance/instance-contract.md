@@ -1,6 +1,6 @@
 # Instance contract v0 (IF-6)
 
-- **Version:** 0.1.0 (draft, 0.x until the tag `contracts-v1.0.0` in story L-09). See [../CHANGELOG.md](../CHANGELOG.md).
+- **Version:** 1.0.0 (first stable release, tag `contracts-v1.0.0`; the history is in [the changelog](../CHANGELOG.md))
 - **Owner:** stream L (Tanmay) with stream T (Sahil). Sahil approves as consumer before merge (CODEOWNERS `/contracts/instance/`).
 - **Source:** `docs/architecture/07-repo-and-workstreams.md` section 3.2 (the 11 topics below), `04-data-and-state.md` sections 11.1 and 11.3, `docs/design/challenge-specs.md` sections 8 and 10.
 - **Check it:** `pnpm run contracts:check` (or `node scripts/validate-contracts.mjs`).

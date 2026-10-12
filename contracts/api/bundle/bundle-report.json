@@ -2,12 +2,12 @@
   "fragments": [
     {
       "name": "platform",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "operations": 25
     },
     {
       "name": "lab",
-      "version": "0.3.0",
+      "version": "1.0.0",
       "operations": 18
     }
   ],

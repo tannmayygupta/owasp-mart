@@ -10,15 +10,15 @@ Every version listed here must be an entry of the contract's own section in `con
 
 | Contract | Version | Owner | Folder |
 |---|---|---|---|
-| IF-1 | 0.1.0 | P | `contracts/api/platform/` |
-| IF-3 | 0.1.0 | P | `contracts/domain-events/` |
-| IF-8 | 0.4.0 | P | `contracts/errors/` |
-| IF-2 | 0.3.0 | L | `contracts/api/lab/` |
-| IF-4 | 0.3.0 | L | `contracts/events/` |
-| IF-5 | 0.4.0 | L | `contracts/orchestrator/` |
-| IF-6 | 0.3.2 | L | `contracts/instance/` |
-| IF-7 | 0.1.0 | T | `contracts/catalog/` |
-| DB | 0.2.0 | P | `contracts/db/` |
+| IF-1 | 1.0.0 | P | `contracts/api/platform/` |
+| IF-3 | 1.0.0 | P | `contracts/domain-events/` |
+| IF-8 | 1.0.0 | P | `contracts/errors/` |
+| IF-2 | 1.0.0 | L | `contracts/api/lab/` |
+| IF-4 | 1.0.0 | L | `contracts/events/` |
+| IF-5 | 1.0.0 | L | `contracts/orchestrator/` |
+| IF-6 | 1.0.0 | L | `contracts/instance/` |
+| IF-7 | 1.0.0 | T | `contracts/catalog/` |
+| DB | 1.0.0 | P | `contracts/db/` |
 
 ## Approvals
 
@@ -28,25 +28,25 @@ After the tag, a pull request that changes the files of a contract needs: one ap
 
 | Contract | Stream | Handle | Role | Version | Date | Status |
 |---|---|---|---|---|---|---|
-| IF-1 | P | @akshaay29 | owner | 0.1.0 | - | pending |
-| IF-3 | P | @akshaay29 | owner | 0.1.0 | - | pending |
-| IF-8 | P | @akshaay29 | owner | 0.4.0 | - | pending |
-| IF-2 | L | @tannmayygupta | owner | 0.3.0 | - | pending |
-| IF-2 | P | @akshaay29 | consumer | 0.3.0 | - | pending |
-| IF-4 | L | @tannmayygupta | owner | 0.3.0 | - | pending |
-| IF-4 | T | @sahillroy | consumer | 0.3.0 | - | pending |
-| IF-4 | P | @akshaay29 | consumer | 0.3.0 | - | pending |
-| IF-5 | L | @tannmayygupta | owner | 0.4.0 | - | pending |
-| IF-5 | P | @akshaay29 | consumer | 0.4.0 | - | pending |
-| IF-6 | L | @tannmayygupta | owner | 0.3.2 | - | pending |
-| IF-6 | L | @tannmayygupta | consumer | 0.3.2 | - | pending |
-| IF-6 | T | @sahillroy | consumer | 0.3.2 | - | pending |
-| IF-7 | T | @sahillroy | owner | 0.1.0 | - | pending |
-| IF-7 | P | @akshaay29 | consumer | 0.1.0 | - | pending |
-| IF-7 | L | @tannmayygupta | consumer | 0.1.0 | - | pending |
-| DB | P | @akshaay29 | owner | 0.2.0 | - | pending |
-| DB | L | @tannmayygupta | consumer | 0.2.0 | - | pending |
-| DB | T | @sahillroy | consumer | 0.2.0 | - | pending |
+| IF-1 | P | @akshaay29 | owner | 1.0.0 | - | pending |
+| IF-3 | P | @akshaay29 | owner | 1.0.0 | - | pending |
+| IF-8 | P | @akshaay29 | owner | 1.0.0 | - | pending |
+| IF-2 | L | @tannmayygupta | owner | 1.0.0 | - | pending |
+| IF-2 | P | @akshaay29 | consumer | 1.0.0 | - | pending |
+| IF-4 | L | @tannmayygupta | owner | 1.0.0 | - | pending |
+| IF-4 | T | @sahillroy | consumer | 1.0.0 | - | pending |
+| IF-4 | P | @akshaay29 | consumer | 1.0.0 | - | pending |
+| IF-5 | L | @tannmayygupta | owner | 1.0.0 | - | pending |
+| IF-5 | P | @akshaay29 | consumer | 1.0.0 | - | pending |
+| IF-6 | L | @tannmayygupta | owner | 1.0.0 | - | pending |
+| IF-6 | L | @tannmayygupta | consumer | 1.0.0 | - | pending |
+| IF-6 | T | @sahillroy | consumer | 1.0.0 | - | pending |
+| IF-7 | T | @sahillroy | owner | 1.0.0 | - | pending |
+| IF-7 | P | @akshaay29 | consumer | 1.0.0 | - | pending |
+| IF-7 | L | @tannmayygupta | consumer | 1.0.0 | - | pending |
+| DB | P | @akshaay29 | owner | 1.0.0 | - | pending |
+| DB | L | @tannmayygupta | consumer | 1.0.0 | - | pending |
+| DB | T | @sahillroy | consumer | 1.0.0 | - | pending |
 
 Stream P recorded its review in story P-08 (`docs/reviews/2026-10-12-p08-contract-sign-off.md`) against IF-4 0.2.0, IF-6 0.2.0 and DB 0.2.0, which are older than the versions above, and with a condition (F-2: the IF-2, IF-4 and IF-5 error bodies move to IF-8 before the tag). Stream L met F-2 on 2026-10-12 (IF-2 0.3.0, IF-4 0.3.0, IF-5 0.4.0, IF-6 0.3.2 editorial, IF-8 0.4.0 with three added codes). The Akshay rows stay `pending` until he confirms the current versions.
 

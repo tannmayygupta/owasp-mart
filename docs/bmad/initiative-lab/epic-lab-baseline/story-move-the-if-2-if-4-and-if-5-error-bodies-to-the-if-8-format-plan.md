@@ -3,7 +3,7 @@ title: 'Move the IF-2, IF-4 and IF-5 error bodies to the IF-8 format (condition 
 type: 'feature'
 ticket: '16'
 created: '2026-10-12'
-status: 'built'
+status: 'done'
 baseline_revision: '4005bfd'
 route: 'full'
 route_source: 'pinned'
