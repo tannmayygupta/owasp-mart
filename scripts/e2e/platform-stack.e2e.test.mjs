@@ -1,4 +1,4 @@
-// End-to-end test of the platform and web profiles (story P-01) against the REAL Docker engine.
+// End-to-end test of the platform and web profiles (stories P-01 and P-06) against the REAL Docker engine.
 // Needs Docker running and the host ports 3000, 8000 and 8025 free.
 // Run: node --test "scripts/e2e/platform-stack.e2e.test.mjs"   (about 2 minutes on a warm machine)
 // Node built-ins only. The stack is started once, then the tests inspect and disturb it, then `down` is checked last.
@@ -13,6 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const DEV = path.join(ROOT, 'scripts', 'dev.mjs');
 const COMPOSE = path.join(ROOT, 'infra', 'compose', 'compose.yaml');
 const SERVICES = ['postgres', 'valkey', 'mailpit', 'api', 'web'];
+const ONE_SHOT = ['migrate']; // runs the migrations, exits 0 before the API starts (story P-06)
 const NAME = (s) => `vulnmart-${s}`;
 const PORTS = [3000, 8000, 8025];
 
@@ -22,7 +23,7 @@ const docker = (...args) => sh('docker', args);
 const composeDown = () =>
   docker('compose', '-f', COMPOSE, '--profile', 'platform', '--profile', 'web', 'down', '--remove-orphans', '--timeout', '2');
 const present = () =>
-  docker('ps', '-a', '--filter', 'name=vulnmart-', '--format', '{{.Names}}').stdout.split(/\r?\n/).filter((n) => SERVICES.map(NAME).includes(n));
+  docker('ps', '-a', '--filter', 'name=vulnmart-', '--format', '{{.Names}}').stdout.split(/\r?\n/).filter((n) => [...SERVICES, ...ONE_SHOT].map(NAME).includes(n));
 const inspect = (service) => JSON.parse(docker('inspect', NAME(service)).stdout)[0];
 const portFree = (port) =>
   new Promise((resolve) => {
@@ -40,7 +41,7 @@ async function waitForHealth(wanted, tries = 40) {
   let last;
   for (let i = 0; i < tries; i++) {
     try {
-      last = await getJson('http://127.0.0.1:3000/api/healthz');
+      last = await getJson('http://127.0.0.1:3000/api/v1/health');
       if (last.status === wanted) return last;
     } catch (e) {
       last = { error: e.message };
@@ -65,8 +66,11 @@ describe('platform and web profiles on a real Docker engine', () => {
     composeDown();
   });
 
-  test('up: exits 0 and starts all five services healthy', () => {
+  test('up: exits 0, the migrations ran first, and all five services are healthy', () => {
     assert.equal(up.status, 0, up.stdout + up.stderr);
+    const migrate = inspect('migrate').State;
+    assert.equal(migrate.Status, 'exited');
+    assert.equal(migrate.ExitCode, 0, 'alembic upgrade head exits 0');
     for (const s of SERVICES) {
       assert.match(up.stdout, new RegExp(`Started:.*\\b${s}\\b`), `"Started:" line should name ${s}`);
       const state = inspect(s).State;
@@ -75,9 +79,9 @@ describe('platform and web profiles on a real Docker engine', () => {
     }
   });
 
-  test('healthy stack: /api/healthz through the web origin reports all three ok', async () => {
+  test('healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API)', async () => {
     const r = await waitForHealth(200);
-    assert.deepEqual(r.body, { status: 'ok', postgres: 'ok', valkey: 'ok' });
+    assert.deepEqual(r.body, { status: 'ok' });
   });
 
   test('the page is served and the API is also reachable directly on its own port', async () => {
@@ -86,6 +90,10 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.match(await page.text(), /VulnMart/);
     const direct = await getJson('http://127.0.0.1:8000/healthz');
     assert.equal(direct.status, 200);
+    const ready = await getJson('http://127.0.0.1:8000/readyz');
+    assert.deepEqual(ready, { status: 200, body: { status: 'ok', checks: { postgres: 'ok', valkey: 'ok' } } });
+    const version = await getJson('http://127.0.0.1:8000/version');
+    assert.equal(version.body.service, 'api');
     const mail = await fetch('http://127.0.0.1:8025/', { signal: AbortSignal.timeout(20000) });
     assert.equal(mail.status, 200);
   });
@@ -102,7 +110,7 @@ describe('platform and web profiles on a real Docker engine', () => {
       code: 'REQ-ROUTE-UNKNOWN',
       request_id: 'e2e-req-0001',
     });
-    const wrong = await fetch('http://127.0.0.1:3000/api/healthz', { method: 'POST', signal: AbortSignal.timeout(20000) });
+    const wrong = await fetch('http://127.0.0.1:3000/api/v1/health', { method: 'POST', signal: AbortSignal.timeout(20000) });
     assert.equal(wrong.status, 405);
     assert.match(wrong.headers.get('content-type'), /application\/problem\+json/);
     const body = await wrong.json();
@@ -140,29 +148,33 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.doesNotMatch(env, /VM\{/);
   });
 
-  test('Postgres down: 503, "postgres":"down", no error text; recovers when Postgres returns', async () => {
+  test('Postgres down: public health 503 degraded naming no store, /readyz names it; recovers', async () => {
     assert.equal(docker('stop', '--time', '2', NAME('postgres')).status, 0);
     try {
       const r = await waitForHealth(503);
-      assert.deepEqual(r.body, { status: 'degraded', postgres: 'down', valkey: 'ok' });
-      assert.doesNotMatch(JSON.stringify(r.body), /password|vulnmart-dev|host|error|exception/i);
+      assert.deepEqual(r.body, { status: 'degraded' });
+      const ready = await getJson('http://127.0.0.1:8000/readyz');
+      assert.deepEqual(ready.body, { status: 'degraded', checks: { postgres: 'down', valkey: 'ok' } });
+      assert.doesNotMatch(JSON.stringify(ready.body), /password|vulnmart-dev|host|error|exception/i);
     } finally {
       assert.equal(docker('start', NAME('postgres')).status, 0);
     }
     const back = await waitForHealth(200);
-    assert.deepEqual(back.body, { status: 'ok', postgres: 'ok', valkey: 'ok' });
+    assert.deepEqual(back.body, { status: 'ok' });
   }, { timeout: 180000 });
 
-  test('Valkey down: 503, "valkey":"down"; recovers when Valkey returns', async () => {
+  test('Valkey down: public health 503 degraded, /readyz names valkey; recovers', async () => {
     assert.equal(docker('stop', '--time', '2', NAME('valkey')).status, 0);
     try {
       const r = await waitForHealth(503);
-      assert.deepEqual(r.body, { status: 'degraded', postgres: 'ok', valkey: 'down' });
+      assert.deepEqual(r.body, { status: 'degraded' });
+      const ready = await getJson('http://127.0.0.1:8000/readyz');
+      assert.deepEqual(ready.body, { status: 'degraded', checks: { postgres: 'ok', valkey: 'down' } });
     } finally {
       assert.equal(docker('start', NAME('valkey')).status, 0);
     }
     const back = await waitForHealth(200);
-    assert.deepEqual(back.body, { status: 'ok', postgres: 'ok', valkey: 'ok' });
+    assert.deepEqual(back.body, { status: 'ok' });
   }, { timeout: 180000 });
 
   test('down: `node scripts/dev.mjs down` leaves no platform or web container behind', () => {

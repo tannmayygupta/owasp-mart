@@ -5,6 +5,12 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (P-06 API skeleton: kernel and single-head migrations, 2026-10-12, Akshay)
+- `apps/api/src/vulnmart/kernel/`: typed settings (pydantic-settings) and a `SettingsPort` over the `settings` table; request ids on every answer and log line, JSON logs with a secret filter, IF-8 500 answers inside the request; a SQLAlchemy 2 session that refuses a query on an org-scoped table without an organisation in scope and tells Postgres the same organisation per transaction (ADR 0014); `/healthz`, `/readyz` and `/version` for the API and four skeleton entrypoints (ingest, live, worker, scheduler); the P-05 fakes wired as audit, outbox, key and quota stubs. `main.py` adds the public `GET /api/v1/health` of IF-1. One Alembic history (`apps/api/migrations/`, revision `0001`: settings, quotas, job_runs, organizations, org_members, row-level security forced on the company tables). Compose runs a one-shot `migrate` service before `api`, which now logs in as a role without ownership or BYPASSRLS; the web proxy keeps the `/api` prefix. Pins: sqlalchemy 2.0.54, alembic 1.20.0, pydantic-settings 2.15.0. Covers PB-5.
+
+### Changed (P-06)
+- The API's `/healthz` is now liveness only; readiness with the store checks moved to `/readyz` (the Docker healthcheck follows). An existing Compose Postgres volume must be removed once (`vulnmart_pg-data`) and the images rebuilt, so the app role is created.
+
 ### Added (P-05 ports, in-memory fakes and table ownership IF-9 IF-10, 2026-10-12, Akshay)
 - `apps/api/src/vulnmart/ports/`: the six ports stream P provides as `typing.Protocol`s (`AuditPort` with a SHA-256 hash chain and `verify_chain`, `OutboxPort` for IF-3 events with server-resolved audiences and e-mail jobs, `KeyPort` with attempt keys, encrypt, decrypt, shred and the event-key (H-105 vector), flag, decoy and owner-hash derivations, `ScopePort`, `SettingsPort`, `QuotaPort`), errors with IF-8 codes, and provisional `AttemptPort`, `ReportPort` and `InstancePort` for stream L to take over; thread-safe in-memory fakes of all nine (`ports/fakes.py`, `ports/lab_fakes.py`). 13 module packages and `contracts/db/table-owners.yaml` (43 tables, table owners 0.2.0; stream L's rows and the catalogue rows to confirm), so stream L's ownership check passes. 80 new tests. Handoffs H-05, H-06, H-09, H-20, H-21, H-95, H-105 answered. Covers PB-4.
 

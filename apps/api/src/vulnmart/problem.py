@@ -2,7 +2,8 @@
 
 A body carries the RFC 9457 members `type`, `title` and `status` plus our `code` and `request_id`, and for a
 422 an `errors` list. `title` is the registry's fixed generic text: nothing a client sent and nothing about the
-server is ever copied into a body (NFR-SEC-03). Story 1.6 replaces `request_id_for` with the request-ID middleware.
+server is ever copied into a body (NFR-SEC-03). The request id is the one the request-ID middleware chose
+(`vulnmart.kernel.observability`), so the body, the `X-Request-ID` header and the log lines agree.
 """
 
 import logging
@@ -55,7 +56,10 @@ _KEPT_HEADERS = ("allow", "retry-after", "www-authenticate")
 
 
 def request_id_for(request: Request) -> str:
-    """The caller's `X-Request-ID` when it is well formed, else a new one."""
+    """The id the middleware chose for this request; without the middleware, the caller's well-formed id or a new one."""
+    chosen = getattr(request.state, "request_id", None)
+    if chosen:
+        return chosen
     supplied = request.headers.get("x-request-id", "")
     return supplied if _REQUEST_ID.fullmatch(supplied) else f"req-{uuid.uuid4().hex}"
 
