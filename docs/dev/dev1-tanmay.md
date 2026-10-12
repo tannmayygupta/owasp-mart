@@ -125,7 +125,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Covers: LB-8
   - Waits on: L-05, L-06, L-07 and the sign-offs of Akshay (P-08) and Sahil (T-03).
   - Done when: The tag exists, COMPAT.md lists the versions every stream targets and the approvals check is active.
-  - Handoffs: H-58, H-80, H-81, H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-58, H-80, H-81, H-82, H-114 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **L-10. DuckDNS names and certificates**
   - Epic: `epic-environments-and-deployment`

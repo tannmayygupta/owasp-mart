@@ -3,7 +3,7 @@ title: 'Dashboards skeleton with the same-origin proxy (local)'
 type: 'feature'
 ticket: '7'
 created: '2026-10-12'
-status: 'built'
+status: done
 baseline_revision: '51ddcd7675393574a226f9f3fdd9cee611762f90'
 route: 'full'
 route_source: 'auto'
