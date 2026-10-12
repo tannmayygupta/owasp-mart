@@ -182,5 +182,8 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
+### 2026-10-12 (Sahil, Sprint 2, T-11/T-12/T-13)
+- registry change: the `app tests` CI job in `.github/workflows/ci.yml` now also runs `services/*/test/**/*.test.mjs`, so the new `services/mock-services`, `services/import-service` and `services/bot` test suites run in CI alongside `apps/*`. Workflow change only — no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract, or any rule.
+
 ### 2026-10-11 (Tanmay, story 1.15)
 - registry change: IF-7 (challenge catalogue, owner T) is registered and `contracts/catalog` is no longer reserved; the checker, its registry, the oasdiff pins and the workflow now run from the base commit (trusted checker, ADR 0026); deleting a whole contract is a breaking change; the marker is the exact line `BREAKING:`.
