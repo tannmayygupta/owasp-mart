@@ -1,0 +1,15 @@
+{
+  "name": "@vulnmart/import-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated product-import preview service: a fresh process per job, no network, no database. Node built-ins only.",
+  "scripts": {
+    "start": "node src/main.mjs",
+    "isolation:check": "node instance-harness/import-isolation-check.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

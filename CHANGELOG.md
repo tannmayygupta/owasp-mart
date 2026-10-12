@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-12 isolated import service, 2026-10-12, Sahil)
+- `services/import-service/` (FR-SHP-13): a unix-socket service that runs each product-import preview job in a fresh child process with a timeout, in a hardened container run with network_mode none and no /data mount — so the service has no network and no database access and any per-job state (a future C06 prototype pollution) dies with the job. Correct flow only: the preview merge is safe (drops `__proto__`/`constructor`/`prototype` at every level); the deliberate lodash-merge C06 is a later isolated path. 6 unit tests (fork isolation, safe merge, timeout, socket round-trip); a Docker isolation harness (`pnpm --filter @vulnmart/import-service run isolation:check`) proves a job runs in a fresh process and the service cannot reach the network or a database (7 checks PASS). Node built-ins only.
+
 ### Added (T-11 mock-services container, 2026-10-12, Sahil)
 - `services/mock-services/` (FR-SHP-13): one hardened, Node-built-ins-only container running four mocks on their instance ports — payment gateway (9101), KYC provider (9102), metadata service (9103), XSS collector (9104). Correct flow only: the gateway always signs its events (the shop verifying it is C08), the KYC fails CLOSED on bad input (the fail-open is C11, in the shop), the metadata service serves the per-instance C10 flag only from the injected read-only placement file (the SSRF reaching it is C10), and the collector only records (C03 is in the shop). 6 unit tests; a Docker reachability harness (`pnpm --filter @vulnmart/mock-services run reach:check`) proves the mocks answer inside the instance network, have no route from outside (by name and IP), and are not published to the host (6 checks PASS). CI's app-tests job now also runs `services/*/test/**`.
 

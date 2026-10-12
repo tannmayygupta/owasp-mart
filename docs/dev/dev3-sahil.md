@@ -134,7 +134,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: Each mock answers inside the instance and is unreachable from outside.
   - Handoffs: H-28, H-31, H-36, H-37, H-38, H-40, H-47, H-52, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-12. Isolated import service**
+- [x] **T-12. Isolated import service**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: An import service that runs a fresh process per job with no network and no database access.
