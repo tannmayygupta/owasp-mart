@@ -29,3 +29,9 @@
 - In instance mode the shop serves only the health surface: `server.mjs` builds `createApp({ isReady })` with no `db`, so the T-14/15 marketplace routes are not mounted on the injected snapshot. Mounting them once the snapshot opens needs lazy-db wiring (the routes must take the db that appears only after the marker, while `/readyz` still reports 503 before then). Do it with the flows/boundaries work (T-10) or a dedicated wiring step.
 - The runtime profile in T-09 is applied by the shop-owned harness's `docker run` flags, mirroring IF-6 section 7. Binding it to the real orchestrator's instance template (and running the real shop through Tanmay's lab harness with shop-agnostic live-checks) is L-13.
 - Running `apps/shop/instance-harness/shop-instance-check.mjs` in CI (Docker) is a possible regression guard; it runs locally today.
+
+## Deferred from: T-11 (mock-services)
+
+- **H-120 (C11 KYC error shape):** the correct KYC mock returns 400 on malformed input (fails closed). RS-F C11 has the provider reply 500 so the shop's `try/catch` fails open and auto-approves. The C11 challenge story decides whether the mock should 500 on the specific malformed shapes it abuses, or the shop's fail-open treats a 400 as an error. Keep the mock correct until then.
+- **H-121 (C10 metadata detection event):** the metadata mock records requests internally but does not yet emit the `meta.request_served` event (source `mock`) that is C10's primary detection signal. Emit it with the events/monitor work (the mocks' event emission — `gateway.ledger_entry`, `collector.hit`, `meta.request_served` — is deferred alongside the shop's event wiring).
+- Live docker-compose wiring of mock-services into a full instance (with the `/run/placement/mock` volume mounted and `VM_MOCK_URL` reachable by the shop) is L-13; T-11 proves the container + its network boundary via its own reachability harness.

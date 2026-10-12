@@ -171,7 +171,7 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      - run: node --test "apps/*/test/**/*.test.mjs"
+      - run: node --test "apps/*/test/**/*.test.mjs" "services/*/test/**/*.test.mjs"
 
   exploit-runner:
     name: exploit runner

@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-11 mock-services container, 2026-10-12, Sahil)
+- `services/mock-services/` (FR-SHP-13): one hardened, Node-built-ins-only container running four mocks on their instance ports — payment gateway (9101), KYC provider (9102), metadata service (9103), XSS collector (9104). Correct flow only: the gateway always signs its events (the shop verifying it is C08), the KYC fails CLOSED on bad input (the fail-open is C11, in the shop), the metadata service serves the per-instance C10 flag only from the injected read-only placement file (the SSRF reaching it is C10), and the collector only records (C03 is in the shop). 6 unit tests; a Docker reachability harness (`pnpm --filter @vulnmart/mock-services run reach:check`) proves the mocks answer inside the instance network, have no route from outside (by name and IP), and are not published to the host (6 checks PASS). CI's app-tests job now also runs `services/*/test/**`.
+
 ### Added (T-10 shop boundaries and signed app events, 2026-10-12, Sahil)
 - `apps/shop/instance-harness/shop-events-check.mjs` (FR-SHP-14): a shop-owned Docker harness (`pnpm --filter @vulnmart/shop run instance:events`) that proves, with the real shop + the real sidecar + the fake ingest, that the shop sends its app events through the sidecar and the platform accepts them, and that the shop is network-isolated. The shop posts one event through its own code; the sidecar stamps `(instance_id, epoch, seq)` and signs with the per-epoch event key; the fake ingest verifies and stores it. The shop can reach the sidecar but has no route to a platform service on another network and no internet egress; no flag/key appears in the ingest read-out. 9 checks PASS on Docker 28.5.1. No shop code change (reuses T-04's `postEvent`).
 

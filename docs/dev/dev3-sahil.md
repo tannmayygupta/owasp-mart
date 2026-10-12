@@ -125,7 +125,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: Boundary tests pass and the fake ingest accepts the shop's events.
   - Handoffs: H-35, H-36, H-37, H-38, H-39, H-40 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-11. Mock services container**
+- [x] **T-11. Mock services container**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Combined mock services: payment, KYC, metadata and the XSS collector, reachable only inside the instance network.
