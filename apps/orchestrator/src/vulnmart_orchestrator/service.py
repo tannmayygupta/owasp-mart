@@ -22,6 +22,7 @@ import asyncio
 import base64
 import binascii
 import copy
+import ipaddress
 import json
 import os
 import re
@@ -55,6 +56,8 @@ from .states import (
 from .templates import load_templates
 
 MAX_BODY = 64 * 1024
+BODY_READ_TIMEOUT_S = 10.0  # L13: the whole request body is due within this time (slow-body clients are cut)
+MAX_CONCURRENCY = 64  # L13: uvicorn answers 503 above this many requests in flight
 JSON_TYPE = re.compile(r"application/json\s*(;.*)?", re.IGNORECASE)
 LABELS = ("instance", "epoch", "component", "template", "kind")
 CURSOR = re.compile(r"[A-Za-z0-9_-]{24}")  # base64url, no padding, of an 18-character instance id
@@ -192,11 +195,16 @@ class Service:
             raise ProblemError("ORCH-BODY-TOO-LARGE", f"the body is larger than {MAX_BODY} bytes")
         chunks: list[bytes] = []
         size = 0
-        async for chunk in request.stream():
-            size += len(chunk)
-            if size > MAX_BODY:
-                raise ProblemError("ORCH-BODY-TOO-LARGE", f"the body is larger than {MAX_BODY} bytes")
-            chunks.append(chunk)
+        try:
+            # a client that sends its body one byte a minute would hold a connection for ever: the whole body is due within a deadline
+            async with asyncio.timeout(BODY_READ_TIMEOUT_S):
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > MAX_BODY:
+                        raise ProblemError("ORCH-BODY-TOO-LARGE", f"the body is larger than {MAX_BODY} bytes")
+                    chunks.append(chunk)
+        except TimeoutError:
+            raise ProblemError("ORCH-VALIDATION", "the body did not arrive in time", "", {"Connection": "close"}) from None
         buf = b"".join(chunks)
 
         # 2. signature (the request target as sent: path plus query string)
@@ -247,7 +255,12 @@ class Service:
     def _create(self, buf: bytes) -> tuple[int, dict]:
         accepted = self.engine.accept_create(parse_create(_loads(buf)))
         if accepted.work is not None:
-            self._spawn(accepted.work, "create")
+            try:
+                self._spawn(accepted.work, "create")
+            except Exception as e:  # no thread could be started (M10): the instance fails with a code, it does not stay `requested`
+                log_line(event="spawn-failed", what="create", error=type(e).__name__)
+                self.engine.abandon_create(accepted.record)
+                raise ProblemError(INTERNAL, "the worker could not be started") from None
         return (202 if accepted.changed else 200), accepted.view
 
     def _access(self, instance_id: str, buf: bytes) -> tuple[int, dict]:
@@ -257,7 +270,12 @@ class Service:
     def _destroy(self, instance_id: str, buf: bytes) -> tuple[int, dict]:
         accepted = self.engine.accept_destroy(instance_id)
         if accepted.work is not None:
-            self._spawn(destroy_worker(accepted.work), "destroy")
+            try:
+                self._spawn(destroy_worker(accepted.work), "destroy")
+            except Exception as e:  # M10: the flag is cleared, so a repeated destroy starts the work again
+                log_line(event="spawn-failed", what="destroy", error=type(e).__name__)
+                self.engine.release_destroy(accepted.record)
+                raise ProblemError(INTERNAL, "the worker could not be started") from None
         return (202 if accepted.changed else 200), accepted.view
 
     def _reset(self, instance_id: str, buf: bytes) -> tuple[int, dict]:
@@ -304,6 +322,9 @@ class Service:
 # ---------------------------------------------------------------- command line
 
 class _Parser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, allow_abbrev=False, **kwargs)  # "--key" must not mean "--key-file"
+
     def error(self, message: str):  # exit code 2, like the Node fake
         self.exit(2, f"{self.prog}: {message}\n")
 
@@ -312,8 +333,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = _Parser(prog="vulnmart_orchestrator", description="VulnMart orchestrator service (IF-5)")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8443)
-    p.add_argument("--key", help="platform signing key (or VM_ORCH_PLATFORM_KEY)")
-    p.add_argument("--report-key", help="orchestrator signing key for state reports (or VM_ORCH_REPORT_KEY)")
+    # No signing key on the command line (it would show in `ps`): the environment variables, or a file that only the owner can read.
+    p.add_argument("--key-file", help="file with the platform signing key (or the environment variable VM_ORCH_PLATFORM_KEY); on POSIX the file must not be readable by group or others")
+    p.add_argument("--report-key-file", help="file with the orchestrator signing key for state reports (or VM_ORCH_REPORT_KEY); same file rule")
+    p.add_argument("--insecure-no-tls", action="store_true", help="test and local demo only: allow a listen address that is not loopback without TLS")
+    p.add_argument("--allow-fake-backend", action="store_true", help="test switch: required for --backend fake")
     p.add_argument("--report-url", help="platform base URL for state reports")
     p.add_argument("--report-timeout-ms", type=int, default=5000)
     p.add_argument("--capacity-mb", type=int, default=DEFAULT_CAPACITY_MB)
@@ -325,6 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--templates-dir", required=True)
     p.add_argument("--template-schema", required=True)
     p.add_argument("--images-manifest", help="release manifest (required with --backend docker)")
+    p.add_argument("--allow-local-images", action="store_true", help="local demo and tests only: accept bare local image ids (sha256:<hex>) in the manifest")
     p.add_argument("--health-timeout-s", type=float, default=None)
     p.add_argument("--injector-timeout-s", type=float, default=None)
     p.add_argument("--rate-per-s", type=float, default=RATE_PER_SECOND, help="requests per second per client; 0 switches the limit off")
@@ -335,10 +360,30 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _key(value: str | None, env: str, label: str) -> bytes:
-    raw = value or os.environ.get(env) or ""
+def is_loopback(host: str) -> bool:
+    """True for localhost and the loopback addresses. Anything else (0.0.0.0, a LAN address, a name) is reachable from the network."""
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def read_key_file(path: str, label: str) -> str:
+    """The key in a file. On POSIX a file readable or writable by group or others is refused (like an ssh private key); Windows has no
+    such mode bits, so the check is skipped there."""
+    st = os.stat(path)
+    if os.name != "nt" and st.st_mode & 0o077:
+        raise ValueError(f"{label} file {path} has mode {st.st_mode & 0o777:03o}: it must be 0600 or stricter (chmod 600)")
+    with open(path, encoding="utf-8") as f:
+        return f.read().strip()
+
+
+def _key(file: str | None, env: str, label: str) -> bytes:
+    raw = read_key_file(file, label) if file else (os.environ.get(env) or "")
     if len(raw) < MIN_KEY_LENGTH:
-        raise ValueError(f"{label} must be given (--{label.split()[0]} or {env}) and be at least {MIN_KEY_LENGTH} characters")
+        raise ValueError(f"{label} must be given (--{label.split()[0]}-file or the environment variable {env}) and be at least {MIN_KEY_LENGTH} characters")
     return raw.encode()
 
 
@@ -370,7 +415,7 @@ def build_engine(args: argparse.Namespace, on_transition: Callable | None) -> Or
     from .backend import SdkBackend
 
     return Orchestrator(
-        SdkBackend(base_url=args.docker_host), templates, ImageAllowlist.load(args.images_manifest),
+        SdkBackend(base_url=args.docker_host), templates, ImageAllowlist.load(args.images_manifest, allow_local_ids=args.allow_local_images),
         health_timeout_s=args.health_timeout_s or 60.0, injector_timeout_s=args.injector_timeout_s or 30.0,
         host_kind=args.host_kind or "vm", **common,
     )
@@ -395,12 +440,17 @@ def main(argv: list[str] | None = None) -> int:
         tls = [args.tls_cert, args.tls_key, args.tls_ca]
         if any(tls) and not all(tls):
             raise ValueError("--tls-cert, --tls-key and --tls-ca must be given together")
+        if not all(tls) and not is_loopback(args.host) and not args.insecure_no_tls:
+            raise ValueError(f"refusing to listen on {args.host} without TLS: give --tls-cert, --tls-key and --tls-ca, or listen on 127.0.0.1 "
+                             "(--insecure-no-tls is for tests and the local demo only)")
+        if args.backend == "fake" and not args.allow_fake_backend:
+            raise ValueError("--backend fake is a test backend: it needs --allow-fake-backend")
         if args.report_url:
             check_report_url(args.report_url)
-        platform_key = _key(args.key, "VM_ORCH_PLATFORM_KEY", "key (platform signing key)")
+        platform_key = _key(args.key_file, "VM_ORCH_PLATFORM_KEY", "key (platform signing key)")
         pusher = None
         if args.report_url:
-            pusher = ReportPusher(args.report_url, _key(args.report_key, "VM_ORCH_REPORT_KEY", "report-key (orchestrator signing key)"),
+            pusher = ReportPusher(args.report_url, _key(args.report_key_file, "VM_ORCH_REPORT_KEY", "report-key (orchestrator signing key)"),
                                   timeout_s=args.report_timeout_ms / 1000)
         engine = build_engine(args, pusher.submit if pusher else None)
         ctx = tls_context(args.tls_cert, args.tls_key, args.tls_ca) if all(tls) else None
@@ -438,7 +488,7 @@ class _AnnouncingServer(uvicorn.Server):
 async def serve(app: FastAPI, host: str, port: int, ssl_context: ssl.SSLContext | None) -> None:
     config = uvicorn.Config(
         app, host=host, port=port, access_log=False, log_level="warning", server_header=False, date_header=False, lifespan="off",
-        timeout_keep_alive=5,
+        timeout_keep_alive=5, limit_concurrency=MAX_CONCURRENCY,
         # uvicorn would build its own context from file names; ours (TLS 1.2 or higher, client certificate required) replaces it
         ssl_context_factory=(lambda _config, _default: ssl_context) if ssl_context is not None else None,
     )

@@ -3,7 +3,7 @@ title: 'Local end-to-end demo of sprints 1 and 2 for the guide meeting'
 type: 'feature'
 ticket: '17'
 created: '2026-10-13'
-status: 'done'
+status: 'built'
 baseline_revision: '0a2a43b'
 route: 'full'
 route_source: 'pinned'
@@ -23,5 +23,5 @@ context: ['docs/bmad/initiative-lab/epic-lab-baseline/tickets.toml']
 ## Done when
 `node scripts/dev.mjs demo` runs to the end on the developer machine with every step PASS and nothing left over (docker ps, networks, volumes labelled vm.*); the runbook `docs/runbooks/local-demo.md` lists what to show and say; the pure parts are unit tested.
 ## Implementation notes (2026-10-13)
-- Built as planned; see docs/dev-log/2026-10-13-tannmayygupta-local-demo.md. Real run: every step PASS in 141 s, nothing left over. The real shop does not yet work in the shop role (health check needs wget); the stub is used and the table says so.
+- Built as planned; see docs/dev-log/2026-10-13-tannmayygupta-local-demo.md. Real run: every step PASS in 141 s, nothing left over. The real shop works in the shop role (the manifest `healthchecks` entry gives it a node check, the distroless image has no wget); the stub is used only if the shop image fails to build or reach ready. Review and e2e skills not run.
 - Not done: the review and the e2e test generation steps; the developer confirms and closes the story.

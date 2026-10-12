@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from support import create_request, material, new_id, owner_hash, reset_request
+from support import create_request, instance_memory_mb, material, new_id, owner_hash, reset_request
 from vulnmart.ports.instance_host import (
     Access, Busy, Health, HostHealth, InstanceExists, InstanceHost, InstanceNotFound, InstanceState, InvalidState,
     LabelUnknown, RequestMismatch, StaleAccessEpoch, StaleEpoch, TemplateUnknown, ValidationFailed,
@@ -69,7 +69,8 @@ def test_unknown_template_creates_nothing(harness):
 
 
 def test_busy_host_refuses_and_creates_nothing(make, kind):
-    h = make(kind, capacity_mb=512)
+    unit = instance_memory_mb(kind, 256)
+    h = make(kind, capacity_mb=2 * unit)
     a, b, c = (create_request(memory_mb=256) for _ in range(3))
     h.host.create(a)
     h.host.create(b)
@@ -356,7 +357,7 @@ def test_host_reports_capacity_and_health(harness):
     req = create_request(memory_mb=300)
     harness.host.create(req)
     during = harness.host.host_status()
-    assert during.used_memory_mb == 300 and during.instances == 1
+    assert during.used_memory_mb == instance_memory_mb(harness.kind, 300) and during.instances == 1
     harness.host.destroy(req.instance_id)
     harness.settle(req.instance_id, S.DESTROYED)
     after = harness.host.host_status()

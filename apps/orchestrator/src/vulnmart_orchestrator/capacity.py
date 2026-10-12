@@ -1,5 +1,4 @@
-"""Capacity of the host (contract sections 3 and 7, D8 of story 3.2): counted in memory only. The used memory is the sum of
-`limits.memory_mb` of every instance that is not destroyed; a create that would pass the capacity is refused with 429 `ORCH-BUSY` and
+"""Capacity of the host (contract sections 3 and 7, D8 of story 3.2): counted in memory only. The used memory is the sum of the plan memory (the memory of every container the template gives the instance, the 64 MB volume keeper included; not the request value `limits.memory_mb`, which is only validated) of every instance that is not destroyed; a create that would pass the capacity is refused with 429 `ORCH-BUSY` and
 creates nothing. A destroyed instance (a tombstone) holds no memory. A reset has no capacity check of its own (it keeps the memory the
 instance holds: handoff H-57)."""
 from __future__ import annotations

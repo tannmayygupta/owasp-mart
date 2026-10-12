@@ -35,7 +35,12 @@ export const MAX_SKEW_MS = 60 * 1000;
 export const NONCE_TTL_MS = 5 * 60 * 1000;
 export const TEMPLATES = new Set(['shop-v0', 'shop-fail-v0']);
 const COMPONENTS = new Set(['bot-controller', 'import-service', 'injector', 'mock-services', 'shop', 'sidecar']);
-const FORBIDDEN = new Set(['image', 'command', 'cmd', 'entrypoint', 'volume', 'volumes', 'mount', 'mounts', 'port', 'ports', 'network', 'networks', 'env', 'environment']);
+// The same names as FORBIDDEN_FIELDS of apps/orchestrator/src/vulnmart_orchestrator/builder.py (a test compares the two lists).
+const FORBIDDEN = new Set([
+  'image', 'images', 'command', 'cmd', 'entrypoint', 'args', 'env', 'environment', 'volumes', 'volume', 'mounts', 'mount',
+  'ports', 'port', 'network', 'networks', 'network_mode', 'privileged', 'user', 'cap_add', 'cap_drop', 'devices', 'labels',
+  'security_opt', 'binds', 'tmpfs', 'components', 'healthcheck', 'restart', 'pid', 'ipc', 'extra_hosts', 'dns',
+]);
 const LABELS = new Set(['instance', 'epoch', 'component', 'template', 'kind']);
 const RESETTABLE = new Set(['ready', 'active', 'idle']);
 const TRANSITIONAL = new Set(['requested', 'provisioning', 'starting', 'resetting', 'stopping']);

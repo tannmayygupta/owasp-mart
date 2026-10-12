@@ -4,8 +4,10 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PROJECT, PLATFORM_CONTAINERS, parseDemoArgs, platformProfiles, platformPorts, redact, formatLine, formatTable, exitCode,
-  parseStepLines, evaluateDoctor, reduceTemplate, relaxSchema, buildManifest, leftoverNames, evidenceText,
+  parseStepLines, evaluateDoctor, reduceTemplate, relaxSchema, buildManifest, leftoverNames, evidenceText, parseInstanceIds, killTree,
 } from './demo.mjs';
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { parseArgs, HELP } from './dev.mjs';
 
 describe('arguments', () => {
@@ -126,3 +128,40 @@ describe('leftovers', () => {
   });
 });
 
+
+describe('audit fixes L16 and L17', () => {
+  test('instance ids come only from the IID lines of the client', () => {
+    const out = ['IID i-ABCDEFGHIJKLMNOP', 'noise IID i-ZZZZZZZZZZZZZZZZ', 'IID i-bad', 'IID i-ABCDEFGHIJKLMNOP', 'STEP {"name":"a","ok":true}', 'IID i-2222222222222222'].join('\r\n');
+    assert.deepEqual(parseInstanceIds(out), ['i-ABCDEFGHIJKLMNOP', 'i-2222222222222222']);
+  });
+  test('the evidence names the image and a SKIP is not written as every step PASS', () => {
+    const text = evidenceText({ date: '2026-10-13', args: { keep: false, stubOnly: false, noWeb: false }, mode: 'stub instance image', image: 'vulnmart-stub-instance:local (stub)', rows: [{ status: 'PASS', name: 'x', detail: 'd' }, { status: 'SKIP', name: 'shop-role', detail: 'stub used' }], note: '' });
+    assert.match(text, /Image in the shop role: vulnmart-stub-instance:local/);
+    assert.doesNotMatch(text, /every step PASS/);
+    assert.match(text, /no step FAIL; some steps SKIP/);
+  });
+  test('a failed shop build or a rejected real shop is never recorded as PASS (source check)', () => {
+    const src = readFileSync(new URL('./demo.mjs', import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /record\('PASS', 'shop-image-build', `could not build/);
+    assert.doesNotMatch(src, /record\('PASS', 'shop-role'/);
+    assert.match(src, /record\(useReal \? 'PASS' : 'SKIP', 'shop-role'/);
+    assert.match(src, /record\('SKIP', 'shop-image-build'/);
+  });
+  test('the cleanup removes by the ids the client made, not by the bare vm.instance label', () => {
+    const src = readFileSync(new URL('./demo.mjs', import.meta.url), 'utf8');
+    const finish = src.slice(src.indexOf('async function finish()'));
+    assert.match(finish, /for \(const iid of madeIds\)/);
+    assert.doesNotMatch(finish, /for \(const id of vm\) run\('docker', \['rm'/);
+  });
+  test('killTree ends the child and its own child (the process tree)', async () => {
+    const script = "const {spawn}=require('node:child_process');const c=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log(c.pid);setInterval(()=>{},1000)";
+    const parent = spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
+    const grand = await new Promise((resolve) => parent.stdout.once('data', (d) => resolve(Number(String(d).trim()))));
+    const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    assert.ok(alive(grand) && alive(parent.pid));
+    killTree(parent);
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.ok(!alive(parent.pid), 'the child is gone');
+    assert.ok(!alive(grand), 'the grandchild is gone too');
+  });
+});

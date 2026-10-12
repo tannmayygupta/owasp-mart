@@ -32,11 +32,12 @@ while [ $# -gt 0 ]; do case "$1" in --path) path="$2"; shift ;; --domains) domai
 base=$(printf '%s' "$domain" | tr '*' '_')
 mkdir -p "$path/certificates"
 [ "\${STUB_LEGO_NOFILES:-0}" = 1 ] || { echo CERT > "$path/certificates/$base.crt"; echo KEY > "$path/certificates/$base.key"; }
+if [ "\${STUB_LEGO_CRTDIR:-0}" = 1 ]; then rm -f "$path/certificates/$base.crt"; mkdir "$path/certificates/$base.crt"; echo x > "$path/certificates/$base.crt/f"; fi
 `;
 const STUB_OPENSSL = '#!/bin/sh\necho "notAfter=$STUB_NOTAFTER"\n';
 
 // Run a host script with the stub folder first on PATH. Git bash (MSYS) puts its own /usr/bin first, so a stub named like a real tool (openssl, curl) must be put in front inside the shell.
-const WRAP = 'PATH="$(cygpath -u "$STUBBIN" 2>/dev/null || echo "$STUBBIN"):$PATH"\nexport PATH\nexec "$SHELL_PATH" "$@"\n';
+const WRAP = 'PATH="$(cygpath -u "$STUBBIN" 2>/dev/null || echo "$STUBBIN"):$PATH"\nexport PATH\n_s=$1\nshift\n. "$_s"\n';
 const runScript = (env, bin, script, args) => {
   const wrap = path.join(path.dirname(bin), 'wrap.sh');
   writeFileSync(wrap, WRAP);
@@ -50,8 +51,13 @@ function setup(extra = {}) {
     writeFileSync(path.join(bin, n), b);
     chmodSync(path.join(bin, n), 0o755);
   }
+  if (extra.STUB_CP_FAIL_CRT) { // a cp that fails only for the certificate copy: the old publish() went on, copied the key and returned 0 from its last mv
+    writeFileSync(path.join(bin, 'cp'), '#!/bin/sh\ncase "$*" in *fullchain.pem.new*) exit 1 ;; esac\nexec /usr/bin/cp "$@"\n');
+    chmodSync(path.join(bin, 'cp'), 0o755);
+  }
   const token = path.join(dir, 'duckdns.token');
   writeFileSync(token, 'TOKEN-PLACEHOLDER-NOT-REAL\n');
+  chmodSync(token, 0o600);
   const env = {
     ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`,
     STUB_LOG: fwd(path.join(dir, 'log')), VULNMART_CERTS_ENV: '/nonexistent',
@@ -430,6 +436,42 @@ test('the service has a start timeout and the script header says when Caddy may 
   const sh = readFileSync(path.join(HOSTS, 'vulnmart-certs.sh'), 'utf8');
   assert.match(sh, /flock -n 9/);
   assert.match(sh, /Caddy must reload only after the run ends/);
+  assert.match(sh, /^set -eu$/m, 'set -eu is on its own line (it was glued to a comment and dead)');
+});
+
+test('H2: the service reloads the origin Caddy after the run through the admin socket, and a failed reload cannot fail the unit', () => {
+  const svc = readFileSync(path.join(HOSTS, 'vulnmart-certs.service'), 'utf8');
+  const m = svc.match(/^ExecStartPost=(.*)$/m);
+  assert.ok(m, 'ExecStartPost present');
+  assert.ok(m[1].startsWith('-'), 'leading - : a failed reload is ignored');
+  assert.match(m[1], /docker exec vulnmart-origin-caddy-1 caddy reload --config \/etc\/caddy\/Caddyfile --adapter caddyfile --address unix\/\/tmp\/caddy-admin\.sock/);
+  const compose = readFileSync(path.join(ROOT, 'infra', 'caddy', 'compose.p.yaml'), 'utf8');
+  assert.match(compose, /^name: vulnmart-origin$/m);
+  assert.match(compose, /^  caddy:$/m);
+  assert.match(readFileSync(path.join(ROOT, 'infra', 'caddy', 'Caddyfile.p'), 'utf8'), /admin unix\/\/tmp\/caddy-admin\.sock/);
+});
+
+test('H1: a failing copy exits 1, writes no certs-ok stamp and leaves no .new file', { skip }, () => {
+  const s = setup({ STUB_CP_FAIL_CRT: '1' });
+  try {
+    s.put('marks/certs-staging-ok', 'demo.duckdns.org\n');
+    const r = s.run('vulnmart-certs.sh', 'issue', '--production');
+    assert.equal(r.status, 1, r.stderr + r.stdout);
+    assert.ok(!s.mark('certs-ok'), 'no success stamp after a failed publish');
+    assert.ok(s.mark('certs-failed'), 'failure marker written');
+    assert.ok(!existsSync(path.join(s.dir, 'certs', 'live', 'fullchain.pem.new')), 'temporary file cleaned');
+  } finally { s.clean(); }
+});
+
+test('L19: a token file readable by group or others is refused with exit 2 and no lego call (POSIX only)', { skip: skip || (process.platform === 'win32' ? 'Windows shells cannot report modes' : false) }, () => {
+  const s = setup();
+  try {
+    chmodSync(path.join(s.dir, 'duckdns.token'), 0o644);
+    const r = s.run('vulnmart-certs.sh', 'issue');
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /must be 0600 or stricter/);
+    assert.equal(legoCalls(s).length, 0);
+  } finally { s.clean(); }
 });
 
 

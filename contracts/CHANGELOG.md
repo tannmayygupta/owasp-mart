@@ -29,6 +29,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+- BREAKING: none in substance. The only change is the `contract_version` label in `audiences.json` (0.1.0 to 1.0.0); the rules engine flags a changed value as breaking on the safe side. Checked by hand: no member added, removed or retyped.
 
 ### 0.1.0 (2026-10-11, Akshay, story P-03)
 - registry change: IF-3 is registered in `contracts/registry.json` (new contract in its own folder: `contracts/events/` is IF-4's folder in the registry, so the architecture's path `contracts/events/domain-events.schema.json` moved to `contracts/domain-events/`; `docs/architecture/07-repo-and-workstreams.md` is updated).
@@ -42,7 +43,8 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
-- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+- First stable release, label change plus one code (below); no mock change. Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+- registry change: one code added before the tag, no breaking change: `INST-START-FAILED` (`status` null, `retryable` true), the `error_code` the orchestrator sets on an instance that could not be started (`apps/orchestrator`, states). Checked by hand: 1 added, 0 removed, 0 changed.
 
 ### 0.4.0 (2026-10-12, Tanmay for stream L, story "IF-8 error bodies", condition F-2 of the contracts sign-off; for Akshay to confirm)
 - Additive: three codes that the Python orchestrator service and the IF-5 contract name and that the seed did not have: `ORCH-CURSOR-INVALID` (422, a list cursor that this orchestrator did not hand out), `ORCH-UNSUPPORTED-MEDIA-TYPE` (415) and `ORCH-NOT-IMPLEMENTED` (501, the reset placeholder of the Python service; never in the OpenAPI file). Titles are generic sentences like the others. Constants regenerated (59 codes).

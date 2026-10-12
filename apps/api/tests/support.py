@@ -50,6 +50,14 @@ START_TIMEOUT_SECONDS = 15
 _counter = itertools.count(1)
 
 
+def instance_memory_mb(kind: str, request_mb: int) -> int:
+    """What one instance counts against the host capacity. The Node fake and the in-memory fake count the request value
+    `limits.memory_mb`; the Python service counts what the template gives the containers (components plus the 64 MB keeper, M5)."""
+    if PYTHON_SERVICE and kind == "http":
+        return sum(c["memory_mb"] for c in json.loads(SHOP_TEMPLATE.read_text(encoding="utf-8"))["components"]) + 64
+    return request_mb
+
+
 def new_id() -> str:
     """A unique, valid instance id (i- plus 16 Base32 characters)."""
     return "i-" + base64.b32encode(next(_counter).to_bytes(10, "big")).decode()
@@ -236,10 +244,12 @@ class ServiceProcess:
         env = None
         if PYTHON_SERVICE:
             # the rate limit is off: a test polls far faster than the 20 requests per second a platform client is allowed
-            args = [sys.executable, "-m", "vulnmart_orchestrator", "--backend", "fake", "--port", "0", "--capacity-mb", str(capacity_mb),
-                    "--step-delay-ms", str(step_delay_ms), "--key", PLATFORM_KEY.decode(), "--report-key", ORCH_KEY.decode(),
+            # the keys go in the environment, never on the command line (M6); the fake backend needs its explicit test switch (H3)
+            args = [sys.executable, "-m", "vulnmart_orchestrator", "--backend", "fake", "--allow-fake-backend", "--port", "0",
+                    "--capacity-mb", str(capacity_mb), "--step-delay-ms", str(step_delay_ms),
                     "--templates-dir", str(python_templates_dir()), "--template-schema", str(TEMPLATE_SCHEMA), "--rate-per-s", "0"]
-            env = {**os.environ, "PYTHONPATH": str(ORCH_SRC)}
+            env = {**os.environ, "PYTHONPATH": str(ORCH_SRC), "VM_ORCH_PLATFORM_KEY": PLATFORM_KEY.decode(),
+                   "VM_ORCH_REPORT_KEY": ORCH_KEY.decode()}
         else:
             node = shutil.which("node")
             if node is None:

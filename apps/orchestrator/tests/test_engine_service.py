@@ -1,14 +1,19 @@
 """The engine as the service uses it (story 3.2): contract alignment of the create body, accept and run split, capacity, access, list,
 the record fields and a destroy that arrives while the instance is still being built."""
+import json
 import threading
 import time
 
 import pytest
-from support import EVENT_KEY, FLAG_A, IID, SEED, allowlist, body, template
+from support import EVENT_KEY, FLAG_A, IID, SEED, allowlist, body, plan_memory_mb, template
 
 from vulnmart_orchestrator.backend import FakeBackend
 from vulnmart_orchestrator.builder import parse_access, parse_create, parse_reset
+from vulnmart_orchestrator.auth import Verifier
 from vulnmart_orchestrator.engine import Orchestrator
+from vulnmart_orchestrator.problems import ProblemError
+from vulnmart_orchestrator.ratelimit import RateLimiter
+from vulnmart_orchestrator.service import Service
 from vulnmart_orchestrator.states import (
     Busy, FieldForbidden, InstanceNotFound, InstanceState, InvalidState, StaleAccessEpoch, ValidationFailed,
 )
@@ -175,17 +180,28 @@ def test_the_view_holds_no_secret_and_only_the_contract_members():
 
 # ---- capacity (D8) ----
 def test_capacity_is_the_sum_of_memory_of_instances_that_are_not_destroyed():
-    orch, be = make(capacity_mb=512)
+    unit = plan_memory_mb()  # what the containers really get; the request limit (256) is not what is counted
+    orch, be = make(capacity_mb=2 * unit)
     orch.create(body(iid=IID))
     orch.create(body(iid=OTHER))
     third = "i-YYYYYYYYYYYYYYYY"
     with pytest.raises(Busy):
         orch.accept_create(body(iid=third))
-    assert orch.get(third) is None and orch.host_status()["used_memory_mb"] == 512 and orch.host_status()["instances"] == 2
+    assert orch.get(third) is None and orch.host_status()["used_memory_mb"] == 2 * unit and orch.host_status()["instances"] == 2
     orch.destroy(IID)
-    assert orch.host_status()["used_memory_mb"] == 256 and orch.host_status()["instances"] == 1
+    assert orch.host_status()["used_memory_mb"] == unit and orch.host_status()["instances"] == 1
     orch.create(body(iid=third))  # the memory of a destroyed instance is free again; its tombstone stays
     assert orch.view(IID)["state"] == "destroyed"
+
+
+def test_capacity_uses_the_plan_memory_not_the_request_limit():
+    # M5: a request that claims 64 MB still takes the whole template (components plus keeper) when its containers are created
+    orch, be = make(capacity_mb=plan_memory_mb())
+    limits = {"memory_mb": 64, "cpu_limit": 1.5, "pids_limit": 512, "idle_minutes": 30, "max_minutes": 120}
+    orch.create(body(iid=IID, limits=limits))
+    assert orch.host_status()["used_memory_mb"] == plan_memory_mb()
+    with pytest.raises(Busy):  # a sum of request limits (64 + 64) would have fitted
+        orch.accept_create(body(iid=OTHER, limits=limits))
 
 
 def test_a_create_larger_than_the_whole_host_is_busy_and_creates_nothing():
@@ -268,3 +284,33 @@ def test_the_step_delay_pauses_before_each_step_and_a_destroy_cuts_it_short():
     orch.accept_destroy(IID)
     build.join(2)
     assert not build.is_alive()
+
+
+# ---- M10: a worker thread that cannot be started never leaves a record stuck ----
+def _service(orch):
+    def no_thread(fn, what):
+        raise RuntimeError("can't start new thread")
+
+    return Service(orch, Verifier(b"FAKE-SIGNING-KEY-NOT-REAL-0000000000"), RateLimiter(0, 1), spawn_work=no_thread)
+
+
+def test_a_create_whose_worker_cannot_start_fails_with_a_code_and_can_be_destroyed():
+    orch, be = make()
+    svc = _service(orch)
+    with pytest.raises(ProblemError) as err:
+        svc._create(json.dumps(body()).encode())
+    assert err.value.code == "ORCH-INTERNAL"
+    view = orch.view(IID)
+    assert view["state"] == "failed" and view["error_code"] == "INST-START-FAILED"  # not stuck in requested
+    orch.destroy(IID)  # a failed instance is destroyed like any other and frees its capacity
+    assert orch.view(IID)["state"] == "destroyed"
+
+
+def test_a_destroy_whose_worker_cannot_start_can_be_repeated():
+    orch, be = make()
+    orch.create(body())
+    svc = _service(orch)
+    with pytest.raises(ProblemError):
+        svc._destroy(IID, b"")
+    assert orch.get(IID).destroying is False  # not stuck: the next destroy starts the work again
+    assert orch.accept_destroy(IID).work is not None

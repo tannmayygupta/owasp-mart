@@ -121,7 +121,11 @@ def create_service_app(
     app.state.check_timeout = limit
     install_problem_handlers(app)
     # Added first, so it runs inside the request-id middleware (its 403 carries the request id).
-    app.add_middleware(OriginSecretMiddleware, secrets=parse_secrets(settings.origin_secrets_value()))
+    origin_secrets = parse_secrets(settings.origin_secrets_value())
+    if not origin_secrets and settings.env in ("staging", "production"):
+        # fail closed: without a secret the check is off and every /api/ route would be open to anyone who reaches the origin
+        raise RuntimeError(f"VULNMART_ENV={settings.env} needs an origin secret (VULNMART_ORIGIN_SECRET or VULNMART_ORIGIN_SECRET_FILE)")
+    app.add_middleware(OriginSecretMiddleware, secrets=origin_secrets)
     app.add_middleware(RequestIdMiddleware)
 
     @app.get("/healthz", include_in_schema=False)

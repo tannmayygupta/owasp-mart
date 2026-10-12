@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     postgres_dsn: str | None = Field(default=None, repr=False)  # the app role (no table owner, no BYPASSRLS)
     migrate_dsn: str | None = Field(default=None, repr=False)  # the owner role; only the migrate job has it
     valkey_url: str | None = Field(default=None, repr=False)
+    # Where this process runs. `staging` and `production` are strict: the service does not start without an origin secret (M11 of the
+    # audit), because an unset secret switches the origin check off. `dev` (the default) and `test` keep the check optional.
+    env: Literal["dev", "test", "staging", "production"] = "dev"
     service: ServiceName = "api"
     version: str = "0.0.0-dev"
     commit: str = "unknown"

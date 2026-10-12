@@ -1,5 +1,7 @@
 # Runbook: image builds in CI and the human-run deploy (hello stack)
 
+**Cost warning:** vm-i is stopped to save credits: start it first, stop it after, never create or replace a host while `vm_i_running = false`.
+
 Story: L-12 (D-51, ADR 0032, ADR 0011). Files: `infra/images.json`, `.github/workflows/images.yml`, `scripts/images-matrix.mjs`, `scripts/images-release.mjs`, `scripts/deploy.mjs`, `infra/hello/`, `infra/compose/hello-stack.yaml`.
 
 Everything here is free (GitHub Free minutes, GHCR). CI builds and pushes images by digest and writes a release manifest; **you** deploy with `scripts/deploy.mjs`. CI holds no deployment credential and never touches the VMs. Claude ran none of the steps below against GitHub, GHCR, the VMs or the laptop: they are yours, and the result is yours to record.

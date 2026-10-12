@@ -67,9 +67,9 @@ def test_allowlist_needs_digests_and_known_roles():
     with pytest.raises(ValueError):
         ImageAllowlist({"shop": "registry.invalid/shop:latest"})
     with pytest.raises(ValueError):
-        ImageAllowlist({"other": "sha256:" + "a" * 64})
+        ImageAllowlist({"other": "sha256:" + "a" * 64}, allow_local_ids=True)
     with pytest.raises(ValueError):
-        ImageAllowlist({"shop": "sha256:" + "a" * 64}, commands={"sidecar": ("x",)})
+        ImageAllowlist({"shop": "sha256:" + "a" * 64}, commands={"sidecar": ("x",)}, allow_local_ids=True)
 
 
 def test_allowlist_loads_a_manifest_file(tmp_path):
@@ -87,8 +87,33 @@ def test_manifest_healthchecks_override_the_template_check_for_an_image_without_
     from support import allowlist, digest, template, body
     import copy
 
-    manifest = {"images": {"shop": digest("shop")}, "healthchecks": {"shop": ["CMD", "/nodejs/bin/node", "-e", "process.exit(0)"]}}
+    manifest = {"images": {"shop": "r.invalid/shop@" + digest("shop")}, "healthchecks": {"shop": ["CMD", "/nodejs/bin/node", "-e", "process.exit(0)"]}}
     a = ImageAllowlist.from_manifest(manifest)
     assert a.healthchecks["shop"][1] == "/nodejs/bin/node"
     with pytest.raises(ValueError):
-        ImageAllowlist.from_manifest({"images": {"shop": digest("shop")}, "healthchecks": {"sidecar": ["CMD", "x"]}})
+        ImageAllowlist.from_manifest({"images": {"shop": "r.invalid/shop@" + digest("shop")}, "healthchecks": {"sidecar": ["CMD", "x"]}})
+
+
+# ---- L20: the digest check matches the whole reference; a bare image id is for tests and the local demo only ----
+@pytest.mark.parametrize("ref", [
+    "registry.invalid/shop@sha256:" + "a" * 64 + "\n",  # a trailing newline passed the old `$` anchor
+    "registry.invalid/shop@sha256:" + "a" * 64 + " x",
+    "registry.invalid/shop@sha256:" + "a" * 63,
+    "registry.invalid/shop@sha256:" + "A" * 64,
+    "registry.invalid/shop:latest",
+])
+def test_a_malformed_digest_reference_is_refused(ref):
+    with pytest.raises(ValueError):
+        ImageAllowlist({"shop": ref}, allow_local_ids=True)
+
+
+def test_a_bare_image_id_is_refused_unless_the_allowlist_is_made_for_local_use(tmp_path):
+    bare = "sha256:" + "a" * 64
+    with pytest.raises(ValueError, match="bare image id"):
+        ImageAllowlist({"shop": bare})
+    assert ImageAllowlist({"shop": bare}, allow_local_ids=True).images["shop"] == bare
+    f = tmp_path / "images.json"
+    f.write_text(json.dumps({"images": {"shop": bare}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="bare image id"):
+        ImageAllowlist.load(f)
+    assert ImageAllowlist.load(f, allow_local_ids=True).images["shop"] == bare

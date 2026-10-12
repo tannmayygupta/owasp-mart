@@ -1,12 +1,12 @@
 """GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
 
-Error registry (IF-8) version 0.4.0.
+Error registry (IF-8) version 1.0.0.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
 
-REGISTRY_VERSION = "0.4.0"
+REGISTRY_VERSION = "1.0.0"
 PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:"
 
 
@@ -42,6 +42,7 @@ class ErrorCode(StrEnum):
     INST_NOT_FOUND = "INST-NOT-FOUND"
     INST_NOT_READY = "INST-NOT-READY"
     INST_QUOTA_REACHED = "INST-QUOTA-REACHED"
+    INST_START_FAILED = "INST-START-FAILED"
     ORCH_BAD_SIGNATURE = "ORCH-BAD-SIGNATURE"
     ORCH_BODY_TOO_LARGE = "ORCH-BODY-TOO-LARGE"
     ORCH_BUSY = "ORCH-BUSY"
@@ -113,6 +114,7 @@ ERRORS: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.INST_NOT_FOUND: ErrorInfo(ErrorCode.INST_NOT_FOUND, 404, "Instance not found.", False),
     ErrorCode.INST_NOT_READY: ErrorInfo(ErrorCode.INST_NOT_READY, 409, "The instance is not ready yet.", True),
     ErrorCode.INST_QUOTA_REACHED: ErrorInfo(ErrorCode.INST_QUOTA_REACHED, 409, "The instance limit has been reached.", False),
+    ErrorCode.INST_START_FAILED: ErrorInfo(ErrorCode.INST_START_FAILED, None, "The instance could not be started.", True),
     ErrorCode.ORCH_BAD_SIGNATURE: ErrorInfo(ErrorCode.ORCH_BAD_SIGNATURE, 401, "The request could not be authenticated.", False),
     ErrorCode.ORCH_BODY_TOO_LARGE: ErrorInfo(ErrorCode.ORCH_BODY_TOO_LARGE, 413, "The request body is too large.", False),
     ErrorCode.ORCH_BUSY: ErrorInfo(ErrorCode.ORCH_BUSY, 429, "No capacity is available right now.", True),

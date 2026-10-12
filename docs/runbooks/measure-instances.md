@@ -9,10 +9,9 @@ All steps are yours. I (Claude) do not call AWS or SSH to hosts. Paste the redac
 ## Steps
 
 1. **Start vm-i** (your AWS window, every new window needs the profile line first):
-   `$env:AWS_PROFILE = "vulnmart"` then start it the way you did for the earlier checks (`docs/runbooks/aws-account-and-vms.md`). Wait about 2 minutes, then SSH in with your own key.
-2. **Get the code on the host** (clone is private, use your own deploy method; no token in this repo):
-   `git clone git@github.com:tannmayygupta/owasp-mart.git && cd owasp-mart && git switch shared-L-13`
-   (after the L-13 pull request is merged, use `main`). If the host has no git access, copy the folder with `scp -r` instead.
+   `$env:AWS_PROFILE = "vulnmart"`, then in `infra\terraform\aws` set `vm_i_running = true` in `terraform.tfvars` and run `terraform apply` (see `docs/runbooks/aws-account-and-vms.md`, "What a stop of `vm-i` does"; do not start it by hand with the AWS CLI). Wait about 2 minutes, then SSH in with your own key. Cost warning: vm-i is stopped to save credits: start it first, stop it after, and never create or replace a host while `vm_i_running = false`.
+2. **Get the code on the host** (vm-i's egress allows only tcp 443 and 80, DNS to the VPC resolver and NTP: no ssh and no git, so `git clone` cannot work). Copy the repository from your PC at the branch you want to measure, from the PC:
+   `scp -r <repo folder> <user>@<vm-i address>:owasp-mart` or, without copying `.git` and `node_modules`: `git archive HEAD | ssh <user>@<vm-i address> "mkdir -p owasp-mart && tar x -C owasp-mart"`, then `cd owasp-mart` on the host. `uv`, `docker build` and `uv sync` need HTTPS egress only (443), which the host has.
 3. **Install uv** if missing: `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `source ~/.bashrc`.
 4. **Build the stub instance image** (the real shop image comes with L-12 and T-04; the stub has the same shape: injector, then a shop with `/readyz` and a healthcheck):
    `docker build -q -f contracts/mocks/stub-instance/Dockerfile -t vulnmart-stub-instance:local .`
@@ -25,7 +24,7 @@ All steps are yours. I (Claude) do not call AWS or SSH to hosts. Paste the redac
    - Exit code 0 means no failed instance and nothing left behind. Exit 1 means a failure or leftovers (the JSON says which).
    Optional, to see the limit: repeat with `--count 20`.
 7. **Paste back** the JSON printed at the end plus the `free -m` of step 5. It holds only numbers and the host class (kernel, CPU count, total memory): no address, no name. Also run `docker ps -a | wc -l` and `docker volume ls | wc -l` and tell me the counts (both should be unchanged from before).
-8. **Stop vm-i** again (same AWS way as step 1) and confirm it shows stopped.
+8. **Stop vm-i** again: set `vm_i_running = false` in `terraform.tfvars`, run `terraform apply`, and confirm it shows stopped. Never create or replace a host while `vm_i_running = false`.
 
 ## What I do with the result
 

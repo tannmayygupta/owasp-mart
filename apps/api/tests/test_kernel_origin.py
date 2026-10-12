@@ -123,3 +123,34 @@ def test_the_secret_is_never_in_a_log_line_or_the_settings_repr():
         logging.getLogger().removeHandler(handler)
     text = stream.getvalue()
     assert SECRET not in text and json.loads(text.splitlines()[-1])["x_origin_secret"] == "[REDACTED]"
+
+
+# ---- M11: staging and production never start with the origin check switched off ----
+@pytest.mark.parametrize("env", ["staging", "production"])
+def test_a_strict_environment_without_an_origin_secret_fails_at_startup(env, tmp_path):
+    with pytest.raises(RuntimeError, match="needs an origin secret"):
+        create_app({}, settings=Settings(env=env))
+    empty = tmp_path / "origin_secret"
+    empty.write_text("\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="needs an origin secret"):  # an empty file is no secret either
+        create_app({}, settings=Settings(env=env, origin_secret_file=str(empty)))
+
+
+@pytest.mark.parametrize("env", ["staging", "production"])
+def test_a_strict_environment_with_a_secret_starts_and_checks_it(env):
+    with TestClient(create_app({}, settings=Settings(env=env, origin_secret=SECRET))) as c:
+        assert c.get("/api/v1/health").status_code == 403
+        assert c.get("/api/v1/health", headers={"x-origin-secret": SECRET}).status_code == 200
+
+
+@pytest.mark.parametrize("env", ["dev", "test"])
+def test_dev_and_test_keep_the_check_optional(env):
+    with TestClient(create_app({}, settings=Settings(env=env))) as c:
+        assert c.get("/api/v1/health").status_code == 200
+
+
+def test_the_default_environment_is_dev_and_the_variable_is_vulnmart_env(monkeypatch):
+    monkeypatch.delenv("VULNMART_ENV", raising=False)
+    assert Settings().env == "dev"
+    monkeypatch.setenv("VULNMART_ENV", "production")
+    assert Settings().env == "production"

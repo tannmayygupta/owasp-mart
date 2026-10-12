@@ -43,7 +43,7 @@ No ADR: the shape was decided by IF-8 and the change request. Choices made insid
 ## Tests
 Real runs, 2026-10-12/13 (details in the story plan file):
 - `node scripts/check-contract-rules.mjs`: 25 PASS, 0 FAIL, 1 NOT-APPLICABLE.
-- `uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests`: 225 passed, 1 failed (`test_over_twenty_per_second...`, timing: each local call takes about 55 ms so the 20 per second limit never triggers; the same at the base commit, checked with `git archive`).
+- `uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests`: 225 passed, 1 failed on 2026-10-12 (`test_over_twenty_per_second...`, timing: each local call takes about 55 ms so the 20 per second limit never triggers; the same at the base commit, checked with `git archive`). The rate-limit timing test was flaky on the slow Windows machine and was made deterministic on 2026-10-13; the real count on 2026-10-13 is 243 passed, 0 failed.
 - `VM_ORCH_SERVICE=python` five suites: 393 passed, 18 skipped.
 - `node --test "scripts/*.test.mjs"`: 705 pass, 0 fail.
 - `check-text-files`, `scan-secrets`: PASS. New test `test_every_error_answer_validates_against_the_if8_schema` validates the Python service answers with `problem.schema.json`.
@@ -64,4 +64,4 @@ None. The change removes free text from answers (no path or value reaches a clie
 - The stub sidecar's own answers on `/v1/events` keep their shape (not ingest answers).
 - `contracts/api/platform/platform-api.md` still says IF-2 keeps its own error bodies (stream P file, not touched).
 - Akshay re-confirms the new versions; Approvals rows stay `pending`.
-- Rate-limit test is timing-bound on this machine.
+- The rate-limit test was timing-bound on this machine; made deterministic on 2026-10-13 (see Tests).

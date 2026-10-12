@@ -7,7 +7,8 @@
 #   TOKEN_FILE (/opt/vulnmart/secrets/duckdns.token, passed to lego as DUCKDNS_TOKEN_FILE only), CERT_DIR (/opt/vulnmart/certs), LEGO_EXTRA_ARGS. Environment only: MARK_DIR, LEGO_BIN, OPENSSL_BIN, VULNMART_CERTS_ENV.
 # Markers in MARK_DIR: certs-staging-ok (first line CERT_NAME), certs-staging-failed, certs-ok, certs-failed (production only). A success clears only its own mode's failure marker; status reads production only.
 # One run at a time (flock on MARK_DIR/certs.lock, else exit 1 "already running"). Files are replaced by two renames: Caddy must reload only after the run ends (hook of L-12).
-# Exit: 0 ok or nothing to do, 1 failed, 2 bad usage or settings (no network call).set -eu
+# Exit: 0 ok or nothing to do, 1 failed, 2 bad usage or settings (no network call).
+set -eu
 
 ENV_FILE="${VULNMART_CERTS_ENV:-/etc/vulnmart/certs.env}"
 
@@ -75,6 +76,15 @@ check_name() {
 
 check_token() {
   [ -f "$TOKEN_FILE" ] || die 2 "token file not found: $TOKEN_FILE (root-only file, runbook certificates.md)"
+  # Refuse a token file readable or writable by group or others (mode must be 0600 or stricter; stat -c on Linux, stat -f on BSD).
+  _m=$(stat -c %a "$TOKEN_FILE" 2>/dev/null || stat -f %Lp "$TOKEN_FILE" 2>/dev/null || echo)
+  case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) _m= ;; esac   # Windows shells cannot report real modes (local tests only)
+  if [ -n "$_m" ]; then
+    case "$_m" in
+      *[!0-7]*) ;;
+      *) [ $(( 0$_m & 077 )) -eq 0 ] || die 2 "token file $TOKEN_FILE has mode $_m: it must be 0600 or stricter (chmod 600)" ;;
+    esac
+  fi
   [ -n "${CERT_EMAIL:-}" ] || die 2 "CERT_EMAIL is not set (certs.env)"
 }
 
@@ -115,12 +125,14 @@ publish() {
   [ -s "$_src/$_base.crt" ] && [ -s "$_src/$_base.key" ] || return 1
   if [ "$_mode" = production ]; then _dst="$CERT_DIR/live"; else _dst="$CERT_DIR/staging"; fi
   mkdir -p "$_dst"
-  cp "$_src/$_base.crt" "$_dst/fullchain.pem.new"
-  cp "$_src/$_base.key" "$_dst/privkey.pem.new"
-  chmod 0644 "$_dst/fullchain.pem.new"
-  chmod 0600 "$_dst/privkey.pem.new"
-  mv "$_dst/fullchain.pem.new" "$_dst/fullchain.pem"
-  mv "$_dst/privkey.pem.new" "$_dst/privkey.pem"
+  # One unit: any failing step returns 1 (callers test publish with "if !", where set -e is off), so a failed copy never stamps certs-ok.
+  cp "$_src/$_base.crt" "$_dst/fullchain.pem.new" \
+    && cp "$_src/$_base.key" "$_dst/privkey.pem.new" \
+    && chmod 0644 "$_dst/fullchain.pem.new" \
+    && chmod 0600 "$_dst/privkey.pem.new" \
+    && mv "$_dst/fullchain.pem.new" "$_dst/fullchain.pem" \
+    && mv "$_dst/privkey.pem.new" "$_dst/privkey.pem" \
+    || { rm -f "$_dst/fullchain.pem.new" "$_dst/privkey.pem.new"; return 1; }
 }
 
 # fail_marker <mode> <what>: production problems go to certs-failed, staging problems to certs-staging-failed

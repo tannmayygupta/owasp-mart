@@ -199,18 +199,34 @@ class Orchestrator:
                 if known.fingerprint != spec.fingerprint():
                     raise RequestMismatch("same instance and epoch with another body")
                 return Accepted(known, False, self._view(known), None)  # a repeat: no new work, same result
-            used = self.capacity.used(r.memory_mb for r in self.records.values() if r.state is not S.DESTROYED)
-            if not self.capacity.would_fit(used, spec.memory_mb):
-                raise Busy("the host has no capacity")
             plan = build_plan(template, spec, self.images, now=self._now())  # refuses before any object exists
+            # Capacity counts what the containers really get (the template memory of every component plus the keeper), not the request
+            # limit `limits.memory_mb`, which is validated but is not what Docker is given (M5 of the audit).
+            used = self.capacity.used(r.memory_mb for r in self.records.values() if r.state is not S.DESTROYED)
+            if not self.capacity.would_fit(used, plan.memory_mb):
+                raise Busy("the host has no capacity")
             now = self._stamp()
             rec = InstanceRecord(
-                spec.instance_id, spec.epoch, spec.template_id, spec.fingerprint(), hostname=spec.hostname, memory_mb=spec.memory_mb,
+                spec.instance_id, spec.epoch, spec.template_id, spec.fingerprint(), hostname=spec.hostname, memory_mb=plan.memory_mb,
                 components=frozenset(c["name"] for c in template["components"]), created_at=now, updated_at=now,
             )
             self.records[spec.instance_id] = rec
             self._move(rec, S.REQUESTED, "create accepted")
             return Accepted(rec, True, self._view(rec), lambda: self._run_create(rec, plan, spec))
+
+    def abandon_create(self, rec: InstanceRecord) -> None:
+        """The worker thread of an accepted create could not be started (M10): fail the instance with INST-START-FAILED instead of
+        leaving it in `requested` for ever, holding capacity. It can be destroyed like any failed instance."""
+        with self._lock:
+            if rec.state is S.REQUESTED:
+                self._move(rec, S.PROVISIONING, "the worker could not be started")
+        if rec.state is S.PROVISIONING:
+            self._fail(rec, _Failure(ErrorCode.START_FAILED, "the orchestrator could not start the worker for this create"))
+
+    def release_destroy(self, rec: InstanceRecord) -> None:
+        """The worker thread of an accepted destroy could not be started (M10): clear the flag so that a repeated destroy starts it."""
+        with self._lock:
+            rec.destroying = False
 
     def _run_create(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec) -> None:
         with rec.lock:

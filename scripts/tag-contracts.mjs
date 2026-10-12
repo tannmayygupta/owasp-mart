@@ -2,7 +2,8 @@
 // Usage: node scripts/tag-contracts.mjs [--dry-run | --create] [--root <dir>] [--tag <name>]
 //   --dry-run (the default): checks every precondition and lists every one that fails (never stops at the first); when all are green it prints the
 //                            `git tag -a` command and the push command, and creates nothing.
-//   --create:                the same checks; when all are green it creates the annotated tag LOCALLY. It never pushes: the push is the developer's.
+//   --create:                the same checks, after `git fetch origin main` (so origin/main is current); origin/main must exist (a dry run only warns when it
+//                            does not). When all are green it creates the annotated tag LOCALLY. It never pushes: the push is the developer's.
 // Exit 0: all preconditions green. Exit 1: at least one is red. Exit 2: the script could not run.
 // The preconditions (contracts/COMPAT.md, section "Tag preconditions"): clean tree, branch main, the tag does not exist yet, versions in COMPAT.md
 // are the newest changelog entries, every approval row of COMPAT.md is `approved`, every line of the done checklist in docs/dev/HANDOFFS.md is ticked.
@@ -46,7 +47,7 @@ export function checklist(text) {
 }
 
 // Each precondition returns { name, ok, details }. They never throw for a missing file (that is a red precondition).
-export function checkPreconditions(root, { tag = DEFAULT_TAG } = {}) {
+export function checkPreconditions(root, { tag = DEFAULT_TAG, create = false } = {}) {
   const out = [];
   const add = (name, ok, details) => out.push({ name, ok, details });
 
@@ -62,9 +63,12 @@ export function checkPreconditions(root, { tag = DEFAULT_TAG } = {}) {
   add('on-main', name === MAIN, [name === MAIN ? `on ${MAIN}` : `the current branch is ${name ?? 'unknown'}, not ${MAIN} (a tag on a feature branch would tag work that is not merged)`]);
 
   // HEAD must be the tip of origin/main as this clone knows it; a clone with no origin/main ref (a test repository) passes with a note.
+  // --create fetches first: a stale origin/main would let a tag land on a commit that is no longer the tip. The fetch reads only; it never pushes.
+  const fetched = create ? git(root, ['fetch', '--quiet', 'origin', MAIN]) : null;
   const remote = git(root, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN}^{commit}`]);
   const head = git(root, ['rev-parse', 'HEAD']);
-  if (remote.status !== 0) add('up-to-date', true, [`there is no origin/${MAIN} ref in this repository, so HEAD was not compared with it`]);
+  if (fetched && fetched.status !== 0) add('up-to-date', false, [`git fetch origin ${MAIN} failed: ${fetched.stderr.trim().split('\n')[0] || 'no message'}; --create needs a current origin/${MAIN} (set the origin remote and check the network)`]);
+  else if (remote.status !== 0) add('up-to-date', !create, [create ? `there is no origin/${MAIN} ref, so HEAD cannot be compared with it: --create refuses (fetch origin first)` : `WARNING: there is no origin/${MAIN} ref in this repository, so HEAD was not compared with it (--create would refuse)`]);
   else add('up-to-date', head.stdout.trim() === remote.stdout.trim(), [head.stdout.trim() === remote.stdout.trim() ? `HEAD is origin/${MAIN}` : `HEAD (${head.stdout.trim().slice(0, 10)}) is not origin/${MAIN} (${remote.stdout.trim().slice(0, 10)}); run \`git fetch origin\` first, then update ${MAIN} (git pull) so the tag lands on the merge commit that CI checked`]);
 
   const existing = git(root, ['tag', '--list', tag]).stdout.trim();
@@ -150,7 +154,7 @@ export function run(argv, { root = ROOT, out = (s) => process.stdout.write(`${s}
   if (!/^contracts-v\d+\.\d+\.\d+$/.test(tag)) { out(`the tag name ${tag} must look like contracts-vX.Y.Z`); return 2; }
   let results;
   try {
-    results = checkPreconditions(dir, { tag });
+    results = checkPreconditions(dir, { tag, create });
   } catch (e) {
     out(`tag-contracts could not run: ${e.message}`);
     return 2;

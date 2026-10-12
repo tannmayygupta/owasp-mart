@@ -103,3 +103,8 @@
 - source_plan: `docs/bmad/initiative-lab/epic-orchestrator-and-instance-lifecycle/story-state-machine-and-docker-instance-host-create-from-a-templat-plan.md`
   summary: Akshay's test scripts/generate-api-code.test.mjs ("CRLF alone is not stale") fails deterministically on the Windows checkout of main.
   evidence: Found while verifying story 3.1: the failure is in P-04 files that this branch does not touch (git diff against origin/main is empty for them); core.autocrlf is true on this PC. It probably passes on the Linux CI. Akshay should make the test independent of the checkout's line endings.
+
+## Contracts audit (2026-10-13)
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: Accepted risk (audit 2026-10-13): the rules-engine guard accepts a self-written `registry change:` line and CODEOWNERS needs one owner; GitHub branch protection with required code-owner review is the control; check Settings > Branches (open question to the developer, ADR 0029).
+  evidence: Audit of 2026-10-13; unverified until the developer looks at Settings, Branches. All rows must be re-confirmed at 1.0.0 (release commit 0a2a43b); the P-08 review of 2026-10-12 does not satisfy the tag.

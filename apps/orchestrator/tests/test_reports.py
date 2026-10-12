@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 
 from vulnmart_orchestrator.auth import NonceMemory, Verifier, body_sha256
+from vulnmart_orchestrator import reports
 from vulnmart_orchestrator.reports import TARGET, ReportPusher, check_report_url, report_body
 from vulnmart_orchestrator.states import InstanceState, Transition
 
@@ -195,3 +196,82 @@ def test_a_real_http_exchange_with_a_path_prefix_signs_the_target_as_sent():
         server.shutdown()
         server.server_close()
     assert seen == {"ok": True, "path": "/platform" + TARGET, "type": "application/json"}
+
+
+# ---- L15: a permanent refusal is not retried for ever, and the queue bound counts every item ----
+@pytest.mark.parametrize("status", [400, 401, 404, 409, 422])
+def test_a_permanent_refusal_is_dropped_after_ten_attempts_and_the_next_report_goes_on(monkeypatch, status):
+    monkeypatch.setattr(reports, "BACKOFF_FIRST_S", 0.001)
+    monkeypatch.setattr(reports, "BACKOFF_MAX_S", 0.001)
+    platform = Platform(lambda i, n, attempt: status if n == 1 else 204)
+    p, log = pusher(platform)
+    try:
+        p.submit(t(A, 1))
+        p.submit(t(A, 2))
+        assert p.flush(10)
+    finally:
+        p.stop()
+    assert platform.delivered(A) == [1] * 10 + [2]  # exactly ten tries of the refused report, then the later one is sent
+    assert f"state report dropped: HTTP {status} 10 times in a row" in log
+    assert not any(k in " ".join(log) for k in ("instance", "i-A", "VM{"))  # status only, no content
+
+
+def test_a_server_error_is_still_retried_without_the_cap(monkeypatch):
+    monkeypatch.setattr(reports, "BACKOFF_FIRST_S", 0.001)
+    monkeypatch.setattr(reports, "BACKOFF_MAX_S", 0.001)
+    platform = Platform(lambda i, n, attempt: 503 if attempt <= 12 else 204)
+    p, log = pusher(platform)
+    try:
+        p.submit(t(A, 1))
+        assert p.flush(10)
+    finally:
+        p.stop()
+    assert platform.delivered(A) == [1] * 13 and not any("dropped" in line for line in log)
+
+
+def test_the_bound_holds_for_one_instance_with_a_long_queue_behind_the_report_on_the_wire():
+    gate = threading.Event()
+    seen = []
+
+    def post(url, body, headers, timeout):
+        gate.wait(5)
+        seen.append(json.loads(body)["transition"])
+        return 204
+
+    log = []
+    p = ReportPusher("http://127.0.0.1:1", KEY, post=post, log=log.append, max_pending=3)
+    p.start()
+    try:
+        p.submit(t(A, 1))  # on the wire, waiting for the gate
+        time.sleep(0.1)
+        for n in range(2, 12):  # the old code dropped only the head of ANOTHER instance: with one instance the queue grew without a bound
+            p.submit(t(A, n))
+            assert p.pending() <= 3
+        gate.set()
+        assert p.flush(5)
+    finally:
+        gate.set()
+        p.stop()
+    assert seen[0] == 1 and seen[-1] == 11 and len(seen) <= 4
+    assert "state report queue is full: the oldest report was dropped" in log
+
+
+def test_with_a_bound_of_one_and_a_report_on_the_wire_the_new_report_is_dropped_not_queued_over_the_bound():
+    gate = threading.Event()
+
+    def post(url, body, headers, timeout):
+        gate.wait(5)
+        return 204
+
+    log = []
+    p = ReportPusher("http://127.0.0.1:1", KEY, post=post, log=log.append, max_pending=1)
+    p.start()
+    try:
+        p.submit(t(A, 1))
+        time.sleep(0.1)
+        p.submit(t(A, 2))
+        assert p.pending() == 1
+        assert "state report queue is full: the new report was dropped" in log
+    finally:
+        gate.set()
+        p.stop()

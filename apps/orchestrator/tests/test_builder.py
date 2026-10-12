@@ -38,6 +38,19 @@ def test_plan_has_the_fixed_runtime_profile_for_every_container():
     assert all("e1" in v.name and IID.lower() in v.name for v in p.volumes)
 
 
+def test_the_four_shared_volumes_are_noexec_nosuid_nodev():
+    p = plan()
+    assert len(p.volumes) == 4
+    for v in p.volumes:
+        options = v.driver_opts["o"].split(",")
+        assert {"noexec", "nosuid", "nodev"} <= set(options), v.name
+
+
+def test_plan_memory_is_every_component_plus_the_keeper():
+    p = plan()
+    assert p.memory_mb == sum(c.memory_mb for c in p.others) + p.injector.memory_mb + 64 == 1728
+
+
 def test_networks_injector_and_keeper():
     p = plan()
     assert p.injector.network == "none" and p.injector.stdin == "injection"
@@ -154,3 +167,14 @@ def test_fingerprint_changes_with_any_field_and_repr_hides_secrets():
     text = repr(SPEC)
     for secret in (FLAG_A, SEED, EVENT_KEY, OWNER):
         assert secret not in text
+
+
+def test_the_fake_orchestrator_refuses_exactly_the_names_the_builder_refuses():
+    """L22: contracts/mocks/fake-orchestrator/server.mjs had a shorter FORBIDDEN list than FORBIDDEN_FIELDS, so a client tested against the
+    mock could send a name the real service refuses."""
+    import re
+    from support import ROOT
+
+    src = (ROOT / "contracts" / "mocks" / "fake-orchestrator" / "server.mjs").read_text(encoding="utf-8")
+    block = re.search(r"const FORBIDDEN = new Set\(\[(.*?)\]\);", src, re.S).group(1)
+    assert set(re.findall(r"'([a-z_]+)'", block)) == set(FORBIDDEN_FIELDS)

@@ -5,14 +5,14 @@
 | Date | 2026-10-13 |
 | Developer | tannmayygupta |
 | Branch / commit | sprint-2-tanmay, not committed yet (base 0a2a43b) |
-| Status | Done (built and run for real; the developer commits and closes story 17) |
+| Status | Built and run for real; `bmad-code-review` and `bmad-qa-generate-e2e-tests` not run; the developer commits and closes story 17 |
 | Report tag | demo, integration, stream L, P and T |
 
 ## Requirements covered
 FR-INS-01, FR-INS-07, PB-6 (ticket 17 of initiative-lab); D-28 (same-origin proxy), IF-5, IF-8. Row DEMO-1 in `docs/traceability.md`.
 
 ## Summary (plain language, 3-5 lines)
-One command, `node scripts/dev.mjs demo`, starts the platform stack, builds the lab images, starts the real Python orchestrator and drives it with the platform's own client. It prints a PASS/FAIL table, saves redacted evidence, and removes everything it started. The real shop image is tried in the shop role; today it fails there, so the stub is used and the table says so.
+One command, `node scripts/dev.mjs demo`, starts the platform stack, builds the lab images, starts the real Python orchestrator and drives it with the platform's own client. It prints a PASS/FAIL table, saves redacted evidence, and removes everything it started. The real `apps/shop` image runs in the shop role (the manifest `healthchecks` entry gives it a node check); the demo falls back to the stub only if that image fails to build or reach ready, and the table says so.
 
 ## Why
 The guide meeting needs proof that the three streams run together on one machine. Ticket 17 asks for one command, a step table, evidence and a runbook.
@@ -46,14 +46,13 @@ None needing an ADR. Choices: a unique Compose project name (`vulnmart-demo`), b
 
 ## Problems met and how they were fixed
 - The orchestrator refused the reduced template: the schema requires six components. Fix: a temporary relaxed copy of the schema in the temp folder.
-- The real shop image does not reach `ready` in the shop role (`INST-HEALTH-TIMEOUT`). The orchestrator's http health check runs `wget` and the distroless shop image has none (checked: `wget` not found in the image). Not changed: that is a decision between stream L and T. The demo falls back to the stub and prints why.
-- No existing code needed changing.
+- The real shop image first did not reach `ready` in the shop role (`INST-HEALTH-TIMEOUT`): the orchestrator's http health check runs `wget` and the distroless shop image has none (checked: `wget` not found in the image). Fixed the same day with the per-role `healthchecks` entry in the image manifest (see "Fix after the first runs"); the orchestrator code changed for it (`ImageAllowlist.healthchecks`, `build_plan`).
 
 ## Security notes (vulnerable parts only)
 None. The demo uses random fake flags, seed and event key, a random signing key in a temporary file, loopback only. No real secret is printed or saved.
 
 ## Limitations and follow-ups
-- Real shop not yet usable in the shop role (health check tool and a real snapshot from the real injector are needed). Follow-up for L and T.
+- The real shop reaches ready in the shop role only through the manifest `healthchecks` entry; the template's own health check still uses `wget`, so the shop template for the real deployment must use the same entry (follow-up for L and T).
 - Sahil's import service, mock services and bot controller are on `origin/sprint-2-sahil`, not in `main`; the demo runs a reduced template.
 - First run needs internet and about 4 to 5 minutes for image builds.
 - Review step (`bmad-code-review`) and `bmad-qa-generate-e2e-tests` were not run by this build.

@@ -88,6 +88,16 @@ export function parseStepLines(stdout) {
   return rows;
 }
 
+// Lines `IID i-...` printed by scripts/demo_client.py for every instance id it makes: the demo cleans up only these.
+export function parseInstanceIds(stdout) {
+  const ids = new Set();
+  for (const line of String(stdout).split(/\r?\n/)) {
+    const m = /^IID (i-[A-Z2-7]{16})$/.exec(line.trim());
+    if (m) ids.add(m[1]);
+  }
+  return [...ids];
+}
+
 // Only these doctor lines matter for the demo (pnpm is not needed to run it).
 export function evaluateDoctor(lines, needed = ['Node', 'uv', 'Docker', 'Compose', 'Docker engine']) {
   const rows = lines.map((l) => {
@@ -134,18 +144,19 @@ export function leftoverNames(psOutput, wanted = PLATFORM_CONTAINERS) {
   return String(psOutput).split(/\r?\n/).map((s) => s.trim()).filter((n) => wanted.includes(n));
 }
 
-export function evidenceText({ date, args, mode, rows, note }) {
+export function evidenceText({ date, args, mode, rows, note, image }) {
   const opts = [args.keep && '--keep', args.stubOnly && '--stub-only', args.noWeb && '--no-web'].filter(Boolean).join(' ') || '(none)';
   return redact([
     'VulnMart local demo output (node scripts/dev.mjs demo)',
     `Date: ${date}`,
     `Options: ${opts}`,
     `Shop role: ${mode}`,
+    ...(image ? [`Image in the shop role: ${image}`] : []),
     ...(note ? [`Note: ${note}`] : []),
     '',
     formatTable(rows),
     '',
-    `Result: ${exitCode(rows) === 0 ? 'every step PASS' : 'at least one step FAIL'}`,
+    `Result: ${exitCode(rows) !== 0 ? 'at least one step FAIL' : rows.some((r) => r.status === 'SKIP') ? 'no step FAIL; some steps SKIP (see the table)' : 'every step PASS'}`,
     '',
   ].join('\n'));
 }
@@ -153,6 +164,8 @@ export function evidenceText({ date, args, mode, rows, note }) {
 // ---------- impure parts ----------
 const compose = (args, profiles = ['platform', 'web'], opts = {}) =>
   run('docker', ['compose', '-p', PROJECT, '-f', COMPOSE_FILE, ...profiles.flatMap((p) => ['--profile', p]), ...args], { timeout: 1200000, ...opts });
+const liveChildren = new Set();
+let exitHookSet = false;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const dockerLines = (args) => run('docker', args, { timeout: 60000 }).stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
@@ -194,10 +207,13 @@ async function waitHealthy(url, tries = 60) {
   throw new Error(`no 200 after ${tries} tries (${last})`);
 }
 
-function killTree(child) {
-  if (!child || child.exitCode !== null || child.pid === undefined) return;
+// `uv run` starts the Python service as its child: kill the whole tree (Windows: taskkill /T /F; POSIX: the process group, see spawn).
+export function killTree(child) {
+  if (!child || child.pid === undefined) return;
   if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-  else child.kill('SIGKILL');
+  else {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already gone */ } }
+  }
 }
 
 function imageId(tag) {
@@ -215,8 +231,12 @@ function startOrchestrator({ dir, manifest, port, key, healthTimeoutS, log }) {
     '--host', '127.0.0.1', '--port', String(port), '--backend', 'docker', '--host-kind', 'laptop',
     '--templates-dir', path.join(dir, 'templates'), '--template-schema', path.join(dir, 'template.schema.json'), '--images-manifest', manifestFile,
     '--health-timeout-s', String(healthTimeoutS), '--injector-timeout-s', '30', '--rate-per-s', '0',
+    '--allow-local-images', // the manifest holds the ids of images built on this machine (no registry)
   ];
-  const child = spawn('uv', args, { cwd: ROOT, env: { ...process.env, VM_ORCH_PLATFORM_KEY: key }, stdio: ['ignore', out, out], windowsHide: true });
+  // the key goes in the environment, never on the command line; detached on POSIX so that the process group can be killed
+  const child = spawn('uv', args, { cwd: ROOT, env: { ...process.env, VM_ORCH_PLATFORM_KEY: key }, stdio: ['ignore', out, out], windowsHide: true, detached: process.platform !== 'win32' });
+  liveChildren.add(child);
+  if (!exitHookSet) { exitHookSet = true; process.on('exit', () => { for (const c of liveChildren) killTree(c); }); } // never leave the service behind, whatever ends the demo
   child.logFile = path.join(dir, `orchestrator-${port}.log`);
   log(`orchestrator process started (pid ${child.pid})`);
   return child;
@@ -276,6 +296,8 @@ export async function demo(argv = []) {
   let mode = 'not reached';
   let note = '';
   let ranWork = false;
+  let imageUsed = '';
+  const madeIds = new Set(); // instance ids the client reported: the only ones the cleanup removes
 
   try {
     // 1. Preflight
@@ -343,7 +365,7 @@ export async function demo(argv = []) {
       const b = run('docker', ['build', '-q', '-f', 'apps/shop/Dockerfile', '-t', SHOP_TAG, 'apps/shop'], { cwd: ROOT, timeout: 900000 });
       shopId = b.status === 0 ? imageId(SHOP_TAG) : null;
       if (shopId) record('PASS', 'shop-image-build', `${SHOP_TAG} built from apps/shop`);
-      else record('PASS', 'shop-image-build', `could not build apps/shop (${b.stderr.split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'unknown'}); the stub is used`);
+      else record('SKIP', 'shop-image-build', `could not build apps/shop (${b.stderr.split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? 'unknown'}); the stub image is used instead`);
     }
 
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vulnmart-demo-'));
@@ -361,6 +383,7 @@ export async function demo(argv = []) {
       orch = startOrchestrator({ dir: tmp, manifest: buildManifest({ stubId, shopId, realShop: true }), port, key, healthTimeoutS: 30, log });
       if (await waitListening(orch, port)) {
         const p = runClient({ port, keyFile, mode: 'shop', probe: true });
+        for (const i of parseInstanceIds(p.stdout)) madeIds.add(i);
         const step = parseStepLines(p.stdout).find((r) => r.name === 'probe');
         useReal = step?.status === 'PASS';
         note = useReal ? 'the real apps/shop image works in the shop role' : `the real apps/shop image does not satisfy the shop role yet (${step?.detail ?? 'no answer'}); the stub image was used`;
@@ -369,11 +392,13 @@ export async function demo(argv = []) {
       }
       killTree(orch);
       orch = null;
-      record('PASS', 'shop-role', note);
+      // the real shop was tried: PASS only when it was accepted, otherwise SKIP (the stub is the fallback), never PASS
+      record(useReal ? 'PASS' : 'SKIP', 'shop-role', note);
     } else {
-      record('PASS', 'shop-role', args.stubOnly ? 'stub image (--stub-only)' : 'stub image (apps/shop did not build)');
+      record('SKIP', 'shop-role', args.stubOnly ? 'stub image (--stub-only): the real shop was not tried' : 'stub image (apps/shop did not build): the real shop was not tried');
     }
     mode = useReal ? 'real shop image (apps/shop)' : 'stub instance image';
+    imageUsed = useReal ? `${SHOP_TAG} (built from apps/shop)` : `${STUB_TAG} (stub instance, contracts/mocks/stub-instance)`;
 
     const port = await freePort();
     orch = startOrchestrator({ dir: tmp, manifest: buildManifest({ stubId, shopId: useReal ? shopId : stubId, realShop: useReal }), port, key, healthTimeoutS: 60, log });
@@ -386,6 +411,7 @@ export async function demo(argv = []) {
     // 4. Drive it with the platform's own client
     ranWork = true;
     const c = runClient({ port, keyFile, mode: useReal ? 'shop' : 'stub', probe: false });
+    for (const i of parseInstanceIds(c.stdout)) madeIds.add(i);
     const clientRows = parseStepLines(c.stdout);
     if (!clientRows.length) record('FAIL', 'client', `no step lines from the client (exit ${c.status}): ${redact(c.stderr.split(/\r?\n/).filter(Boolean).slice(-3).join(' '))}`);
     for (const r of clientRows) record(r.status, `client:${r.name}`, r.detail);
@@ -405,10 +431,17 @@ export async function demo(argv = []) {
       if (stackStarted) {
         const d = compose(['down', '-v', '--remove-orphans', '--timeout', '2']);
         const left = leftoverNames(dockerLines(['ps', '-a', '--format', '{{.Names}}']).join('\n'));
-        const vm = dockerLines(['ps', '-a', '-q', '--filter', 'label=vm.instance']);
-        for (const id of vm) run('docker', ['rm', '-f', '-v', id], { timeout: 60000 });
-        for (const n of dockerLines(['network', 'ls', '-q', '--filter', 'label=vm.instance'])) run('docker', ['network', 'rm', n], { timeout: 60000 });
-        for (const v of dockerLines(['volume', 'ls', '-q', '--filter', 'label=vm.instance'])) run('docker', ['volume', 'rm', '-f', v], { timeout: 60000 });
+        // only the instances this run made (ids from the client), never every object with a vm.instance label; the preflight made sure
+        // none existed before. Anything else that is left is reported as a FAIL below, not removed.
+        const vm = [];
+        for (const iid of madeIds) {
+          const f = `label=vm.instance=${iid}`;
+          const found = dockerLines(['ps', '-a', '-q', '--filter', f]);
+          vm.push(...found);
+          for (const id of found) run('docker', ['rm', '-f', '-v', id], { timeout: 60000 });
+          for (const n of dockerLines(['network', 'ls', '-q', '--filter', f])) run('docker', ['network', 'rm', n], { timeout: 60000 });
+          for (const v of dockerLines(['volume', 'ls', '-q', '--filter', f])) run('docker', ['volume', 'rm', '-f', v], { timeout: 60000 });
+        }
         const stillLabelled = dockerLines(['ps', '-a', '-q', '--filter', 'label=vm.instance']).length + dockerLines(['volume', 'ls', '-q', '--filter', 'label=vm.instance']).length + dockerLines(['network', 'ls', '-q', '--filter', 'label=vm.instance']).length;
         ok = d.status === 0 && !left.length && !stillLabelled;
         detail = ok ? `project ${PROJECT} removed with its volumes, orchestrator stopped, ${vm.length ? `${vm.length} stray instance container(s) removed` : 'no stray instance objects'}` : `compose down exit ${d.status}, ${left.length} container(s) and ${stillLabelled} vm.instance object(s) left`;
@@ -423,7 +456,7 @@ export async function demo(argv = []) {
     if (ranWork || rows.length > 6) {
       try {
         fs.mkdirSync(path.dirname(EVIDENCE_FILE), { recursive: true });
-        fs.writeFileSync(EVIDENCE_FILE, evidenceText({ date: new Date().toLocaleDateString('en-CA'), args, mode, rows, note }), 'utf8');
+        fs.writeFileSync(EVIDENCE_FILE, evidenceText({ date: new Date().toLocaleDateString('en-CA'), args, mode, rows, note, image: imageUsed }), 'utf8');
         console.log('Evidence (redacted) written to docs/assets/local-demo/demo-output.txt');
       } catch (e) {
         console.error(`Could not write the evidence file: ${e.message}`);

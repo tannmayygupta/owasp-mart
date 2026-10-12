@@ -95,7 +95,7 @@ def stub_allowlist(image_id: str, injector_command=("inject",)) -> ImageAllowlis
     return ImageAllowlist(
         {r: image_id for r in roles},
         entrypoints={"volume-keeper": ("node", "-e", "setInterval(()=>{},1<<30)")},
-        commands={"shop": ("shop",), "injector": tuple(injector_command)},
+        commands={"shop": ("shop",), "injector": tuple(injector_command)}, allow_local_ids=True,  # the stub is a local image id
     )
 
 

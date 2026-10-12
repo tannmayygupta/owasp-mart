@@ -322,7 +322,7 @@ VM-I: (1) Docker and the host INPUT rule (verified before anything else starts);
 |---|---|---|---|
 | Vercel outage or Hobby quota exhausted | Dashboards unavailable; running instances and attempts keep going (the clock is server-side) | External uptime check on the dashboard URL | Switch DNS or documentation to the laptop fallback; Hobby limits in `[EF-06]` (100 GB transfer, 1M CDN requests, 10 GB origin transfer) are far above expected traffic but must be watched |
 | Platform edge or API down | Dashboards show errors; SSE drops and reconnects; sidecars buffer events (FR-DET-04) | Healthchecks, Caddy logs | Docker restart policy; events replay from sidecar buffers after recovery |
-| Ingest unreachable | Sidecars buffer in memory and small disk (bounded; oldest summaries dropped first, never flag or state events) | Buffer-depth metric | Resume sending; idempotent by `(instance_id, seq)` |
+| Ingest unreachable | Sidecars buffer in memory and small disk (bounded; oldest summaries dropped first, never flag or state events) | Buffer-depth metric | Resume sending; idempotent by `(instance_id, epoch, seq)` (D-42) |
 | Postgres down | API returns 503; ingest keeps filling the Valkey stream; scoring workers pause | Readiness, alerts | Restart; restore from the nightly dump if the volume is lost (RPO about one day, RTO to be tested in the restore drill, NFR-AVL-05) |
 | Valkey down | Queue and rate limits unavailable; API fails closed for rate-limited routes; SSE hub cannot serve | Readiness | Restart with append-only recovery |
 | Orchestrator down | New instances queue (jobs retry with back-off); existing instances keep running; expiry timers run when it returns | Metrics, healthcheck | Restart then reconcile |

@@ -1,7 +1,7 @@
 // GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
-// Error registry (IF-8) version 0.4.0.
+// Error registry (IF-8) version 1.0.0.
 
-export const REGISTRY_VERSION = "0.4.0";
+export const REGISTRY_VERSION = "1.0.0";
 export const PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:";
 
 export const ERROR_CODES = {
@@ -36,6 +36,7 @@ export const ERROR_CODES = {
   INST_NOT_FOUND: "INST-NOT-FOUND",
   INST_NOT_READY: "INST-NOT-READY",
   INST_QUOTA_REACHED: "INST-QUOTA-REACHED",
+  INST_START_FAILED: "INST-START-FAILED",
   ORCH_BAD_SIGNATURE: "ORCH-BAD-SIGNATURE",
   ORCH_BODY_TOO_LARGE: "ORCH-BODY-TOO-LARGE",
   ORCH_BUSY: "ORCH-BUSY",
@@ -109,6 +110,7 @@ export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "INST-NOT-FOUND": { status: 404, title: "Instance not found.", retryable: false },
   "INST-NOT-READY": { status: 409, title: "The instance is not ready yet.", retryable: true },
   "INST-QUOTA-REACHED": { status: 409, title: "The instance limit has been reached.", retryable: false },
+  "INST-START-FAILED": { status: null, title: "The instance could not be started.", retryable: true },
   "ORCH-BAD-SIGNATURE": { status: 401, title: "The request could not be authenticated.", retryable: false },
   "ORCH-BODY-TOO-LARGE": { status: 413, title: "The request body is too large.", retryable: false },
   "ORCH-BUSY": { status: 429, title: "No capacity is available right now.", retryable: true },

@@ -4,9 +4,12 @@ Every transition of the engine becomes one report: `POST <report_url>/internal/v
 signing scheme as a request, a new nonce and timestamp on every attempt). Delivery is at least once and in order per instance: the
 reports of one instance are sent one after the other, and a report that is not accepted is tried again (with a growing pause, 0.2 s up to
 5 s) before the next report of that instance is sent. Only 204 (new) and 200 (the platform already has this identical report) mean
-delivered; every other answer, a 409 included, and every network error is tried again. The reports of other instances are not held up.
-The queue is bounded: when it is full the oldest report that is not being sent is dropped and a line says so (the platform treats a
-gap as history, section 8). Nothing secret is logged: a line holds an HTTP status or an exception class name.
+delivered; every other answer and every network error is tried again. A permanent refusal (400, 401, 404, 409, 422) is tried at most
+`MAX_PERMANENT` (10) times: then the report is dropped with a log line (its status only) so that one report the platform will never
+take cannot block the later reports of its instance for ever (L15 of the audit). The reports of other instances are not held up.
+The queue is bounded over all items, not only the heads: when it is full the oldest report that is not on the wire is dropped and a
+line says so (the platform treats a gap as history, section 8); the number of queued reports never passes the bound. Nothing secret is
+logged: a line holds an HTTP status or an exception class name.
 """
 from __future__ import annotations
 
@@ -30,6 +33,8 @@ TARGET = "/internal/v1/orch/state"
 MAX_PENDING = 10_000
 BACKOFF_FIRST_S, BACKOFF_MAX_S = 0.2, 5.0
 DELIVERED = (200, 204)
+PERMANENT = (400, 401, 404, 409, 422)  # the platform will not take this report as it is: do not retry for ever
+MAX_PERMANENT = 10
 
 
 def report_body(t: Transition) -> bytes:
@@ -87,6 +92,7 @@ class _Item:
     instance_id: str
     body: bytes
     attempts: int = 0
+    permanent: int = 0  # answers that were a permanent refusal
     not_before: float = 0.0
 
 
@@ -124,21 +130,34 @@ class ReportPusher:
     def submit(self, t: Transition) -> None:
         """Called by the engine for every transition, in the order the transitions happen. Never blocks on the network."""
         with self._cond:
-            if self._pending >= self._max:
-                self._drop_oldest()
+            while self._pending >= self._max:
+                if not self._drop_oldest():
+                    self._log("state report queue is full: the new report was dropped")  # everything queued is on the wire
+                    return
             self._seq += 1
             self._queues.setdefault(t.instance_id, deque()).append(_Item(self._seq, t.instance_id, report_body(t)))
             self._pending += 1
             self._cond.notify_all()
 
-    def _drop_oldest(self) -> None:
-        candidates = [(q[0].seq, i) for i, q in self._queues.items() if q and i != self._sending]
-        if not candidates:
-            return
-        _, instance = min(candidates)
-        self._queues[instance].popleft()
+    def _drop_oldest(self) -> bool:
+        """Drop the oldest queued report that is not on the wire (any position of any queue). False when there is none."""
+        best: tuple[int, str, int] | None = None
+        for instance, q in self._queues.items():
+            for pos, item in enumerate(q):
+                if instance == self._sending and pos == 0:
+                    continue  # the head that is being sent
+                if best is None or item.seq < best[0]:
+                    best = (item.seq, instance, pos)
+                break  # the first item that is not on the wire is the oldest of this queue
+        if best is None:
+            return False
+        _, instance, pos = best
+        del self._queues[instance][pos]
+        if not self._queues[instance]:
+            del self._queues[instance]
         self._pending -= 1
         self._log("state report queue is full: the oldest report was dropped")
+        return True
 
     def pending(self) -> int:
         with self._cond:
@@ -179,7 +198,12 @@ class ReportPusher:
                 if self._stop:
                     return
                 self._sending = item.instance_id
-            delivered = self._deliver(item)
+            delivered, status = self._deliver(item)
+            if not delivered and status in PERMANENT:
+                item.permanent += 1
+                if item.permanent >= MAX_PERMANENT:
+                    self._log(f"state report dropped: HTTP {status} {item.permanent} times in a row")
+                    delivered = True  # given up: it leaves the queue like a delivered one, so the later reports of the instance go on
             with self._cond:
                 self._sending = None
                 q = self._queues.get(item.instance_id)
@@ -194,7 +218,8 @@ class ReportPusher:
                     item.not_before = self._clock() + min(BACKOFF_MAX_S, BACKOFF_FIRST_S * 2 ** min(item.attempts - 1, 6))
                 self._cond.notify_all()
 
-    def _deliver(self, item: _Item) -> bool:
+    def _deliver(self, item: _Item) -> tuple[bool, int | None]:
+        """(delivered, the HTTP status; None for a network error)"""
         ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         nonce = secrets.token_hex(16)
         headers = {
@@ -205,8 +230,8 @@ class ReportPusher:
             status = self._post(self._base + TARGET, item.body, headers, self._timeout)
         except (http.client.HTTPException, urllib.error.URLError, OSError, ValueError) as e:
             self._log(f"state report failed: {type(e).__name__}")
-            return False
+            return False, None
         if status in DELIVERED:
-            return True
+            return True, status
         self._log(f"state report refused: HTTP {status}")
-        return False
+        return False, status

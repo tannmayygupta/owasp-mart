@@ -3,7 +3,7 @@ title: 'Image builds in CI and the human-run deploy script (hello stack on both 
 type: 'feature'
 ticket: '4'
 created: '2026-10-12'
-status: 'done'
+status: 'built'
 baseline_revision: '49f7f4feed57873c1cd1dcbeb0a0567e6346c910'
 route: 'full'
 route_source: 'pinned'
@@ -53,11 +53,11 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `infra/images.json`, `scripts/images-matrix.mjs` and test -- the matrix and its validation -- one place to add an image
-- [ ] `infra/hello/Dockerfile`, `infra/compose/hello-stack.yaml` -- a tiny pinned hello service with a health check -- the hello stack
-- [ ] `.github/workflows/images.yml` and shape test -- build, push by digest, manifest artifact, no PR push, token rules, arm64 behind the variable -- CI
-- [ ] `scripts/deploy.mjs` and test (injected ssh and docker runners) -- the matrix rows -- deploy
-- [ ] ADR 0032, D-51, runbook (developer steps: run the workflow, make the hello package public, deploy to both VMs and the laptop, record minutes used), handoff for adding an image, dev-log, CHANGELOG, traceability LE-4 -- documentation rule
+- [x] `infra/images.json`, `scripts/images-matrix.mjs` and test -- the matrix and its validation -- one place to add an image
+- [x] `infra/hello/Dockerfile`, `infra/compose/hello-stack.yaml` -- a tiny pinned hello service with a health check -- the hello stack
+- [x] `.github/workflows/images.yml` and shape test -- build, push by digest, manifest artifact, no PR push, token rules, arm64 behind the variable -- CI
+- [x] `scripts/deploy.mjs` and test (injected ssh and docker runners) -- the matrix rows -- deploy
+- [x] ADR 0032, D-51, runbook (developer steps: run the workflow, make the hello package public, deploy to both VMs and the laptop, record minutes used), handoff for adding an image, dev-log, CHANGELOG, traceability LE-4 -- documentation rule
 
 **Acceptance Criteria:**
 - Given the repository, when the tests run, then every matrix row passes without Docker, GitHub or SSH.

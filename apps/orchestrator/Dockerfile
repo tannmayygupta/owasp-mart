@@ -2,9 +2,14 @@
 # Build context is the REPOSITORY ROOT (the uv workspace lockfile lives there):
 #   docker build -f apps/orchestrator/Dockerfile .
 # There is no compose service and no Docker socket proxy wiring yet (deployment is a later story). At run time the service needs, from
-# the operator and never from the image: the two signing keys (VM_ORCH_PLATFORM_KEY, VM_ORCH_REPORT_KEY), the template folder
+# the operator and never from the image: the two signing keys (environment variables VM_ORCH_PLATFORM_KEY and VM_ORCH_REPORT_KEY, or the
+# files --key-file and --report-key-file with mode 0600; there is no key option on the command line, it would show in `ps`), the template folder
 # (--templates-dir), the release manifest of image digests (--images-manifest), the three TLS files (--tls-cert, --tls-key, --tls-ca)
 # and the Docker API address (--docker-host, a socket proxy that allows only what the engine needs).
+#
+# TLS is required: the image listens on 0.0.0.0, and the service refuses to start on a non-loopback address without the three TLS files
+# (exit 2). `--insecure-no-tls` exists for tests and the local demo only and is never part of this image. `--backend fake` is refused
+# unless `--allow-fake-backend` is given; this image never sets it, and the default backend is docker.
 #
 # Base images are pinned by digest, the same ones as the API image (captured with `docker buildx imagetools inspect` on 2026-10-11).
 # Update them deliberately, never float the tag.

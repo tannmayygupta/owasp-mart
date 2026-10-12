@@ -169,3 +169,19 @@ test('every action in every workflow is pinned by a full commit SHA', () => {
     for (const [n, j] of Object.entries(d.jobs)) for (const s of j.steps ?? []) if (s.uses) assert.match(s.uses, /^[\w.-]+\/[\w.\/-]+@[0-9a-f]{40}$/, `${f} job ${n}: ${s.uses}`);
   }
 });
+
+
+test('images workflow M8: the publish job checks that the tagged commit is an ancestor of origin/main, with full history and no kept credentials, before it logs in or pushes', () => {
+  const steps = images.jobs.publish.steps;
+  const checkout = steps.find((s) => s.uses?.startsWith('actions/checkout'));
+  assert.equal(checkout.with['fetch-depth'], 0);
+  assert.equal(checkout.with['persist-credentials'], false);
+  assert.match(checkout.uses, /@[0-9a-f]{40}\b/, 'pinned by commit');
+  const check = steps.findIndex((s) => /git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/.test(s.run ?? ''));
+  const login = steps.findIndex((s) => /docker login/.test(s.run ?? ''));
+  const merge = steps.findIndex((s) => /imagetools create/.test(s.run ?? ''));
+  assert.ok(check > 0, 'the ancestry check exists');
+  assert.ok(check < login && check < merge, 'it runs before the registry login and before any tag is pushed');
+  assert.match(steps[check].run, /set -euo pipefail/);
+  assert.match(steps[check].run, /exit 1/);
+});

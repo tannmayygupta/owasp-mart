@@ -244,7 +244,7 @@ class VolumeSpec:
 
     @property
     def driver_opts(self) -> dict[str, str]:
-        return {"type": "tmpfs", "device": "tmpfs", "o": f"size={self.size_mb}m,uid={UID},gid={GID},mode=0750"}
+        return {"type": "tmpfs", "device": "tmpfs", "o": f"noexec,nosuid,nodev,size={self.size_mb}m,uid={UID},gid={GID},mode=0750"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,6 +302,11 @@ class InstancePlan:
     @property
     def containers(self) -> tuple[ContainerSpec, ...]:
         return (self.keeper, self.injector, *self.others)
+
+    @property
+    def memory_mb(self) -> int:
+        """What this instance really takes: the memory limit of every container of the plan (template components plus the keeper)."""
+        return sum(c.memory_mb for c in self.containers)
 
 
 def _prefix(spec: CreateSpec) -> str:

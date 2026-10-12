@@ -20,7 +20,7 @@ export function buildRelease(data, digests, { commit, repo }) {
     if (!DIGEST.test(d ?? '')) throw new Error(`no valid digest for image "${img.name}"`);
     images[img.name] = `${data.registry}/${repo.toLowerCase()}/${img.name}@${d}`;
   }
-  return { commit, images };
+  return { commit, repo: repo.toLowerCase(), images }; // the repository is recorded so that deploy can check the image path against it
 }
 
 export const USAGE = 'usage: node scripts/images-release.mjs --digests <dir> --commit <sha> --repo <owner/name> --out <file>';

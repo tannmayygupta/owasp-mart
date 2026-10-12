@@ -102,14 +102,14 @@ def run(args: argparse.Namespace) -> dict:
     client = docker.from_env()
     client.ping()
     if args.manifest:
-        allow = ImageAllowlist.load(args.manifest)
+        allow = ImageAllowlist.load(args.manifest, allow_local_ids=args.allow_local_images)
         template = json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
         image_note = "release manifest"
     else:
         ref = client.images.get(args.stub_image).id
         allow = ImageAllowlist({r: ref for r in ("shop", "injector", "volume-keeper")},
                                entrypoints={"volume-keeper": ("node", "-e", "setInterval(()=>{},1<<30)")},
-                               commands={"shop": ("shop",), "injector": ("inject",)})
+                               commands={"shop": ("shop",), "injector": ("inject",)}, allow_local_ids=True)  # a local image id, so local ids are allowed here
         template = json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
         template["components"] = [c for c in template["components"] if c["role"] in ("injector", "shop")]
         image_note = "stub instance image (L-06), two components (injector and shop)"
@@ -167,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="vulnmart_orchestrator.measure", description=__doc__.split("\n")[0])
     p.add_argument("--stub-image", help="image id or tag of the stub instance image (contracts/mocks/stub-instance)")
     p.add_argument("--manifest", help="release manifest of L-12 (real images) instead of the stub image")
+    p.add_argument("--allow-local-images", action="store_true", help="accept bare local image ids (sha256:<hex>) in --manifest (a local run only)")
     p.add_argument("--rounds", type=int, default=5, help="cold-start repeats, one instance at a time")
     p.add_argument("--count", type=int, default=5, help="instances running together for the memory numbers")
     p.add_argument("--memory-mb", type=int, default=256)

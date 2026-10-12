@@ -25,7 +25,7 @@ After the tag `contracts-v1.0.0` the change rules of architecture 07 apply: an a
 
 ## Consequences
 Easier: the change rules are enforced and tested without depending on the plan. Harder: the rule is itself part of the rules engine (a change to it needs a `registry change:` line); the first real run on GitHub is unproven (the workflow cannot run locally; its shape is pinned by tests on the parsed workflow).
-**Still open:** (1) is the author who is also a consumer excused from the BREAKING list (chosen here)? (2) does Settings, Branches enforce reviews on this private repository (if it does, it can be added on top)? The ADR stays Proposed until the developer confirms these.
+**Still open:** (1) is the author who is also a consumer excused from the BREAKING list (chosen here)? (2) does Settings, Branches enforce reviews on this private repository (if it does, it can be added on top)? The ADR stays Proposed until the developer confirms these. (3) Accepted risk (audit 2026-10-13): the rules-engine guard accepts a self-written `registry change:` line and CODEOWNERS needs one owner; GitHub branch protection with required code-owner review is the control; check Settings > Branches (open question to the developer, ADR 0029). All approval rows must be re-confirmed at 1.0.0.
 
 ## Evidence
 - Real runs: the covering tests and the command outputs are saved in `docs/assets/contracts-tag-preparation/`.

@@ -1,6 +1,6 @@
 # Instance event contract v0 (IF-4)
 
-- **Version:** 1.0.0 (first stable release, tag `contracts-v1.0.0`; the history is in [the changelog](../CHANGELOG.md))
+- **Version:** 1.0.0 (first stable release, tag `contracts-v1.0.0` pending; the history is in [the changelog](../CHANGELOG.md))
 - **Owner:** stream L (Tanmay). Stream T (Sahil) reviews the event names as consumer; under D-37 his approval is optional. The `EVT-*` codes are in the IF-8 registry (stream P).
 - **Source:** `docs/architecture/07-repo-and-workstreams.md` sections 3.1 (IF-4), 3.2 item 6 and 3.6; `04-data-and-state.md` sections 2.6 and 11; `05-key-flows.md` flows 4 and 5; `06-security.md` section 6; `docs/design/challenge-specs.md` section 10 (the event names and fields).
 - **Check it:** `pnpm run events:check` (or `node scripts/validate-events.mjs`). `pnpm run contracts:check` runs this check and the instance contract check.

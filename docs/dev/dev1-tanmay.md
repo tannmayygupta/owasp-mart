@@ -118,8 +118,10 @@ Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosti
 
 Goal: Instances start, reset, tear down and are isolated; the deployment pipeline works (Vercel, certificates, image builds).
 
+Truth summary (2026-10-13): built and verified locally: L-09 preparation and release commit, L-10 to L-13 code. NOT built: L-14, L-15, L-16.
+
 - [x] **L-09. Tag contracts v1.0.0 and start the change rules**
-  - Closed 2026-10-12 on the developer's instruction. Still open, needs others: tag `contracts-v1.0.0` waits for Akshay P-08, Sahil T-03/H-108 re-review, release commit relabelling to 1.0.0, handoff checklist lines.
+  - Closed 2026-10-12 on the developer's instruction. Release commit done 2026-10-13 (0a2a43b). NOT met: tag contracts-v1.0.0 does not exist; all 19 COMPAT.md Approvals rows pending (Akshay, Sahil, and Tanmay's own); the approvals rule is NOT-APPLICABLE until the tag; handoff checklist has 27 unticked lines (node scripts/tag-contracts.mjs --dry-run).
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.7` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - Build: Collect every contract owner approval, write COMPAT.md, tag `contracts-v1.0.0` and turn the change rules on. Settle branch protection on the private repository (EF-30) or use the CI approvals check.
@@ -127,20 +129,20 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Waits on: L-05, L-06, L-07 and the sign-offs of Akshay (P-08) and Sahil (T-03).
   - Done when: The tag exists, COMPAT.md lists the versions every stream targets and the approvals check is active.
   - Handoffs: H-58, H-80, H-81, H-82, H-114 (see docs/dev/HANDOFFS.md; read them when you plan this task)
-  - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT ticked: the tag `contracts-v1.0.0` waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run `node scripts/tag-contracts.mjs --dry-run`.
+  - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT met (ticked on the developer's instruction): the tag `contracts-v1.0.0` waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run `node scripts/tag-contracts.mjs --dry-run`.
 
 - [x] **L-10. DuckDNS names and certificates**
-  - Closed 2026-10-12 on the developer's instruction. Still open (developer, live): DuckDNS names, lego staging then production, renewal, S-16 result.
+  - Closed 2026-10-12 on the developer's instruction (ticked on the developer's instruction, live steps open). Still open (developer, live): DuckDNS names, lego staging then production, renewal, S-16 result. NOT met: Done-when (real certificates issued and renewing, S-16 recorded).
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Register the platform and labs DuckDNS names, issue a certificate for the platform host and a wildcard certificate for the labs name (DNS-01), automatic renewal.
   - Covers: LE-2; spike S-16
   - Waits on: L-08.
   - Done when: Real certificates are issued and renew automatically; the S-16 result (wildcard resolution) is recorded.
-  - Status 2026-10-11 (story 2.2): the host scripts, the timer, the pinned lego installer, the cloud-init wiring, the S-16 check script, ADR 0030, decision D-49 (Proposed) and the runbook `docs/runbooks/certificates.md` are built and tested against stubs (and on Linux in Docker). NOT ticked: the live steps are the developer's (DuckDNS accounts and names, token files on the hosts, staging then production issuance, one real renewal, the S-16 result). Tick L-10 only after the real redacted results are pasted.
+  - Status 2026-10-11 (story 2.2): the host scripts, the timer, the pinned lego installer, the cloud-init wiring, the S-16 check script, ADR 0030, decision D-49 (Proposed) and the runbook `docs/runbooks/certificates.md` are built and tested against stubs (and on Linux in Docker). NOT met (ticked on the developer's instruction): the live steps are the developer's (DuckDNS accounts and names, token files on the hosts, staging then production issuance, one real renewal, the S-16 result). Tick L-10 only after the real redacted results are pasted.
 
 - [x] **L-11. Vercel project, same-origin rewrite and live-stream check**
-  - Closed 2026-10-12 on the developer's instruction. Still open: live Vercel S-14 run; wiring with Akshay P-07; port 443 via public_web_cidrs.
+  - Closed 2026-10-12 on the developer's instruction (ticked on the developer's instruction, live steps open). Still open: live Vercel S-14 run; wiring with Akshay P-07; port 443 via public_web_cidrs. NOT met: Done-when (site reaches the API through /api/*, S-14 recorded).
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Create the Vercel project with the rewrite config from Akshay, the origin secret and the origin-secret check in the platform Caddy; run the SSE-through-rewrite test on the real VM.
@@ -149,30 +151,29 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Handoffs: H-116, H-117 (see docs/dev/HANDOFFS.md; added by the preparation story, 2026-10-11)
   - Done when: The Vercel site reaches the API through `/api/*`, direct access to the VM without the secret is refused, and the S-14 result is recorded.
   - Handoffs: H-113 (see docs/dev/HANDOFFS.md; read them when you plan this task)
-  - Status 2026-10-12 (story 2.3): the Caddy origin-secret gate, the stock Caddy edge for vm-p, the Vercel probe project with the `routes` header transform, the S-14 check script, ADR 0031, decision D-50 (Proposed) and the runbook `docs/runbooks/vercel-and-origin.md` are built and tested with real Caddy in Docker (including TLS) and stand-in proxies. NOT ticked: the live steps are the developer's (Vercel login and project, sensitive environment variable, secret files on vm-p, port 443, the S-14 run) and the real wiring waits for Akshay's P-07 and the live certificates of L-10.
+  - Status 2026-10-12 (story 2.3): the Caddy origin-secret gate, the stock Caddy edge for vm-p, the Vercel probe project with the `routes` header transform, the S-14 check script, ADR 0031, decision D-50 (Proposed) and the runbook `docs/runbooks/vercel-and-origin.md` are built and tested with real Caddy in Docker (including TLS) and stand-in proxies. NOT met (ticked on the developer's instruction): the live steps are the developer's (Vercel login and project, sensitive environment variable, secret files on vm-p, port 443, the S-14 run) and the real wiring waits for Akshay's P-07 and the live certificates of L-10.
 
 - [x] **L-12. Image builds for amd64 and arm64 and deploy pipelines**
-  - Closed 2026-10-12 on the developer's instruction. Still open (developer, live): run images workflow on GitHub, make the hello package public, deploy to both VMs and laptop.
+  - Closed 2026-10-12 on the developer's instruction (ticked on the developer's instruction, live steps open). arm64 not built (D-51 amends LE-4); only amd64 is in scope. Still open (developer, live): run images workflow on GitHub, make the hello package public, deploy to both VMs and laptop. NOT met: Done-when (hello stack from CI on both VMs and the laptop).
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: CI builds images for amd64 and natively for arm64 on the VM, and a deploy step puts them on both VMs.
   - Covers: LE-4
   - Waits on: L-08, L-07.
-  - Handoffs: H-118 (how to add an image; added by the story, 2026-10-12). Preparation done and tested locally (story plan, ADR 0032, D-51, runbook `docs/runbooks/deploy.md`); NOT ticked: the workflow run, the public package and the deploy to both VMs and the laptop are yours.
+  - Handoffs: H-118 (how to add an image; added by the story, 2026-10-12). Preparation done and tested locally (story plan, ADR 0032, D-51, runbook `docs/runbooks/deploy.md`); NOT met (ticked on the developer's instruction): the workflow run, the public package and the deploy to both VMs and the laptop are yours.
   - Done when: A hello stack from CI runs on both VMs and on the laptop.
 
 - [x] **L-13. Orchestrator creates an instance from a template**
-  - Closed 2026-10-12 on the developer's instruction. Still open: the real S-4 run on vm-i (runbook `docs/runbooks/measure-instances.md`), the small L-13 PR, tell Sahil (T-09) when merged.
+  - Closed 2026-10-12 on the developer's instruction. Done-when NOT met: S-4 not measured on vm-i (developer run, runbook `docs/runbooks/measure-instances.md`); reset (3.4) and reconciler (3.5) belong to L-14. ONE sprint PR carries L-13 too (branch shared-L-13 is not pushed); Sahil's T-09 waits for this PR being merged, tell him then.
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
-  - EARLY PR: yes. T-09 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
+  - EARLY PR: yes, but decided 2026-10-13: ONE sprint PR carries L-13 too (the branch shared-L-13 is not pushed). T-09 (Sahil, same sprint) waits for that PR to be merged.
   - Build: Create a private instance on request from a template, wait for health and flag injection, track its state in a state machine.
   - Covers: FR-INS-01, 02, 07, 11; spike S-4
   - Waits on: L-04, L-08.
   - Done when: An instance is never shown ready before flag injection finished and the cold-start time is measured and recorded (S-4).
   - Handoffs: H-57, H-58, H-59, H-60, H-61, H-64, H-66, H-67, H-68, H-69, H-70, H-71, H-72, H-79 (see docs/dev/HANDOFFS.md; read them when you plan this task)
-  - Status (2026-10-12): engine done (state machine, builder, Docker backend, create and destroy; tests on a fake and on real Docker). Story 3.2 built the same day (the IF-5 service: signing, mTLS options, strict JSON, rate limit, capacity, accept and run, state reports, test backend, Dockerfile; the contract suites of apps/api pass against it; ADR 0034, D-53). NOT ticked: reset and idle detection (story 3.4), the reconciler (3.5) and the cold-start measurement S-4 are open, and the stories wait for review and the developer's confirmation.
-  - Status 2026-10-12: stories 3.1 and 3.2 built. Story 3.3 tool, runbook and research note built (`docs/runbooks/measure-instances.md`); the real run on vm-i is still to do, so L-13 stays unticked.
+  - Status (2026-10-12): engine done (state machine, builder, Docker backend, create and destroy; tests on a fake and on real Docker). Story 3.2 built the same day (the IF-5 service: signing, mTLS options, strict JSON, rate limit, capacity, accept and run, state reports, test backend, Dockerfile; the contract suites of apps/api pass against it; ADR 0034, D-53). NOT met (ticked on the developer's instruction): reset and idle detection (story 3.4), the reconciler (3.5) and the cold-start measurement S-4 are open, and the stories wait for review and the developer's confirmation.
 
 - [ ] **L-14. Reset, teardown, timing defaults and reconciler**
   - Epic: `epic-orchestrator-and-instance-lifecycle`

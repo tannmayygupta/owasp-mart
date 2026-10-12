@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from support import (
-    CONTRACT_DIR, PLATFORM_KEY, ROOT, WRONG_KEY, ReportReceiver, ServiceProcess, create_request, material, new_id,
+    CONTRACT_DIR, PLATFORM_KEY, ROOT, WRONG_KEY, ReportReceiver, ServiceProcess, create_request, instance_memory_mb, material, new_id,
     raw_call, reset_request,
 )
 from vulnmart_models.error_codes import ERRORS, ErrorCode
@@ -719,7 +719,7 @@ def test_access_values_are_the_enum():
 
 # ---- the closed IF-8 error body ----
 def test_every_error_answer_is_problem_json_with_the_if8_members(svc):
-    small = ServiceProcess(capacity_mb=300)
+    small = ServiceProcess(capacity_mb=instance_memory_mb("http", 256) + 44)  # room for one instance only
     try:
         HttpInstanceHost(small.url, PLATFORM_KEY).create(create_request(memory_mb=256))
         answers = {

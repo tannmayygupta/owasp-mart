@@ -35,6 +35,11 @@ def template() -> dict:
     return json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
 
 
+def plan_memory_mb() -> int:
+    """What one instance of the example template takes: the memory of every component plus the 64 MB volume keeper (the capacity unit, M5)."""
+    return sum(c["memory_mb"] for c in template()["components"]) + 64
+
+
 def body(iid: str = IID, epoch: int = 1, **over) -> dict:
     b = {
         "instance_id": iid, "template_id": "shop-v0", "epoch": epoch, "owner_hash": OWNER,

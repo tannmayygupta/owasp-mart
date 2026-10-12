@@ -48,6 +48,14 @@ const sh = (root, ...args) => {
   assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout;
 };
+function addRemote(root) {
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-tag-remote-'));
+  spawnSync('git', ['init', '-q', '--bare', '-b', 'main', bare]);
+  sh(root, 'remote', 'add', 'origin', bare);
+  sh(root, 'push', '-q', 'origin', 'main');
+  sh(root, 'fetch', '-q', 'origin');
+  return bare;
+}
 function makeRepo({ status, version, box, branch = 'main' } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-tag-'));
   sh(root, 'init', '-q', '-b', 'main');
@@ -90,8 +98,9 @@ test('all green: --dry-run exits 0, prints the git tag -a command and the push c
   }
 });
 
-test('all green: --create makes one annotated local tag and never pushes (the repository has no remote and the output says the push is by hand)', () => {
+test('all green: --create makes one annotated local tag and never pushes (the remote gets no tag and the output says the push is by hand)', () => {
   const root = makeRepo();
+  const bare = addRemote(root);
   try {
     const { code, text } = capture(['--create'], root);
     assert.equal(code, 0, text);
@@ -99,13 +108,55 @@ test('all green: --create makes one annotated local tag and never pushes (the re
     assert.equal(sh(root, 'cat-file', '-t', `refs/tags/${DEFAULT_TAG}`).trim(), 'tag', 'annotated');
     assert.match(sh(root, 'tag', '-n1', DEFAULT_TAG), /contracts-v1\.0\.0: X 1\.0\.0/);
     assert.match(text, /It is not pushed\. To publish it, run by hand: git push origin contracts-v1\.0\.0/);
-    assert.equal(sh(root, 'remote').trim(), '');
+    assert.equal(sh(bare, 'tag', '--list').trim(), '', 'nothing was pushed');
     const again = capture(['--create'], root);
     assert.equal(again.code, 1, 'a second run is refused');
     assert.match(again.text, /FAIL {2}tag-absent: the tag contracts-v1\.0\.0 already exists/);
     assert.equal(tags(root), DEFAULT_TAG);
   } finally {
     cleanup(root);
+    cleanup(bare);
+  }
+});
+
+test('L23: --create refuses when origin/main is absent (a dry run only warns), and the refusal names the reason', () => {
+  const root = makeRepo();
+  try {
+    const dry = capture(['--dry-run'], root);
+    assert.equal(dry.code, 0, dry.text);
+    assert.match(dry.text, /PASS {2}up-to-date: WARNING: there is no origin\/main ref/);
+    const c = capture(['--create'], root); // no origin remote: the fetch fails, nothing is tagged
+    assert.equal(c.code, 1, c.text);
+    assert.match(c.text, /FAIL {2}up-to-date: git fetch origin main failed/);
+    assert.equal(tags(root), '');
+    const withoutRef = checkPreconditions(root, { create: true });
+    assert.equal(byName(withoutRef)['up-to-date'].ok, false);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('L23: --create fetches origin main first, so a stale origin/main cannot hide that HEAD is behind', () => {
+  const root = makeRepo();
+  const bare = addRemote(root);
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-tag-other-'));
+  try {
+    spawnSync('git', ['clone', '-q', bare, other]);
+    sh(other, 'config', 'user.email', 't@example.invalid');
+    sh(other, 'config', 'user.name', 'test');
+    write(other, 'newer.txt', 'x\n');
+    sh(other, 'add', '-A');
+    sh(other, 'commit', '-qm', 'newer main');
+    sh(other, 'push', '-q', 'origin', 'main');
+    assert.equal(byName(checkPreconditions(root))['up-to-date'].ok, true, 'a dry run uses the ref as it is (stale, so still equal)');
+    const c = capture(['--create'], root);
+    assert.equal(c.code, 1, c.text);
+    assert.match(c.text, /FAIL {2}up-to-date: HEAD .* is not origin\/main/);
+    assert.equal(tags(root), '');
+  } finally {
+    cleanup(root);
+    cleanup(bare);
+    cleanup(other);
   }
 });
 
@@ -273,6 +324,7 @@ test('proof in a temporary repository: after the tag, the checker compares with 
     const before = await runRules({ root, base: 'main', skip: ['table-owners', 'alembic'] });
     assert.equal(byName(before).approvals.status, NA, 'no tag: not applicable');
     assert.match(byName(before).base.details.join('\n'), /NOTICE: no tag contracts-v\*/);
+    addRemote(root); // --create needs origin/main
     assert.equal(capture(['--create'], root).code, 0);
 
     sh(root, 'checkout', '-q', '-b', 'pr');

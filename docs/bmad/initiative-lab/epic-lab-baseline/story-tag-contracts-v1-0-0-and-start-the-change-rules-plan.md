@@ -3,7 +3,7 @@ title: 'Tag contracts v1.0.0 and start the change rules (preparation; the tag wa
 type: 'feature'
 ticket: '7'
 created: '2026-10-11'
-status: 'done'
+status: 'in-progress'
 baseline_revision: 'bfb333cb2136254daca1407454a0cb533f8ddb53'
 route: 'full'
 route_source: 'pinned'

@@ -1,5 +1,7 @@
 # Runbook: DuckDNS names and certificates (lego on each host, DNS-01)
 
+**Cost warning:** vm-i is stopped to save credits: start it first, stop it after, never create or replace a host while `vm_i_running = false`.
+
 Story: L-10 (D-49, ADR 0030). The scripts are in `infra/hosts/` (`vulnmart-certs.sh`, `vulnmart-certs.service`, `vulnmart-certs.timer`, `vulnmart-install-lego.sh`, `lego.pin.json`). Claude never runs these steps and never sees a token. Nothing below puts a token, email, public address or account name into a file of the repository: they live only on the host and in your DuckDNS and Let's Encrypt accounts. Where this runbook shows `<...>`, you fill the value at your keyboard.
 
 Everything here is free: DuckDNS, Let's Encrypt, lego (MIT). No port 80 or 443 is needed for the issue (DNS-01 talks only outbound to DuckDNS and Let's Encrypt).
@@ -9,7 +11,7 @@ References to the AWS runbook mean `docs/runbooks/aws-account-and-vms.md`, writt
 ## How it works (short)
 - One host, one name, one certificate. The platform host (vm-p) gets `<platform>.duckdns.org`; the labs host (vm-i) gets the wildcard `*.<labs>.duckdns.org` only (DuckDNS keeps one TXT value per name, so the labs name itself is not in the certificate).
 - `lego` writes the proof (a TXT record) through the DuckDNS API using a token file read by root only. Let's Encrypt checks it and issues the certificate.
-- Files end up in `/opt/vulnmart/certs/live/` (`fullchain.pem` 0644, `privkey.pem` 0600 root). Staging results go in `/opt/vulnmart/certs/staging/` and are never used by Caddy. Stock Caddy (L-12) mounts `live/` read-only.
+- Files end up in `/opt/vulnmart/certs/live/` (`fullchain.pem` 0644, `privkey.pem` 0600 root). Staging results go in `/opt/vulnmart/certs/staging/` and are never used by Caddy. Stock Caddy (L-12) mounts `live/` read-only. After every renewal run `vulnmart-certs.service` reloads the origin Caddy by itself (`ExecStartPost=-docker exec vulnmart-origin-caddy-1 caddy reload ...` through the admin socket; a failed reload never fails the unit, it shows in `journalctl -u vulnmart-certs.service`). No manual reload step is needed.
 - A systemd timer runs `vulnmart-certs.sh renew` twice a day (03:00 and 15:00, plus up to one hour random delay, `Persistent=true`: a run missed while the host was stopped happens at the next boot). The script renews when `RENEW_DAYS` (default 30) or fewer days are left, and exits 0 first, without needing a token, when no production certificate exists or it is not due. A failed run leaves a failed unit and the marker `/var/lib/vulnmart/certs-failed` (production problems only; staging problems use `certs-staging-failed`). One run at a time (a lock); the service stops after 30 minutes.
 - Settings file `/etc/vulnmart/certs.env` is read as `KEY=value` lines only and never executed. Allowed keys: `CERT_NAME`, `CERT_EMAIL`, `RENEW_DAYS`, `TOKEN_FILE`, `CERT_DIR`, `LEGO_EXTRA_ARGS`. A variable already set in the environment wins.
 - `RENEW_DAYS` must stay below half of the certificate lifetime (Let's Encrypt is moving from 90 to 64 and then 45 days: at 45 days a value above 22 would renew every run). Today 30 is right for 90 days; lower it when the lifetime shortens.
@@ -63,6 +65,8 @@ EOF
 ```
 
 On vm-i use `CERT_NAME="*.<labs>.duckdns.org"` and your own address instead of the example one. Check: `sudo /usr/local/sbin/vulnmart-certs.sh status` prints `state=none` (no certificate yet). A wrong name is refused with exit 2 and no network call.
+
+**If lego times out on DNS propagation:** the vm hosts only reach the VPC resolver on port 53 (see `infra/network-rules.json`), so lego cannot check the record at other resolvers. Either set the extra arguments for the resolver (the flag is not verified here: check `lego dnsprovider help` and `lego run --help` first) or open port 53 outbound in a reviewed Terraform change.
 
 ## Part D. Staging first (always)
 On the host: `sudo /usr/local/sbin/vulnmart-certs.sh issue` (it uses the Let's Encrypt **staging** server; its certificates are not trusted by browsers and do not count against the production limits).

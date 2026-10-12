@@ -64,7 +64,7 @@ const D = `sha256:${'b'.repeat(64)}`;
 
 test('release manifest: a digest reference per image and the commit; lower-cases the repository', () => {
   const r = buildRelease(good(), { hello: D }, { commit: SHA, repo: 'Owner/Repo' });
-  assert.deepEqual(r, { commit: SHA, images: { hello: `ghcr.io/owner/repo/hello@${D}` } });
+  assert.deepEqual(r, { commit: SHA, repo: 'owner/repo', images: { hello: `ghcr.io/owner/repo/hello@${D}` } });
 });
 
 test('release manifest: a missing or malformed digest fails', () => {

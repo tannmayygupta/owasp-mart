@@ -35,6 +35,13 @@ export function helloImage(manifestText, registry = loadImages().registry) {
   if (typeof ref !== 'string') throw new InputError('the manifest has no image "hello"');
   if (!DIGEST_REF.test(ref)) throw new InputError('the manifest entry for "hello" is not a digest reference (<registry>/<path>@sha256:<64 hex>): tags are refused');
   if (!ref.startsWith(`${registry}/`)) throw new InputError(`the manifest entry for "hello" is not from the registry of infra/images.json (${registry})`);
+  // The whole path is fixed: <registry>/<owner>/<repo>/hello@sha256:<64 hex>, with owner/repo as images-release.mjs recorded them in release.json.
+  const repo = m?.repo;
+  if (typeof repo !== 'string' || !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo)) throw new InputError('the manifest has no valid "repo" (owner/name): it was not made by scripts/images-release.mjs');
+  const prefix = `${registry}/${repo}/hello@sha256:`;
+  if (!(ref.startsWith(prefix) && /^[0-9a-f]{64}$/.test(ref.slice(prefix.length)))) {
+    throw new InputError(`the manifest entry for "hello" must be ${registry}/${repo}/hello@sha256:<64 hex>, as recorded in the manifest`);
+  }
   return ref;
 }
 
@@ -57,7 +64,8 @@ export const remoteCommands = (image) => ({
   pull: `sudo -n docker pull ${image}`,
   up: `cd ${REMOTE_DIR} && sudo -n env HELLO_IMAGE=${image} docker compose -f hello-stack.yaml up -d --force-recreate --pull never`,
   // The running container must use exactly the image that was pulled by digest (image ids compared).
-  verify: `[ "$(sudo -n docker inspect -f '{{.Image}}' ${CONTAINER})" = "$(sudo -n docker image inspect -f '{{.Id}}' ${image})" ] || { echo "the running container does not use the pulled image"; exit 1; }`,
+  // Both ids must be non-empty: two failed commands would give two empty strings that are "equal".
+  verify: `a=$(sudo -n docker inspect -f '{{.Image}}' ${CONTAINER}); b=$(sudo -n docker image inspect -f '{{.Id}}' ${image}); [ -n "$a" ] && [ -n "$b" ] && [ "$a" = "$b" ] || { echo "the running container does not use the pulled image"; exit 1; }`,
   health: `for i in $(seq 1 30); do s=$(sudo -n docker inspect -f '{{.State.Health.Status}}' ${CONTAINER} 2>/dev/null); [ "$s" = healthy ] && exit 0; sleep 2; done; echo "health=$s"; exit 1`,
 });
 

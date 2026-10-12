@@ -25,12 +25,21 @@ REPORT_KEY = "FAKE-ORCHESTRATOR-KEY-NOT-REAL-0000000"
 SRC = ROOT / "apps" / "orchestrator" / "src"
 
 
-def command(*extra: str, templates: Path, key: str | None = KEY) -> list[str]:
-    args = [sys.executable, "-m", "vulnmart_orchestrator", "--backend", "fake", "--port", "0", "--templates-dir", str(templates),
-            "--template-schema", str(TEMPLATE_SCHEMA)]
-    if key is not None:
-        args += ["--key", key]
+def command(*extra: str, templates: Path) -> list[str]:
+    """The keys never go on the command line (M6): they come from the environment (see `environment`) or from a --key-file."""
+    args = [sys.executable, "-m", "vulnmart_orchestrator", "--backend", "fake", "--allow-fake-backend", "--port", "0",
+            "--templates-dir", str(templates), "--template-schema", str(TEMPLATE_SCHEMA)]
     return args + list(extra)
+
+
+def environment(key: str | None = KEY, report_key: str | None = REPORT_KEY) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if k not in ("VM_ORCH_PLATFORM_KEY", "VM_ORCH_REPORT_KEY")}
+    env["PYTHONPATH"] = str(SRC)
+    if key is not None:
+        env["VM_ORCH_PLATFORM_KEY"] = key
+    if report_key is not None:
+        env["VM_ORCH_REPORT_KEY"] = report_key
+    return env
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +52,7 @@ def templates():
 
 class Svc:
     def __init__(self, templates: Path, *extra: str):
-        env = {**os.environ, "PYTHONPATH": str(SRC)}
+        env = environment()
         self.err = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
         self.proc = subprocess.Popen(command(*extra, templates=templates), stdout=subprocess.PIPE, stderr=self.err, text=True, env=env)
         lines: queue.Queue[str] = queue.Queue()
@@ -295,18 +304,58 @@ def test_every_error_answer_validates_against_the_if8_schema(svc):
     (["--backend", "docker"], KEY, "images-manifest"),
     (["--port", "abc"], KEY, "invalid"),
     (["--nope", "1"], KEY, "unrecognized"),
+    (["--key", KEY], None, "unrecognized"),  # M6: no key on the command line (it would show in ps)
+    (["--report-key", REPORT_KEY], KEY, "unrecognized"),
+    (["--host", "0.0.0.0"], KEY, "without TLS"),  # H3: a listen address that is not loopback needs TLS
+    (["--host", "192.0.2.1"], KEY, "without TLS"),
+    (["--host", "::"], KEY, "without TLS"),
+    (["--host", "example.invalid"], KEY, "without TLS"),
+    (["--key-file", "no-such-file"], None, "no-such-file"),
 ])
 def test_bad_command_lines_exit_2_without_starting(templates, extra, key, message):
-    env = {k: v for k, v in os.environ.items() if k not in ("VM_ORCH_PLATFORM_KEY", "VM_ORCH_REPORT_KEY")}
-    env["PYTHONPATH"] = str(SRC)
-    res = subprocess.run(command(*extra, templates=templates, key=key), capture_output=True, text=True, timeout=60, env=env)
+    res = subprocess.run(command(*extra, templates=templates), capture_output=True, text=True, timeout=60, env=environment(key, None))
     assert res.returncode == 2, res.stdout + res.stderr
     assert res.stdout == "" and message in res.stderr
 
 
+def test_the_fake_backend_needs_the_explicit_test_switch(templates):
+    args = [a for a in command(templates=templates) if a != "--allow-fake-backend"]
+    res = subprocess.run(args, capture_output=True, text=True, timeout=60, env=environment())
+    assert res.returncode == 2 and "--allow-fake-backend" in res.stderr and res.stdout == ""
+
+
+def _starts(args, env) -> bool:
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=env)
+    try:
+        lines: queue.Queue[str] = queue.Queue()
+        threading.Thread(target=lambda: lines.put(proc.stdout.readline()), daemon=True).start()
+        return json.loads(lines.get(timeout=30))["listening"] is True
+    finally:
+        proc.terminate()
+        proc.wait(10)
+        proc.stdout.close()
+
+
+def test_loopback_without_tls_and_the_explicit_insecure_flag_start(templates):
+    assert _starts(command("--host", "127.0.0.1", templates=templates), environment())
+    assert _starts(command("--host", "localhost", templates=templates), environment())
+    assert _starts(command("--host", "0.0.0.0", "--insecure-no-tls", templates=templates), environment())  # only on purpose, for tests
+
+
+def test_a_key_file_is_read_and_on_posix_it_must_not_be_group_or_world_readable(templates, tmp_path):
+    good = tmp_path / "platform.key"
+    good.write_text(KEY + "\n", encoding="utf-8")
+    if os.name != "nt":
+        good.chmod(0o644)
+        res = subprocess.run(command("--key-file", str(good), templates=templates), capture_output=True, text=True, timeout=60,
+                             env=environment(None, None))
+        assert res.returncode == 2 and "0600" in res.stderr and KEY not in res.stderr
+        good.chmod(0o600)
+    assert _starts(command("--key-file", str(good), templates=templates), environment(None, None))
+
+
 def test_the_keys_can_come_from_the_environment(templates):
-    env = {**os.environ, "PYTHONPATH": str(SRC), "VM_ORCH_PLATFORM_KEY": KEY}
-    proc = subprocess.Popen(command(templates=templates, key=None), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=env)
+    proc = subprocess.Popen(command(templates=templates), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=environment(KEY, None))
     try:
         lines: queue.Queue[str] = queue.Queue()
         threading.Thread(target=lambda: lines.put(proc.stdout.readline()), daemon=True).start()
@@ -315,3 +364,12 @@ def test_the_keys_can_come_from_the_environment(templates):
         proc.terminate()
         proc.wait(10)
         proc.stdout.close()
+
+
+def test_the_image_default_is_tls_required_and_never_carries_the_test_switches():
+    text = (ROOT / "apps" / "orchestrator" / "Dockerfile").read_text(encoding="utf-8")
+    lines = [ln for ln in text.splitlines() if ln.startswith(("ENTRYPOINT", "CMD"))]
+    joined = " ".join(lines)
+    assert "--insecure-no-tls" not in joined and "--allow-fake-backend" not in joined and "--backend" not in joined
+    assert "0.0.0.0" in joined  # so the refusal of a non-loopback address without TLS (tested above) is what protects the image
+    assert "--key " not in joined and "--report-key " not in joined

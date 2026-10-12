@@ -50,6 +50,10 @@ After the tag, a pull request that changes the files of a contract needs: one ap
 
 Stream P recorded its review in story P-08 (`docs/reviews/2026-10-12-p08-contract-sign-off.md`) against IF-4 0.2.0, IF-6 0.2.0 and DB 0.2.0, which are older than the versions above, and with a condition (F-2: the IF-2, IF-4 and IF-5 error bodies move to IF-8 before the tag). Stream L met F-2 on 2026-10-12 (IF-2 0.3.0, IF-4 0.3.0, IF-5 0.4.0, IF-6 0.3.2 editorial, IF-8 0.4.0 with three added codes). The Akshay rows stay `pending` until he confirms the current versions.
 
+All rows must be re-confirmed at 1.0.0 (release commit 0a2a43b); the P-08 review of 2026-10-12 does not satisfy the tag.
+
+Accepted risk (audit 2026-10-13): the rules-engine guard accepts a self-written `registry change:` line and CODEOWNERS needs one owner; GitHub branch protection with required code-owner review is the control; check Settings > Branches (open question to the developer, ADR 0029).
+
 ## Tag preconditions
 
 `node scripts/tag-contracts.mjs --dry-run` checks all of these and lists every one that fails. It never pushes.

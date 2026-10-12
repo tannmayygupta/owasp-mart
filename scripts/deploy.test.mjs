@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { main, helloImage, parseTargets, remoteCommands, localCommands, InputError, CONTAINER } from './deploy.mjs';
 import { parseHosts } from './cloud-hosts.mjs';
+import { spawnSync } from 'node:child_process';
 
 const DIGEST = `sha256:${'c'.repeat(64)}`;
 const IMAGE = `ghcr.io/owner/repo/hello@${DIGEST}`;
-const manifest = (hello = IMAGE) => JSON.stringify({ commit: 'a'.repeat(40), images: { hello } });
+const manifest = (hello = IMAGE, repo = 'owner/repo') => JSON.stringify({ commit: 'a'.repeat(40), repo, images: { hello } });
 // Documentation-range and private addresses only: not real hosts.
 const hosts = parseHosts({ vm_p_public_ip: '192.0.2.10', vm_p_private_ip: '10.0.0.11', vm_i_public_ip: '192.0.2.20', vm_i_private_ip: '10.0.0.12' });
 
@@ -192,4 +193,32 @@ test('after compose up the running container must use the pulled image, else the
   const l = harness({ running: 'sha256:old', pulled: 'sha256:new' });
   assert.equal(await main(['--manifest', 'release.json', '--target', 'local'], l.inject), 1);
   assert.match(l.out.join('\n'), /FAIL local verify image - the running container does not use the pulled image/);
+});
+
+test('M7: the image path must be exactly <registry>/<owner>/<repo>/hello@sha256:<digest> with the repo of the manifest', () => {
+  assert.equal(helloImage(manifest()), IMAGE);
+  // another path under the same registry, a nested or traversal path, another repository
+  assert.throws(() => helloImage(manifest(`ghcr.io/evil/other/hello@${DIGEST}`)), /must be ghcr\.io\/owner\/repo\/hello@sha256/);
+  assert.throws(() => helloImage(manifest(`ghcr.io/owner/repo/extra/hello@${DIGEST}`)), /must be/);
+  assert.throws(() => helloImage(manifest(`ghcr.io/owner/repo/../../evil/hello@${DIGEST}`)), /must be/);
+  assert.throws(() => helloImage(manifest(`ghcr.io/owner/repo/other@${DIGEST}`)), /must be/);
+  assert.throws(() => helloImage(manifest(`ghcr.io/owner/repo/hello@${DIGEST}`, 'owner/other')), /must be/);
+  // a manifest without the repo (not made by images-release.mjs), or with a malformed one
+  assert.throws(() => helloImage(JSON.stringify({ images: { hello: IMAGE } })), /no valid "repo"/);
+  assert.throws(() => helloImage(manifest(IMAGE, 'owner/repo/x')), /no valid "repo"/);
+  assert.throws(() => helloImage(manifest(IMAGE, 'Owner/Repo')), /no valid "repo"/);
+});
+
+test('M7: the remote verify command needs both image ids non-empty before it compares them', () => {
+  const v = remoteCommands(IMAGE).verify;
+  assert.match(v, /\[ -n "\$a" \] && \[ -n "\$b" \] && \[ "\$a" = "\$b" \]/);
+  // run the same shell logic with both lookups failing (empty ids): it must not pass
+  const sh = (a, b) => `a='${a}'; b='${b}'; [ -n "$a" ] && [ -n "$b" ] && [ "$a" = "$b" ] || { echo bad; exit 1; }`;
+  const run = (a, b) => spawnSync(process.platform === 'win32' ? 'C:\\git\\Git\\bin\\sh.exe' : 'sh', ['-c', sh(a, b)], { encoding: 'utf8' });
+  if (!spawnSync(process.platform === 'win32' ? 'C:\\git\\Git\\bin\\sh.exe' : 'sh', ['-c', 'true']).error) {
+    assert.equal(run('', '').status, 1, 'two empty ids are not equal ids');
+    assert.equal(run('x', '').status, 1);
+    assert.equal(run('x', 'y').status, 1);
+    assert.equal(run('sha256:1', 'sha256:1').status, 0);
+  }
 });

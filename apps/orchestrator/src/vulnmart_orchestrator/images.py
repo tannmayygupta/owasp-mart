@@ -20,8 +20,11 @@ from .states import ValidationFailed
 
 ROLES = ("shop", "sidecar", "injector", "import-service", "mock-services", "bot-controller", "volume-keeper")
 PLACEHOLDER = re.compile(r"^\{image:([a-z][a-z-]*)\}$")
-# A digest-pinned reference: `name@sha256:<hex>` or a bare image id `sha256:<hex>` (used for local test images).
-DIGEST_REF = re.compile(r"^(?:[A-Za-z0-9][A-Za-z0-9._/:-]*@)?sha256:[0-9a-f]{64}$")
+# A digest-pinned reference: `name@sha256:<hex>`, matched as a whole (fullmatch: a trailing newline or text never passes).
+DIGEST_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/:-]*@sha256:[0-9a-f]{64}")
+# A bare image id `sha256:<hex>` names no registry and no repository: it is only what a local build gives. It is accepted only when the
+# allowlist is made for tests or the local demo (`allow_local_ids`, CLI `--allow-local-images`), never for a release manifest.
+LOCAL_IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 class ImageNotAllowed(ValidationFailed):
@@ -34,13 +37,21 @@ class ImageAllowlist:
     entrypoints: dict[str, tuple[str, ...]] = field(default_factory=dict)
     commands: dict[str, tuple[str, ...]] = field(default_factory=dict)
     healthchecks: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    allow_local_ids: bool = False  # tests and the local demo only: also accept a bare local image id `sha256:<hex>`
 
     def __post_init__(self) -> None:
         for role, ref in self.images.items():
             if role not in ROLES:
                 raise ValueError(f"unknown image role {role!r}")
-            if not isinstance(ref, str) or not DIGEST_REF.match(ref):
+            if not isinstance(ref, str):
                 raise ValueError(f"image for role {role!r} is not pinned by a sha256 digest")
+            if DIGEST_REF.fullmatch(ref):
+                continue
+            if self.allow_local_ids and LOCAL_IMAGE_ID.fullmatch(ref):
+                continue
+            if LOCAL_IMAGE_ID.fullmatch(ref):
+                raise ValueError(f"image for role {role!r} is a bare image id: a release manifest needs <name>@sha256:<digest> (local images need --allow-local-images)")
+            raise ValueError(f"image for role {role!r} is not pinned by a sha256 digest")
         for table in (self.entrypoints, self.commands, self.healthchecks):
             for role, argv in table.items():
                 if role not in self.images:
@@ -49,7 +60,7 @@ class ImageAllowlist:
                     raise ValueError("entrypoints and commands are lists of strings")
 
     @classmethod
-    def from_manifest(cls, data: dict) -> ImageAllowlist:
+    def from_manifest(cls, data: dict, *, allow_local_ids: bool = False) -> ImageAllowlist:
         if not isinstance(data, dict) or not isinstance(data.get("images"), dict):
             raise ValueError("release manifest needs an `images` object")
         extra = set(data) - {"images", "entrypoints", "commands", "healthchecks"}
@@ -60,11 +71,12 @@ class ImageAllowlist:
             entrypoints={r: tuple(v) for r, v in (data.get("entrypoints") or {}).items()},
             commands={r: tuple(v) for r, v in (data.get("commands") or {}).items()},
             healthchecks={r: tuple(v) for r, v in (data.get("healthchecks") or {}).items()},
+            allow_local_ids=allow_local_ids,
         )
 
     @classmethod
-    def load(cls, path: str | Path) -> ImageAllowlist:
-        return cls.from_manifest(json.loads(Path(path).read_text(encoding="utf-8")))
+    def load(cls, path: str | Path, *, allow_local_ids: bool = False) -> ImageAllowlist:
+        return cls.from_manifest(json.loads(Path(path).read_text(encoding="utf-8")), allow_local_ids=allow_local_ids)
 
     def role_of(self, placeholder: str) -> str:
         m = PLACEHOLDER.match(placeholder or "")

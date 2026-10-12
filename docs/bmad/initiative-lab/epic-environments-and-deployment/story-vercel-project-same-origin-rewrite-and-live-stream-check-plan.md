@@ -3,7 +3,7 @@ title: 'Vercel same-origin rewrite, origin-secret check and live-stream check (p
 type: 'feature'
 ticket: '3'
 created: '2026-10-11'
-status: 'done'
+status: 'built'
 baseline_revision: 'b493a689ab1dd7e5d1afafaa3d1680a55c9580b1'
 route: 'full'
 route_source: 'pinned'

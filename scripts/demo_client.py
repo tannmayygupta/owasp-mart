@@ -37,7 +37,9 @@ def step(name: str, ok: bool, detail: str) -> bool:
 
 
 def new_iid() -> str:
-    return "i-" + "".join(secrets.choice(LETTERS) for _ in range(16))
+    iid = "i-" + "".join(secrets.choice(LETTERS) for _ in range(16))
+    print(f"IID {iid}", flush=True)  # the demo removes only the instances this client made (L17 of the audit)
+    return iid
 
 
 def fake_flag() -> str:
