@@ -1,4 +1,4 @@
-# VulnMart platform API image (story 1.1 tracer bullet).
+# VulnMart platform API image (story 1.1; story 1.6 adds the migrations and the entrypoints).
 # Build context is the REPOSITORY ROOT (the uv workspace lockfile lives there):
 #   docker build -f apps/api/Dockerfile .
 # Compose does this for you (infra/compose/compose.yaml).
@@ -35,11 +35,21 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     TZ=UTC
 WORKDIR /app
+# What /version answers (NFR-OBS-02): passed by the build (Compose sets them from VULNMART_VERSION and VULNMART_COMMIT).
+ARG VULNMART_VERSION=0.0.0-dev
+ARG VULNMART_COMMIT=unknown
+ENV VULNMART_VERSION=$VULNMART_VERSION \
+    VULNMART_COMMIT=$VULNMART_COMMIT
+# The one Alembic history: the Compose `migrate` service runs `alembic -c /app/alembic.ini upgrade head`.
+COPY apps/api/alembic.ini /app/alembic.ini
+COPY apps/api/migrations /app/migrations
 USER 65532:65532
 EXPOSE 8000
 
-# Docker's own healthcheck: healthy only when /healthz answers 200 (Postgres and Valkey both ok).
+# Docker's own healthcheck: healthy when /readyz answers 200 (Postgres and Valkey ready), so services that depend on
+# the API start after it is ready. /healthz is the liveness route (the process answers).
 HEALTHCHECK --interval=2s --timeout=4s --retries=15 --start-period=2s \
-  CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3).status == 200 else 1)"]
+  CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3).status == 200 else 1)"]
 
+# The API. The other entrypoints use the same image: uvicorn vulnmart.kernel.entrypoints.<ingest|live|worker|scheduler>:app
 CMD ["uvicorn", "vulnmart.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]

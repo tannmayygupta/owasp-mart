@@ -77,7 +77,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: Tests run against the fakes and the table-owners file validates (the CI ownership check is Tanmay's L-07).
   - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21, H-83, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-06. API skeleton: kernel and single-head migrations**
+- [x] **P-06. API skeleton: kernel and single-head migrations**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.6` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Settings, session and organisation scope, audit, outbox and key-service stubs, request IDs and structured logs, health, readiness and version endpoints, one Alembic history.

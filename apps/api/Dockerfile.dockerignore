@@ -6,6 +6,8 @@
 !.python-version
 !apps/api/pyproject.toml
 !apps/api/src/**
+!apps/api/alembic.ini
+!apps/api/migrations/**
 !packages/py-models/pyproject.toml
 !packages/py-models/src/**
 **/__pycache__

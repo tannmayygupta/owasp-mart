@@ -3,7 +3,7 @@ title: 'Platform and lab API fragments, bundle, mock and generated clients (IF-1
 type: 'feature'
 ticket: '4'
 created: '2026-10-11'
-status: 'built'
+status: done
 baseline_revision: '74df5328e30f14b2485d09437b99edb5541f3301'
 route: 'full'
 route_source: 'pinned'
