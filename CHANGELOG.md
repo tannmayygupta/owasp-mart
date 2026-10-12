@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-10 shop boundaries and signed app events, 2026-10-12, Sahil)
+- `apps/shop/instance-harness/shop-events-check.mjs` (FR-SHP-14): a shop-owned Docker harness (`pnpm --filter @vulnmart/shop run instance:events`) that proves, with the real shop + the real sidecar + the fake ingest, that the shop sends its app events through the sidecar and the platform accepts them, and that the shop is network-isolated. The shop posts one event through its own code; the sidecar stamps `(instance_id, epoch, seq)` and signs with the per-epoch event key; the fake ingest verifies and stores it. The shop can reach the sidecar but has no route to a platform service on another network and no internet egress; no flag/key appears in the ingest read-out. 9 checks PASS on Docker 28.5.1. No shop code change (reuses T-04's `postEvent`).
+
 ### Added (T-09 shop instance runtime profile, 2026-10-12, Sahil)
 - `apps/shop/instance-harness/` (FR-SHP-15): a shop-owned Docker harness (`shop-instance-check.mjs`, `pnpm --filter @vulnmart/shop run instance:check`) that runs the **real** shop image as an instance container under the IF-6 section-7 runtime profile and proves, end to end, that it is never ready before the injector marker (`/readyz` 503) and ready only after it (200, injected snapshot copied to `/data` and opened), running non-root (65532), read-only root, cap-drop ALL, no-new-privileges, with no network egress and no flag in the health surface — 9 checks PASS on Docker 28.5.1. Fixed a merge-latent crash: `server.mjs` now imports the seed registry dynamically (local-run branch only), so the production image (which ships no `seed/`) no longer fails to boot. The sidecar/event chain is T-10; mounting the marketplace on the injected snapshot is a tracked follow-up.
 

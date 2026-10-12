@@ -10,6 +10,7 @@
     "migrate": "node src/db/migrate.mjs",
     "snapshot": "node seed/build-snapshot.mjs",
     "instance:check": "node instance-harness/shop-instance-check.mjs",
+    "instance:events": "node instance-harness/shop-events-check.mjs",
     "test": "node --test"
   },
   "dependencies": {

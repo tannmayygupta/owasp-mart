@@ -116,7 +116,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: The shop is never ready before the marker and runs under the runtime profile in the harness.
   - Handoffs: H-24, H-26, H-27, H-30, H-31, H-32, H-33, H-34 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-10. Shop boundaries and signed app events**
+- [x] **T-10. Shop boundaries and signed app events**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The shop has no route to the platform database, Valkey, the orchestrator or other instances, and sends signed app events through the sidecar.
