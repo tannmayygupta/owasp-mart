@@ -177,6 +177,9 @@ services:
       VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}@postgres:5432/vulnmart
       VULNMART_VALKEY_URL: valkey://valkey:6379/0
       VULNMART_SERVICE: api
+      # Story P-07: the API refuses /api/* without the origin secret the web proxy adds (a development value, the same
+      # default as the web service below; production keeps it in the Vercel project and on VM-P, architecture 06 s3).
+      VULNMART_ORIGIN_SECRET: ${VULNMART_DEV_ORIGIN_SECRET:-vulnmart-dev-origin-secret-not-a-secret}
     cap_drop:
       - ALL
     security_opt:
@@ -209,6 +212,9 @@ services:
     read_only: true
     environment:
       API_ORIGIN: http://api:8000
+      # Added by proxy.ts to every forwarded /api/* request as x-origin-secret (server side only, never sent to the browser).
+      ORIGIN_SECRET: ${VULNMART_DEV_ORIGIN_SECRET:-vulnmart-dev-origin-secret-not-a-secret}
+      DASHBOARD_ORIGIN: http://127.0.0.1:3000
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
     cap_drop:

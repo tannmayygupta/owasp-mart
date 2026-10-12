@@ -1,0 +1,5 @@
+/* Site-wide styles. A stylesheet, not inline styles: the Content-Security-Policy allows no inline style in production. */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 2rem;
+}

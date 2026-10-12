@@ -4,7 +4,8 @@ Each service answers (architecture 02 section 12, NFR-OBS-02):
 - `GET /healthz`: liveness, the process answers (no dependency is checked, so a database outage never restarts it);
 - `GET /readyz`: readiness, Postgres and Valkey answer within the timeout; 503 otherwise;
 - `GET /version`: service name, version and commit.
-These are internal routes: the dashboards' proxy forwards `/api/*` only. Answers carry no error text (NFR-SEC-03),
+These are internal routes: the dashboards' proxy forwards `/api/*` only, and the origin-secret check (`origin.py`)
+applies to `/api/*` only, so probes never need the secret. Answers carry no error text (NFR-SEC-03),
 are never cached, and every request has an id (`observability.RequestIdMiddleware`).
 """
 from __future__ import annotations
@@ -24,6 +25,7 @@ from vulnmart.problem import install_problem_handlers
 
 from .db import make_engine
 from .observability import RequestIdMiddleware, configure_logging
+from .origin import OriginSecretMiddleware, parse_secrets
 from .settings import Settings, get_settings
 
 logger = logging.getLogger("vulnmart.health")
@@ -118,6 +120,8 @@ def create_service_app(
     app.state.checks = active
     app.state.check_timeout = limit
     install_problem_handlers(app)
+    # Added first, so it runs inside the request-id middleware (its 403 carries the request id).
+    app.add_middleware(OriginSecretMiddleware, secrets=parse_secrets(settings.origin_secrets_value()))
     app.add_middleware(RequestIdMiddleware)
 
     @app.get("/healthz", include_in_schema=False)

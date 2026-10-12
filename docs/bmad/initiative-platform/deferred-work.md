@@ -41,3 +41,7 @@
 - Client does not throw when an authenticated write has no CSRF token; a dashboards decision (P-07).
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
+
+## Deferred from: code review of story-dashboards-skeleton-with-the-same-origin-proxy-local-plan (2026-10-12)
+
+- The health page's own client call is not run in a real browser under the CSP (no browser harness yet); the e2e test fetches the same URL and checks the CSP. Add a browser test with the first dashboards story that needs one.

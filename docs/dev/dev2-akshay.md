@@ -86,7 +86,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The API starts against Postgres, `alembic heads` shows one head and a scope test refuses a query without an organisation filter.
   - Handoffs: H-05, H-07, H-16, H-19, H-22, H-23 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-07. Dashboards skeleton with the same-origin proxy (local)**
+- [x] **P-07. Dashboards skeleton with the same-origin proxy (local)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.7` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Next.js skeleton with the `/api/*` proxy, origin secret header, no-store and security headers, run locally.
