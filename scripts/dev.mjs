@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // One command to start VulnMart containers on Windows, macOS and Linux. Node built-ins only.
-//   node scripts/dev.mjs hello | up <profile...> | down | doctor | harness [--keep] | harness down | --help
+//   node scripts/dev.mjs hello | up <profile...> | down | doctor | harness [--keep] | harness down | demo [--keep] [--stub-only] [--no-web] | --help
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import net from 'node:net';
@@ -25,6 +25,7 @@ Usage: node scripts/dev.mjs <command>
   harness [--keep]  Start one full stub instance with the fake ingest, check it against the contracts, remove it (--keep leaves it up)
   harness down      Remove the harness containers, networks and volumes
   doctor            Print tool versions (Node, pnpm, uv, Docker, Compose) with PASS or FAIL
+  demo [options]    Local end-to-end demo of sprints 1 and 2 (platform stack, orchestrator, platform client, cleanup). Options: --keep (leave it up), --stub-only (skip the real shop image), --no-web (skip the dashboards); demo down removes a kept demo
   --help            Show this text
 `;
 
@@ -39,6 +40,12 @@ export function parseArgs(argv) {
   if (cmd === 'hello' || cmd === 'down' || cmd === 'doctor') {
     if (rest.length) return { error: `"${cmd}" takes no arguments.` };
     return { cmd };
+  }
+  if (cmd === 'demo') {
+    if (rest.length === 1 && rest[0] === 'down') return { cmd, rest };
+    const bad = rest.filter((a) => !['--keep', '--stub-only', '--no-web'].includes(a));
+    if (bad.length) return { error: `Unknown option for demo: ${bad.join(', ')}. Valid: --keep, --stub-only, --no-web.` };
+    return { cmd, rest };
   }
   if (cmd === 'harness') {
     if (!rest.length) return { cmd, keep: false };
@@ -200,6 +207,7 @@ export async function main(argv = process.argv.slice(2)) {
     case 'doctor': return doctor();
     case 'harness': return harness({ keep: a.keep });
     case 'harness-down': return harnessDownCmd();
+    case 'demo': return (await import('./demo.mjs')).demo(a.rest);
     default: return 1;
   }
 }

@@ -80,3 +80,15 @@ def test_allowlist_loads_a_manifest_file(tmp_path):
     f.write_text(json.dumps({"images": {}, "extra": 1}), encoding="utf-8")
     with pytest.raises(ValueError):
         ImageAllowlist.load(f)
+
+def test_manifest_healthchecks_override_the_template_check_for_an_image_without_wget():
+    from vulnmart_orchestrator.images import ImageAllowlist
+    from vulnmart_orchestrator.builder import CreateSpec, build_plan  # noqa: F401
+    from support import allowlist, digest, template, body
+    import copy
+
+    manifest = {"images": {"shop": digest("shop")}, "healthchecks": {"shop": ["CMD", "/nodejs/bin/node", "-e", "process.exit(0)"]}}
+    a = ImageAllowlist.from_manifest(manifest)
+    assert a.healthchecks["shop"][1] == "/nodejs/bin/node"
+    with pytest.raises(ValueError):
+        ImageAllowlist.from_manifest({"images": {"shop": digest("shop")}, "healthchecks": {"sidecar": ["CMD", "x"]}})

@@ -180,3 +180,14 @@ after = [15]
 hitl = false
 risk = "high"
 references = ["docs/reviews/2026-10-11-if8-change-request-for-stream-l.md", "docs/reviews/2026-10-12-p08-contract-sign-off.md"]
+
+[[entry]]
+id = 17
+type = "story"
+title = "Local end-to-end demo of sprints 1 and 2 for the guide meeting"
+description = "One command, node scripts/dev.mjs demo, shows the work of all three streams running on the developer's machine: the platform stack (API, Postgres, Valkey, Mailpit, dashboards) answering through the same-origin proxy, the real Python orchestrator service with the Docker backend, and the platform's own InstanceHost client creating an instance from the shop template (real shop image from apps/shop where it works as the shop role, the stub otherwise), reading it, opening access, listing, destroying it and checking nothing is left. Prints a clear step table, saves redacted evidence, tears everything down, and has a short runbook for the meeting."
+verify = "node scripts/dev.mjs demo runs to the end on the developer machine with every step PASS and nothing left over (docker ps, networks, volumes labelled vm.*); the runbook lists what to show and say; no secret, address or personal data is printed or saved."
+covers = ["FR-INS-01", "FR-INS-07", "PB-6"]
+after = [16]
+hitl = false
+risk = "medium"

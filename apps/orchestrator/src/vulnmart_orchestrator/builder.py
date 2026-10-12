@@ -421,7 +421,7 @@ def build_plan(template: dict, spec: CreateSpec, images: ImageAllowlist, *, now:
         if set(labels) != set(LABELS) or labels["vm.component"] != c["name"]:
             raise TemplateInvalid("a component must carry exactly the nine labels")
         hc = c.get("healthcheck")
-        health = HealthSpec(_health_test(hc), int(hc["interval_s"]), int(hc["timeout_s"]), int(hc["retries"])) if hc else None
+        health = HealthSpec(images.healthchecks.get(role) or _health_test(hc), int(hc["interval_s"]), int(hc["timeout_s"]), int(hc["retries"])) if hc else None
         return ContainerSpec(
             name=f"{pre}-{c['name']}", component=c["name"], role=role, image=image,
             entrypoint=images.entrypoints.get(role), command=images.commands.get(role),

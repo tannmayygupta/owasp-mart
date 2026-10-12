@@ -4,7 +4,8 @@ The real source is the release manifest of L-12, a JSON file written by the rele
 
     {"images": {"shop": "registry/name@sha256:<64 hex>", ...},
      "entrypoints": {"role": ["..."]},   (optional, per role)
-     "commands": {"role": ["..."]}}      (optional, per role)
+     "commands": {"role": ["..."]},      (optional, per role)
+     "healthchecks": {"role": ["CMD", "..."]}}   (optional, per role: the test of the Docker health check, for an image without `wget`)
 
 A request can only name a template; it cannot add an image, entrypoint or command.
 """
@@ -32,6 +33,7 @@ class ImageAllowlist:
     images: dict[str, str]
     entrypoints: dict[str, tuple[str, ...]] = field(default_factory=dict)
     commands: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    healthchecks: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for role, ref in self.images.items():
@@ -39,7 +41,7 @@ class ImageAllowlist:
                 raise ValueError(f"unknown image role {role!r}")
             if not isinstance(ref, str) or not DIGEST_REF.match(ref):
                 raise ValueError(f"image for role {role!r} is not pinned by a sha256 digest")
-        for table in (self.entrypoints, self.commands):
+        for table in (self.entrypoints, self.commands, self.healthchecks):
             for role, argv in table.items():
                 if role not in self.images:
                     raise ValueError(f"entrypoint or command for role {role!r} without an image")
@@ -50,13 +52,14 @@ class ImageAllowlist:
     def from_manifest(cls, data: dict) -> ImageAllowlist:
         if not isinstance(data, dict) or not isinstance(data.get("images"), dict):
             raise ValueError("release manifest needs an `images` object")
-        extra = set(data) - {"images", "entrypoints", "commands"}
+        extra = set(data) - {"images", "entrypoints", "commands", "healthchecks"}
         if extra:
             raise ValueError(f"unknown manifest keys: {sorted(extra)}")
         return cls(
             images=dict(data["images"]),
             entrypoints={r: tuple(v) for r, v in (data.get("entrypoints") or {}).items()},
             commands={r: tuple(v) for r, v in (data.get("commands") or {}).items()},
+            healthchecks={r: tuple(v) for r, v in (data.get("healthchecks") or {}).items()},
         )
 
     @classmethod
