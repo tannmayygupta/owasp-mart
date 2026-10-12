@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- S-4 measurement tool for the orchestrator (story 3.3, L-13 part 3): `vulnmart_orchestrator.measure` measures cold start and memory per instance with the real engine and Docker, runbook `docs/runbooks/measure-instances.md`, research note with the result table still pending the developer run on vm-i.
 
 ### Added (L-13 part 2: orchestrator service, 2026-10-12, Tanmay)
 - `apps/orchestrator` now serves the IF-5 API (`python -m vulnmart_orchestrator`, FastAPI and uvicorn): signed requests (`v1`, 60 s skew, 5 minute nonce memory), mutual TLS options, strict JSON (integer tokens only, no duplicate keys), RFC 9457 problem bodies, 64 KiB body limit, 20 per second rate limit, capacity in memory, create and destroy answered at once with a worker thread, ordered and retried state reports to the platform, a marked reset placeholder (501, story 3.4), a test backend (`--backend fake`) and a `Dockerfile`. The engine now follows the contract (patterns, limits, JSON Pointer errors, `fullmatch`), has one lock per instance, access, list and host status. The protocol, wire, http, report and mTLS suites of `apps/api` run against the service with `VM_ORCH_SERVICE=python` (CI and `ci:linux` step added); reset cases are skipped with the reason story 3.4. ADR 0034, D-53, handoffs H-57 to H-59 answered, H-113 added.
