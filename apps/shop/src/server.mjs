@@ -7,8 +7,10 @@
 import { createApp } from './app.mjs';
 import { openDb } from './db/index.mjs';
 import { migrate } from './db/migrate.mjs';
-import { seedAll } from '../seed/registry.mjs';
 import { makeReadiness } from './instance/instance.mjs';
+// `seedAll` is imported dynamically in the local-run branch only: the seed data
+// lives outside src/ and is NOT shipped in the instance image (the instance gets
+// a pre-seeded snapshot from the injector), so the instance path must not load it.
 
 // Resolve PORT once. An unset value defaults to 3000; a set-but-invalid value is
 // a misconfiguration we fail loudly on rather than binding a random port. The
@@ -53,6 +55,7 @@ if (!readiness) {
   db = openDb(process.env.VM_DB_PATH ?? ':memory:');
   migrate(db);
   if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
+    const { seedAll } = await import('../seed/registry.mjs');
     await seedAll(db);
   }
 }

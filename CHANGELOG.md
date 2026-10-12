@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-09 shop instance runtime profile, 2026-10-12, Sahil)
+- `apps/shop/instance-harness/` (FR-SHP-15): a shop-owned Docker harness (`shop-instance-check.mjs`, `pnpm --filter @vulnmart/shop run instance:check`) that runs the **real** shop image as an instance container under the IF-6 section-7 runtime profile and proves, end to end, that it is never ready before the injector marker (`/readyz` 503) and ready only after it (200, injected snapshot copied to `/data` and opened), running non-root (65532), read-only root, cap-drop ALL, no-new-privileges, with no network egress and no flag in the health surface — 9 checks PASS on Docker 28.5.1. Fixed a merge-latent crash: `server.mjs` now imports the seed registry dynamically (local-run branch only), so the production image (which ships no `seed/`) no longer fails to boot. The sidecar/event chain is T-10; mounting the marketplace on the injected snapshot is a tracked follow-up.
+
 ### Added (T-16 seeded challenge accounts, 2026-10-11, Sahil)
 - `apps/shop/seed/` challenge account roster (FR-SHP-08): one seed contribution (`contributions/010-challenge-accounts.mjs`, dropped into the T-08 registry) seeds the known cast every fresh instance needs — the player's seller-staff at Harbor and a player customer, a finance account (C07), a dormant support agent `s.iyer` (C09, distinct from the C03 support-agent bot), an admin, and filler customers no human uses — as eight `users` rows over the existing baseline stores, each with a distinct, documented, non-secret password. The deliberate weak/default credentials (C05/C07/C09) and per-instance flags are injected later by the challenge epics, never baked in. A new `seededPasswords` export convention plus a global test enforce the no-reuse AC across all contributions as challenges grow. 5 tests (84 total); the T-08 `stores==2` invariant is intact.
 

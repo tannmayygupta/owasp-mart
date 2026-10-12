@@ -23,3 +23,9 @@
 - `setUserStatus` (admin manage-users) has no self-suspend / last-admin guard, so an admin can lock themselves or the last admin out. Deferred: out of FR-SHP-07 scope (correct-flow role screens); add the guard with the richer admin user-management screen.
 - The service layer calls `can(role, action, {})` with an empty ctx. Safe today because every staff-reachable matrix cell is unscoped (`true`/`amounts_only`); if a staff action ever gains a scoped rule (`own`/`own_store`), pass real ctx so the matrix check is not a no-op behind `requireRole`.
 - `assignTicket` and `holdPayout` endpoints exist and are gated but have no UI control yet (reachable only by direct POST). Add the buttons with the fuller staff screens.
+
+## Deferred from: T-09 (health, readiness and runtime profile)
+
+- In instance mode the shop serves only the health surface: `server.mjs` builds `createApp({ isReady })` with no `db`, so the T-14/15 marketplace routes are not mounted on the injected snapshot. Mounting them once the snapshot opens needs lazy-db wiring (the routes must take the db that appears only after the marker, while `/readyz` still reports 503 before then). Do it with the flows/boundaries work (T-10) or a dedicated wiring step.
+- The runtime profile in T-09 is applied by the shop-owned harness's `docker run` flags, mirroring IF-6 section 7. Binding it to the real orchestrator's instance template (and running the real shop through Tanmay's lab harness with shop-agnostic live-checks) is L-13.
+- Running `apps/shop/instance-harness/shop-instance-check.mjs` in CI (Docker) is a possible regression guard; it runs locally today.

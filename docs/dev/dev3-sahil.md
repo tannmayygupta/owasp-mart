@@ -107,7 +107,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 Goal: The shop runs inside an instance (health, events, mock services, import service, bot) and the customer, support, finance and admin flows work.
 
-- [ ] **T-09. Health, readiness after the injector marker and runtime profile**
+- [x] **T-09. Health, readiness after the injector marker and runtime profile**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Health endpoints, ready only after the injector writes the marker, running non-root with a read-only filesystem and no egress.
