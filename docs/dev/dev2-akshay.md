@@ -68,7 +68,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The bundle validates, the mock answers every endpoint and clients are generated in CI.
   - Handoffs: H-12, H-13, H-14, H-16, H-17, H-19, H-20, H-23, H-84, H-85, H-86, H-87, H-88, H-89, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
+- [x] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the ports the platform provides (AuditPort, OutboxPort, KeyPort, ScopePort, SettingsPort, QuotaPort) as Python protocols with in-memory fakes, fakes of the lab ports and the table-owners file.
@@ -77,7 +77,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: Tests run against the fakes and the table-owners file validates (the CI ownership check is Tanmay's L-07).
   - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21, H-83, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-06. API skeleton: kernel and single-head migrations**
+- [x] **P-06. API skeleton: kernel and single-head migrations**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.6` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Settings, session and organisation scope, audit, outbox and key-service stubs, request IDs and structured logs, health, readiness and version endpoints, one Alembic history.
@@ -86,7 +86,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Done when: The API starts against Postgres, `alembic heads` shows one head and a scope test refuses a query without an organisation filter.
   - Handoffs: H-05, H-07, H-16, H-19, H-22, H-23 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-07. Dashboards skeleton with the same-origin proxy (local)**
+- [x] **P-07. Dashboards skeleton with the same-origin proxy (local)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.7` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Next.js skeleton with the `/api/*` proxy, origin secret header, no-store and security headers, run locally.

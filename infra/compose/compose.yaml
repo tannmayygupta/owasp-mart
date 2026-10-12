@@ -43,8 +43,10 @@ services:
   # Local development only. Postgres and Valkey are NOT published to the host: only the API and the
   # Mailpit page are, on 127.0.0.1. The database password below is a fixed development value (the
   # database is reachable only inside this Compose network); production secrets never come from here.
-  # The value is written once as VULNMART_DEV_DB_PASSWORD (default below) and used by Postgres and the API alike.
-  # Postgres applies it only when its data volume is first created: after changing it, reset the volume (README).
+  # Two roles (story P-06, ADR 0014): `vulnmart` owns the tables and runs the migrations (VULNMART_DEV_DB_PASSWORD);
+  # `vulnmart_app` is the API's role, without ownership or BYPASSRLS (VULNMART_DEV_APP_DB_PASSWORD), created by
+  # postgres/initdb/10-app-role.sql. Postgres applies both only when its data volume is first created: after a
+  # change, or on a volume made before story P-06, reset the volume (docker volume rm vulnmart_pg-data).
   # Images are pinned by digest, captured with `docker buildx imagetools inspect` on 2026-10-11.
 
   postgres:
@@ -57,6 +59,7 @@ services:
       POSTGRES_USER: vulnmart
       POSTGRES_DB: vulnmart
       POSTGRES_PASSWORD: ${VULNMART_DEV_DB_PASSWORD:-vulnmart-dev-only-not-a-secret}
+      VULNMART_APP_DB_PASSWORD: ${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}
     cap_drop:
       - ALL
     security_opt:
@@ -69,6 +72,7 @@ services:
     volumes:
       # PostgreSQL 18 images keep the cluster under /var/lib/postgresql/18/docker; mount the parent.
       - pg-data:/var/lib/postgresql
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vulnmart -d vulnmart"]
       interval: 2s
@@ -126,18 +130,56 @@ services:
       start_period: 1s
     restart: "no"
 
+  # One-shot: brings the schema to the single Alembic head as the owner role, then exits; the API starts after it.
+  migrate:
+    profiles: ["platform"]
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      args:
+        VULNMART_VERSION: ${VULNMART_VERSION:-0.0.0-dev}
+        VULNMART_COMMIT: ${VULNMART_COMMIT:-unknown}
+    image: vulnmart-api:local
+    container_name: vulnmart-migrate
+    read_only: true
+    command: ["alembic", "-c", "/app/alembic.ini", "upgrade", "head"]
+    environment:
+      VULNMART_MIGRATE_DSN: postgresql://vulnmart:${VULNMART_DEV_DB_PASSWORD:-vulnmart-dev-only-not-a-secret}@postgres:5432/vulnmart
+      VULNMART_APP_ROLE: vulnmart_app
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 64
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m,uid=65532,gid=65532
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     profiles: ["platform"]
     # Build context is the repository root (the uv workspace lockfile lives there).
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
+      args:
+        VULNMART_VERSION: ${VULNMART_VERSION:-0.0.0-dev}
+        VULNMART_COMMIT: ${VULNMART_COMMIT:-unknown}
     image: vulnmart-api:local
     container_name: vulnmart-api
     read_only: true
     environment:
-      VULNMART_POSTGRES_DSN: postgresql://vulnmart:${VULNMART_DEV_DB_PASSWORD:-vulnmart-dev-only-not-a-secret}@postgres:5432/vulnmart
+      VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}@postgres:5432/vulnmart
       VULNMART_VALKEY_URL: valkey://valkey:6379/0
+      VULNMART_SERVICE: api
+      # Story P-07: the API refuses /api/* without the origin secret the web proxy adds (a development value, the same
+      # default as the web service below; production keeps it in the Vercel project and on VM-P, architecture 06 s3).
+      VULNMART_ORIGIN_SECRET: ${VULNMART_DEV_ORIGIN_SECRET:-vulnmart-dev-origin-secret-not-a-secret}
     cap_drop:
       - ALL
     security_opt:
@@ -149,6 +191,8 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       valkey:
@@ -168,6 +212,9 @@ services:
     read_only: true
     environment:
       API_ORIGIN: http://api:8000
+      # Added by proxy.ts to every forwarded /api/* request as x-origin-secret (server side only, never sent to the browser).
+      ORIGIN_SECRET: ${VULNMART_DEV_ORIGIN_SECRET:-vulnmart-dev-origin-secret-not-a-secret}
+      DASHBOARD_ORIGIN: http://127.0.0.1:3000
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
     cap_drop:

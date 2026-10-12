@@ -139,7 +139,7 @@ Every item is a configuration value, never code (NFR-POR-01, NFR-EXT-04).
 | `API_UPSTREAM` (the rewrite target) | `http://api:8000` (Next dev proxy) | Caddy route | `https://api.<PLATFORM_ZONE>` |
 | `PLATFORM_ZONE`, `LABS_ZONE` | `localhost`, `localhost` | `localhost`, `localhost` | Per D-16 route, see [03](03-origins-and-access.md) |
 | TLS mode | none (loopback) | none (loopback) | Let's Encrypt: wildcard via DNS-01 for `LABS_ZONE`, normal certificate for the API host |
-| `ORIGIN_SECRET` check | off | off | on (Vercel adds it, `[EF-01]`) |
+| `ORIGIN_SECRET` check | on in Compose since story P-07 (the web proxy adds a development value; the API checks it) | off | on (Vercel adds it, `[EF-01]`; checked at `caddy-p` and again by the API) |
 | `DB_URL`, `VALKEY_URL` | compose service names | compose service names | VM-P local addresses |
 | `INSTANCE_HOST_URL` | `http://orchestrator:9000` | same | `https://<VM-I private address>:9443` with mTLS |
 | Email | Mailpit | Mailpit | Resend or Brevo (OI-32) |

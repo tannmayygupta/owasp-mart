@@ -3,7 +3,7 @@
 - **Status:** Proposed (D-53, decided on the developer's delegation 2026-10-12: "choose the best free option, least tokens"; to be confirmed)
 - **Date:** 2026-10-12
 - **Deciders:** Tanmay (by delegation to Claude Code, story "Orchestrator service: the IF-5 API with mTLS, signed requests and state reports", task L-13 part 2)
-- **Requirements:** FR-INS-07, FR-INS-01, FR-INS-11, NFR-SEC-03, NFR-SEC-04; decisions D-52, D-47, ADR 0024, ADR 0028; contracts IF-5 and IF-6; handoffs H-57, H-58, H-59, H-66, H-67, H-113
+- **Requirements:** FR-INS-07, FR-INS-01, FR-INS-11, NFR-SEC-03, NFR-SEC-04; decisions D-52, D-47, ADR 0024, ADR 0028; contracts IF-5 and IF-6; handoffs H-57, H-58, H-59, H-66, H-67, H-119
 
 ## Context
 The engine of story 3.1 (ADR 0033) had no network face. Nothing served the IF-5 calls, checked mutual TLS and signed requests, pushed state reports to the platform, or ran the existing contract suites against a real implementation. The engine also differed from the contract in some patterns and limits, and `create` blocked for about 90 seconds while Docker worked, which a request-answering service cannot do.

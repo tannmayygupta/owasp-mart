@@ -9,7 +9,7 @@
 | Report tag | orchestrator, instance lifecycle, IF-5 service |
 
 ## Requirements covered
-FR-INS-07 (state machine over the API, reports), FR-INS-01, FR-INS-11; NFR-SEC-03, NFR-SEC-04; D-53 (ADR 0034); handoffs H-57, H-58, H-59 answered, H-113 added; H-66 and H-67 built.
+FR-INS-07 (state machine over the API, reports), FR-INS-01, FR-INS-11; NFR-SEC-03, NFR-SEC-04; D-53 (ADR 0034); handoffs H-57, H-58, H-59 answered, H-119 added; H-66 and H-67 built.
 
 ## Summary (plain language, 3-5 lines)
 The engine now has a network face. `python -m vulnmart_orchestrator` serves the seven IF-5 calls: it checks the signature and the client certificate, answers a create at once (202) while a worker thread builds the instance, and tells the platform about every state change. The instance is still never ready before the flag injection. The same contract test suites that were written for the Node fake now also run against this service.
@@ -61,4 +61,4 @@ See `docs/assets/orchestrator-service/test-output.txt` (last lines of each run) 
 None of the challenge code. Service rules: no flag, seed, key or owner hash in an answer or a log line (a test creates, fails and lists instances and searches every answer and the whole log); an exception message is never sent or logged (class name only); the signature check never says which part failed; unsigned traffic does not spend the rate limit; forbidden fields create nothing.
 
 ## Limitations and follow-ups
-Reset and idle detection are story 3.4 (the reset call answers 501 and the suites skip those cases). The nonce memory and the report queue are per process. The rate limit keys on the peer address. No read timeout on a slow body beyond uvicorn defaults. Request `limits` other than memory are validated but not applied to containers. No compose service and no socket proxy wiring yet. The service was not run through real Docker (the engine's real-Docker tests of story 3.1 still pass), nor on a real host. Handoff H-113 tells the platform side what the report sender does. The Excel tracker is updated by the developer by hand.
+Reset and idle detection are story 3.4 (the reset call answers 501 and the suites skip those cases). The nonce memory and the report queue are per process. The rate limit keys on the peer address. No read timeout on a slow body beyond uvicorn defaults. Request `limits` other than memory are validated but not applied to containers. No compose service and no socket proxy wiring yet. The service was not run through real Docker (the engine's real-Docker tests of story 3.1 still pass), nor on a real host. Handoff H-119 tells the platform side what the report sender does. The Excel tracker is updated by the developer by hand.

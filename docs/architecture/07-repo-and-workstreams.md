@@ -169,7 +169,7 @@ The two streams share one deployable codebase, so their agreement is a set of Py
 | L | `InstancePort` (request, open ticket, reset, stop, force-stop, capacity) | P | Learner and admin screens |
 | P | `AuditPort` (append) | L | Audit writes from instance and scoring actions |
 | P | `OutboxPort` (publish domain event, enqueue email) | L | Live updates and notifications |
-| P | `KeyPort` (create, wrap, unwrap, shred) | L | Evidence encryption |
+| P | `KeyPort` (create an attempt key, encrypt, decrypt, shred; event key, flag, decoy and owner-hash derivations) | L | Evidence encryption, ingest signatures, flag material (story P-05: wrapping the DEK with the KEK stays inside the key service) |
 | P | `ScopePort` (current user and organization scope) | L | Filtering and row-level security |
 | P | `SettingsPort` and `QuotaPort` | L | Timeouts, caps, quotas |
 | T | none | | T has no code-level port; T meets L at IF-4, IF-6, IF-7 only |
