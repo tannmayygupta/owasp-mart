@@ -3,7 +3,7 @@ title: 'API skeleton: kernel and single-head migrations'
 type: 'feature'
 ticket: '6'
 created: '2026-10-12'
-status: 'built'
+status: done
 baseline_revision: '328c189840744eec9d6da6d2d72ecb97056ec744'
 route: 'full'
 route_source: 'auto'
