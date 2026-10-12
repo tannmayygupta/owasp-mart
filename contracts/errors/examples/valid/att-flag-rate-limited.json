@@ -1,0 +1,7 @@
+{
+  "type": "urn:vulnmart:error:ATT-FLAG-RATE-LIMITED",
+  "title": "Too many attempts. Try again later.",
+  "status": 429,
+  "code": "ATT-FLAG-RATE-LIMITED",
+  "request_id": "req-0a1b2c3d"
+}

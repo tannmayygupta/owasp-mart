@@ -1,0 +1,93 @@
+{
+  "items": [
+    {
+      "challenge_key": "C00",
+      "best_milestone": "M3",
+      "solved": true,
+      "held": true,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C02",
+      "best_milestone": "M1",
+      "solved": false,
+      "held": false,
+      "hints_used": 1,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C03",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C04",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C05",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C06",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C07",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C08",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C09",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C10",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    },
+    {
+      "challenge_key": "C11",
+      "best_milestone": "none",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true
+    }
+  ],
+  "has_more": false
+}

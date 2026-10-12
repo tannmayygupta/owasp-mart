@@ -1,5 +1,7 @@
 # Target-stream consumer review of IF-6 and IF-4
 
+> **STALE (2026-10-11, flagged by stream L in the PR 3 remediation, story 1.15):** the IF-4 sign-off below covers v0.1.0 as reviewed on 2026-10-09. IF-4 changed afterwards: the shop must post `import.job` on the import service's behalf (H-50) and a required `first_seq` was added (commit 3c22683); story 1.15 now changes the sequence rules again (the epoch is carried on every event, `first_seq` is removed, see ADR 0025). The IF-4 sign-off is therefore **not valid** until stream T re-reviews the new version. The IF-6 part is unaffected except for the IF-6 schema hardening of story 1.15, which also needs a quick re-check.
+
 | Field | Value |
 |---|---|
 | Reviewer | Sahil Roy (stream T, the shop and services) |

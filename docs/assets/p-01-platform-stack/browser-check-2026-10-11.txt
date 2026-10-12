@@ -1,0 +1,8 @@
+--- page text ---
+VulnMart platform
+API: ok
+Postgres: ok
+Valkey: ok
+--- network hosts seen: 127.0.0.1:3000
+--- API call: http://127.0.0.1:3000/api/healthz, http://127.0.0.1:3000/api/healthz
+

@@ -8,6 +8,7 @@ import { createApp } from './app.mjs';
 import { openDb } from './db/index.mjs';
 import { migrate } from './db/migrate.mjs';
 import { seedAll } from '../seed/registry.mjs';
+import { makeReadiness } from './instance/instance.mjs';
 
 // Resolve PORT once. An unset value defaults to 3000; a set-but-invalid value is
 // a misconfiguration we fail loudly on rather than binding a random port. The
@@ -24,15 +25,39 @@ function resolvePort(raw) {
 const PORT = resolvePort(process.env.PORT);
 const HOST = '0.0.0.0';
 
-// Open the shop database. In an instance the injector supplies a seeded snapshot
-// at VM_DB_PATH (T-04/T-09); for local running we migrate and seed a fresh db.
-const db = openDb(process.env.VM_DB_PATH ?? ':memory:');
-migrate(db);
-if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
-  await seedAll(db);
+// Inside an instance the injector hands over a snapshot and a flags file and
+// writes the marker last; the shop is ready only after that (T-04, IF-6 s5/6).
+// The env names are the ones the instance contract allows. Outside an instance
+// (no snapshot/flags configured) the shop is simply always-ready.
+function instanceReadiness(env) {
+  const snapshotPath = env.VM_SNAPSHOT_PATH;
+  const flagsPath = env.VM_FLAGS_PATH;
+  const dbPath = env.VM_DB_PATH;
+  const set = [snapshotPath, flagsPath, dbPath].filter(Boolean).length;
+  if (set === 0) return undefined; // not an instance: always-ready skeleton
+  // A partially configured instance must fail loudly, not silently be always-ready.
+  if (set !== 3) {
+    throw new Error('instance mode needs all of VM_SNAPSHOT_PATH, VM_FLAGS_PATH and VM_DB_PATH (or none)');
+  }
+  return makeReadiness({ snapshotPath, flagsPath, dbPath });
 }
 
-const app = createApp({ db });
+// Reconcile the T-14 marketplace (needs an open db) with the T-04 instance
+// readiness (db appears from the injected snapshot only after the marker). For a
+// local / non-instance run we open, migrate and seed a fresh db and mount the
+// full shop, always-ready. In an instance the db comes from the snapshot once
+// ready; mounting the marketplace on that db is completed in T-09.
+const readiness = instanceReadiness(process.env);
+let db;
+if (!readiness) {
+  db = openDb(process.env.VM_DB_PATH ?? ':memory:');
+  migrate(db);
+  if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
+    await seedAll(db);
+  }
+}
+
+const app = createApp({ db, isReady: readiness?.ready });
 const server = app.listen(PORT, HOST, () => {
   console.log(`vulnmart-shop listening on http://${HOST}:${PORT}`);
 });

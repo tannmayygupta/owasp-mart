@@ -33,7 +33,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 
 Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton exist and are signed off.
 
-- [ ] **P-01. Platform stack runs end to end locally (tracer bullet)**
+- [x] **P-01. Platform stack runs end to end locally (tracer bullet)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Postgres, API, worker, Valkey and the dashboards start with `node scripts/dev.mjs`, and a request passes dashboards, API and database.
@@ -41,47 +41,52 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Waits on: L-01 (repository skeleton and Compose profiles).
   - Done when: A hello request works through the whole local stack and the developer environment on your Mac is verified.
 
-- [ ] **P-02. Error registry and problem-details format (IF-8)**
+- [x] **P-02. Error registry and problem-details format (IF-8)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the shared error codes and the problem-details response format.
   - Covers: PB-1
   - Waits on: P-01.
   - Done when: The registry validates and a test shows an API error in the agreed format.
+  - Handoffs: H-01, H-02, H-03, H-04, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-03. Domain event schema (IF-3) with fixtures and replay script**
+- [x] **P-03. Domain event schema (IF-3) with fixtures and replay script**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the platform domain events, fixtures and a replay script.
   - Covers: PB-2
   - Waits on: P-02.
   - Done when: Every fixture validates, the replay script emits them in order to a local consumer and the validation runs in CI.
+  - Handoffs: H-22 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-04. Platform and lab API fragments, bundle, mock and generated clients (IF-1, IF-2)**
+- [x] **P-04. Platform and lab API fragments, bundle, mock and generated clients (IF-1, IF-2)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.4` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Write the platform API fragment, bundle it with the lab fragment, a mock server and generated clients.
   - Covers: PB-3
   - Waits on: P-02, P-03, Tanmay's L-05 (lab fragment) and Sahil's T-02 (catalogue stubs).
   - Done when: The bundle validates, the mock answers every endpoint and clients are generated in CI.
+  - Handoffs: H-12, H-13, H-14, H-16, H-17, H-19, H-20, H-23, H-84, H-85, H-86, H-87, H-88, H-89, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
+- [x] **P-05. Ports, in-memory fakes and table ownership (IF-9, IF-10)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Define the ports the platform provides (AuditPort, OutboxPort, KeyPort, ScopePort, SettingsPort, QuotaPort) as Python protocols with in-memory fakes, fakes of the lab ports and the table-owners file.
   - Covers: PB-4
   - Waits on: P-02, P-03.
   - Done when: Tests run against the fakes and the table-owners file validates (the CI ownership check is Tanmay's L-07).
+  - Handoffs: H-05, H-06, H-07, H-08, H-09, H-10, H-11, H-12, H-13, H-14, H-15, H-18, H-20, H-21, H-83, H-90, H-91 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-06. API skeleton: kernel and single-head migrations**
+- [x] **P-06. API skeleton: kernel and single-head migrations**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.6` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Settings, session and organisation scope, audit, outbox and key-service stubs, request IDs and structured logs, health, readiness and version endpoints, one Alembic history.
   - Covers: PB-5
   - Waits on: P-01, P-03, P-05.
   - Done when: The API starts against Postgres, `alembic heads` shows one head and a scope test refuses a query without an organisation filter.
+  - Handoffs: H-05, H-07, H-16, H-19, H-22, H-23 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-07. Dashboards skeleton with the same-origin proxy (local)**
+- [x] **P-07. Dashboards skeleton with the same-origin proxy (local)**
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.7` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Next.js skeleton with the `/api/*` proxy, origin secret header, no-store and security headers, run locally.
@@ -96,6 +101,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Covers: PB-9
   - Waits on: P-03, P-04, P-05.
   - Done when: Your approvals are on the contracts pull request and COMPAT.md lists the versions you target (the tag itself is Tanmay's L-09).
+  - Handoffs: H-10, H-11, H-83 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 ## Sprint 2 (15 Oct to 21 Oct 2026)
 
@@ -176,6 +182,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Covers: FR-PRV-10, 12
   - Waits on: P-12. Open in part: OI-28. Tanmay's flag and evidence tasks use your KeyPort.
   - Done when: Every sensitive action writes an audit entry and the key service encrypts and decrypts in a test.
+  - Handoffs: H-08, H-09, H-10, H-21 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-18. Recruiter signup and company approval**
   - Epic: `epic-companies-and-approval`
@@ -268,6 +275,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Covers: FR-ADM-01, 02, 04, 05, 06
   - Waits on: P-18 and Tanmay's L-16 (InstancePort, capacity).
   - Done when: An admin approves a company, force-stops an instance and changes a quota that the lab then enforces.
+  - Handoffs: H-15 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-29. Data exports**
   - Epic: `epic-dashboards-and-exports`

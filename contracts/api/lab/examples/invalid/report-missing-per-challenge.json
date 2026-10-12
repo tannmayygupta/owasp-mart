@@ -1,0 +1,11 @@
+{
+  "attempt_id": "a-AAAAAAAAAAAAAAAA",
+  "mode": "candidate",
+  "state": "reported",
+  "generated_at": "2026-10-09T12:00:00Z",
+  "score": 109,
+  "elapsed_seconds": 6600,
+  "active_seconds": null,
+  "hints_used_total": 1,
+  "integrity_open": 1
+}

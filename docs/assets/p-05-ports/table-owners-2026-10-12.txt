@@ -1,0 +1,1 @@
+PASS 43 tables, every owner is a module in CODEOWNERS

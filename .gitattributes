@@ -11,3 +11,17 @@
 _bmad/** text eol=lf
 docs/bmad/skills.sha256 text eol=lf
 *.xlsx binary
+
+# Contracts, examples, code and lockfiles: the same bytes on every machine (signatures, derived files and hashes are compared byte for byte).
+contracts/** text eol=lf
+apps/** text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+uv.lock text eol=lf
+pnpm-lock.yaml text eol=lf
+
+# Host files that run on Linux, and Terraform (cloud-init is rendered from them).
+infra/hosts/** text eol=lf
+infra/terraform/** text eol=lf

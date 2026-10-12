@@ -1,0 +1,28 @@
+PASS            registry: 5 contracts, 13 folders under contracts/ all registered
+PASS            base: compared with 16ae8aa (merge base 16ae8aa170); 499 file(s) differ
+PASS            changelog[IF-6]: new entries for IF-6: 0.1.1 (2026-10-09, Tanmay, story L-03); 0.1.2 (2026-10-09, Tanmay, story L-04 follow-up); 0.1.3 (2026-10-10, Tanmay, story L-06)
+PASS            mock[IF-6]: a mock file changed with the contract
+PASS            breaking[IF-6]: contracts/instance/sidecar-start.schema.json: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-4]: new entries for IF-4: 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft); 0.1.0 (2026-10-08, Tanmay, story L-03)
+PASS            mock[IF-4]: a mock file changed with the contract
+PASS            breaking[IF-4]: contracts/events/instance-events.schema.json: new file, not compared (a new file is not a breaking change)
+                contracts/events/instance-events.posted.schema.json: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-5]: new entries for IF-5: 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft, nothing was confirmed yet); 0.1.0 (2026-10-09, Tanmay, story L-04)
+PASS            mock[IF-5]: a mock file changed with the contract
+PASS            breaking[IF-5]: contracts/orchestrator/orchestrator.openapi.yaml: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-2]: new entry for IF-2: 0.1.0 (2026-10-09, Tanmay, story L-05)
+PASS            mock[IF-2]: a mock file changed with the contract
+PASS            breaking[IF-2]: contracts/api/lab/lab.openapi.yaml: new file, not compared (a new file is not a breaking change)
+PASS            changelog[DB]: new entry for DB: 0.1.0 (2026-10-10, Tanmay, story L-07)
+PASS            mock[DB]: no mock by design: the table-owners list is read by CI only, nothing runs against it
+PASS            breaking[DB]: contracts/db/table-owners.schema.json: new file, not compared (a new file is not a breaking change)
+NOT-APPLICABLE  table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE  alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE  compat: contracts/COMPAT.md does not exist yet
+NOT-APPLICABLE  bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet
+
+SUMMARY: 17 PASS, 0 FAIL, 4 NOT-APPLICABLE
+NOT-APPLICABLE: table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE: alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE: compat: contracts/COMPAT.md does not exist yet
+NOT-APPLICABLE: bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet

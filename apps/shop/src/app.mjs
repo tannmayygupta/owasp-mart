@@ -19,17 +19,18 @@ import { registerStaffRoutes } from './web/routes-staff.mjs';
 const BUILD_ID = process.env.VM_BUILD_ID ?? 'dev';
 const CATALOGUE_VERSION = process.env.VM_CATALOG_VERSION ?? 'dev';
 
-// Readiness. In this skeleton the shop is ready as soon as the process is up.
-// T-04 will make /readyz return 200 only after the injector writes the marker
-// /run/vm/injected and the database is open (instance contract section 5/6);
-// that gate does not exist yet and we do not pretend it does.
-function isReady() {
-  return true;
-}
+// Readiness gate. Outside an instance (tests, local runs) the shop is ready as
+// soon as the process is up, so the default is always-ready. Inside an instance
+// the entrypoint passes `isReady` from the instance layer (T-04): 200 only after
+// the injector marker /run/vm/injected exists and the snapshot is open
+// (instance contract section 5/6).
+const ALWAYS_READY = () => true;
 
 // Build the app. Pass { db } to mount the customer-facing shop (T-14); without
 // a db only the health endpoints are served (the T-01 skeleton / health tests).
-export function createApp({ db } = {}) {
+// Pass { isReady } (T-04) to gate /readyz behind the instance marker + snapshot;
+// without it the shop is always-ready (tests / local runs).
+export function createApp({ db, isReady = ALWAYS_READY } = {}) {
   const app = express();
 
   // Do not advertise the framework.

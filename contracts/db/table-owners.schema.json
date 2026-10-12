@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/db/table-owners.schema.json",
+  "title": "Table owners (proposal, story L-07)",
+  "description": "Shape of contracts/db/table-owners.yaml, proposed by Tanmay for Akshay to confirm (handoff in docs/dev/HANDOFFS.md, tasks P-05 and P-06). One entry per database table, naming the one module that owns it. Owner values must be module folders of apps/api/src/vulnmart/ listed in .github/CODEOWNERS; that cross-check and the duplicate-table check are made by scripts/check_table_owners.py.",
+  "type": "object",
+  "required": ["version", "tables"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "tables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["table", "owner"],
+        "additionalProperties": false,
+        "properties": {
+          "table": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,62}$" },
+          "owner": { "type": "string", "pattern": "^[a-z][a-z_]{0,31}$" },
+          "note": { "type": "string", "maxLength": 200 }
+        }
+      }
+    }
+  }
+}

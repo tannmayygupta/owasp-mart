@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "at": "2026-10-09T12:00:00Z",
+      "type": "attempt.started",
+      "challenge_key": null,
+      "milestone": null,
+      "result": null
+    },
+    {
+      "at": "2026-10-09T12:20:00Z",
+      "type": "milestone.reached",
+      "challenge_key": "C01",
+      "milestone": "M1",
+      "result": null
+    },
+    {
+      "at": "2026-10-09T12:30:00Z",
+      "type": "flag.submitted",
+      "challenge_key": "C01",
+      "milestone": null,
+      "result": "correct"
+    }
+  ],
+  "has_more": true,
+  "next_cursor": "Zi4xLjMwMDA"
+}

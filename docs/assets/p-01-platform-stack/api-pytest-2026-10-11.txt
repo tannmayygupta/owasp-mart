@@ -1,0 +1,21 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.8, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\gupta\OneDrive\Desktop\mp\owasp-mart\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\gupta\OneDrive\Desktop\mp\owasp-mart\apps\api
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 10 items
+
+apps\api\tests\test_healthz.py::test_healthy PASSED                      [ 10%]
+apps\api\tests\test_healthz.py::test_postgres_down PASSED                [ 20%]
+apps\api\tests\test_healthz.py::test_valkey_down PASSED                  [ 30%]
+apps\api\tests\test_healthz.py::test_both_down PASSED                    [ 40%]
+apps\api\tests\test_healthz.py::test_slow_dependency_counts_as_down_and_request_returns PASSED [ 50%]
+apps\api\tests\test_healthz.py::test_empty_checks_mapping_is_respected_not_replaced_by_real_checks PASSED [ 60%]
+apps\api\tests\test_healthz.py::test_default_timeout_is_two_seconds PASSED [ 70%]
+apps\api\tests\test_healthz.py::test_no_error_text_leaks[postgres] PASSED [ 80%]
+apps\api\tests\test_healthz.py::test_no_error_text_leaks[valkey] PASSED  [ 90%]
+apps\api\tests\test_healthz.py::test_real_checks_without_configuration_are_down_not_errors PASSED [100%]
+
+============================= 10 passed in 1.31s ==============================
+

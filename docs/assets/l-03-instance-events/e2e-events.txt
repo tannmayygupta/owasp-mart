@@ -1,0 +1,18 @@
+# node --test "scripts/e2e/events.e2e.test.mjs"  (real fake-ingest process)
+✔ every valid example type is accepted (202) and an identical repeat is a duplicate (200) (502.9779ms)
+✔ the same (instance_id, seq) with a different body is refused with 409 and nothing new is stored (3.4976ms)
+✔ a bad signature and a wrong instance are refused with 401 and the answer never repeats the signature (2.6279ms)
+✔ an oversize body is refused with 413 and the server keeps working (8.0645ms)
+✔ a flag-like string in data is refused with 422 in any letter case, and the answer never echoes it (3.5781ms)
+✔ an unknown type and an extra field are refused with 422 and the answer names a JSON path (2.9331ms)
+✔ GET is answered 405 and a client that aborts in the middle of a body does not stop the server (113.2889ms)
+✔ the posted-body schema accepts every valid posted example and refuses source sidecar (136.2716ms)
+✔ --write-posted leaves the committed posted schema unchanged (283.4536ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1444.8575

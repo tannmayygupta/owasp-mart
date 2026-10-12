@@ -1,0 +1,20 @@
+✔ the startup line is printed once and unknown arguments exit 2 (490.1149ms)
+✔ an owner reads, an outsider gets the same 404 as for a missing id, and there is no session without a cookie (34.5133ms)
+✔ a POST needs the CSRF header and the dashboard origin (19.3767ms)
+✔ flag results by input, no echo, rate limit per challenge (67.4356ms)
+✔ bad bodies are 422 with a field pointer; wrong media type 415; a body where none is allowed 422 (16.689ms)
+✔ hints off is 404, hints on unlock and repeat (12.8428ms)
+✔ an instance goes requested to ready, opens with a ticket, resets with a new epoch, stops (55.7765ms)
+✔ an instance that is not ready cannot be opened or reset (409) (9.5739ms)
+✔ start, submit and wrong states (12.8938ms)
+✔ reviewer routes: evidence, integrity flags with a decision, report, timeline paging (18.911ms)
+✔ unknown path is 404 and a wrong method is 405 with Allow (5.3352ms)
+✔ no answer holds a flag, key, seed, owner hash, host id or stack trace (1.8199ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1066.2324

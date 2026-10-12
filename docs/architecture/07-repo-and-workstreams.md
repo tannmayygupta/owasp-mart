@@ -18,13 +18,14 @@ owasp-mart/
     api/platform/*.yaml                         OpenAPI fragments, stream P
     api/lab/*.yaml                              OpenAPI fragments, stream L
     api/bundle/openapi.json                     generated, committed, CI checks it is current
-    events/                                     JSON Schemas: instance events, app events, domain events
+    events/                                     JSON Schemas: instance events, app events (IF-4, stream L)
+    domain-events/                              JSON Schema, audiences and fixtures of the live stream (IF-3, stream P)
     orchestrator/orchestrator.openapi.yaml
     instance/                                   instance contract (env, health, labels, injection, events, errors)
     catalog/challenge.schema.json
     errors/error-codes.yaml
     db/table-owners.yaml                        which module owns which table
-    mocks/                                      Prism config, fake orchestrator, fake ingest, stub shop
+    mocks/                                      platform mock, fake lab, fake orchestrator, fake ingest, stub shop
     CHANGELOG.md  COMPAT.md                     contract versions and who targets which
   apps/
     api/                                        FastAPI codebase, five entrypoints: api, ingest, live, worker, scheduler
@@ -109,9 +110,9 @@ General rules: (1) a contract file exists, is reviewed and merged **before** eit
 
 | ID | Contract | File | Owner | Consumers | Format | Mock or stub |
 |---|---|---|---|---|---|---|
-| IF-1 | Browser-facing platform API (P part) | `contracts/api/platform/*.yaml` | P | Dashboards (P), tests | OpenAPI | Prism mock |
-| IF-2 | Browser-facing lab API (instances, attempts runtime, flag submit, hints, reports) | `contracts/api/lab/*.yaml` | L | Dashboards (P) | OpenAPI | Prism mock |
-| IF-3 | Domain events (what the live stream carries) | `contracts/events/domain-events.schema.json` | P (L adds types by PR) | Dashboards, SSE hub, L publishers | JSON Schema | Event fixtures and a replay script |
+| IF-1 | Browser-facing platform API (P part) | `contracts/api/platform/*.yaml` | P | Dashboards (P), tests | OpenAPI | Platform mock (Node) |
+| IF-2 | Browser-facing lab API (instances, attempts runtime, flag submit, hints, reports) | `contracts/api/lab/*.yaml` | L | Dashboards (P) | OpenAPI | Fake lab (Node) |
+| IF-3 | Domain events (what the live stream carries) | `contracts/domain-events/domain-events.schema.json` | P (L adds types by PR) | Dashboards, SSE hub, L publishers | JSON Schema | Event fixtures and a replay script |
 | IF-4 | Instance events (sidecar and app events to ingest) | `contracts/events/instance-events.schema.json` | L | T (app events), ingest | JSON Schema | Fake ingest that validates and prints |
 | IF-5 | Orchestrator API (platform to orchestrator, orchestrator to platform) | `contracts/orchestrator/orchestrator.openapi.yaml` | L | Workers (L) | OpenAPI | Fake orchestrator |
 | IF-6 | Instance contract (what an instance must look like) | `contracts/instance/*` | L with T | Orchestrator (L), shop and services (T) | Markdown plus JSON Schema for the spec | Stub shop and the lab harness |
@@ -129,7 +130,7 @@ This is the document the shop and every in-instance service obey, and the orches
 3. **Health.** `GET /healthz` (process up), `GET /readyz` (200 only after the injector marker exists and the database is open), `GET /version` (build id and catalogue version, no secrets). The orchestrator reads Docker's built-in health status of the container, which runs the check inside it. These paths are not routed to players. `/_vm/` is a reserved path prefix on the public host and `/_ops/diagnostics` belongs to challenge C05; the shop must not use `/_vm/`.
 4. **Labels** on every container and network: `vm.schema`, `vm.instance`, `vm.epoch`, `vm.component`, `vm.template`, `vm.expires`, `vm.host`, `vm.kind` (`inst` or `front`), and `vm.owner` as an opaque hash, never an email (FR-INS-05).
 5. **Flag injection.** The injector is the shop image's `inject` entrypoint, run as a one-shot container. The orchestrator writes one JSON document on its standard input (schema version, epoch, flags, decoys, seeds). The injector patches the snapshot and writes read-only files named in the catalogue (`flag_placement`), writes `/run/vm/flags.json` (mode 0400) for sentinel logic and the marker file `/run/vm/injected`, then exits. Exit codes map to error codes (section 3.6). The container is removed at once.
-6. **Event emission.** The shop posts JSON to the sidecar's event endpoint on the instance network. Body fields: `name`, `ts`, optional `challenge_key`, `actor_role`, small `data` (no secrets, size capped). Names are a catalogue in `contracts/events/app-events.md` (for example cross-store order read, gift card redeemed, refund total above paid, diagnostics viewed, unsigned webhook accepted, KYC fail-open approval, metadata fetched, bot visit, XSS token received; the exact milestone mapping is OI-17). The sidecar adds `instance_id`, `seq`, `source: app`, signs and forwards.
+6. **Event emission (superseded by IF-4, `contracts/events/app-events.md`, 2026-10-09: the body uses `type`, an event is identified by `(instance_id, seq)`, `source` is fine-grained; ADR 0023).** The shop posts JSON to the sidecar's event endpoint on the instance network. Body fields: `name`, `ts`, optional `challenge_key`, `actor_role`, small `data` (no secrets, size capped). Names are a catalogue in `contracts/events/app-events.md` (for example cross-store order read, gift card redeemed, refund total above paid, diagnostics viewed, unsigned webhook accepted, KYC fail-open approval, metadata fetched, bot visit, XSS token received; the exact milestone mapping is OI-17). The sidecar adds `instance_id`, `seq`, `source: app`, signs and forwards.
 7. **Runtime profile.** Non-root user, read-only root filesystem, writable memory-backed `/tmp`, `/data` and `/run/vm`, all capabilities dropped, no egress, no host mounts, memory and CPU limits declared in the template (FR-SHP-15, NFR-ISO-03).
 8. **Import service.** Proposal for T to confirm: its container has no network at all and talks to the shop through a unix socket on a shared memory-backed volume, with a fresh process per job. This is how "no network, no database access" (FR-CHL-07, FR-INS-02) can hold while the shop still sends jobs.
 9. **Bot controller.** A small always-present container; the Chromium process is launched per visit with a fresh context, a fixed lifetime and only the shop origin, then closed (FR-SHP-11). Always-on count therefore includes the controller.
@@ -155,7 +156,7 @@ Implementations: the real HTTP client, an in-memory `FakeInstanceHost`, and the 
 
 ### 3.4 OpenAPI composition and generated artefacts
 
-The browser API is authored as OpenAPI fragments per stream, bundled into `contracts/api/bundle/openapi.json` by a script, and FastAPI route definitions must match it (CI exports the running app's schema and compares). The typed TypeScript client and Pydantic models are generated from the bundle and the JSON Schemas and are committed, so nobody waits for a build step to have types. Tools named for this (Prism, oasdiff, Schemathesis, openapi-ts or Orval) come from RS-D and are UNVERIFIED (not read in a primary source); ADR 0012 asks the user to confirm them.
+The browser API is authored as OpenAPI fragments per stream, bundled into `contracts/api/bundle/openapi.json` by a script, and FastAPI route definitions must match it (CI exports the running app's schema and compares). The typed TypeScript client and Pydantic models are generated from the bundle and the JSON Schemas and are committed, so nobody waits for a build step to have types. Tools, confirmed by the developer on 2026-10-11 (story P-04): the bundler is `scripts/bundle-openapi.mjs` (Node, js-yaml; `pnpm run contracts:bundle` and `contracts:bundle:check`); the TypeScript types come from openapi-typescript 7.13.0 and the client from openapi-fetch 0.17.0 (`packages/ts-client`); the Pydantic v2 models come from datamodel-code-generator 0.83.0 (`packages/py-models`); `pnpm run api:generate` writes them and `pnpm run api:check` proves they are current (CI). The mock is a small Node server, not Prism (Prism 5.16 needs Node 24.18 or newer, and a dependency-free fake is the pattern of every other mock here). Orval and Hey API were read and not chosen (they need Node 22.18 or newer and add generated runtime code). oasdiff (pinned by stream L, `tools/oasdiff.json`) and Schemathesis (a later story) are unchanged.
 
 ### 3.5 Internal ports between P and L (IF-9)
 
@@ -168,7 +169,7 @@ The two streams share one deployable codebase, so their agreement is a set of Py
 | L | `InstancePort` (request, open ticket, reset, stop, force-stop, capacity) | P | Learner and admin screens |
 | P | `AuditPort` (append) | L | Audit writes from instance and scoring actions |
 | P | `OutboxPort` (publish domain event, enqueue email) | L | Live updates and notifications |
-| P | `KeyPort` (create, wrap, unwrap, shred) | L | Evidence encryption |
+| P | `KeyPort` (create an attempt key, encrypt, decrypt, shred; event key, flag, decoy and owner-hash derivations) | L | Evidence encryption, ingest signatures, flag material (story P-05: wrapping the DEK with the KEK stays inside the key service) |
 | P | `ScopePort` (current user and organization scope) | L | Filtering and row-level security |
 | P | `SettingsPort` and `QuotaPort` | L | Timeouts, caps, quotas |
 | T | none | | T has no code-level port; T meets L at IF-4, IF-6, IF-7 only |
@@ -181,7 +182,7 @@ One registry (`contracts/errors/error-codes.yaml`) with stable codes and a probl
 
 | Provided by | Mock or stub | Lets this stream work alone |
 |---|---|---|
-| P (via Prism and fixtures) | **Platform mock**: serves IF-1 and IF-2 examples | The dashboards can be built without a backend; L can test its own pages |
+| P (Node server `contracts/mocks/platform-mock`) | **Platform mock**: serves IF-1 examples and forwards IF-2 routes to the fake lab | The dashboards can be built without a backend; L can test its own pages |
 | L | **Fake orchestrator** (IF-5), **fake ingest** (prints and validates IF-4), **stub shop** (a tiny Node app that satisfies IF-6: health, serves a planted flag, emits one app event), **lab harness** (Compose file that starts one full instance with the real sidecar, edge and gate and the stub shop) | T runs and tests the real shop inside a real instance from day one; P tests provisioning flows without Docker |
 | L | **Fakes of P's ports** (in-memory audit, outbox, key, scope) | L builds and tests scoring and the orchestrator without P's modules |
 | P | **Fakes of L's ports** | P builds the privacy, assessment and admin modules without a running lab |
@@ -208,7 +209,7 @@ Path filters decide what runs (workflow table in [02](02-deployment-and-network.
 
 ## 6. Full-stack local development with Docker Compose (Windows and macOS)
 
-- One Compose project with profiles: `platform` (Postgres, Valkey, Mailpit, API, ingest, live, worker, scheduler, Caddy), `web` (Next.js dev server), `lab` (orchestrator, socket proxy, edge, gate, instance images), `mocks` (Prism, fake orchestrator, fake ingest, stub shop). A Node script (`scripts/dev.mjs`) starts the right profiles per stream, so there is one command on every OS (NFR-POR-03).
+- One Compose project with profiles: `platform` (Postgres, Valkey, Mailpit, API, ingest, live, worker, scheduler, Caddy), `web` (Next.js dev server), `lab` (orchestrator, socket proxy, edge, gate, instance images), `mocks` (platform mock, fake lab, fake orchestrator, fake ingest, stub shop). A Node script (`scripts/dev.mjs`) starts the right profiles per stream, so there is one command on every OS (NFR-POR-03).
 - Stream recipes: P runs `platform + web + mocks(fake orchestrator)`; L runs `platform(minimal) + lab + mocks(stub shop, fake ingest)`; T runs `lab + the shop` with the platform replaced by the fake ingest.
 - Hostnames are `*.localhost` over plain HTTP on loopback (confirm Chrome, Firefox and Safari behaviour in spike S-20).
 - Windows: Docker Desktop on WSL2; line endings are pinned to LF (existing repository rule); keep `node_modules` and database data in named volumes, not Windows bind mounts, because bind mounts across the Windows and Linux file systems are slow (general experience, UNVERIFIED). macOS Intel: Docker Desktop for Intel is supported on the current and two previous macOS versions `[EF-26]`.
@@ -264,9 +265,9 @@ D differs from C by moving the scoring, attempt clock, flags and anti-cheat (the
 
 | Interface | Between | Contract file | Owner | Mock |
 |---|---|---|---|---|
-| IF-1 platform API | P (server) to dashboards (P) | `contracts/api/platform/` | P | Prism |
-| IF-2 lab API | L to dashboards (P) | `contracts/api/lab/` | L | Prism |
-| IF-3 domain events | L and P publishers to dashboards via SSE | `contracts/events/domain-events.schema.json` | P | Fixtures |
+| IF-1 platform API | P (server) to dashboards (P) | `contracts/api/platform/` | P | Platform mock |
+| IF-2 lab API | L to dashboards (P) | `contracts/api/lab/` | L | Fake lab |
+| IF-3 domain events | L and P publishers to dashboards via SSE | `contracts/domain-events/domain-events.schema.json` | P | Fixtures |
 | IF-4 instance events | T app events and L sidecar to L ingest | `contracts/events/instance-events.schema.json` | L | Fake ingest |
 | IF-6 instance contract | L to T | `contracts/instance/` | L with T | Stub shop and harness |
 | IF-7 catalogue | T to P and L | `contracts/catalog/` | T | Stub entries |
@@ -327,7 +328,7 @@ All of this is done before feature coding. Each item is done when the contract f
 | 3 | Instance contract v0: containers, env, health, labels, injection protocol, runtime profile (IF-6) | L with T | 4, 9 |
 | 4 | Instance event schema and app-event name list (IF-4) | L, T reviews | 8, 9 |
 | 5 | Domain event schema (IF-3) | P, L reviews | 6, 7 |
-| 6 | Platform and lab API fragments with examples, bundle, Prism mock, generated client (IF-1, IF-2) | P and L | web work |
+| 6 | Platform and lab API fragments with examples, bundle, platform mock, generated client (IF-1, IF-2) | P and L | web work |
 | 7 | Ports as Protocols with in-memory fakes (IF-9) and `table-owners.yaml` (IF-10) | P and L | module work |
 | 8 | Orchestrator API and the fake orchestrator (IF-5) | L | worker work |
 | 9 | Stub shop, fake ingest and the lab harness (one full instance on a laptop) | L | T's shop work |

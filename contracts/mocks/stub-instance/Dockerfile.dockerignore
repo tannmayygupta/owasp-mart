@@ -1,0 +1,11 @@
+# Keep the build context small: only what the Dockerfile copies.
+*
+!contracts/mocks/fake-ingest
+!contracts/mocks/stub-instance
+!contracts/events/instance-events.schema.json
+!contracts/events/instance-events.posted.schema.json
+!contracts/instance/injection-document.schema.json
+!contracts/instance/flags-file.schema.json
+!contracts/instance/sidecar-start.schema.json
+contracts/mocks/stub-instance/**/*.test.mjs
+contracts/mocks/stub-instance/fixtures.mjs

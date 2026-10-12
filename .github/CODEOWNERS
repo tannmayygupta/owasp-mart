@@ -7,12 +7,14 @@
 /contracts/api/platform/            @akshaay29
 /contracts/api/lab/                 @tannmayygupta
 /contracts/events/                  @tannmayygupta
+/contracts/domain-events/           @akshaay29 @tannmayygupta
 /contracts/orchestrator/            @tannmayygupta
 /contracts/instance/                @tannmayygupta @sahillroy
 /contracts/catalog/                 @sahillroy
 /contracts/errors/                  @akshaay29
 /contracts/db/                      @akshaay29
 /contracts/mocks/                   @tannmayygupta
+/contracts/mocks/platform-mock/      @akshaay29
 /apps/api/src/vulnmart/kernel/      @akshaay29
 /apps/api/src/vulnmart/ports/       @akshaay29 @tannmayygupta
 /apps/api/src/vulnmart/accounts/    @akshaay29
@@ -40,4 +42,11 @@
 /challenges/                        @sahillroy
 /infra/                             @tannmayygupta
 /.github/                           @tannmayygupta @akshaay29 @sahillroy
+# D-46: the rules engine is protected by review of all three owners (a pull request cannot weaken it unseen)
+/.github/workflows/                 @tannmayygupta @akshaay29 @sahillroy
+/scripts/check-contract-rules.mjs     @tannmayygupta @akshaay29 @sahillroy
+/scripts/schema-diff.mjs              @tannmayygupta @akshaay29 @sahillroy
+/scripts/oasdiff.mjs                 @tannmayygupta @akshaay29 @sahillroy
+/tools/oasdiff.json                  @tannmayygupta @akshaay29 @sahillroy
+/contracts/registry.json             @tannmayygupta @akshaay29 @sahillroy
 /docs/                              @akshaay29 @tannmayygupta @sahillroy

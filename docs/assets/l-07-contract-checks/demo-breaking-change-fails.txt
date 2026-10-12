@@ -1,0 +1,24 @@
+PASS            registry: 5 contracts, 13 folders under contracts/ all registered
+PASS            base: compared with HEAD (merge base b0a55cd4b2); 23 file(s) differ
+PASS            contract[IF-6]: no file of this contract changed
+PASS            contract[IF-4]: no file of this contract changed
+FAIL            changelog[IF-5]: IF-5 changed (contracts/orchestrator/orchestrator.openapi.yaml) but its section "Orchestrator API (IF-5), `contracts/orchestrator/`" in contracts/CHANGELOG.md has no new line
+FAIL            mock[IF-5]: contracts/orchestrator/orchestrator.openapi.yaml changed but no file under the mock path(s) contracts/mocks/fake-orchestrator changed; update the mock or add a line "no mock change: <reason>" to the changelog entry
+FAIL            breaking[IF-5]: contracts/orchestrator/orchestrator.openapi.yaml GET /v1/instances: [request-parameter-enum-value-removed] removed the enum value `front` from the `query` request parameter `kind`
+                needs a changelog line marked BREAKING and a raised version (the newest entry is 0.1.0, it must be above 0.1.0 by a minor step before v1.0.0) in the section "Orchestrator API (IF-5), `contracts/orchestrator/`"
+PASS            contract[IF-2]: no file of this contract changed
+PASS            changelog[DB]: 3 new changelog line(s) for DB
+NOT-APPLICABLE  mock[DB]: the registry lists no mock paths for DB
+PASS            breaking[DB]: contracts/db/table-owners.schema.json: new file, not compared (a new file is not a breaking change)
+NOT-APPLICABLE  table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE  alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE  compat: contracts/COMPAT.md does not exist yet
+NOT-APPLICABLE  bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet
+
+SUMMARY: 7 PASS, 3 FAIL, 5 NOT-APPLICABLE
+NOT-APPLICABLE: mock[DB]: the registry lists no mock paths for DB
+NOT-APPLICABLE: table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE: alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE: compat: contracts/COMPAT.md does not exist yet
+NOT-APPLICABLE: bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet
+exit 1

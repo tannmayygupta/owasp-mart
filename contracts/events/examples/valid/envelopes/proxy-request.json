@@ -1,0 +1,11 @@
+{
+  "description": "A proxy.request request as the sidecar sends it, signed with the fake test key (see app-events.md section 4). body is the exact text that was signed.",
+  "method": "POST",
+  "path": "/internal/v1/events",
+  "headers": {
+    "content-type": "application/json",
+    "x-vm-signature": "v1=fb3c5e01063d7ed8355e208284fe78c24deafde84686264d6faa6eabc0a1da54"
+  },
+  "body": "{\"schema_version\":\"0.1\",\"instance_id\":\"i-AAAAAAAAAAAAAAAA\",\"epoch\":1,\"seq\":1,\"type\":\"proxy.request\",\"source\":\"sidecar\",\"session_kind\":\"player\",\"user_id\":null,\"ts\":\"2026-01-01T00:00:00Z\",\"data\":{\"method\":\"GET\",\"route_template\":\"/api/products/search\",\"status\":200,\"resp_len\":512,\"client_class\":\"browser\"}}",
+  "expect_status": 202
+}

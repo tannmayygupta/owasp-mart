@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/errors/problem.schema.json",
+  "title": "VulnMart error response body (IF-8)",
+  "description": "Media type application/problem+json. RFC 9457 members type, title and status, plus our extensions code, request_id, field and errors. detail and instance are not used, so a path or a submitted value cannot leak. Never a stack trace (NFR-SEC-03).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "title", "status", "code", "request_id"],
+  "properties": {
+    "type": {
+      "description": "urn:vulnmart:error: plus the code.",
+      "type": "string",
+      "pattern": "^urn:vulnmart:error:[A-Z]{2,6}(-[A-Z]+)+$",
+      "maxLength": 100
+    },
+    "title": { "description": "The registry's fixed generic text for the code.", "type": "string", "minLength": 1, "maxLength": 200 },
+    "status": { "type": "integer", "minimum": 400, "maximum": 599 },
+    "code": { "type": "string", "pattern": "^[A-Z]{2,6}(-[A-Z]+)+$", "maxLength": 60 },
+    "request_id": { "type": "string", "pattern": "^[A-Za-z0-9-]{8,64}$" },
+    "field": {
+      "description": "One JSON Pointer to the offending field (empty string for the whole body).",
+      "type": "string",
+      "pattern": "^(/([^/~]|~[01])*)*$",
+      "maxLength": 200
+    },
+    "errors": {
+      "description": "For 422 with several problems: one entry per offending field. The detail is a fixed generic text and never repeats the submitted value.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pointer", "detail"],
+        "properties": {
+          "pointer": { "type": "string", "pattern": "^(/([^/~]|~[01])*)*$", "maxLength": 200 },
+          "detail": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      }
+    }
+  }
+}

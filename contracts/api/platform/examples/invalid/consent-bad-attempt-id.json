@@ -1,0 +1,11 @@
+{
+  "schema": "ConsentRequest",
+  "body": {
+    "attempt_id": "a-lowercase",
+    "notice_version": "2026-10-01.1",
+    "notice_text_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "decision": "granted"
+  },
+  "path": "/attempt_id",
+  "rule": "attempt id is a- plus 16 Base32 characters"
+}

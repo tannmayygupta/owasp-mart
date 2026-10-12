@@ -1,0 +1,47 @@
+pnpm.exe : $ node --test --test-concurrency=1 "scripts/e2e/*.test.mjs"
+At C:\Users\gupta\AppData\Roaming\npm\pnpm.ps1:14 char:3
++   & "$basedir/node_modules/pnpm/pnpm.exe"   $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ($ node --test -...e2e/*.test.mjs":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(node:32056) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✔ fresh checkout parity: install with a frozen lockfile, then the CI scripts job command passes (122315.686ms)
+✔ pnpm run contracts:check passes in the real repository and prints the counts (5855.0902ms)
+✔ breaking a rule exits 1: removing epoch from the injection schema (1680.5078ms)
+✔ breaking a rule exits 1: the injector and the shop use different /run/vm volumes (1598.3909ms)
+✔ breaking a rule exits 1: a real-looking flag in an example (1696.5078ms)
+✔ usage: --help exits 0, an unknown argument exits 2, a missing folder fails with exit 1 (1590.6665ms)
+✔ the contract document has sections 1 to 11 in order and an open-points table (4.2122ms)
+✔ help: prints the commands and exits 0 (562.2181ms)
+✔ unknown command: exits 1 with a message on stderr (442.0615ms)
+✔ doctor: every check passes against the real tools (10104.9163ms)
+✔ hello: starts a real container, answers hello, exits 0 and leaves nothing behind (15759.307ms)
+✔ hello: removes a stale container from an earlier run first (15133.5771ms)
+✔ hello: a busy port exits 1, names the port and starts no container (1859.6766ms)
+✔ up: a profile with no services yet exits 1 and starts nothing (1513.6769ms)
+✔ up: an unknown profile is refused before Docker is used (425.5982ms)
+✔ down: stops and removes a running hello container (10782.8644ms)
+✔ hello container hardening: non-root, read-only, no capabilities, loopback port, limits, no mounts (7685.2184ms)
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0 and starts all five services healthy (808.9866ms)
+  ✔ healthy stack: /api/healthz through the web origin reports all three ok (223.3579ms)
+  ✔ the page is served and the API is also reachable directly on its own port (242.7776ms)
+  ✔ API errors follow the IF-8 format through the web origin: unknown route and wrong method (47.0362ms)
+  ✔ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (952.8137ms)
+  ✔ hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (725.5148ms)
+  ✔ web has no secrets or flags in its environment (171.1585ms)
+  ✔ Postgres down: 503, "postgres":"down", no error text; recovers when Postgres returns (5422.3049ms)
+  ✔ Valkey down: 503, "valkey":"down"; recovers when Valkey returns (4736.1993ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (5554.9633ms)
+✔ platform and web profiles on a real Docker engine (59090.8012ms)
+ℹ tests 27
+ℹ suites 1
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 283665.6633
+

@@ -1,0 +1,10 @@
+{
+  "schema": "ConsentRequest",
+  "body": {
+    "attempt_id": "a-CANDIDATEATTEMPT",
+    "notice_text_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "decision": "granted"
+  },
+  "path": "/notice_version",
+  "rule": "the notice version is required"
+}

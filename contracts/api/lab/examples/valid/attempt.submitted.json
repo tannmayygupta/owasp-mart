@@ -1,0 +1,12 @@
+{
+  "attempt_id": "a-AAAAAAAAAAAAAAAA",
+  "mode": "learner",
+  "state": "submitted",
+  "hints_enabled": true,
+  "instance_id": "i-AAAAAAAAAAAAAAAA",
+  "started_at": "2026-10-09T12:00:00Z",
+  "deadline_at": null,
+  "submitted_at": "2026-10-09T12:50:00Z",
+  "frozen_until": "2026-10-09T13:05:00Z",
+  "server_time": "2026-10-09T12:10:00Z"
+}

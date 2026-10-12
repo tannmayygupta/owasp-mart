@@ -1,0 +1,48 @@
+offline checks after review fixes, 2026-10-11, Terraform 1.16.5 image, no credentials
+## fmt
+exit 0
+
+## aws : terraform init -backend=false -input=false -lockfile=readonly
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+exit 0
+
+## aws : terraform validate
+Success! The configuration is valid.
+
+exit 0
+
+## aws : terraform test
+tests/network.tftest.hcl... tearing down
+tests/network.tftest.hcl... pass
+
+Success! 30 passed, 0 failed.
+exit 0
+
+## oci : terraform init -backend=false -input=false -lockfile=readonly
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+exit 0
+
+## oci : terraform validate
+Success! The configuration is valid.
+
+exit 0
+
+## oci : terraform test
+tests/network.tftest.hcl... tearing down
+tests/network.tftest.hcl... pass
+
+Success! 10 passed, 0 failed.
+exit 0
+
+## node --test (files touched)
+ℹ tests 96
+ℹ pass 96
+ℹ fail 0
+PASS network rules: public ports 22, 80, 443 only
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree

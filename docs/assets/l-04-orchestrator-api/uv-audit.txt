@@ -1,0 +1,10 @@
+uv : warning: `uv audit` is experimental and may change without warning. Pass `--preview-features audit-command` to 
+disable this warning.
+At line:7 char:1
++ uv audit --locked 2>&1 | Out-File $d/uv-audit.txt -Encoding utf8
++ ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: `uv au...e this warning.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Resolved 28 packages in 1ms
+Found no known vulnerabilities and no adverse project statuses in 26 packages
