@@ -151,7 +151,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Waits on: L-08, L-07.
   - Done when: A hello stack from CI runs on both VMs and on the laptop.
 
-- [ ] **L-13. Orchestrator creates an instance from a template**
+- [x] **L-13. Orchestrator creates an instance from a template**
+  - Closed 2026-10-12 on the developer's instruction. Still open: the real S-4 run on vm-i (runbook `docs/runbooks/measure-instances.md`), the small L-13 PR, tell Sahil (T-09) when merged.
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
   - EARLY PR: yes. T-09 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
