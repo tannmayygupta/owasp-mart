@@ -16,6 +16,7 @@ from dataclasses import field as dc_field
 from datetime import datetime, timezone
 
 from .images import ImageAllowlist
+from .problems import pointer
 from .states import EngineError, ErrorCode, FieldForbidden, ValidationFailed
 
 SCHEMA_VERSION = "0.1"
@@ -110,7 +111,7 @@ def _check_keys(body: object, allowed: tuple[str, ...]) -> dict:
         raise ValidationFailed("the body must be a JSON object", field="")
     for k in body:
         if isinstance(k, str) and k.lower() in FORBIDDEN_FIELDS:
-            raise FieldForbidden("the orchestrator accepts no container fields", field=k[:64])
+            raise FieldForbidden("the orchestrator accepts no container fields", field=pointer(k[:64]))
     for k in body:
         if k not in allowed:
             raise ValidationFailed("unknown field", field=_pointer(k))
@@ -172,7 +173,7 @@ ACCESS_VALUES = ("open", "frozen", "closed")
 def parse_create(body: object) -> CreateSpec:
     """Validate a create body (the IF-5 field names and limits) into a `CreateSpec`. Refuses any field that is not data.
 
-    Errors carry the JSON Pointer of the field (`ValidationFailed.field`), or the name for a forbidden field."""
+    Errors carry the JSON Pointer of the field (`ValidationFailed.field`), also for a forbidden field."""
     body = _check_keys(body, CREATE_FIELDS)
     iid, tpl = body["instance_id"], body["template_id"]
     _need(isinstance(iid, str) and INSTANCE_ID.fullmatch(iid) is not None, "/instance_id", "bad instance id")

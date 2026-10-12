@@ -1,7 +1,7 @@
 // GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
-// Error registry (IF-8) version 0.3.0.
+// Error registry (IF-8) version 0.4.0.
 
-export const REGISTRY_VERSION = "0.3.0";
+export const REGISTRY_VERSION = "0.4.0";
 export const PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:";
 
 export const ERROR_CODES = {
@@ -39,6 +39,7 @@ export const ERROR_CODES = {
   ORCH_BAD_SIGNATURE: "ORCH-BAD-SIGNATURE",
   ORCH_BODY_TOO_LARGE: "ORCH-BODY-TOO-LARGE",
   ORCH_BUSY: "ORCH-BUSY",
+  ORCH_CURSOR_INVALID: "ORCH-CURSOR-INVALID",
   ORCH_FIELD_FORBIDDEN: "ORCH-FIELD-FORBIDDEN",
   ORCH_INSTANCE_EXISTS: "ORCH-INSTANCE-EXISTS",
   ORCH_INSTANCE_NOT_FOUND: "ORCH-INSTANCE-NOT-FOUND",
@@ -46,6 +47,7 @@ export const ERROR_CODES = {
   ORCH_INVALID_STATE: "ORCH-INVALID-STATE",
   ORCH_LABEL_UNKNOWN: "ORCH-LABEL-UNKNOWN",
   ORCH_METHOD_NOT_ALLOWED: "ORCH-METHOD-NOT-ALLOWED",
+  ORCH_NOT_IMPLEMENTED: "ORCH-NOT-IMPLEMENTED",
   ORCH_RATE_LIMITED: "ORCH-RATE-LIMITED",
   ORCH_REQUEST_MISMATCH: "ORCH-REQUEST-MISMATCH",
   ORCH_ROUTE_UNKNOWN: "ORCH-ROUTE-UNKNOWN",
@@ -53,6 +55,7 @@ export const ERROR_CODES = {
   ORCH_STALE_EPOCH: "ORCH-STALE-EPOCH",
   ORCH_TEMPLATE_UNKNOWN: "ORCH-TEMPLATE-UNKNOWN",
   ORCH_UNAVAILABLE: "ORCH-UNAVAILABLE",
+  ORCH_UNSUPPORTED_MEDIA_TYPE: "ORCH-UNSUPPORTED-MEDIA-TYPE",
   ORCH_VALIDATION: "ORCH-VALIDATION",
   REQ_INTERNAL: "REQ-INTERNAL",
   REQ_METHOD_NOT_ALLOWED: "REQ-METHOD-NOT-ALLOWED",
@@ -109,6 +112,7 @@ export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "ORCH-BAD-SIGNATURE": { status: 401, title: "The request could not be authenticated.", retryable: false },
   "ORCH-BODY-TOO-LARGE": { status: 413, title: "The request body is too large.", retryable: false },
   "ORCH-BUSY": { status: 429, title: "No capacity is available right now.", retryable: true },
+  "ORCH-CURSOR-INVALID": { status: 422, title: "The cursor is not valid.", retryable: false },
   "ORCH-FIELD-FORBIDDEN": { status: 422, title: "The request names a field that is not allowed.", retryable: false },
   "ORCH-INSTANCE-EXISTS": { status: 409, title: "An instance with this identity already exists.", retryable: false },
   "ORCH-INSTANCE-NOT-FOUND": { status: 404, title: "Instance not found.", retryable: false },
@@ -116,6 +120,7 @@ export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "ORCH-INVALID-STATE": { status: 409, title: "This action is not allowed in the instance's current state.", retryable: false },
   "ORCH-LABEL-UNKNOWN": { status: 422, title: "The label filter is not known.", retryable: false },
   "ORCH-METHOD-NOT-ALLOWED": { status: 405, title: "Method not allowed.", retryable: false },
+  "ORCH-NOT-IMPLEMENTED": { status: 501, title: "This call is not implemented yet.", retryable: false },
   "ORCH-RATE-LIMITED": { status: 429, title: "Too many requests. Try again later.", retryable: true },
   "ORCH-REQUEST-MISMATCH": { status: 409, title: "This request identity was already used with different content.", retryable: false },
   "ORCH-ROUTE-UNKNOWN": { status: 404, title: "Route not found.", retryable: false },
@@ -123,6 +128,7 @@ export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "ORCH-STALE-EPOCH": { status: 409, title: "The epoch is out of date.", retryable: false },
   "ORCH-TEMPLATE-UNKNOWN": { status: 422, title: "The template is not known.", retryable: false },
   "ORCH-UNAVAILABLE": { status: 503, title: "The orchestrator could not be reached or understood.", retryable: true },
+  "ORCH-UNSUPPORTED-MEDIA-TYPE": { status: 415, title: "The request must be JSON.", retryable: false },
   "ORCH-VALIDATION": { status: 422, title: "The request is not valid.", retryable: false },
   "REQ-INTERNAL": { status: 500, title: "Something went wrong. Try again later.", retryable: true },
   "REQ-METHOD-NOT-ALLOWED": { status: 405, title: "Method not allowed.", retryable: false },

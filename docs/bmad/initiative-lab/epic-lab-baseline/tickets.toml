@@ -169,3 +169,14 @@ hitl = true
 risk = "high"
 references = ["docs/bmad/initiative-lab/audit-2026-10-11-sprint-1.md"]
 unknown = "Design points to settle with the developer before they are built: IF-4 sequence and epoch rule, event key derivation and distribution (H-09, H-10), the isolation design for H-103, the remote state backend, and whether story 1.12 (RFC 9457) is folded in because it also changes the IF-5 and IF-2 Problem schema."
+[[entry]]
+id = 16
+type = "story"
+title = "Move the IF-2, IF-4 and IF-5 error bodies to the IF-8 format (condition F-2 of the contracts sign-off)"
+description = "Stream P signs contracts v1.0.0 on the condition that the error bodies of IF-2, IF-4 and IF-5 use the closed IF-8 problem body (type urn:vulnmart:error:<CODE>, title, status, code, request_id, field or errors with pointer and detail; no message, detail or instance; registry codes), because changing them after the tag would be a breaking change. Change the three contracts, their examples and schemas, the Node fake orchestrator and ingest, the Python InstanceHost client and the Python orchestrator service, and every test that checks an error body."
+verify = "Every error answer of the fake orchestrator, the Python orchestrator service, the fake ingest and the mock validates against contracts/errors/problem.schema.json; the contract-rules check, the orchestrator tests, the api tests and the script tests pass."
+covers = ["LB-8", "FR-INS-07"]
+after = [15]
+hitl = false
+risk = "high"
+references = ["docs/reviews/2026-10-11-if8-change-request-for-stream-l.md", "docs/reviews/2026-10-12-p08-contract-sign-off.md"]

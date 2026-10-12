@@ -3,7 +3,7 @@
 Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 18 operations exist and no other; every operation
 declares its security; the state, access and health values equal those of IF-5; no GET answer schema or valid answer example
 can hold a secret-looking name; every valid example matches its schema; every invalid example fails at the path its manifest
-names; no real-looking flag is in the contract; the flag result names no oracle reason; every problem example is RFC 9457 shaped. Run through `pnpm run contracts:check` (last part) or on its own:
+names; no real-looking flag is in the contract; the flag result names no oracle reason; every problem example is an IF-8 body (the closed schema, a registered code, its status and title). Run through `pnpm run contracts:check` (last part) or on its own:
 
     uv run --package vulnmart-api python scripts/check_lab_contract.py [--dir <folder>]
 
@@ -53,7 +53,8 @@ NEEDED = {
 }
 METHODS = {"get", "post", "put", "delete", "patch"}
 PROBLEM_MEDIA = "application/problem+json"
-PROBLEM_TYPE_PREFIX = "https://vulnmart.invalid/problems/"
+PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:"
+REGISTRY = {c["code"]: c for c in yaml.safe_load((ROOT / "contracts" / "errors" / "error-codes.yaml").read_text(encoding="utf-8"))["codes"]}
 # What the submitter of a flag must never be told (the oracle rule): these may not be values of the answer result.
 ORACLE_REASONS = {"decoy", "other_instance", "stale_epoch", "wrong"}
 
@@ -150,7 +151,7 @@ def run(folder: Path, if5_spec: Path = IF5_SPEC) -> tuple[list[str], dict[str, i
                 for name in base._walk_properties(spec, (body or {}).get("schema") or {}):
                     if name in SECRET_NAMES:
                         fail(f"{method.upper()} {path} {status} {media}: the answer schema can carry the secret-looking property {name!r}")
-                    elif name == base.FREE_FORM and media != PROBLEM_MEDIA:  # a problem details body is open on purpose (RFC 9457)
+                    elif name == base.FREE_FORM:
                         fail(f"{method.upper()} {path} {status} {media}: the answer schema has a free-form object (additionalProperties is not false)")
 
     # The submitter-facing flag result carries no reason that works as an oracle.
@@ -181,10 +182,21 @@ def run(folder: Path, if5_spec: Path = IF5_SPEC) -> tuple[list[str], dict[str, i
         if schema == "Problem" and isinstance(data, dict):  # the parts of a problem that a schema cannot tie together
             if data.get("type") != PROBLEM_TYPE_PREFIX + str(data.get("code")):
                 fail(f"valid/{name}: type must be {PROBLEM_TYPE_PREFIX} plus the code")
-            if data.get("instance") != f"urn:vulnmart:request:{data.get('request_id')}":
-                fail(f"valid/{name}: instance must be urn:vulnmart:request: plus the request_id")
-            if "message" in data:
-                fail(f"valid/{name}: the old member message is gone (use detail)")
+            info = REGISTRY.get(str(data.get("code")))
+            if info is None:
+                fail(f"valid/{name}: the code {data.get('code')!r} is not in the error registry (contracts/errors/error-codes.yaml)")
+            else:
+                if info.get("status") != data.get("status"):
+                    fail(f"valid/{name}: status must be the registry's {info.get('status')}")
+                if info.get("title") != data.get("title"):
+                    fail(f"valid/{name}: title must be the registry's text for the code")
+                if str(data.get("code")).startswith("ORCH-"):
+                    fail(f"valid/{name}: an ORCH code never reaches a browser")
+                if "field" in data or "errors" in data:
+                    if data.get("status") != 422:
+                        fail(f"valid/{name}: field and errors are for a 422 only")
+                    if "field" in data and "errors" in data:
+                        fail(f"valid/{name}: field and errors are never both present")
         if not schema.endswith(REQUEST_SUFFIX):  # an answer example must not hold a secret-looking name
             for key in sorted(set(_keys(data)) & SECRET_NAMES):
                 fail(f"valid/{name} is an answer example but holds the secret-looking name {key!r}")

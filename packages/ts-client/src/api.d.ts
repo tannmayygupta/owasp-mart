@@ -503,7 +503,7 @@ export interface paths {
          * @description Asks for an instance of the learner's practice attempt. Answers 202 with state `requested`; the
          *     state then advances on its own (poll the instance, or listen to the live stream). Candidate
          *     instances are created by the platform when the attempt starts, not through this route.
-         *     409 inst_quota_reached when the user already holds an instance (the numbers are OI-21).
+         *     409 INST-QUOTA-REACHED when the user already holds an instance (the numbers are OI-21).
          */
         post: operations["requestInstance"];
         delete?: never;
@@ -545,7 +545,7 @@ export interface paths {
         /**
          * Get the one-time URL that opens the instance in a new tab
          * @description Allowed while the instance is ready, active or idle and its access is open. Otherwise 409
-         *     inst_not_ready. The URL carries a single-use ticket that expires after about a minute. The body is
+         *     INST-NOT-READY. The URL carries a single-use ticket that expires after about a minute. The body is
          *     empty.
          */
         post: operations["openInstance"];
@@ -569,7 +569,7 @@ export interface paths {
         /**
          * Reset the instance (new epoch, new flags)
          * @description Needs the body {"confirm": true}. Allowed in state ready, active or idle; otherwise 409
-         *     inst_invalid_state (also 409 when the instance is frozen or its attempt is not running). Answers 202: the epoch grows by one and the state is `resetting`.
+         *     INST-INVALID-STATE (also 409 when the instance is frozen or its attempt is not running). Answers 202: the epoch grows by one and the state is `resetting`.
          */
         post: operations["resetInstance"];
         delete?: never;
@@ -592,7 +592,7 @@ export interface paths {
         /**
          * Stop the instance
          * @description State becomes `stopping`, then `destroyed`. Answers 202 for a new stop and 200 when the instance
-         *     is already stopping or destroyed. 409 inst_invalid_state when the instance is frozen or its attempt is not running (for example after submit; the freeze is not undone). The body is empty.
+         *     is already stopping or destroyed. 409 INST-INVALID-STATE when the instance is frozen or its attempt is not running (for example after submit; the freeze is not undone). The body is empty.
          */
         post: operations["stopInstance"];
         delete?: never;
@@ -638,7 +638,7 @@ export interface paths {
          * Start the clock of a ready attempt (PENDING OI-22)
          * @description PENDING OI-22: whether the candidate presses Start or the clock starts when the instance becomes
          *     ready is open. Both outcomes are recorded in lab-api.md. This route exists for the first outcome;
-         *     if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 att_invalid_state.
+         *     if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 ATT-INVALID-STATE.
          *     The body is empty.
          */
         post: operations["startAttempt"];
@@ -661,7 +661,7 @@ export interface paths {
         put?: never;
         /**
          * Submit early (after a confirmation)
-         * @description Needs the body {"confirm": true}. Allowed in state `running`; otherwise 409 att_invalid_state.
+         * @description Needs the body {"confirm": true}. Allowed in state `running`; otherwise 409 ATT-INVALID-STATE.
          *     The attempt becomes `submitted`; the instance is frozen for the freeze period and then destroyed.
          */
         post: operations["submitAttempt"];
@@ -688,8 +688,8 @@ export interface paths {
          *     `credit` (credited, held, none). A wrong value, a decoy, a value of another instance and a value of an earlier epoch all answer
          *     `incorrect`: the reason is never given to the submitter (no oracle), and each of them counts for the rate limit. The submitted text is never echoed in any answer and never stored;
          *     only the result and the challenge are kept. Allowed while the attempt is `running`, otherwise 409
-         *     att_invalid_state. More than 5 incorrect submissions for one challenge in 10 minutes are refused with
-         *     429 att_flag_rate_limited and a Retry-After header, even for a correct value (the placeholder
+         *     ATT-INVALID-STATE. More than 5 incorrect submissions for one challenge in 10 minutes are refused with
+         *     429 ATT-FLAG-RATE-LIMITED and a Retry-After header, even for a correct value (the placeholder
          *     numbers are FR-ACH-01).
          */
         post: operations["submitFlag"];
@@ -753,7 +753,7 @@ export interface paths {
         /**
          * The three hint levels of a challenge
          * @description The text of a level is null until it is unlocked. When the attempt has hints off the route answers
-         *     404 att_hints_disabled, as does an unknown challenge key (att_challenge_not_found).
+         *     404 ATT-HINTS-DISABLED, as does an unknown challenge key (ATT-CHALLENGE-NOT-FOUND).
          */
         get: operations["listHints"];
         put?: never;
@@ -780,7 +780,7 @@ export interface paths {
         /**
          * Unlock one hint level
          * @description Repeating the call for an unlocked level answers 200 with the same hint and costs nothing more.
-         *     Hints off: 404 att_hints_disabled. Attempt not running: 409 att_invalid_state. Levels unlock in order (2 needs 1, 3 needs 1 and 2); an early level is 409 att_invalid_state with field /level and nothing is unlocked. The body is empty.
+         *     Hints off: 404 ATT-HINTS-DISABLED. Attempt not running: 409 ATT-INVALID-STATE. Levels unlock in order (2 needs 1, 3 needs 1 and 2); an early level is 409 ATT-INVALID-STATE and nothing is unlocked. The body is empty.
          */
         post: operations["unlockHint"];
         delete?: never;
@@ -852,7 +852,7 @@ export interface paths {
          * Record the review decision on an integrity flag
          * @description accept: the evidence is judged fine (a held capture it points to is credited). reject: the evidence
          *     is judged a real problem (a held capture stays out of the score). One decision per flag; a second
-         *     answers 409 att_invalid_state. Who may decide is OI-38 (the mock allows a recruiter of the owning
+         *     answers 409 ATT-INVALID-STATE. Who may decide is OI-38 (the mock allows a recruiter of the owning
          *     company only). The decision is audited by the platform.
          */
         post: operations["decideIntegrityFlag"];
@@ -898,7 +898,7 @@ export interface paths {
          * @description Sorted by the key (epoch, seq) of the event, oldest first, so a late event of an earlier epoch sits before the newer ones.
          *     Cursor-paged: pass `next_cursor` as `cursor` to get the entries after the last one already read. Entries are neither skipped
          *     nor repeated when a late event with a smaller key is stored between two page requests; such an event is shown only when the
-         *     client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /cursor.
+         *     client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /query/cursor.
          */
         get: operations["getTimeline"];
         put?: never;
@@ -1160,7 +1160,7 @@ export interface components {
         EvidenceId: string;
         /**
          * @description Opaque. base64url (no padding) of a text that holds the direction (f, forward) and the key (epoch, seq) of the last
-         *     entry already read. Clients must not build or change one. A cursor that is not one of ours is 422 with field /cursor.
+         *     entry already read. Clients must not build or change one. A cursor that is not one of ours is 422 with field /query/cursor.
          */
         Cursor: string;
         /**
@@ -1200,37 +1200,9 @@ export interface components {
         FlagResult: "correct" | "incorrect";
         /**
          * @description Code of a failed instance, `INST-` plus upper-case words (for example INST-HEALTH-TIMEOUT), the same
-         *     form as IF-5. This is not the code of a problem answer; see ProblemCode.
+         *     form as IF-5 and the registry. This is not the code of a problem answer; see Problem.
          */
         ErrorCode: string;
-        /**
-         * @description Machine-readable code of an error answer: lower-case words joined by underscores. It is also the last
-         *     part of `type`. Placeholder until the error registry (IF-8) is merged. Codes in use: auth_session_required,
-         *     auth_csrf_failed, auth_origin_forbidden, att_not_found, att_gone, att_invalid_state, att_hints_disabled,
-         *     att_challenge_not_found, att_flag_rate_limited, inst_not_found, inst_invalid_state, inst_not_ready,
-         *     inst_quota_reached, req_validation, req_too_large, req_unsupported_media_type, req_method_not_allowed,
-         *     req_route_unknown, req_internal.
-         */
-        ProblemCode: string;
-        /**
-         * @description RFC 9457 problem details (application/problem+json). `type` is https://vulnmart.invalid/problems/ plus the
-         *     `code`; `title` is a short sentence that is the same for every answer with that code; `status` repeats the
-         *     HTTP status; `detail` explains this occurrence (it never repeats a submitted value); `instance` identifies this
-         *     occurrence as urn:vulnmart:request: plus the `request_id`. `code`, `request_id` and `field` are extension
-         *     members. The schema is open on purpose (RFC 9457 section 3.2): a client ignores members it does not know.
-         *     Never a stack trace.
-         */
-        LabProblem: {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            code: components["schemas"]["ProblemCode"];
-            request_id: string;
-            /** @description For 422, a JSON Pointer to the offending field (empty string for the whole body). */
-            field?: string;
-        };
         RequestInstanceRequest: {
             /** @enum {unknown} */
             kind: "learner";
@@ -1616,40 +1588,7 @@ export interface components {
                 "application/json": components["schemas"]["Attempt"];
             };
         };
-        /** @description No valid session. auth_session_required. */
-        LabUnauthenticated: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
-            };
-        };
-        /** @description Missing or wrong CSRF header (auth_csrf_failed) or an Origin that is not the dashboard origin (auth_origin_forbidden). Nothing changed. */
-        LabCsrfFailed: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
-            };
-        };
-        /**
-         * @description The resource does not exist or is not yours (the same answer): att_not_found or inst_not_found.
-         *     Also att_hints_disabled, att_challenge_not_found and, for an unknown path, req_route_unknown.
-         */
-        LabNotFound: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
-            };
-        };
-        /** @description PROPOSAL, to confirm. The attempt is withdrawn or cancelled, so its derived data is no longer served (att_gone). getAttempt still answers 200 with the state; a deleted attempt answers 404 like a missing one. */
+        /** @description PROPOSAL, to confirm. The attempt is withdrawn or cancelled, so its derived data is no longer served (ATT-GONE). getAttempt still answers 200 with the state; a deleted attempt answers 404 like a missing one. */
         Gone: {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
@@ -1659,7 +1598,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description The path exists but not for this method. req_method_not_allowed with an Allow header. Any path can answer it. */
+        /** @description The path exists but not for this method. REQ-METHOD-NOT-ALLOWED with an Allow header. Any path can answer it. */
         MethodNotAllowed: {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
@@ -1668,57 +1607,6 @@ export interface components {
             };
             content: {
                 "application/problem+json": components["schemas"]["Problem"];
-            };
-        };
-        /** @description att_invalid_state, inst_invalid_state, inst_not_ready or inst_quota_reached. Nothing changed. */
-        LabConflict: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
-            };
-        };
-        /** @description Body larger than 64 KiB. req_too_large. */
-        LabTooLarge: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
-            };
-        };
-        /** @description The content type is not application/json. req_unsupported_media_type. Checked before the lookup, so it is answered even for an id that does not exist (415 before 404). */
-        LabUnsupportedMedia: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
-            };
-        };
-        /** @description A missing, extra or wrong-type field, a body where none is allowed, a bad query value, or a query parameter that is unknown or given more than once. req_validation; `field` is a JSON Pointer. The wrong value is never repeated. */
-        LabInvalid: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
-            };
-        };
-        /** @description Too many incorrect flag submissions for the challenge. att_flag_rate_limited with Retry-After. */
-        LabRateLimited: {
-            headers: {
-                "Cache-Control": components["headers"]["CacheControl"];
-                "Retry-After": components["headers"]["RetryAfter"];
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["LabProblem"];
             };
         };
     };
@@ -1731,9 +1619,9 @@ export interface components {
         HintLevelPath: number;
         IntegrityFlagIdPath: components["schemas"]["IntegrityFlagId"];
         Cursor: components["schemas"]["Cursor"];
-        /** @description Page size of the timeline. Default 50, maximum 200; a larger value is 422 req_validation with field /limit. */
+        /** @description Page size of the timeline. Default 50, maximum 200; a larger value is 422 REQ-VALIDATION with field /query/limit. */
         Limit: number;
-        /** @description Most entries in the answer. Default 100, maximum 100; a larger value is 422 req_validation with field /limit. When more exist, has_more is true. */
+        /** @description Most entries in the answer. Default 100, maximum 100; a larger value is 422 REQ-VALIDATION with field /query/limit. When more exist, has_more is true. */
         ListLimit: number;
     };
     requestBodies: never;
@@ -2462,12 +2350,12 @@ export interface operations {
         };
         responses: {
             202: components["responses"]["InstanceAccepted"];
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            409: components["responses"]["LabConflict"];
-            413: components["responses"]["LabTooLarge"];
-            415: components["responses"]["LabUnsupportedMedia"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
         };
     };
     getInstance: {
@@ -2482,9 +2370,9 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["InstanceOk"];
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Invalid"];
         };
     };
     openInstance: {
@@ -2508,11 +2396,11 @@ export interface operations {
                     "application/json": components["schemas"]["OpenTicket"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
         };
     };
     resetInstance: {
@@ -2531,13 +2419,13 @@ export interface operations {
         };
         responses: {
             202: components["responses"]["InstanceAccepted"];
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            413: components["responses"]["LabTooLarge"];
-            415: components["responses"]["LabUnsupportedMedia"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
         };
     };
     stopInstance: {
@@ -2553,11 +2441,11 @@ export interface operations {
         responses: {
             200: components["responses"]["InstanceOk"];
             202: components["responses"]["InstanceAccepted"];
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
         };
     };
     getAttempt: {
@@ -2572,9 +2460,9 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["AttemptOk"];
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Invalid"];
         };
     };
     startAttempt: {
@@ -2589,11 +2477,11 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["AttemptOk"];
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
         };
     };
     submitAttempt: {
@@ -2612,13 +2500,13 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["AttemptOk"];
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            413: components["responses"]["LabTooLarge"];
-            415: components["responses"]["LabUnsupportedMedia"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
         };
     };
     submitFlag: {
@@ -2646,14 +2534,14 @@ export interface operations {
                     "application/json": components["schemas"]["FlagSubmissionResult"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            413: components["responses"]["LabTooLarge"];
-            415: components["responses"]["LabUnsupportedMedia"];
-            422: components["responses"]["LabInvalid"];
-            429: components["responses"]["LabRateLimited"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getScore: {
@@ -2677,10 +2565,10 @@ export interface operations {
                     "application/json": components["schemas"]["Score"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
-            422: components["responses"]["LabInvalid"];
+            422: components["responses"]["Invalid"];
         };
     };
     listChallenges: {
@@ -2704,10 +2592,10 @@ export interface operations {
                     "application/json": components["schemas"]["ChallengeProgressList"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
-            422: components["responses"]["LabInvalid"];
+            422: components["responses"]["Invalid"];
         };
     };
     listHints: {
@@ -2732,10 +2620,10 @@ export interface operations {
                     "application/json": components["schemas"]["HintList"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
-            422: components["responses"]["LabInvalid"];
+            422: components["responses"]["Invalid"];
         };
     };
     unlockHint: {
@@ -2761,17 +2649,17 @@ export interface operations {
                     "application/json": components["schemas"]["Hint"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
         };
     };
     listEvidence: {
         parameters: {
             query?: {
-                /** @description Most entries in the answer. Default 100, maximum 100; a larger value is 422 req_validation with field /limit. When more exist, has_more is true. */
+                /** @description Most entries in the answer. Default 100, maximum 100; a larger value is 422 REQ-VALIDATION with field /query/limit. When more exist, has_more is true. */
                 limit?: components["parameters"]["ListLimit"];
             };
             header?: never;
@@ -2792,16 +2680,16 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceList"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
-            422: components["responses"]["LabInvalid"];
+            422: components["responses"]["Invalid"];
         };
     };
     listIntegrityFlags: {
         parameters: {
             query?: {
-                /** @description Most entries in the answer. Default 100, maximum 100; a larger value is 422 req_validation with field /limit. When more exist, has_more is true. */
+                /** @description Most entries in the answer. Default 100, maximum 100; a larger value is 422 REQ-VALIDATION with field /query/limit. When more exist, has_more is true. */
                 limit?: components["parameters"]["ListLimit"];
             };
             header?: never;
@@ -2822,10 +2710,10 @@ export interface operations {
                     "application/json": components["schemas"]["IntegrityFlagList"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
-            422: components["responses"]["LabInvalid"];
+            422: components["responses"]["Invalid"];
         };
     };
     decideIntegrityFlag: {
@@ -2854,13 +2742,13 @@ export interface operations {
                     "application/json": components["schemas"]["IntegrityFlag"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            403: components["responses"]["LabCsrfFailed"];
-            404: components["responses"]["LabNotFound"];
-            409: components["responses"]["LabConflict"];
-            413: components["responses"]["LabTooLarge"];
-            415: components["responses"]["LabUnsupportedMedia"];
-            422: components["responses"]["LabInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
         };
     };
     getReport: {
@@ -2884,17 +2772,17 @@ export interface operations {
                     "application/json": components["schemas"]["Report"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
-            422: components["responses"]["LabInvalid"];
+            422: components["responses"]["Invalid"];
         };
     };
     getTimeline: {
         parameters: {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
-                /** @description Page size of the timeline. Default 50, maximum 200; a larger value is 422 req_validation with field /limit. */
+                /** @description Page size of the timeline. Default 50, maximum 200; a larger value is 422 REQ-VALIDATION with field /query/limit. */
                 limit?: components["parameters"]["Limit"];
             };
             header?: never;
@@ -2915,10 +2803,10 @@ export interface operations {
                     "application/json": components["schemas"]["Timeline"];
                 };
             };
-            401: components["responses"]["LabUnauthenticated"];
-            404: components["responses"]["LabNotFound"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
-            422: components["responses"]["LabInvalid"];
+            422: components["responses"]["Invalid"];
         };
     };
 }

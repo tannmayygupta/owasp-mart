@@ -1,0 +1,8 @@
+{
+  "type": "urn:vulnmart:error:ATT-NOT-FOUND",
+  "title": "Attempt not found.",
+  "status": 404,
+  "code": "ATT-NOT-FOUND",
+  "request_id": "req-0123456789ab",
+  "detail": "no such attempt"
+}

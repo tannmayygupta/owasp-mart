@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/orch-bad-signature",
-  "title": "Bad signature",
+  "type": "urn:vulnmart:error:ORCH-BAD-SIGNATURE",
+  "title": "The request could not be authenticated.",
   "status": 401,
-  "detail": "bad signature",
-  "instance": "urn:vulnmart:request:req-0000000003",
   "code": "ORCH-BAD-SIGNATURE",
   "request_id": "req-0000000003"
 }

@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/req_unsupported_media_type",
-  "title": "The body must be JSON.",
+  "type": "urn:vulnmart:error:REQ-UNSUPPORTED-MEDIA-TYPE",
+  "title": "The request must be JSON.",
   "status": 415,
-  "detail": "the body must be application/json",
-  "instance": "urn:vulnmart:request:req-0123456789ab",
-  "code": "req_unsupported_media_type",
+  "code": "REQ-UNSUPPORTED-MEDIA-TYPE",
   "request_id": "req-0123456789ab"
 }

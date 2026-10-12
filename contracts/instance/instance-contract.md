@@ -7,7 +7,7 @@
 
 Plain terms: an **instance** is one private copy of the shop with its helper containers. This document says what every container in an instance must look like, so the orchestrator (L) and the shop and services (T) can be built separately. Words in **bold "to confirm"** are values the architecture does not fix; every one is listed in the table at the end ("Open points (to confirm)") for Sahil and Akshay.
 
-What this contract does not cover: the body and names of events (IF-4, `contracts/events/app-events.md`), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are placeholders until the registry is merged.
+What this contract does not cover: the body and names of events (IF-4, `contracts/events/app-events.md`), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are the codes of the IF-8 registry.
 
 Machine-checkable parts: [injection-document.schema.json](injection-document.schema.json), [flags-file.schema.json](flags-file.schema.json), [instance-template.schema.json](instance-template.schema.json), [sidecar-start.schema.json](sidecar-start.schema.json) (JSON Schema 2020-12), with valid and invalid examples in `examples/`. Rules that compare two fields (for example "the injector and the shop share one `/run/vm` volume") are checked by `scripts/validate-contracts.mjs`.
 
@@ -110,9 +110,9 @@ Order and lifetime: the shop, import service and mock-services start only after 
 
 **Seed.** `seed` is random, at least 32 and at most 128 characters from `A-Z a-z 0-9 _ -`. It is a secret like the flags: never in an environment variable, a log line, a label or an event. It drives the per-instance seeded passwords and data.
 
-**Exit codes** (the `INST-*` names are placeholders until the error registry, story P-02, is merged):
+**Exit codes** (the `INST-*` names are the codes of the IF-8 error registry):
 
-| Exit code | Meaning | Placeholder error code |
+| Exit code | Meaning | Error code (IF-8) |
 |---|---|---|
 | 0 | Injected, marker written | none |
 | 10 | The document is missing, not JSON or fails the schema | `INST-INJECT-BAD-DOCUMENT` |
@@ -179,7 +179,7 @@ Every value below was chosen by this draft because the architecture does not fix
 | 2 | Flag length and alphabet | 24 characters from `A-Z2-7` inside `VM{ }` (architecture 04 section 11.1 calls the format a placeholder, FR-FLG-02) | Sahil, Akshay |
 | 3 | Maximum flags per document | 11 (C01 to C11) | Sahil |
 | 4 | Seed length and alphabet | 32 to 128 characters of `A-Z a-z 0-9 _ -` | Sahil |
-| 5 | Exit codes and placeholder names | 0, 10, 11, 12, 13 and `INST-INJECT-*` (section 5) | Akshay (registry P-02) |
+| 5 | Exit codes and error code names | 0, 10, 11, 12, 13 and `INST-INJECT-*` (section 5) | Akshay (registry P-02) |
 | 6 | Marker file content and mode | `/run/vm/injected`, empty, mode 0444 (the path is from the architecture) | Sahil |
 | 7 | Flags file | `/run/vm/flags.json`, mode 0400 (from the architecture), fields in the schema | Sahil |
 | 8 | Run user | `65532:65532` for every component | Sahil |

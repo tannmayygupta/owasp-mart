@@ -26,6 +26,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MEDIA_TYPE, problemBody } from '../shared/problem.mjs';
 
 export const MAX_BODY = 64 * 1024;
 const DRAIN_CAP = 1024 * 1024;
@@ -44,16 +45,6 @@ const RE = {
   instance: /^i-[A-Z2-7]{16}$/, attempt: /^a-[A-Z2-7]{16}$/, flagId: /^g-[A-Z2-7]{16}$/,
   challenge: /^C(0[1-9]|10|11)$/, cursor: /^[A-Za-z0-9_-]{1,128}$/,
 };
-const TITLES = {
-  auth_session_required: 'Sign in is required.', auth_csrf_failed: 'The CSRF check failed.', auth_origin_forbidden: 'The Origin is not allowed.',
-  att_not_found: 'The attempt was not found.', att_gone: 'The attempt data is no longer available.', att_invalid_state: 'The attempt is in the wrong state.',
-  att_hints_disabled: 'Hints are off for this attempt.', att_challenge_not_found: 'The challenge or hint level was not found.',
-  att_flag_rate_limited: 'Too many incorrect submissions.', inst_not_found: 'The instance was not found.', inst_invalid_state: 'The instance is in the wrong state.',
-  inst_not_ready: 'The instance is not ready.', inst_quota_reached: 'The instance quota is reached.', req_validation: 'The request is not valid.',
-  req_too_large: 'The body is too large.', req_unsupported_media_type: 'The body must be JSON.', req_method_not_allowed: 'The method is not allowed.',
-  req_route_unknown: 'The route does not exist.', req_internal: 'Internal error.',
-};
-const PROBLEM_BASE = 'https://vulnmart.invalid/problems/';
 const SEQ_STEP = 1000; // the mock leaves gaps between sequence numbers, like the separate lanes of IF-4 do
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const stamp = (ms = Date.now()) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -138,15 +129,16 @@ export function createFakeLab(options = {}) {
       'x-content-type-options': 'nosniff', ...extra });
     res.end(text);
   };
+  // The IF-8 error body (shared/problem.mjs): title and status come from the registry, no `detail`, no `instance`, and `field` only on a 422.
+  // `message` is a note for the reader of this file; it never reaches the answer.
   const problem = (res, status, code, message, field, extra = {}) => {
     const requestId = 'req-' + crypto.randomBytes(6).toString('hex');
-    const body = { type: PROBLEM_BASE + code, title: TITLES[code], status, detail: message, instance: 'urn:vulnmart:request:' + requestId, code, request_id: requestId };
-    if (field !== undefined) body.field = field;
-    send(res, status, body, 'application/problem+json', extra);
+    const body = problemBody(code, requestId, { field });
+    send(res, body.status, body, MEDIA_TYPE, extra);
   };
-  const invalid = (res, field, message) => problem(res, 422, 'req_validation', message, field);
-  const attemptNotFound = (res) => problem(res, 404, 'att_not_found', 'no such attempt');
-  const instanceNotFound = (res) => problem(res, 404, 'inst_not_found', 'no such instance');
+  const invalid = (res, field, message) => problem(res, 422, 'REQ-VALIDATION', message, field);
+  const attemptNotFound = (res) => problem(res, 404, 'ATT-NOT-FOUND', 'no such attempt');
+  const instanceNotFound = (res) => problem(res, 404, 'INST-NOT-FOUND', 'no such instance');
 
   // ---- views ----
   const instanceView = (r) => ({ instance_id: r.id, attempt_id: r.attemptId, state: r.state, access: r.access, health: r.health, epoch: r.epoch,
@@ -260,8 +252,9 @@ export function createFakeLab(options = {}) {
   function queryOf(res, url, allowed) {
     const q = url.searchParams;
     const pointer = (name) => { const s = name.slice(0, 32).replace(/[^A-Za-z0-9_-]/g, ''); return s === name && s !== '' ? '/' + s : ''; };
-    for (const name of q.keys()) if (!allowed.includes(name)) { invalid(res, pointer(name), 'unknown query parameter'); return null; }
-    for (const name of new Set(q.keys())) if (q.getAll(name).length > 1) { invalid(res, pointer(name), 'a query parameter is given more than once'); return null; }
+const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(name));
+    for (const name of q.keys()) if (!allowed.includes(name)) { invalid(res, queryPointer(name), 'unknown query parameter'); return null; }
+    for (const name of new Set(q.keys())) if (q.getAll(name).length > 1) { invalid(res, queryPointer(name), 'a query parameter is given more than once'); return null; }
     return q;
   }
 
@@ -269,7 +262,7 @@ export function createFakeLab(options = {}) {
   function parseLimit(res, q, dflt, max) {
     if (!q.has('limit')) return dflt;
     const t = q.get('limit');
-    if (!/^[1-9][0-9]{0,2}$/.test(t) || Number(t) > max) { invalid(res, '/limit', `limit is 1 to ${max}`); return null; }
+    if (!/^[1-9][0-9]{0,2}$/.test(t) || Number(t) > max) { invalid(res, '/query/limit', `limit is 1 to ${max}`); return null; }
     return Number(t);
   }
 
@@ -280,7 +273,7 @@ export function createFakeLab(options = {}) {
     if (body === false || !checkKeys(res, body, ['kind'])) return;
     if (body.kind !== 'learner') return invalid(res, '/kind', 'kind must be learner');
     for (const r of instances.values()) {
-      if (r.ownerId === user.id && r.state !== 'destroyed') return problem(res, 409, 'inst_quota_reached', 'you already hold an instance');
+      if (r.ownerId === user.id && r.state !== 'destroyed') return problem(res, 409, 'INST-QUOTA-REACHED', 'you already hold an instance');
     }
     let a = [...attempts.values()].find((x) => x.ownerId === user.id && x.mode === 'learner' && x.state === 'running' && x.instanceId === null);
     if (!a) {
@@ -301,7 +294,7 @@ export function createFakeLab(options = {}) {
   H.openInstance = ({ res, user, params, take }) => {
     const r = ownInstance(res, user, params.instance_id);
     if (!r || take() === false) return;
-    if (!['ready', 'active', 'idle'].includes(r.state) || r.access !== 'open') return problem(res, 409, 'inst_not_ready', 'the instance is not ready to open');
+    if (!['ready', 'active', 'idle'].includes(r.state) || r.access !== 'open') return problem(res, 409, 'INST-NOT-READY', 'the instance is not ready to open');
     const ticket = crypto.randomBytes(32).toString('base64url');
     send(res, 200, { url: `https://${r.id.toLowerCase()}.labs.example.invalid/_vm/enter?t=${ticket}`, expires_at: stamp(Date.now() + 60 * 1000) });
   };
@@ -312,8 +305,8 @@ export function createFakeLab(options = {}) {
     const body = take();
     if (body === false || !checkKeys(res, body, ['confirm'])) return;
     if (body.confirm !== true) return invalid(res, '/confirm', 'confirm must be true');
-    if (!['ready', 'active', 'idle'].includes(r.state)) return problem(res, 409, 'inst_invalid_state', `reset is not allowed in state ${r.state}`);
-    if (!canChange(r)) return problem(res, 409, 'inst_invalid_state', 'the instance is frozen or its attempt is not running');
+    if (!['ready', 'active', 'idle'].includes(r.state)) return problem(res, 409, 'INST-INVALID-STATE', `reset is not allowed in state ${r.state}`);
+    if (!canChange(r)) return problem(res, 409, 'INST-INVALID-STATE', 'the instance is frozen or its attempt is not running');
     r.epoch += 1;
     move(r, 'resetting', { health: 'unknown', readyAt: null });
     const a = attempts.get(r.attemptId);
@@ -326,7 +319,7 @@ export function createFakeLab(options = {}) {
     const r = ownInstance(res, user, params.instance_id);
     if (!r || take() === false) return;
     if (r.state === 'stopping' || r.state === 'destroyed') return send(res, 200, instanceView(r));
-    if (!canChange(r)) return problem(res, 409, 'inst_invalid_state', 'the instance is frozen or its attempt is not running');
+    if (!canChange(r)) return problem(res, 409, 'INST-INVALID-STATE', 'the instance is frozen or its attempt is not running');
     move(r, 'stopping');
     const view = instanceView(r);
     schedule(r);
@@ -335,7 +328,7 @@ export function createFakeLab(options = {}) {
   // A deleted attempt is the same 404 as a missing one (proposal, to confirm).
   const findAttempt = (res, id) => { const a = RE.attempt.test(id) ? attempts.get(id) : undefined; if (!a || a.state === 'deleted') { attemptNotFound(res); return undefined; } return a; };
   // A withdrawn or cancelled attempt is still readable as itself (getAttempt); its derived data is 410 (proposal, to confirm).
-  const gone = (res, a) => { if (!GONE_STATES.includes(a.state)) return false; problem(res, 410, 'att_gone', `the attempt is ${a.state}; its data is no longer available`); return true; };
+  const gone = (res, a) => { if (!GONE_STATES.includes(a.state)) return false; problem(res, 410, 'ATT-GONE', `the attempt is ${a.state}; its data is no longer available`); return true; };
   const readableState = (res, user, id) => { const a = findAttempt(res, id); if (!a) return null; if (!canRead(user, a)) { attemptNotFound(res); return null; } return a; };
   const readable = (res, user, id) => { const a = readableState(res, user, id); return a && !gone(res, a) ? a : null; };
   const owned = (res, user, id) => { const a = findAttempt(res, id); if (!a) return null; if (a.ownerId !== user.id) { attemptNotFound(res); return null; } return a; };
@@ -345,7 +338,7 @@ export function createFakeLab(options = {}) {
   H.startAttempt = ({ res, user, params, take }) => {
     const a = owned(res, user, params.attempt_id);
     if (!a || take() === false) return;
-    if (a.state !== 'ready') return problem(res, 409, 'att_invalid_state', `start is not allowed in state ${a.state}`);
+    if (a.state !== 'ready') return problem(res, 409, 'ATT-INVALID-STATE', `start is not allowed in state ${a.state}`);
     a.state = 'running';
     a.startedAt = stamp();
     a.deadlineAt = stamp(Date.now() + 120 * 60 * 1000);
@@ -358,7 +351,7 @@ export function createFakeLab(options = {}) {
     const body = take();
     if (body === false || !checkKeys(res, body, ['confirm'])) return;
     if (body.confirm !== true) return invalid(res, '/confirm', 'confirm must be true');
-    if (a.state !== 'running') return problem(res, 409, 'att_invalid_state', `submit is not allowed in state ${a.state}`);
+    if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `submit is not allowed in state ${a.state}`);
     a.state = 'submitted';
     a.submittedAt = stamp();
     a.frozenUntil = stamp(Date.now() + 15 * 60 * 1000);
@@ -374,7 +367,7 @@ export function createFakeLab(options = {}) {
     if (body === false || !checkKeys(res, body, ['challenge_key', 'flag'])) return;
     if (typeof body.challenge_key !== 'string' || !RE.challenge.test(body.challenge_key)) return invalid(res, '/challenge_key', 'bad challenge key');
     if (typeof body.flag !== 'string' || body.flag.length < 1 || body.flag.length > 200) return invalid(res, '/flag', 'flag is text of 1 to 200 characters');
-    if (a.state !== 'running') return problem(res, 409, 'att_invalid_state', `a flag cannot be submitted in state ${a.state}`);
+    if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a flag cannot be submitted in state ${a.state}`);
     const key = body.challenge_key;
     const now = Date.now();
     // Only the result is kept, never the text. The submitter is told `correct` or `incorrect` (no oracle); the reason stays on the server.
@@ -390,7 +383,7 @@ export function createFakeLab(options = {}) {
     const recent = a.submissions.filter((s) => s.key === key && s.result === 'incorrect' && now - s.at < WINDOW_MS).sort((x, y) => x.at - y.at);
     if (recent.length >= WRONG_LIMIT) {
       const wait = Math.max(1, Math.ceil((recent[recent.length - WRONG_LIMIT].at + WINDOW_MS - now) / 1000));
-      return problem(res, 429, 'att_flag_rate_limited', 'too many incorrect submissions for this challenge', undefined, { 'retry-after': String(wait) });
+      return problem(res, 429, 'ATT-FLAG-RATE-LIMITED', 'too many incorrect submissions for this challenge', undefined, { 'retry-after': String(wait) });
     }
     a.submissions.push({ key, result, at: now }); // every incorrect submission counts for the rate limit, whatever the reason
     if (reason !== 'correct') {
@@ -430,8 +423,8 @@ export function createFakeLab(options = {}) {
   function hintContext(res, user, params) {
     const a = owned(res, user, params.attempt_id);
     if (!a) return null;
-    if (!a.hintsEnabled) { problem(res, 404, 'att_hints_disabled', 'hints are off for this attempt'); return null; }
-    if (!RE.challenge.test(params.challenge_key)) { problem(res, 404, 'att_challenge_not_found', 'no such challenge'); return null; }
+    if (!a.hintsEnabled) { problem(res, 404, 'ATT-HINTS-DISABLED', 'hints are off for this attempt'); return null; }
+    if (!RE.challenge.test(params.challenge_key)) { problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge'); return null; }
     return a;
   }
   const hintView = (a, key, level) => { const open = a.progress.get(key).hints.has(level);
@@ -445,13 +438,13 @@ export function createFakeLab(options = {}) {
   H.unlockHint = ({ res, user, params, take }) => {
     const a = hintContext(res, user, params);
     if (!a || take() === false) return;
-    if (!/^[1-3]$/.test(params.level)) return problem(res, 404, 'att_challenge_not_found', 'no such hint level');
-    if (a.state !== 'running') return problem(res, 409, 'att_invalid_state', `a hint cannot be unlocked in state ${a.state}`);
+    if (!/^[1-3]$/.test(params.level)) return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such hint level');
+    if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a hint cannot be unlocked in state ${a.state}`);
     const level = Number(params.level);
     const set = a.progress.get(params.challenge_key).hints;
     if (!set.has(level)) {
       for (let lower = 1; lower < level; lower++) {
-        if (!set.has(lower)) return problem(res, 409, 'att_invalid_state', `hint level ${lower} must be unlocked first`, '/level');
+        if (!set.has(lower)) return problem(res, 409, 'ATT-INVALID-STATE', `hint level ${lower} must be unlocked first`, '/level');
       }
       set.add(level);
       addTimeline(a, { at: stamp(), type: 'hint.unlocked', challenge_key: params.challenge_key, milestone: null, result: null });
@@ -478,7 +471,7 @@ export function createFakeLab(options = {}) {
     if (body === false || !checkKeys(res, body, ['decision', 'note'])) return;
     if (body.decision !== 'accept' && body.decision !== 'reject') return invalid(res, '/decision', 'decision is accept or reject');
     if (typeof body.note !== 'string' || body.note.length < 1 || body.note.length > 1000) return invalid(res, '/note', 'note is text of 1 to 1000 characters');
-    if (f.status !== 'open') return problem(res, 409, 'att_invalid_state', 'this flag already has a decision');
+    if (f.status !== 'open') return problem(res, 409, 'ATT-INVALID-STATE', 'this flag already has a decision');
     f.status = body.decision === 'accept' ? 'accepted' : 'rejected';
     f.decidedAt = stamp();
     f.note = body.note;
@@ -520,7 +513,7 @@ export function createFakeLab(options = {}) {
     let after = null;
     if (q.has('cursor')) {
       after = decodeCursor(q.get('cursor'));
-      if (!after) return invalid(res, '/cursor', 'bad cursor');
+      if (!after) return invalid(res, '/query/cursor', 'bad cursor');
     }
     // Sorted by the key (epoch, seq); a page holds the entries with a key above the cursor, so a late event with a smaller key is never in a later page.
     const sorted = [...a.timeline].sort((x, y) => x.epoch - y.epoch || x.seq - y.seq);
@@ -542,7 +535,7 @@ export function createFakeLab(options = {}) {
     if (!Number.isSafeInteger(body.epoch) || body.epoch < 1) return invalid(res, '/epoch', 'epoch is a whole number of at least 1');
     if (!Number.isSafeInteger(body.seq) || body.seq < 1) return invalid(res, '/seq', 'seq is a whole number of at least 1');
     if (!types.includes(type)) return invalid(res, '/type', 'unknown timeline type');
-    if (a.timeline.some((e) => e.epoch === body.epoch && e.seq === body.seq)) return problem(res, 409, 'att_invalid_state', 'an event with this key exists');
+    if (a.timeline.some((e) => e.epoch === body.epoch && e.seq === body.seq)) return problem(res, 409, 'ATT-INVALID-STATE', 'an event with this key exists');
     addTimeline(a, { at: stamp(), type, challenge_key: body.challenge_key ?? null, milestone: body.milestone ?? null, result: body.result ?? null }, { epoch: body.epoch, seq: body.seq });
     res.writeHead(204, { 'cache-control': 'private, no-store' });
     res.end();
@@ -577,34 +570,34 @@ export function createFakeLab(options = {}) {
     const { buf, tooLarge } = await readBody(req, res);
     if (tooLarge) {
       res.setHeader('connection', 'close');
-      return problem(res, 413, 'req_too_large', `the body is larger than ${MAX_BODY} bytes`);
+      return problem(res, 413, 'REQ-TOO-LARGE', `the body is larger than ${MAX_BODY} bytes`);
     }
     if (method === 'POST' && url.pathname === '/_fake/late-event') return lateEvent(res, buf);
     const onPath = ROUTES.filter((r) => r[1].test(url.pathname));
-    if (onPath.length === 0) return problem(res, 404, 'req_route_unknown', 'no such route');
+    if (onPath.length === 0) return problem(res, 404, 'REQ-ROUTE-UNKNOWN', 'no such route');
     const route = onPath.find((r) => r[0] === method);
     if (!route) {
-      return problem(res, 405, 'req_method_not_allowed', `${method} is not allowed here`, undefined, { allow: onPath.map((r) => r[0]).join(', ') });
+      return problem(res, 405, 'REQ-METHOD-NOT-ALLOWED', `${method} is not allowed here`, undefined, { allow: onPath.map((r) => r[0]).join(', ') });
     }
     const token = cookies(req)[SESSION_COOKIE];
     const user = typeof token === 'string' && Object.hasOwn(USERS, token) ? USERS[token] : undefined;
-    if (!user) return problem(res, 401, 'auth_session_required', 'sign in first');
+    if (!user) return problem(res, 401, 'AUTH-SESSION-REQUIRED', 'sign in first');
     if (method === 'POST') {
-      if (req.headers.origin !== cfg.origin) return problem(res, 403, 'auth_origin_forbidden', 'the Origin is not the dashboard origin');
+      if (req.headers.origin !== cfg.origin) return problem(res, 403, 'AUTH-ORIGIN-FORBIDDEN', 'the Origin is not the dashboard origin');
       const csrf = req.headers['x-csrf-token'];
       const cookie = cookies(req)[CSRF_COOKIE];
       const csrfBuf = Buffer.from(csrf ?? ''), cookieBuf = Buffer.from(cookie ?? '');
       if (csrfBuf.length === 0 || csrfBuf.length !== cookieBuf.length || !crypto.timingSafeEqual(csrfBuf, cookieBuf)) {
-        return problem(res, 403, 'auth_csrf_failed', 'the CSRF header is missing or wrong');
+        return problem(res, 403, 'AUTH-CSRF-FAILED', 'the CSRF header is missing or wrong');
       }
     }
     // Order of checks (lab-api.md section 3): the content type (415) comes before the lookup (404), so an id that does not exist is also 415 for a body that is not JSON.
     if (method === 'POST' && route[4] === 'json' && !/^application\/json(\s*;.*)?$/i.test(String(req.headers['content-type'] ?? ''))) {
-      return problem(res, 415, 'req_unsupported_media_type', 'the body must be application/json');
+      return problem(res, 415, 'REQ-UNSUPPORTED-MEDIA-TYPE', 'the body must be application/json');
     }
     const match = url.pathname.match(route[1]);
     let params;
-    try { params = Object.fromEntries(route[2].map((n, i) => [n, decodeURIComponent(match[i + 1])])); } catch { return problem(res, 404, 'req_route_unknown', 'no such route'); }
+    try { params = Object.fromEntries(route[2].map((n, i) => [n, decodeURIComponent(match[i + 1])])); } catch { return problem(res, 404, 'REQ-ROUTE-UNKNOWN', 'no such route'); }
     // Resource lookup and ownership (404) come before the body checks (415, 422), so an unknown id never shows a validation answer:
     // a handler calls take() only after its lookup. take() returns the parsed object, null when no body is allowed, or false after answering.
     const take = () => {
@@ -617,7 +610,7 @@ export function createFakeLab(options = {}) {
   const server = http.createServer((req, res) => {
     handle(req, res).catch((err) => {
       process.stderr.write(`fake lab error: ${err.stack}\n`);
-      if (!res.headersSent) problem(res, 500, 'req_internal', 'internal error');
+      if (!res.headersSent) problem(res, 500, 'REQ-INTERNAL', 'internal error');
     });
   });
   return {

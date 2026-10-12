@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Ajv2020 from 'ajv/dist/2020.js';
 import { scanSecrets } from './validate-contracts.mjs';
 import { compileEventSchema, createIngest, schemaErrors, LIMITS } from '../contracts/mocks/fake-ingest/ingest.mjs';
 import { deriveEventKey, TEST_MASTER_HEX, EVENT_KEY_SALT, EVENT_KEY_INFO } from '../contracts/mocks/fake-ingest/event-key.mjs';
@@ -13,6 +14,8 @@ import { signEvent, TEST_KEY, TEST_INSTANCE, SIGNATURE_HEADER, signBody, verifyS
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_DIR = path.join(ROOT, 'contracts', 'events');
+// Every error answer of the ingest is the closed IF-8 body.
+const validateProblem = new Ajv2020({ strict: true }).compile(JSON.parse(fs.readFileSync(path.join(ROOT, 'contracts', 'errors', 'problem.schema.json'), 'utf8')));
 export const SCHEMA_FILE = 'instance-events.schema.json';
 export const CONTRACT_MD = 'app-events.md';
 export const SCHEMA_NAME = 'instance-events';
@@ -103,9 +106,11 @@ export function runMatrix({ schemaFile, events, key = TEST_KEY, instance = TEST_
   const expect = (ing, row, req, status, opts = {}) => {
     const before = ing.stored.length;
     const r = ing.handle(req);
-    const paths = ((r.body && r.body.errors) || []).map((e) => e.path);
+    const paths = ((r.body && r.body.errors) || []).map((e) => e.pointer);
     let ok = r.status === status;
+    if (ok && status >= 400 && !validateProblem(r.body)) { ok = false; }
     let detail = `status ${r.status}, wanted ${status}`;
+    if (!ok && r.status === status) detail = `the answer is not an IF-8 body: ${JSON.stringify(validateProblem.errors)}`;
     if (ok && opts.path !== undefined && !paths.includes(opts.path)) { ok = false; detail = `no error at ${opts.path}, got ${paths.join(', ') || 'none'}`; }
     if (ok && opts.stores !== undefined && ing.stored.length - before !== opts.stores) { ok = false; detail = `stored ${ing.stored.length - before} event(s), wanted ${opts.stores}`; }
     if (ok && opts.code && r.body.code !== opts.code) { ok = false; detail = `code ${r.body.code}, wanted ${opts.code}`; }
@@ -206,7 +211,7 @@ export function runMatrix({ schemaFile, events, key = TEST_KEY, instance = TEST_
       const name = clone(first);
       name.data['VM{AAAAAAAAAAAAAAAAAAAAAAAA}'] = 'x';
       const r = ing.handle(sign(name));
-      check('error paths never echo a flag-like property name', r.status === 422 && !JSON.stringify(r.body).includes('AAAAAAAA') && r.body.errors.some((e) => e.path.includes('<redacted>')), `status ${r.status}: ${JSON.stringify(r.body.errors)}`);
+      check('error paths never echo a flag-like property name', r.status === 422 && !JSON.stringify(r.body).includes('AAAAAAAA') && r.body.errors.some((e) => e.pointer.includes('<redacted>')), `status ${r.status}: ${JSON.stringify(r.body.errors)}`);
     }
   }
   // Clock that cannot be read

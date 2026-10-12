@@ -1,6 +1,8 @@
 # Keep the build context small: only what the Dockerfile copies.
 *
 !contracts/mocks/fake-ingest
+!contracts/mocks/shared
+!contracts/errors/error-codes.yaml
 !contracts/mocks/stub-instance
 !contracts/events/instance-events.schema.json
 !contracts/events/instance-events.posted.schema.json

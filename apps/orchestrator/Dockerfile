@@ -26,7 +26,8 @@ COPY apps/orchestrator/pyproject.toml apps/orchestrator/pyproject.toml
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
 COPY packages/py-models/pyproject.toml packages/py-models/pyproject.toml
 RUN uv sync --frozen --no-dev --no-editable --package vulnmart-orchestrator --no-install-workspace
-# Then the application code.
+# Then the application code (the shared error registry constants of IF-8 come from packages/py-models).
+COPY packages/py-models/src packages/py-models/src
 COPY apps/orchestrator/src apps/orchestrator/src
 RUN uv sync --frozen --no-dev --no-editable --package vulnmart-orchestrator
 

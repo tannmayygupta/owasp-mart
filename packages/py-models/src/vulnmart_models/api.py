@@ -578,7 +578,7 @@ class Cursor(RootModel[str]):
     root: Annotated[
         str,
         Field(
-            description='Opaque. base64url (no padding) of a text that holds the direction (f, forward) and the key (epoch, seq) of the last\nentry already read. Clients must not build or change one. A cursor that is not one of ours is 422 with field /cursor.\n',
+            description='Opaque. base64url (no padding) of a text that holds the direction (f, forward) and the key (epoch, seq) of the last\nentry already read. Clients must not build or change one. A cursor that is not one of ours is 422 with field /query/cursor.\n',
             pattern='^[A-Za-z0-9_-]{1,128}$',
         ),
     ]
@@ -618,44 +618,10 @@ class ErrorCode1(RootModel[str]):
     root: Annotated[
         str,
         Field(
-            description='Code of a failed instance, `INST-` plus upper-case words (for example INST-HEALTH-TIMEOUT), the same\nform as IF-5. This is not the code of a problem answer; see ProblemCode.\n',
+            description='Code of a failed instance, `INST-` plus upper-case words (for example INST-HEALTH-TIMEOUT), the same\nform as IF-5 and the registry. This is not the code of a problem answer; see Problem.\n',
             pattern='^(AUTH|ATT|INST|REQ)-[A-Z0-9]+(-[A-Z0-9]+)*$',
         ),
     ]
-
-
-class ProblemCode(RootModel[str]):
-    root: Annotated[
-        str,
-        Field(
-            description='Machine-readable code of an error answer: lower-case words joined by underscores. It is also the last\npart of `type`. Placeholder until the error registry (IF-8) is merged. Codes in use: auth_session_required,\nauth_csrf_failed, auth_origin_forbidden, att_not_found, att_gone, att_invalid_state, att_hints_disabled,\natt_challenge_not_found, att_flag_rate_limited, inst_not_found, inst_invalid_state, inst_not_ready,\ninst_quota_reached, req_validation, req_too_large, req_unsupported_media_type, req_method_not_allowed,\nreq_route_unknown, req_internal.\n',
-            max_length=64,
-            pattern='^(auth|att|inst|req)(_[a-z0-9]+)+$',
-        ),
-    ]
-
-
-class LabProblem(BaseModel):
-    type: Annotated[
-        str,
-        Field(
-            max_length=128,
-            pattern='^https://vulnmart\\.invalid/problems/[a-z][a-z0-9]*(_[a-z0-9]+)*$',
-        ),
-    ]
-    title: Annotated[str, Field(max_length=120, min_length=1)]
-    status: Annotated[int, Field(ge=400, le=599)]
-    detail: Annotated[str, Field(max_length=500)]
-    instance: Annotated[str, Field(pattern='^urn:vulnmart:request:[A-Za-z0-9-]{8,64}$')]
-    code: ProblemCode
-    request_id: Annotated[str, Field(pattern='^[A-Za-z0-9-]{8,64}$')]
-    field: Annotated[
-        str | None,
-        Field(
-            description='For 422, a JSON Pointer to the offending field (empty string for the whole body).',
-            max_length=200,
-        ),
-    ] = None
 
 
 class Kind(Enum):

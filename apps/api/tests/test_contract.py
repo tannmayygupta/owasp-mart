@@ -203,7 +203,7 @@ def test_check_fails_when_the_open_points_table_is_missing(copy_of_contract):
     assert any("Open points" in e for e in errors)
 
 
-# ---- story 1.15 (ADR 0028): strict integers, RFC 9457 problem details, transition ----
+# ---- story 1.15 (ADR 0028): strict integers, transition; the error body is the closed IF-8 body ----
 def _edit_spec(copy_of_contract, edit):
     f = copy_of_contract / contract.SPEC
     spec = yaml.safe_load(f.read_text(encoding="utf-8"))
@@ -231,14 +231,14 @@ def test_check_fails_when_an_integer_is_not_int64_with_a_safe_range(copy_of_cont
     assert any(expect in e for e in errors), errors
 
 
-def test_check_fails_when_the_problem_schema_is_closed(copy_of_contract):
-    errors = _edit_spec(copy_of_contract, lambda s: s["components"]["schemas"]["Problem"].update(additionalProperties=False))
-    assert any("Problem schema must be open" in e for e in errors), errors
+def test_check_fails_when_the_problem_schema_is_opened(copy_of_contract):
+    errors = _edit_spec(copy_of_contract, lambda s: s["components"]["schemas"]["Problem"].update(additionalProperties=True))
+    assert any("Problem schema must be closed" in e for e in errors), errors
 
 
-def test_check_fails_when_the_problem_schema_drops_a_standard_member_or_wants_message(copy_of_contract):
+def test_check_fails_when_the_problem_schema_differs_from_the_if8_body(copy_of_contract):
     errors = _edit_spec(copy_of_contract, lambda s: s["components"]["schemas"]["Problem"].update(required=["code", "message", "request_id"]))
-    assert any("must require" in e for e in errors) and any("old-style message" in e for e in errors), errors
+    assert any("differs from contracts/errors/problem.schema.json" in e for e in errors), errors
 
 
 def test_check_fails_when_an_error_response_is_plain_json(copy_of_contract):
@@ -283,16 +283,16 @@ def test_the_state_report_python_type_matches_the_openapi_schema():
     assert list(contract.schema_validator(SPEC, "StateReport").iter_errors(sample.to_json())) == []
 
 
-def test_the_problem_schema_is_open_and_has_the_rfc_9457_members_and_no_message():
+def test_the_problem_schema_is_the_closed_if8_body():
     problem = SPEC["components"]["schemas"]["Problem"]
-    assert problem.get("additionalProperties", True) is not False
-    assert {"type", "title", "status", "detail", "instance", "code", "request_id"} <= set(problem["required"])
-    assert "message" not in problem["required"]
+    assert problem["additionalProperties"] is False
+    assert set(problem["required"]) == {"type", "title", "status", "code", "request_id"}
+    assert not {"detail", "instance", "message"} & set(problem["properties"])
     strict = contract.schema_validator(SPEC, "Problem")
-    good = json.loads((CONTRACT_DIR / "examples" / "valid" / "error.extension-member.json").read_text(encoding="utf-8"))
-    assert strict.is_valid(good) and not strict.is_valid({**good, "message": "x"}) and not strict.is_valid({**good, "stack": "x"})
-    assert strict.is_valid({**good, "any_new_member": {"a": [1.5]}})  # an extension member can be added without breaking a reader
-
+    good = json.loads((CONTRACT_DIR / "examples" / "valid" / "error.bad-signature.json").read_text(encoding="utf-8"))
+    assert strict.is_valid(good)
+    for extra in ("message", "stack", "detail", "instance", "any_new_member"):
+        assert not strict.is_valid({**good, extra: "x"}), extra  # closed: no member may be added
 
 def test_every_error_response_of_the_file_is_problem_json():
     for path, item in SPEC["paths"].items():
@@ -306,7 +306,7 @@ def test_every_error_response_of_the_file_is_problem_json():
 
 def test_the_text_states_the_problem_members_the_integer_rule_and_the_check_order():
     text = (CONTRACT_DIR / contract.TEXT).read_text(encoding="utf-8")
-    for needle in ["RFC 9457", "`application/problem+json`", "`detail`", "`instance`", "**open**", "2^53 - 1", "`1.0`", "`1e0`", "415 before 404",
+    for needle in ["IF-8", "`application/problem+json`", "no `detail`, no `instance`", "**closed**", "2^53 - 1", "`1.0`", "`1e0`", "415 before 404",
                    "`transition`", "`(instance_id, epoch, transition)`", "**the call exists**", "ORCH-CURSOR-INVALID"]:
         assert needle in text, needle
 

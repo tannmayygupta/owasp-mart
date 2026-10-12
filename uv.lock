@@ -1066,6 +1066,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "jsonschema" },
     { name = "uvicorn" },
+    { name = "vulnmart-models" },
 ]
 
 [package.dev-dependencies]
@@ -1080,6 +1081,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.143.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "uvicorn", specifier = "==0.54.0" },
+    { name = "vulnmart-models", editable = "packages/py-models" },
 ]
 
 [package.metadata.requires-dev]

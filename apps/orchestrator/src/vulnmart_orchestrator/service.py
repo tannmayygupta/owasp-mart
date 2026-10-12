@@ -45,7 +45,7 @@ from .engine import Orchestrator
 from .images import ImageAllowlist, ImageNotAllowed, fake_allowlist
 from .jsonstrict import JsonStrictError, loads_strict
 from .problems import (
-    INTERNAL, MEDIA_TYPE, NOT_IMPLEMENTED, RETRY_AFTER_BUSY, ROUTE_UNKNOWN, ProblemError, new_request_id, problem_body,
+    INTERNAL, MEDIA_TYPE, NOT_IMPLEMENTED, RETRY_AFTER_BUSY, ROUTE_UNKNOWN, ProblemError, new_request_id, pointer, problem_body,
 )
 from .ratelimit import BURST, RATE_PER_SECOND, RateLimiter
 from .reports import ReportPusher, check_report_url
@@ -142,7 +142,7 @@ def _loads(buf: bytes) -> object:
 
 def _id(raw: str) -> str:
     if not INSTANCE_ID.fullmatch(raw):
-        raise ValidationFailed("bad instance id", field="/instance_id")
+        raise ValidationFailed("bad instance id", field=pointer("path", "instance_id"))
     return raw
 
 
@@ -171,15 +171,18 @@ class Service:
     async def _endpoint(self, request: Request) -> Response:
         request_id = new_request_id()
         route = "unknown"
+        failed = False
         try:
             status, body, headers, route = await self._handle(request, request_id)
         except Exception as e:
+            failed = True
             p = _problem_of(e)
-            status, body, _ = problem_body(p.code, p.detail, p.field, request_id)
+            status, body, _ = problem_body(p.code, p.field, request_id)
+            detail = p.detail[:200]  # for the log only: the answer holds no free text (IF-8)
             headers = {"Content-Type": MEDIA_TYPE, **p.headers}
             if p.code == "ORCH-BODY-TOO-LARGE":
                 headers["Connection"] = "close"  # the rest of the body is not read: drop the connection
-        log_line(event="request", request_id=request_id, method=request.method[:16], route=route, status=status)
+        log_line(event="request", request_id=request_id, method=request.method[:16], route=route, status=status, **({"code": p.code, "detail": detail} if failed else {}))
         return Response(content=body, status_code=status, headers={"Cache-Control": "no-store", **headers})
 
     async def _handle(self, request: Request, request_id: str) -> tuple[int, bytes, dict[str, str], str]:
@@ -272,25 +275,25 @@ class Service:
         names = [k for k, _ in pairs]
         for name in names:
             if name not in LABELS and name not in ("cursor", "limit"):
-                raise LabelUnknown(f"{name[:64]} is not a label filter", field=name[:64])
+                raise LabelUnknown("not a label filter", field=pointer("query", name[:64]))
         for name in dict.fromkeys(names):
             if names.count(name) > 1:
-                raise ValidationFailed(f"{name[:64]} is given more than once", field=name[:64])
+                raise ValidationFailed("a query parameter is given more than once", field=pointer("query", name[:64]))
         q = dict(pairs)
         limit = 100
         if "limit" in q:
             if not LIMIT.fullmatch(q["limit"]) or int(q["limit"]) > 500:
-                raise ValidationFailed("limit is 1 to 500", field="limit")
+                raise ValidationFailed("limit is 1 to 500", field=pointer("query", "limit"))
             limit = int(q["limit"])
         if "epoch" in q and not EPOCH.fullmatch(q["epoch"]):
-            raise ValidationFailed("epoch is a positive integer", field="epoch")
+            raise ValidationFailed("epoch is a positive integer", field=pointer("query", "epoch"))
         if "instance" in q and not INSTANCE_ID.fullmatch(q["instance"]):
-            raise ValidationFailed("bad instance id", field="instance")
+            raise ValidationFailed("bad instance id", field=pointer("query", "instance"))
         after = None
         if "cursor" in q:
             after = _decode_cursor(q["cursor"])
             if after is None:
-                raise CursorInvalid("the cursor is not one this orchestrator handed out", field="cursor")
+                raise CursorInvalid("the cursor is not one this orchestrator handed out", field=pointer("query", "cursor"))
         items, last = self.engine.list_views(
             instance=q.get("instance"), epoch=int(q["epoch"]) if "epoch" in q else None, template=q.get("template"),
             component=q.get("component"), kind=q.get("kind"), after=after, limit=limit,

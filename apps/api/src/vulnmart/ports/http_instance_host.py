@@ -7,8 +7,8 @@ requires in production, is the job of the TLS context handed in (`ssl_context`),
 certificate and its host name (an https URL with a context that does not is refused); the fake service in tests speaks
 plain HTTP on localhost.
 
-Wire rules (ADR 0028): an error answer is `application/problem+json` (RFC 9457; unknown members are ignored, the
-`code` member picks the exception, `detail` is its message); a number in an answer that is not an integer token
+Wire rules (ADR 0028): an error answer is `application/problem+json` (the closed IF-8 body; a member this client does not know is ignored, the
+`code` member picks the exception, `title`, the registry's fixed text, is its message; there is no `detail`); a number in an answer that is not an integer token
 (`1.0`, `1e0`, `NaN`) makes a success answer unusable (`OrchestratorUnavailable`), and a boolean is not an integer.
 
 `sign_request` and `verify_request` are the two halves of the signing scheme; the verifier is what the
@@ -249,7 +249,7 @@ class HttpInstanceHost:
         if not isinstance(data, dict):
             raise OrchestratorUnavailable(f"orchestrator answered {status} with JSON that is not an object")
         if status >= 400:
-            # RFC 9457: the media type says it is a problem; members we do not know are ignored, `code` picks the exception.
+            # IF-8: the media type says it is a problem; members we do not know are ignored, `code` picks the exception.
             if content_type.split(";")[0].strip().lower() != PROBLEM_MEDIA_TYPE:
                 raise OrchestratorUnavailable(f"unexpected answer {status}")
             code = data.get("code")
@@ -257,7 +257,7 @@ class HttpInstanceHost:
             if cls is None:
                 raise OrchestratorUnavailable(f"unexpected answer {status}")
             field = data.get("field")
-            detail = data.get("detail") if isinstance(data.get("detail"), str) else data.get("title")
+            detail = data.get("title")  # the registry's fixed text: the answer has no `detail` (IF-8)
             request_id = data.get("request_id")
             raise cls(
                 detail[:500] if isinstance(detail, str) else "", field=field if isinstance(field, str) else None,
@@ -305,7 +305,7 @@ class HttpInstanceHost:
         self, labels: dict[str, str] | None = None, *, cursor: str | None = None, limit: int = 100
     ) -> InstancePage:
         if not is_wire_int(limit, 1, 500):
-            raise ValidationFailed("limit is 1 to 500", field="limit")
+            raise ValidationFailed("limit is 1 to 500", field="/query/limit")
         query: dict[str, str | int] = dict(labels or {})
         if cursor is not None:
             query["cursor"] = cursor

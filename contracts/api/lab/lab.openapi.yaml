@@ -1,15 +1,15 @@
 openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
-  title: Lab API (IF-2), browser-facing fragment, contract v0.2.0 (proposal)
-  version: 0.2.0
+  title: Lab API (IF-2), browser-facing fragment, contract v0.3.0 (proposal)
+  version: 0.3.0
   description: |
     The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
     flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
     Status: DRAFT, a proposal for Akshay (stream P) to confirm in the team chat (D-37, review optional).
     Every value that the architecture does not fix is listed in the table "Open points (to confirm)" of
-    lab-api.md. Error codes named AUTH-*, ATT-*, INST-* and REQ-* are placeholders until the error
-    registry (IF-8, story P-02) is merged.
+    lab-api.md. Error codes named AUTH-*, ATT-*, INST-* and REQ-* are the codes of the error registry
+    (IF-8, contracts/errors/error-codes.yaml).
 
     Rules that hold for every route (the text is in lab-api.md):
     * Every route is under /api/v1/. The browser calls the dashboard origin only; the platform
@@ -17,10 +17,10 @@ info:
     * Authentication is the session cookie __Host-vm_session. A state-changing call (POST) also needs
       the CSRF header (a signed, session-bound token; the mock compares it with the cookie __Host-vm_csrf), an Origin equal to the dashboard
       origin and a JSON content type. Bodies are JSON only.
-    * Every answer carries Cache-Control private, no-store. Errors are RFC 9457 problem details,
-      application/problem+json: type (https://vulnmart.invalid/problems/<code>), title, status, detail,
-      instance, plus the extension members code, request_id and, for 422, field (a JSON Pointer).
-      The Problem schema is open: a client ignores members it does not know.
+    * Every answer carries Cache-Control private, no-store. Errors are the closed IF-8 body (RFC 9457 style,
+      contracts/errors/problem.schema.json), application/problem+json: type (urn:vulnmart:error:<CODE>), title, status,
+      code, request_id and, for 422, field (one JSON Pointer) or errors (a list of pointer and detail). There is no detail
+      and no instance. The Problem schema is closed.
     * Lists: every list answer has `has_more`. The timeline is paged by an opaque cursor keyed by
       (epoch, seq); evidence and integrity flags take `limit` (default 100, maximum 100).
     * A resource that does not exist and a resource that is not yours answer the same 404.
@@ -53,7 +53,7 @@ paths:
         Asks for an instance of the learner's practice attempt. Answers 202 with state `requested`; the
         state then advances on its own (poll the instance, or listen to the live stream). Candidate
         instances are created by the platform when the attempt starts, not through this route.
-        409 inst_quota_reached when the user already holds an instance (the numbers are OI-21).
+        409 INST-QUOTA-REACHED when the user already holds an instance (the numbers are OI-21).
       security:
         - sessionCookie: []
           csrfHeader: []
@@ -91,7 +91,7 @@ paths:
       summary: Get the one-time URL that opens the instance in a new tab
       description: |
         Allowed while the instance is ready, active or idle and its access is open. Otherwise 409
-        inst_not_ready. The URL carries a single-use ticket that expires after about a minute. The body is
+        INST-NOT-READY. The URL carries a single-use ticket that expires after about a minute. The body is
         empty.
       security:
         - sessionCookie: []
@@ -118,7 +118,7 @@ paths:
       summary: Reset the instance (new epoch, new flags)
       description: |
         Needs the body {"confirm": true}. Allowed in state ready, active or idle; otherwise 409
-        inst_invalid_state (also 409 when the instance is frozen or its attempt is not running). Answers 202: the epoch grows by one and the state is `resetting`.
+        INST-INVALID-STATE (also 409 when the instance is frozen or its attempt is not running). Answers 202: the epoch grows by one and the state is `resetting`.
       security:
         - sessionCookie: []
           csrfHeader: []
@@ -145,7 +145,7 @@ paths:
       summary: Stop the instance
       description: |
         State becomes `stopping`, then `destroyed`. Answers 202 for a new stop and 200 when the instance
-        is already stopping or destroyed. 409 inst_invalid_state when the instance is frozen or its attempt is not running (for example after submit; the freeze is not undone). The body is empty.
+        is already stopping or destroyed. 409 INST-INVALID-STATE when the instance is frozen or its attempt is not running (for example after submit; the freeze is not undone). The body is empty.
       security:
         - sessionCookie: []
           csrfHeader: []
@@ -180,7 +180,7 @@ paths:
       description: |
         PENDING OI-22: whether the candidate presses Start or the clock starts when the instance becomes
         ready is open. Both outcomes are recorded in lab-api.md. This route exists for the first outcome;
-        if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 att_invalid_state.
+        if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 ATT-INVALID-STATE.
         The body is empty.
       security:
         - sessionCookie: []
@@ -200,7 +200,7 @@ paths:
       operationId: submitAttempt
       summary: Submit early (after a confirmation)
       description: |
-        Needs the body {"confirm": true}. Allowed in state `running`; otherwise 409 att_invalid_state.
+        Needs the body {"confirm": true}. Allowed in state `running`; otherwise 409 ATT-INVALID-STATE.
         The attempt becomes `submitted`; the instance is frozen for the freeze period and then destroyed.
       security:
         - sessionCookie: []
@@ -231,8 +231,8 @@ paths:
         `credit` (credited, held, none). A wrong value, a decoy, a value of another instance and a value of an earlier epoch all answer
         `incorrect`: the reason is never given to the submitter (no oracle), and each of them counts for the rate limit. The submitted text is never echoed in any answer and never stored;
         only the result and the challenge are kept. Allowed while the attempt is `running`, otherwise 409
-        att_invalid_state. More than 5 incorrect submissions for one challenge in 10 minutes are refused with
-        429 att_flag_rate_limited and a Retry-After header, even for a correct value (the placeholder
+        ATT-INVALID-STATE. More than 5 incorrect submissions for one challenge in 10 minutes are refused with
+        429 ATT-FLAG-RATE-LIMITED and a Retry-After header, even for a correct value (the placeholder
         numbers are FR-ACH-01).
       security:
         - sessionCookie: []
@@ -307,7 +307,7 @@ paths:
       summary: The three hint levels of a challenge
       description: |
         The text of a level is null until it is unlocked. When the attempt has hints off the route answers
-        404 att_hints_disabled, as does an unknown challenge key (att_challenge_not_found).
+        404 ATT-HINTS-DISABLED, as does an unknown challenge key (ATT-CHALLENGE-NOT-FOUND).
       responses:
         '200':
           description: The hint levels.
@@ -331,7 +331,7 @@ paths:
       summary: Unlock one hint level
       description: |
         Repeating the call for an unlocked level answers 200 with the same hint and costs nothing more.
-        Hints off: 404 att_hints_disabled. Attempt not running: 409 att_invalid_state. Levels unlock in order (2 needs 1, 3 needs 1 and 2); an early level is 409 att_invalid_state with field /level and nothing is unlocked. The body is empty.
+        Hints off: 404 ATT-HINTS-DISABLED. Attempt not running: 409 ATT-INVALID-STATE. Levels unlock in order (2 needs 1, 3 needs 1 and 2); an early level is 409 ATT-INVALID-STATE and nothing is unlocked. The body is empty.
       security:
         - sessionCookie: []
           csrfHeader: []
@@ -408,7 +408,7 @@ paths:
       description: |
         accept: the evidence is judged fine (a held capture it points to is credited). reject: the evidence
         is judged a real problem (a held capture stays out of the score). One decision per flag; a second
-        answers 409 att_invalid_state. Who may decide is OI-38 (the mock allows a recruiter of the owning
+        answers 409 ATT-INVALID-STATE. Who may decide is OI-38 (the mock allows a recruiter of the owning
         company only). The decision is audited by the platform.
       security:
         - sessionCookie: []
@@ -464,7 +464,7 @@ paths:
         Sorted by the key (epoch, seq) of the event, oldest first, so a late event of an earlier epoch sits before the newer ones.
         Cursor-paged: pass `next_cursor` as `cursor` to get the entries after the last one already read. Entries are neither skipped
         nor repeated when a late event with a smaller key is stored between two page requests; such an event is shown only when the
-        client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /cursor.
+        client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /query/cursor.
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -537,13 +537,13 @@ components:
       name: limit
       in: query
       required: false
-      description: Page size of the timeline. Default 50, maximum 200; a larger value is 422 req_validation with field /limit.
+      description: Page size of the timeline. Default 50, maximum 200; a larger value is 422 REQ-VALIDATION with field /query/limit.
       schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
     ListLimit:
       name: limit
       in: query
       required: false
-      description: Most entries in the answer. Default 100, maximum 100; a larger value is 422 req_validation with field /limit. When more exist, has_more is true.
+      description: Most entries in the answer. Default 100, maximum 100; a larger value is 422 REQ-VALIDATION with field /query/limit. When more exist, has_more is true.
       schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
   responses:
     InstanceAccepted:
@@ -568,14 +568,14 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Attempt' }
     Unauthenticated:
-      description: No valid session. auth_session_required.
+      description: No valid session. AUTH-SESSION-REQUIRED.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     CsrfFailed:
-      description: Missing or wrong CSRF header (auth_csrf_failed) or an Origin that is not the dashboard origin (auth_origin_forbidden). Nothing changed.
+      description: Missing or wrong CSRF header (AUTH-CSRF-FAILED) or an Origin that is not the dashboard origin (AUTH-ORIGIN-FORBIDDEN). Nothing changed.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
@@ -583,22 +583,22 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
     NotFound:
       description: |
-        The resource does not exist or is not yours (the same answer): att_not_found or inst_not_found.
-        Also att_hints_disabled, att_challenge_not_found and, for an unknown path, req_route_unknown.
+        The resource does not exist or is not yours (the same answer): ATT-NOT-FOUND or INST-NOT-FOUND.
+        Also ATT-HINTS-DISABLED, ATT-CHALLENGE-NOT-FOUND and, for an unknown path, REQ-ROUTE-UNKNOWN.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Gone:
-      description: PROPOSAL, to confirm. The attempt is withdrawn or cancelled, so its derived data is no longer served (att_gone). getAttempt still answers 200 with the state; a deleted attempt answers 404 like a missing one.
+      description: PROPOSAL, to confirm. The attempt is withdrawn or cancelled, so its derived data is no longer served (ATT-GONE). getAttempt still answers 200 with the state; a deleted attempt answers 404 like a missing one.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     MethodNotAllowed:
-      description: The path exists but not for this method. req_method_not_allowed with an Allow header. Any path can answer it.
+      description: The path exists but not for this method. REQ-METHOD-NOT-ALLOWED with an Allow header. Any path can answer it.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
         Allow: { $ref: '#/components/headers/Allow' }
@@ -606,35 +606,35 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Conflict:
-      description: att_invalid_state, inst_invalid_state, inst_not_ready or inst_quota_reached. Nothing changed.
+      description: ATT-INVALID-STATE, INST-INVALID-STATE, INST-NOT-READY or INST-QUOTA-REACHED. Nothing changed.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     TooLarge:
-      description: Body larger than 64 KiB. req_too_large.
+      description: Body larger than 64 KiB. REQ-TOO-LARGE.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     UnsupportedMedia:
-      description: The content type is not application/json. req_unsupported_media_type. Checked before the lookup, so it is answered even for an id that does not exist (415 before 404).
+      description: The content type is not application/json. REQ-UNSUPPORTED-MEDIA-TYPE. Checked before the lookup, so it is answered even for an id that does not exist (415 before 404).
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Invalid:
-      description: A missing, extra or wrong-type field, a body where none is allowed, a bad query value, or a query parameter that is unknown or given more than once. req_validation; `field` is a JSON Pointer. The wrong value is never repeated.
+      description: A missing, extra or wrong-type field, a body where none is allowed, a bad query value, or a query parameter that is unknown or given more than once. REQ-VALIDATION; `field` is a JSON Pointer. The wrong value is never repeated.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     RateLimited:
-      description: Too many incorrect flag submissions for the challenge. att_flag_rate_limited with Retry-After.
+      description: Too many incorrect flag submissions for the challenge. ATT-FLAG-RATE-LIMITED with Retry-After.
       headers:
         Cache-Control: { $ref: '#/components/headers/CacheControl' }
         Retry-After: { $ref: '#/components/headers/RetryAfter' }
@@ -664,7 +664,7 @@ components:
     Cursor:
       description: |
         Opaque. base64url (no padding) of a text that holds the direction (f, forward) and the key (epoch, seq) of the last
-        entry already read. Clients must not build or change one. A cursor that is not one of ours is 422 with field /cursor.
+        entry already read. Clients must not build or change one. A cursor that is not one of ours is 422 with field /query/cursor.
       type: string
       pattern: '^[A-Za-z0-9_-]{1,128}$'
     Timestamp:
@@ -699,49 +699,51 @@ components:
     ErrorCode:
       description: |
         Code of a failed instance, `INST-` plus upper-case words (for example INST-HEALTH-TIMEOUT), the same
-        form as IF-5. This is not the code of a problem answer; see ProblemCode.
+        form as IF-5 and the registry. This is not the code of a problem answer; see Problem.
       type: string
       pattern: '^(AUTH|ATT|INST|REQ)-[A-Z0-9]+(-[A-Z0-9]+)*$'
-    ProblemCode:
-      description: |
-        Machine-readable code of an error answer: lower-case words joined by underscores. It is also the last
-        part of `type`. Placeholder until the error registry (IF-8) is merged. Codes in use: auth_session_required,
-        auth_csrf_failed, auth_origin_forbidden, att_not_found, att_gone, att_invalid_state, att_hints_disabled,
-        att_challenge_not_found, att_flag_rate_limited, inst_not_found, inst_invalid_state, inst_not_ready,
-        inst_quota_reached, req_validation, req_too_large, req_unsupported_media_type, req_method_not_allowed,
-        req_route_unknown, req_internal.
-      type: string
-      pattern: '^(auth|att|inst|req)(_[a-z0-9]+)+$'
-      maxLength: 64
     Problem:
       description: |
-        RFC 9457 problem details (application/problem+json). `type` is https://vulnmart.invalid/problems/ plus the
-        `code`; `title` is a short sentence that is the same for every answer with that code; `status` repeats the
-        HTTP status; `detail` explains this occurrence (it never repeats a submitted value); `instance` identifies this
-        occurrence as urn:vulnmart:request: plus the `request_id`. `code`, `request_id` and `field` are extension
-        members. The schema is open on purpose (RFC 9457 section 3.2): a client ignores members it does not know.
-        Never a stack trace.
+        The error body of IF-8 (contracts/errors/problem.schema.json), copied here so that this file is self-contained;
+        `scripts/check_lab_contract.py` fails when the two differ. RFC 9457 members `type`, `title` and `status` plus
+        `code`, `request_id` and, for 422, `field` or `errors`. The schema is closed: no `detail`, no `instance`, no
+        `message`, never a stack trace. `type` is `urn:vulnmart:error:` plus the `code`; `code` is a registry code
+        (upper case words joined by hyphens, for example ATT-NOT-FOUND); `title` is the registry's fixed text for the code.
+        A browser answer never carries an ORCH-* code.
       type: object
-      required: [type, title, status, detail, instance, code, request_id]
-      propertyNames:
-        not: { enum: [stack, stack_trace, traceback] }
+      additionalProperties: false
+      required: [type, title, status, code, request_id]
       properties:
         type:
+          description: 'urn:vulnmart:error: plus the code.'
           type: string
-          maxLength: 128
-          pattern: '^https://vulnmart\.invalid/problems/[a-z][a-z0-9]*(_[a-z0-9]+)*$'
-        title: { type: string, minLength: 1, maxLength: 120 }
+          pattern: '^urn:vulnmart:error:[A-Z]{2,6}(-[A-Z]+)+$'
+          maxLength: 100
+        title:
+          description: The registry's fixed generic text for the code.
+          type: string
+          minLength: 1
+          maxLength: 200
         status: { type: integer, minimum: 400, maximum: 599 }
-        detail: { type: string, maxLength: 500 }
-        instance:
-          type: string
-          pattern: '^urn:vulnmart:request:[A-Za-z0-9-]{8,64}$'
-        code: { $ref: '#/components/schemas/ProblemCode' }
+        code: { type: string, pattern: '^[A-Z]{2,6}(-[A-Z]+)+$', maxLength: 60 }
         request_id: { type: string, pattern: '^[A-Za-z0-9-]{8,64}$' }
         field:
-          description: For 422, a JSON Pointer to the offending field (empty string for the whole body).
+          description: One JSON Pointer to the offending field (empty string for the whole body).
           type: string
+          pattern: '^(/([^/~]|~[01])*)*$'
           maxLength: 200
+        errors:
+          description: 'For 422 with several problems: one entry per offending field. The detail is a fixed generic text and never repeats the submitted value.'
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [pointer, detail]
+            properties:
+              pointer: { type: string, pattern: '^(/([^/~]|~[01])*)*$', maxLength: 200 }
+              detail: { type: string, minLength: 1, maxLength: 200 }
     RequestInstanceRequest:
       type: object
       additionalProperties: false

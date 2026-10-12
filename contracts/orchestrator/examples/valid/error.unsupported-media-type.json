@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/orch-unsupported-media-type",
-  "title": "Unsupported media type",
+  "type": "urn:vulnmart:error:ORCH-UNSUPPORTED-MEDIA-TYPE",
+  "title": "The request must be JSON.",
   "status": 415,
-  "detail": "the body must be sent as application/json",
-  "instance": "urn:vulnmart:request:req-0000000005",
   "code": "ORCH-UNSUPPORTED-MEDIA-TYPE",
   "request_id": "req-0000000005"
 }

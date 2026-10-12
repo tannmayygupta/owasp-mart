@@ -1,12 +1,12 @@
 """GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
 
-Error registry (IF-8) version 0.3.0.
+Error registry (IF-8) version 0.4.0.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
 
-REGISTRY_VERSION = "0.3.0"
+REGISTRY_VERSION = "0.4.0"
 PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:"
 
 
@@ -45,6 +45,7 @@ class ErrorCode(StrEnum):
     ORCH_BAD_SIGNATURE = "ORCH-BAD-SIGNATURE"
     ORCH_BODY_TOO_LARGE = "ORCH-BODY-TOO-LARGE"
     ORCH_BUSY = "ORCH-BUSY"
+    ORCH_CURSOR_INVALID = "ORCH-CURSOR-INVALID"
     ORCH_FIELD_FORBIDDEN = "ORCH-FIELD-FORBIDDEN"
     ORCH_INSTANCE_EXISTS = "ORCH-INSTANCE-EXISTS"
     ORCH_INSTANCE_NOT_FOUND = "ORCH-INSTANCE-NOT-FOUND"
@@ -52,6 +53,7 @@ class ErrorCode(StrEnum):
     ORCH_INVALID_STATE = "ORCH-INVALID-STATE"
     ORCH_LABEL_UNKNOWN = "ORCH-LABEL-UNKNOWN"
     ORCH_METHOD_NOT_ALLOWED = "ORCH-METHOD-NOT-ALLOWED"
+    ORCH_NOT_IMPLEMENTED = "ORCH-NOT-IMPLEMENTED"
     ORCH_RATE_LIMITED = "ORCH-RATE-LIMITED"
     ORCH_REQUEST_MISMATCH = "ORCH-REQUEST-MISMATCH"
     ORCH_ROUTE_UNKNOWN = "ORCH-ROUTE-UNKNOWN"
@@ -59,6 +61,7 @@ class ErrorCode(StrEnum):
     ORCH_STALE_EPOCH = "ORCH-STALE-EPOCH"
     ORCH_TEMPLATE_UNKNOWN = "ORCH-TEMPLATE-UNKNOWN"
     ORCH_UNAVAILABLE = "ORCH-UNAVAILABLE"
+    ORCH_UNSUPPORTED_MEDIA_TYPE = "ORCH-UNSUPPORTED-MEDIA-TYPE"
     ORCH_VALIDATION = "ORCH-VALIDATION"
     REQ_INTERNAL = "REQ-INTERNAL"
     REQ_METHOD_NOT_ALLOWED = "REQ-METHOD-NOT-ALLOWED"
@@ -113,6 +116,7 @@ ERRORS: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.ORCH_BAD_SIGNATURE: ErrorInfo(ErrorCode.ORCH_BAD_SIGNATURE, 401, "The request could not be authenticated.", False),
     ErrorCode.ORCH_BODY_TOO_LARGE: ErrorInfo(ErrorCode.ORCH_BODY_TOO_LARGE, 413, "The request body is too large.", False),
     ErrorCode.ORCH_BUSY: ErrorInfo(ErrorCode.ORCH_BUSY, 429, "No capacity is available right now.", True),
+    ErrorCode.ORCH_CURSOR_INVALID: ErrorInfo(ErrorCode.ORCH_CURSOR_INVALID, 422, "The cursor is not valid.", False),
     ErrorCode.ORCH_FIELD_FORBIDDEN: ErrorInfo(ErrorCode.ORCH_FIELD_FORBIDDEN, 422, "The request names a field that is not allowed.", False),
     ErrorCode.ORCH_INSTANCE_EXISTS: ErrorInfo(ErrorCode.ORCH_INSTANCE_EXISTS, 409, "An instance with this identity already exists.", False),
     ErrorCode.ORCH_INSTANCE_NOT_FOUND: ErrorInfo(ErrorCode.ORCH_INSTANCE_NOT_FOUND, 404, "Instance not found.", False),
@@ -120,6 +124,7 @@ ERRORS: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.ORCH_INVALID_STATE: ErrorInfo(ErrorCode.ORCH_INVALID_STATE, 409, "This action is not allowed in the instance's current state.", False),
     ErrorCode.ORCH_LABEL_UNKNOWN: ErrorInfo(ErrorCode.ORCH_LABEL_UNKNOWN, 422, "The label filter is not known.", False),
     ErrorCode.ORCH_METHOD_NOT_ALLOWED: ErrorInfo(ErrorCode.ORCH_METHOD_NOT_ALLOWED, 405, "Method not allowed.", False),
+    ErrorCode.ORCH_NOT_IMPLEMENTED: ErrorInfo(ErrorCode.ORCH_NOT_IMPLEMENTED, 501, "This call is not implemented yet.", False),
     ErrorCode.ORCH_RATE_LIMITED: ErrorInfo(ErrorCode.ORCH_RATE_LIMITED, 429, "Too many requests. Try again later.", True),
     ErrorCode.ORCH_REQUEST_MISMATCH: ErrorInfo(ErrorCode.ORCH_REQUEST_MISMATCH, 409, "This request identity was already used with different content.", False),
     ErrorCode.ORCH_ROUTE_UNKNOWN: ErrorInfo(ErrorCode.ORCH_ROUTE_UNKNOWN, 404, "Route not found.", False),
@@ -127,6 +132,7 @@ ERRORS: dict[ErrorCode, ErrorInfo] = {
     ErrorCode.ORCH_STALE_EPOCH: ErrorInfo(ErrorCode.ORCH_STALE_EPOCH, 409, "The epoch is out of date.", False),
     ErrorCode.ORCH_TEMPLATE_UNKNOWN: ErrorInfo(ErrorCode.ORCH_TEMPLATE_UNKNOWN, 422, "The template is not known.", False),
     ErrorCode.ORCH_UNAVAILABLE: ErrorInfo(ErrorCode.ORCH_UNAVAILABLE, 503, "The orchestrator could not be reached or understood.", True),
+    ErrorCode.ORCH_UNSUPPORTED_MEDIA_TYPE: ErrorInfo(ErrorCode.ORCH_UNSUPPORTED_MEDIA_TYPE, 415, "The request must be JSON.", False),
     ErrorCode.ORCH_VALIDATION: ErrorInfo(ErrorCode.ORCH_VALIDATION, 422, "The request is not valid.", False),
     ErrorCode.REQ_INTERNAL: ErrorInfo(ErrorCode.REQ_INTERNAL, 500, "Something went wrong. Try again later.", True),
     ErrorCode.REQ_METHOD_NOT_ALLOWED: ErrorInfo(ErrorCode.REQ_METHOD_NOT_ALLOWED, 405, "Method not allowed.", False),

@@ -18,13 +18,14 @@ def test_states_equal_the_openapi_enum():
     assert {s.value for s in InstanceState} == set(SCHEMAS["State"]["enum"])
 
 
-def test_error_codes_have_the_openapi_shape_and_orch_codes_are_listed():
+def test_error_codes_have_the_openapi_shape_and_orch_codes_are_in_the_registry():
     pattern = re.compile(SCHEMAS["ErrorCode"]["pattern"])
     codes = [v for k, v in vars(ErrorCode).items() if not k.startswith("_")]
     assert codes and all(pattern.match(c) for c in codes)
-    description = SCHEMAS["ErrorCode"]["description"]
-    for c in (c for c in codes if c.startswith("ORCH-")):
-        assert c in description, c
+    from vulnmart_models.error_codes import ERRORS, ErrorCode as RegistryCode
+
+    for c in (c for c in codes if c.startswith("ORCH-") and c != "ORCH-ERROR"):  # ORCH-ERROR is the label of the base class, never sent
+        assert RegistryCode(c) in ERRORS, c
 
 
 def test_state_report_error_code_fields_use_the_same_schema():

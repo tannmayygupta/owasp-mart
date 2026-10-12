@@ -8,7 +8,9 @@ from support import OPENAPI, ROOT
 from vulnmart_orchestrator.auth import MAX_SKEW_SECONDS, NonceMemory, Verifier, body_sha256, sign, signing_string
 from vulnmart_orchestrator.builder import parse_create
 from vulnmart_orchestrator.jsonstrict import FloatToken, JsonStrictError, OutOfRangeInt, loads_strict
-from vulnmart_orchestrator.problems import STATUS, TITLES, ProblemError, problem_body
+from vulnmart_models.error_codes import ERRORS, ErrorCode
+
+from vulnmart_orchestrator.problems import ProblemError, pointer, problem_body
 from vulnmart_orchestrator.ratelimit import RateLimiter
 
 VECTOR = json.loads((ROOT / "contracts" / "orchestrator" / "examples" / "signing-vector.json").read_text(encoding="utf-8"))
@@ -161,22 +163,30 @@ def test_a_rate_of_zero_switches_the_limit_off():
     assert all(limiter.check("c") is None for _ in range(1000))
 
 
-# ---- problem bodies (D1) ----
-def test_a_problem_has_the_rfc_9457_members_and_the_contract_shape():
-    status, raw, rid = problem_body("ORCH-STALE-EPOCH", "x" * 900, "/epoch")
+# ---- problem bodies (the closed IF-8 body) ----
+def test_a_problem_is_the_closed_if8_body_with_registry_title_and_status():
+    status, raw, rid = problem_body("ORCH-STALE-EPOCH", "/epoch")
     data = json.loads(raw)
-    assert status == 409 and data["status"] == 409 and data["code"] == "ORCH-STALE-EPOCH" and data["field"] == "/epoch"
-    assert data["type"] == "https://vulnmart.invalid/problems/orch-stale-epoch" and data["instance"] == "urn:vulnmart:request:" + rid
-    assert len(data["detail"]) == 500 and data["title"] == TITLES["ORCH-STALE-EPOCH"]
-    assert not {"message", "stack", "trace"} & set(data)
+    assert status == 409 and data["status"] == 409 and data["code"] == "ORCH-STALE-EPOCH"
+    assert data["type"] == "urn:vulnmart:error:ORCH-STALE-EPOCH" and data["request_id"] == rid
+    assert data["title"] == ERRORS[ErrorCode.ORCH_STALE_EPOCH].title
+    assert "field" not in data  # a field is for a 422 only
+    assert not {"detail", "instance", "message", "stack", "trace"} & set(data)
+    status, raw, _ = problem_body("ORCH-VALIDATION", "/epoch")
+    assert json.loads(raw)["field"] == "/epoch" and status == 422
 
 
-def test_every_code_of_the_contract_table_has_a_status_and_a_title():
+def test_a_pointer_is_made_of_names_and_a_long_one_is_the_whole_body():
+    assert pointer("query", "limit") == "/query/limit" and pointer("a/b", "c~d") == "/a~1b/c~0d"
+    assert pointer("x" * 300) == ""
+
+
+def test_every_orch_code_of_the_openapi_file_is_in_the_registry_with_its_status():
     import re
 
-    import yaml
-
-    spec = yaml.safe_load(OPENAPI.read_text(encoding="utf-8"))
-    codes = set(re.findall(r"ORCH-[A-Z0-9]+(?:-[A-Z0-9]+)*", spec["components"]["schemas"]["ErrorCode"]["description"]))
-    assert codes and codes <= set(STATUS) and codes <= set(TITLES)
+    spec_text = OPENAPI.read_text(encoding="utf-8")
+    codes = set(re.findall(r"ORCH-[A-Z0-9]+(?:-[A-Z0-9]+)*", spec_text))
+    assert codes and all(ErrorCode(c) for c in codes)
+    for code in codes:
+        assert ProblemError(code, "d").status == ERRORS[ErrorCode(code)].status
     assert ProblemError("ORCH-BUSY", "d").status == 429

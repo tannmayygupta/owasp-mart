@@ -32,6 +32,12 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Error codes and error format (IF-8), `contracts/errors/`
 
+### 0.4.0 (2026-10-12, Tanmay for stream L, story "IF-8 error bodies", condition F-2 of the contracts sign-off; for Akshay to confirm)
+- Additive: three codes that the Python orchestrator service and the IF-5 contract name and that the seed did not have: `ORCH-CURSOR-INVALID` (422, a list cursor that this orchestrator did not hand out), `ORCH-UNSUPPORTED-MEDIA-TYPE` (415) and `ORCH-NOT-IMPLEMENTED` (501, the reset placeholder of the Python service; never in the OpenAPI file). Titles are generic sentences like the others. Constants regenerated (59 codes).
+- BREAKING: none in substance. This line only satisfies the rules engine, which cannot compare `error-codes.yaml` and flags any change to it as breaking on the safe side. Checked by hand: 3 added, 0 removed, 0 changed.
+- registry change: `contracts/registry.json` names `contracts/mocks/shared` (the one builder of the IF-8 body for the Node mocks) as a mock of IF-8, and `contracts/COMPAT.md` is edited: the Versions and Approvals rows of IF-8, IF-2, IF-4, IF-5 and IF-6 name the new versions (all Approvals stay `pending`; nobody is marked approved).
+- no mock change: the generated constants are the stub of this contract (`noMock` in the registry).
+
 ### 0.3.0 (2026-10-11, Akshay, story P-04, code review)
 - Additive: `AUTH-MFA-STATE` (409: the second factor is already active, or an admin turns it off) and `ATT-CONSENT-STALE` (409: the consent notice the person saw is not the current one). They replace the use of `ATT-INVALID-STATE` for these two cases in IF-1. Constants regenerated (56 codes).
 - BREAKING: none in substance, see 0.2.0 (the rules engine flags any change to `error-codes.yaml`). Checked by hand: 2 added, 0 removed, 0 changed.
@@ -53,6 +59,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting review by Tanmay (statuses, titles, the body shape change for IF-2, IF-4 and IF-5).
 
 ## Instance contract (IF-6), `contracts/instance/`
+
+### 0.3.2 (2026-10-12, Tanmay, story "IF-8 error bodies")
+- Editorial, no schema change: the words "placeholder until the registry is merged" are removed from `instance-contract.md` (the `INST-*` names, among them the injector codes of section 5, are the codes of the IF-8 registry).
 
 ### 0.3.1 (2026-10-11, Tanmay, story L-09 preparation)
 - Editorial, no schema change: the template-hardening entry below was numbered 0.2.0 a second time; it is renumbered 0.3.0 so that every IF-6 version is unique (`contracts/COMPAT.md` lists versions). Open points 20, 21 and 26 of `instance-contract.md` are marked confirmed on delegation by Tanmay (handoff H-82); the written proposals stand.
@@ -92,6 +101,14 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 0.3.0 (2026-10-12, Tanmay, story "IF-8 error bodies", condition F-2 of the contracts sign-off; to be confirmed by Akshay)
+- BREAKING: every error answer is the closed IF-8 body (`contracts/errors/problem.schema.json`): `type` is `urn:vulnmart:error:<CODE>` (was `https://vulnmart.invalid/problems/<code>`), `code` is the registry code in upper case with hyphens (`ATT-NOT-FOUND`, was `att_not_found`), `title` is the registry's fixed sentence, the members `detail` and `instance` are removed, and the `Problem` schema is closed (`additionalProperties: false`; it was open). `ProblemCode` is removed. `Problem` is now identical to the platform one, so the bundle shares it (0 renamed components). `scripts/check_lab_contract.py` compares it with the IF-8 schema.
+- BREAKING: `field` is a 422 only and is a pointer whose first segment names the location for a query parameter: `/query/limit`, `/query/cursor`, `/query/<name>` (was `/limit`, `/cursor`, `/<name>`). The 409 `ATT-INVALID-STATE` for an early hint level no longer carries `field` `/level`. A 422 can also use `errors` (a list of `pointer` and `detail`).
+- The placeholder wording is removed from `lab-api.md` and `lab.openapi.yaml`: the code names are final in IF-8.
+- Examples: 12 valid problem examples rewritten to the new body (plus `error.validation-errors`), the invalid ones rewritten and extended (`detail`, `instance` and the old https `type` are refused; the old lower-case code is refused).
+- Generated code and bundle regenerated: `contracts/api/bundle/`, `packages/ts-client/src/api.d.ts`, `packages/py-models/src/vulnmart_models/api.py`.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (the body comes from `contracts/mocks/shared/problem.mjs`, which reads the registry).
+
 ### 0.2.0 (2026-10-11, Tanmay, story 1.15 part B4, which also carries story 1.12 for IF-2; to be confirmed by Akshay)
 - BREAKING: the timeline is paged by an opaque forward cursor keyed by `(epoch, seq)` instead of a decimal offset; entries are sorted by that key, a cursor of version 0.1.0 (a base64url decimal offset) is now 422 `req_validation` with field `/cursor`, and the cursor never moves back (a client that wants a late IF-4 event of a smaller key reads again from the start, `cursor` left out). The Timeline answer gains the required boolean `has_more`.
 - BREAKING: error answers are RFC 9457 problem details with the media type `application/problem+json`: new required members `type` (`https://vulnmart.invalid/problems/<code>`), `title`, `status`, `detail`, `instance` (`urn:vulnmart:request:<request_id>`); `code`, `request_id` and `field` stay as extension members. The member `message` is removed (it is `detail`), the `code` values are renamed to lower-case words with underscores (`att_not_found` for `ATT-NOT-FOUND`), and the Problem schema is open (unknown members are ignored by clients). Same form as IF-5 (the orchestrator side is changed by its own entry).
@@ -110,6 +127,13 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting optional confirmation by Akshay (consumer; handoffs H-84 to H-89).
 
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
+
+### 0.4.0 (2026-10-12, Tanmay, story "IF-8 error bodies", condition F-2 of the contracts sign-off; to be confirmed by Akshay)
+- BREAKING: every error answer is the closed IF-8 body: `type` is `urn:vulnmart:error:<CODE>` (was `https://vulnmart.invalid/problems/<lower-case code>`), `title` and `status` are the registry's, the members `detail` and `instance` are removed and the `Problem` schema is closed (it was open on purpose in 0.3.0). What happened this time is written to the log under the `request_id`, never into the answer. `scripts/check_orchestrator_contract.py` compares the schema with the IF-8 one.
+- BREAKING: `field` is a 422 only and always a JSON Pointer: `/image` for `ORCH-FIELD-FORBIDDEN` (was the bare name `image`), `/query/limit`, `/query/epoch`, `/query/instance`, `/query/<name>` and `/query/cursor` for the list query (were `limit`, `epoch`, `instance`, the name, `cursor`), `/path/instance_id` for a bad id in the path (was `/instance_id`).
+- The placeholder wording is removed from `orchestrator-api.md` and the OpenAPI file: the `ORCH-*` and `INST-*` names are the registry's. `ORCH-CURSOR-INVALID`, `ORCH-UNSUPPORTED-MEDIA-TYPE` and `ORCH-NOT-IMPLEMENTED` are registered in IF-8 0.4.0 (they were missing from the seed).
+- Examples: the valid error examples rewritten (the open `error.extension-member` is replaced by `error.busy` and `error.validation-errors`); the invalid ones rewritten and extended (`detail`, `instance`, the old https `type`, an extension member).
+- Mocks and services changed with it: `contracts/mocks/fake-orchestrator/server.mjs` (body from `contracts/mocks/shared/problem.mjs`, the test control route answers 404 instead of 403 outside loopback so that the status is the registry's), the Python service `apps/orchestrator/` (`problems.py` takes title and status from `vulnmart_models.error_codes`; the package now depends on `vulnmart-models`), the Python client `apps/api/src/vulnmart/ports/` (the exception message is the `title`; the fake host gives the `/query/...` pointers).
 
 ### 0.3.0 (2026-10-11, Tanmay, story 1.15, review findings of pull request 3; decided on the developer's delegation, ADR 0028; to be confirmed)
 - BREAKING: `StateReport` has a new required member `transition` (integer from 1 to 2^53 - 1), assigned by the orchestrator per `(instance_id, epoch)` (1, 2, 3 ... without gaps; a reset starts again at 1). The identity of a report is `(instance_id, epoch, transition)`; the platform answers 204 for a new one, 200 for an identical repeat, 409 `ORCH-REQUEST-MISMATCH` for another body, and keeps a lower number as history without moving the state back. A real re-entrant change (the same state twice) has its own number. `at` orders nothing. The platform answers of `POST /internal/v1/orch/state` gain 200, 409 and 415. A sender that does not send `transition` is refused with 422.
@@ -138,6 +162,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting optional confirmation by Akshay (consumer).
 
 ## Instance events (IF-4), `contracts/events/`
+
+### 0.3.0 (2026-10-12, Tanmay, story "IF-8 error bodies", condition F-2 of the contracts sign-off; to be confirmed by Sahil and Akshay)
+- BREAKING: every error answer of the ingest is the closed IF-8 body: the member `message` is removed, `type` is `urn:vulnmart:error:<CODE>` (was `about:blank`), `title` and `status` are the registry's, and the 422 `errors` entries are `{ "pointer", "detail" }` (were `{ "path", "message" }`). The `EVT-*` codes are final (IF-8). Section 5 of `app-events.md` says so; the schemas `instance-events.schema.json` and `instance-events.posted.schema.json` do not change.
+- no mock change in the schemas; the fake ingest changed with it: `contracts/mocks/fake-ingest/ingest.mjs` (body from `contracts/mocks/shared/problem.mjs`), `scripts/validate-events.mjs` (every error answer of the matrix must validate against the IF-8 schema), and the stub instance image (`contracts/mocks/stub-instance/Dockerfile` copies the registry and installs `js-yaml`). The stub sidecar's own answers on `/v1/events` (a proposal, section 3) keep their shape; they are not ingest answers.
 
 ### 0.2.1 (2026-10-11, Tanmay, story L-09 preparation)
 - Editorial, no schema change: open point 4 now states the whole order of the ingest checks as section 5 has it (it had stayed at the 0.1.0 wording, without the epoch checks and the store-full answer); open points 3, 4, 13, 14, 19, 20, 22, 27 and 28 are marked confirmed on delegation by Tanmay (handoff H-82; point 28 had been left out of that handoff); the written proposals stand.

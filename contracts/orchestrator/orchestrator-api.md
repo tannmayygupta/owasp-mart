@@ -1,13 +1,13 @@
 # Orchestrator API v0 (IF-5)
 
-- **Version:** 0.3.0 (draft, 0.x until the tag `contracts-v1.0.0` in story L-09). See [../CHANGELOG.md](../CHANGELOG.md).
+- **Version:** 0.4.0 (draft, 0.x until the tag `contracts-v1.0.0` in story L-09). See [../CHANGELOG.md](../CHANGELOG.md).
 - **Owner:** stream L (Tanmay). Consumer: the platform workers (stream P, Akshay). Under D-37 the review by Akshay is optional during initial development; the proposals below are for him to confirm in the team chat.
 - **Source:** `docs/architecture/07-repo-and-workstreams.md` sections 3.1, 3.3, 3.5 and 3.6 (the seven calls, the ports, the errors), `05-key-flows.md` (provision, reset, access, destroy, reconcile), `06-security.md` (mTLS, signed body with timestamp and nonce, template-ID-only, TB-5), `04-data-and-state.md` section 10.2 (the instance state machine).
 - **Machine-checkable part:** [orchestrator.openapi.yaml](orchestrator.openapi.yaml) (OpenAPI 3.1), examples in `examples/`. Check it: `pnpm run contracts:check` (the second half of that command) or `uv run --package vulnmart-api python scripts/check_orchestrator_contract.py`.
 
 Plain terms: the **orchestrator** is the service on the instance VM that builds and removes instances. The platform worker asks it to do things (seven calls) and the orchestrator tells the platform what happened (one signed report). The architecture fixed only the list of calls. This document and the OpenAPI file add the bodies, the signing, the state rules and the errors. Every value the architecture does not fix is a proposal, listed in the table at the end ("Open points (to confirm)").
 
-What this contract does not cover: the browser API (IF-1, IF-2), the other internal ports (IF-9 `InstancePort` and the rest), the error registry (IF-8, story P-02: `ORCH-*` and `INST-*` names here are placeholders), key derivation (ADR 0009), the instance contract (IF-6) and the instance events (IF-4).
+What this contract does not cover: the browser API (IF-1, IF-2), the other internal ports (IF-9 `InstancePort` and the rest), the error registry (IF-8, `contracts/errors/error-codes.yaml`: the `ORCH-*` and `INST-*` names here are the registry's), key derivation (ADR 0009), the instance contract (IF-6) and the instance events (IF-4).
 
 ## 1. The calls
 
@@ -119,20 +119,19 @@ A retry after a network error should send the same body with a **new nonce and t
 
 ## 6. Errors
 
-Every error answer is **RFC 9457 problem details** (decision of 2026-10-09, M1 of ADR 0019, made in story 1.15; ADR 0028), media type `application/problem+json`:
+Every error answer is the **closed IF-8 body** (schema `contracts/errors/problem.schema.json`, RFC 9457 style; decision M1 of ADR 0019; moved to IF-8 in version 0.4.0, story "IF-8 error bodies"), media type `application/problem+json`:
 
 | Member | Kind | Meaning |
 |---|---|---|
-| `type` | standard | URI reference naming the kind of problem: `https://vulnmart.invalid/problems/` plus the lower-case code (for example `.../problems/orch-stale-epoch`). The host is a placeholder that is never contacted; the real address comes with the error registry (IF-8) |
-| `title` | standard | Short text, the same for every answer with this code |
-| `status` | standard | The HTTP status, as an integer token (400 to 599) |
-| `detail` | standard | What happened this time, at most 500 characters; never a secret, never a stack trace (NFR-SEC-03) |
-| `instance` | standard | `urn:vulnmart:request:` plus the `request_id` |
-| `code` | extension | The placeholder code of the table below; the Python client picks its exception from it |
-| `request_id` | extension | Opaque id for the log |
-| `field` | extension, optional | The offending field: a name for `ORCH-FIELD-FORBIDDEN`, a JSON Pointer for `ORCH-VALIDATION`, `cursor` for `ORCH-CURSOR-INVALID` |
+| `type` | standard | `urn:vulnmart:error:` plus the code (for example `urn:vulnmart:error:ORCH-STALE-EPOCH`) |
+| `title` | standard | The registry's fixed text for the code, the same for every answer with this code |
+| `status` | standard | The HTTP status, as an integer token (400 to 599); the registry fixes it per code |
+| `code` | extension | A code of the registry (upper-case words joined by hyphens); the Python client picks its exception from it |
+| `request_id` | extension | Opaque id for the log; what happened this time is written to the log under this id, never into the answer |
+| `field` | extension, optional, 422 only | One JSON Pointer built from names of the request, never from a value: `/image` for `ORCH-FIELD-FORBIDDEN`, `/limits/memory_mb` for `ORCH-VALIDATION`, `/query/cursor` for a bad cursor, `/path/instance_id` for a bad id in the path |
+| `errors` | extension, optional, 422 only | Several problems: up to 50 entries `{ "pointer", "detail" }`, never together with `field` |
 
-The old-style `message` member is gone: use `detail`. The `Problem` schema is **open**: a client ignores members it does not know (RFC 9457 section 3.2), so a member can be added later without breaking anyone; only `message`, `stack` and `trace` are refused. The check script requires every error response of the OpenAPI file to be `application/problem+json` with this schema. Codes are placeholders until IF-8 is merged.
+There is **no `detail`, no `instance` and no `message`**: no free text, path or submitted value reaches a client. The `Problem` schema is **closed** (version 0.3.0 had it open); `detail` and `instance` are removed (breaking, before the tag). The check script requires every error response of the OpenAPI file to be `application/problem+json` with this schema, and the schema to equal the IF-8 one. The codes are final: they are in the IF-8 registry (IF-8 0.4.0 added ORCH-CURSOR-INVALID, ORCH-UNSUPPORTED-MEDIA-TYPE and ORCH-NOT-IMPLEMENTED, the last one for the reset placeholder of the Python service only). The title and the status of a code come from the registry.
 
 | HTTP | Code | When |
 |---|---|---|
@@ -146,14 +145,14 @@ The old-style `message` member is gone: use `detail`. The `Problem` schema is **
 | 409 | `ORCH-STALE-ACCESS-EPOCH` | access epoch older, or equal with another value |
 | 413 | `ORCH-BODY-TOO-LARGE` | body over 64 KiB |
 | 415 | `ORCH-UNSUPPORTED-MEDIA-TYPE` | a body that is not sent as `application/json` (parameters such as `charset` are allowed; a request without a body needs no media type) |
-| 422 | `ORCH-FIELD-FORBIDDEN` | body names an image, command, volume, port, network or environment value; `field` names it |
+| 422 | `ORCH-FIELD-FORBIDDEN` | body names an image, command, volume, port, network or environment value; `field` is its pointer |
 | 422 | `ORCH-TEMPLATE-UNKNOWN` | template not on the allow-list |
 | 422 | `ORCH-LABEL-UNKNOWN` | list with a query parameter that is not a label filter |
 | 422 | `ORCH-VALIDATION` | any other malformed value, a number that is not an integer token included (section 2a); `field` is a JSON Pointer |
-| 422 | `ORCH-CURSOR-INVALID` | a list `cursor` that this orchestrator did not hand out: wrong length or characters, not the base64url of an instance id, or not spelled the canonical way; `field` is `cursor` |
+| 422 | `ORCH-CURSOR-INVALID` | a list `cursor` that this orchestrator did not hand out: wrong length or characters, not the base64url of an instance id, or not spelled the canonical way; `field` is `/query/cursor` |
 | 429 | `ORCH-BUSY` | no capacity; nothing created |
 | 429 | `ORCH-RATE-LIMITED` | request rate over the limit (section 7) |
-| any | `INST-*` | an instance failure appears in `error_code` of a `failed` instance, for example `INST-HEALTH-TIMEOUT` (placeholder) |
+| any | `INST-*` | an instance failure appears in `error_code` of a `failed` instance, for example `INST-HEALTH-TIMEOUT` |
 
 Order of checks: body size (a body over the limit is not read further or hashed, the answer is 413 and the connection is dropped; a client that sends a body over 64 KiB may see the connection reset before it reads the 413, and must treat that as a refusal or as unavailable, not as success), signature, **the call exists** (unknown path 404, wrong method 405), **media type (415)**, path id and body shape (422), template allow-list (422), **existence (404)**, state and epoch (409), capacity (429). So apart from an oversize body, a bad signature is always 401, whatever else is wrong; an unsupported media type is 415 even when the instance does not exist (415 before 404); and a malformed body is 422 even when the instance does not exist (shape before existence; decided 2026-10-11, the fake orchestrator used to look the instance up first and no longer does). A query parameter given twice, or a `limit` that is not a plain whole number from 1 to 500, is 422 `ORCH-VALIDATION`.
 
@@ -213,7 +212,7 @@ Each row is a proposal made while writing the contract. None is decided; Akshay 
 | 17 | State report body `{instance_id, epoch, transition, from_state, to_state, at, reason, error_code, health}`; the platform answers 204 (200 for an identical repeat, see row 34); at-least-once delivery | Not fixed |
 | 18 | Instance health is `unknown`, `healthy` or `unhealthy` | Not fixed |
 | 19 | Body limit 64 KiB; rate 20 per second per client, burst 40 | Architecture says "oversize bodies" and "rate-limited" without numbers |
-| 20 | Error code names `ORCH-FIELD-FORBIDDEN`, `ORCH-VALIDATION`, `ORCH-INSTANCE-EXISTS`, `ORCH-INVALID-STATE`, `ORCH-STALE-EPOCH`, `ORCH-LABEL-UNKNOWN`, `ORCH-BODY-TOO-LARGE`, `ORCH-RATE-LIMITED`, `ORCH-UNSUPPORTED-MEDIA-TYPE`, `ORCH-CURSOR-INVALID` (added to the names in the matrix) | Registry is P-02 |
+| 20 | Error code names `ORCH-FIELD-FORBIDDEN`, `ORCH-VALIDATION`, `ORCH-INSTANCE-EXISTS`, `ORCH-INVALID-STATE`, `ORCH-STALE-EPOCH`, `ORCH-LABEL-UNKNOWN`, `ORCH-BODY-TOO-LARGE`, `ORCH-RATE-LIMITED`, `ORCH-UNSUPPORTED-MEDIA-TYPE`, `ORCH-CURSOR-INVALID` (added to the names in the matrix) | Registered in IF-8 0.4.0 (final) |
 | 21 | Template allow-list starts with `shop-v0`; the fake adds `shop-fail-v0` for failure tests only | Names set with stream T |
 | 22 | A timed-out or retried reset: the orchestrator retries `failed` instances itself; the retry limit is left to OI-24 | OI-24 is open |
 | 23 | Instance id pattern `i-` plus 16 Base32 characters, host name as a DNS name | Taken from the instance contract, itself a proposal |
@@ -229,6 +228,6 @@ Each row is a proposal made while writing the contract. None is decided; Akshay 
 | 33 | The event key is derived per `(instance_id, epoch)` with HKDF-SHA256 (IF-4 section 4), so a reset sends a new `event_key`. Closed by D-42 (proposal until confirmed) | Handoff H-59 |
 | 34 | State reports carry a required `transition` number (per instance and epoch, assigned by the orchestrator) and the platform dedups on `(instance_id, epoch, transition)`: same body 200, other body 409, a lower number is history (section 8) | Reports were identified by their body and `at` only; two changes in the same second could not be ordered. Handoff for Akshay (the platform ingest) |
 | 35 | Every integer is an integer token, at most 2^53 - 1; `1.0`, `1e0` and booleans are 422; `cpu_limit` is the one non-integer and is compared by value (section 2a) | One reading of a body in every language; JSON Schema alone cannot say it |
-| 36 | Errors are RFC 9457 problem details with an open `Problem` schema; `message` is replaced by `detail`; `type` is `https://vulnmart.invalid/problems/<code>` (section 6) | Decided 2026-10-09 (M1 of ADR 0019); the `type` base address is a placeholder until IF-8 |
+| 36 | Errors are the closed IF-8 body (`type` is `urn:vulnmart:error:<CODE>`, no `detail`, no `instance`, a closed `Problem` schema; section 6) | Decided 2026-10-09 (M1 of ADR 0019), moved to IF-8 on 2026-10-12 (condition F-2 of the contracts sign-off) |
 | 37 | Order of checks: signature, call exists, media type 415, shape 422, template, existence 404, state 409, capacity 429; a body that is not `application/json` is 415 `ORCH-UNSUPPORTED-MEDIA-TYPE` | The mock looked an instance up before reading the body; no media type check existed |
 | 38 | A list cursor is the base64url of an instance id; anything else is 422 `ORCH-CURSOR-INVALID` | The two hosts treated garbage cursors differently |

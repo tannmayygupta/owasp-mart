@@ -104,18 +104,21 @@ def wait_state(s: Svc, iid: str, state: str, timeout: float = 10.0) -> dict:
 
 # ---- rate limit (D7) ----
 def test_over_twenty_per_second_with_a_burst_of_forty_is_429_with_retry_after(templates):
-    s = Svc(templates)  # the limit is on
+    from vulnmart_orchestrator.ratelimit import BURST, RATE_PER_SECOND
+
+    assert (RATE_PER_SECOND, BURST) == (20, 40)  # the defaults of D7; the run below uses a slower bucket so a slow machine cannot hide the limit
+    s = Svc(templates, "--rate-per-s", "2", "--rate-burst", "5")
     try:
-        results = [s.call("GET", "/v1/host") for _ in range(120)]
+        results = [s.call("GET", "/v1/host") for _ in range(60)]
     finally:
         s.stop()
     statuses = [r[0] for r in results]
-    assert statuses[:40] == [200] * 40
+    assert statuses[:5] == [200] * 5
     limited = [r for r in results if r[0] == 429]
     assert limited, "the limit never triggered"
     status, problem, headers = limited[0]
     assert problem["code"] == "ORCH-RATE-LIMITED" and int(headers["retry-after"]) >= 1
-    assert "message" not in problem
+    assert not {"message", "detail", "instance"} & set(problem)
 
 
 def test_a_bad_signature_is_401_before_the_rate_limit_is_counted(templates):
@@ -150,7 +153,7 @@ def test_reset_is_a_marked_placeholder_that_changes_nothing(svc):
     wait_state(svc, iid, "ready")
     payload = {k: body()[k] for k in ("flags", "decoys", "flag_digests", "event_key", "seed")}
     status, problem, _ = svc.call("POST", f"/v1/instances/{iid}/reset", json.dumps({**payload, "epoch": 2}).encode())
-    assert status == 501 and problem["code"] == "ORCH-NOT-IMPLEMENTED" and "3.4" in problem["detail"]
+    assert status == 501 and problem["code"] == "ORCH-NOT-IMPLEMENTED" and "detail" not in problem
     after = svc.call("GET", f"/v1/instances/{iid}")[1]
     assert after["state"] == "ready" and after["epoch"] == 1
     # the checks that come before the placeholder still run: shape, state, epoch
@@ -196,7 +199,7 @@ def test_no_answer_and_no_log_line_holds_a_secret(svc):
     wait_state(svc, "i-ABCDEFGHIJKLMNOP", "ready")
     answers.append(json.dumps(svc.call("GET", "/v1/instances/i-ABCDEFGHIJKLMNOP")[1]))
     answers.append(json.dumps(svc.call("GET", "/v1/instances")[1]))
-    answers.append(svc.call("POST", "/v1/instances", b'{"flags": [VM{' + FLAG_A.encode() + b'}', )[1]["detail"])
+    answers.append(json.dumps(svc.call("POST", "/v1/instances", b'{"flags": [VM{' + FLAG_A.encode() + b'}', )[1]))
     text = "\n".join(answers) + svc.stderr()
     for secret in (FLAG_A, SEED, EVENT_KEY, OWNER, KEY, REPORT_KEY):
         assert secret not in text
@@ -206,7 +209,7 @@ def test_no_answer_and_no_log_line_holds_a_secret(svc):
 def test_forbidden_fields_create_nothing(svc):
     for name in ("image", "command", "port", "env", "volume"):
         status, data, _ = svc.call("POST", "/v1/instances", create_body(**{name: "x"}))
-        assert status == 422 and data["code"] == "ORCH-FIELD-FORBIDDEN" and data["field"] == name
+        assert status == 422 and data["code"] == "ORCH-FIELD-FORBIDDEN" and data["field"] == "/" + name
     assert svc.call("GET", "/v1/host")[1]["instances"] == 0
 
 
@@ -222,6 +225,60 @@ def test_a_body_over_64_kib_is_413_and_the_service_lives_on(svc):
         pytest.fail("never saw the 413")
     assert status == 413 and data["code"] == "ORCH-BODY-TOO-LARGE"
     assert svc.call("GET", "/v1/host")[0] == 200
+
+
+# ---- every error answer is the closed IF-8 body ----
+def test_every_error_answer_validates_against_the_if8_schema(svc):
+    import re
+
+    from jsonschema import Draft202012Validator
+    from vulnmart_models.error_codes import ERRORS, ErrorCode
+
+    schema = json.loads((ROOT / "contracts" / "errors" / "problem.schema.json").read_text(encoding="utf-8"))
+    check = Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
+    iid = "i-ABCDEFGHIJKLMNOP"
+    assert svc.call("POST", "/v1/instances", create_body(iid))[0] == 202
+    wait_state(svc, iid, "ready")
+    calls = {
+        "unknown instance": ("GET", "/v1/instances/i-ZZZZZZZZZZZZZZZZ", None),
+        "bad id in the path": ("GET", "/v1/instances/not-an-id", None),
+        "unknown route": ("GET", "/v1/nothing", None),
+        "wrong method": ("PUT", "/v1/host", None),
+        "forbidden field": ("POST", "/v1/instances", create_body(image="x")),
+        "unknown template": ("POST", "/v1/instances", create_body("i-BBBBBBBBBBBBBBBB", template_id="no-such-template")),
+        "bad body": ("POST", "/v1/instances", b"[]"),
+        "same identity, other body": ("POST", "/v1/instances", create_body(iid, seed="X" * 40)),
+        "stale epoch": ("POST", f"/v1/instances/{iid}/access", json.dumps({"access": "open", "access_epoch": 0}).encode()),
+        "unknown label": ("GET", "/v1/instances?bogus=1", None),
+        "bad limit": ("GET", "/v1/instances?limit=0", None),
+        "bad cursor": ("GET", "/v1/instances?cursor=nope", None),
+        "wrong media type": ("POST", f"/v1/instances/{iid}/access", b"x"),
+    }
+    seen = {}
+    for name, (method, target, payload) in calls.items():
+        ctype = "text/plain" if name == "wrong media type" else "application/json"
+        status, data, headers = svc.call(method, target, payload, ctype=ctype)
+        assert status >= 400, name
+        assert headers["content-type"] == "application/problem+json", name
+        errors = [f"{e.json_path}: {e.message}" for e in check.iter_errors(data)]
+        assert not errors, (name, errors)
+        info = ERRORS[ErrorCode(data["code"])]
+        assert data["status"] == status == info.status and data["title"] == info.title, name
+        assert data["type"] == "urn:vulnmart:error:" + data["code"], name
+        assert ("field" in data) <= (status == 422), name
+        seen[name] = data["code"]
+    assert seen["bad cursor"] == "ORCH-CURSOR-INVALID" and seen["wrong media type"] == "ORCH-UNSUPPORTED-MEDIA-TYPE"
+    assert seen["unknown route"] == "ORCH-ROUTE-UNKNOWN"
+    # the unsigned answer and the too-large answer too
+    import http.client
+
+    conn = http.client.HTTPConnection(svc.url.removeprefix("http://"), timeout=10)
+    conn.request("GET", "/v1/host")
+    res = conn.getresponse()
+    unsigned = json.loads(res.read())
+    conn.close()
+    assert res.status == 401 and not list(check.iter_errors(unsigned)) and unsigned["code"] == "ORCH-BAD-SIGNATURE"
+    assert re.fullmatch(r"req-[0-9a-f]{12}", unsigned["request_id"])
 
 
 # ---- command line ----

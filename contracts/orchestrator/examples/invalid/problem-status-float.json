@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/orch-busy",
-  "title": "No capacity",
+  "type": "urn:vulnmart:error:ORCH-BUSY",
+  "title": "No capacity is available right now.",
   "status": 429.0,
-  "detail": "the host has no capacity",
-  "instance": "urn:vulnmart:request:req-0000000006",
   "code": "ORCH-BUSY",
   "request_id": "req-0000000006"
 }

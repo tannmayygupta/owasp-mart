@@ -81,10 +81,10 @@ def test_a_bad_create_value_is_refused_with_its_json_pointer(mutate, field):
     assert err.value.field == field
 
 
-def test_a_forbidden_name_is_found_in_any_case_and_names_the_field():
+def test_a_forbidden_name_is_found_in_any_case_and_gives_its_pointer():
     with pytest.raises(FieldForbidden) as err:
         parse_create({**body(), "Image": "x"})
-    assert err.value.field == "Image"
+    assert err.value.field == "/Image"
 
 
 def test_the_limits_are_part_of_the_fingerprint_and_cpu_is_compared_by_value():
