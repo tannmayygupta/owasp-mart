@@ -17,6 +17,8 @@ export const UV_IMAGE = 'ghcr.io/astral-sh/uv:0.12.23';
 export const PNPM_VERSION = '12.10.1';
 export const IMAGE_TAG = 'vulnmart-ci-linux:local';
 export const NESTED_PYTEST_SWITCH = 'VULNMART_E2E_SKIP_NESTED_PYTEST';
+// The container has no Docker daemon, so the real-Docker tests of apps/orchestrator are skipped here (the CI job `scripts` runs them).
+export const SKIP_DOCKER_TESTS_SWITCH = 'VULNMART_SKIP_DOCKER_TESTS';
 
 // These are the `run:` commands of the CI jobs skills, scripts, installs, contract-rules and e2e (scripts/ci-linux.test.mjs checks both directions).
 // Not repeated here: the job `compose` (it needs Docker, and Docker inside this container is not available). Not in the e2e job either:
@@ -31,6 +33,8 @@ export const STEPS = [
   ['api-check', 'pnpm run api:check'],
   ['stub-instance-tests', 'node --test "contracts/mocks/stub-instance/**/*.test.mjs"'],
   ['pytest', 'uv run --locked --package vulnmart-api pytest -q'],
+  ['pytest-orchestrator', 'uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests'],
+  ['pytest-orchestrator-service', 'VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py'],
   ['contracts-check', 'pnpm run contracts:check'],
   ['uv-lock-check', 'uv lock --check'],
   // local form: no reviews file, so the rule `approvals` prints NOT-APPLICABLE (in CI a separate step fetches the reviews and passes --reviews --require-reviews)
@@ -39,7 +43,7 @@ export const STEPS = [
 ];
 
 // Steps that need the packages installed by `pnpm-install` (ajv for the validators and end-to-end tests). With `--only`, the install runs first for them.
-export const NEEDS_INSTALL = new Set(['unit-tests', 'errors-check', 'domain-events-check', 'api-check', 'stub-instance-tests', 'pytest', 'contracts-check', 'contract-rules', 'e2e']);
+export const NEEDS_INSTALL = new Set(['unit-tests', 'errors-check', 'domain-events-check', 'api-check', 'stub-instance-tests', 'pytest', 'pytest-orchestrator-service', 'contracts-check', 'contract-rules', 'e2e']);
 
 export const dockerfile = () => `FROM ${UV_IMAGE} AS uv
 FROM ${NODE_IMAGE}
@@ -101,7 +105,7 @@ function main(argv) {
     const b = spawnSync('docker', ['build', '--quiet', '-t', IMAGE_TAG, '-'], { input: dockerfile(), stdio: ['pipe', 'inherit', 'inherit'] });
     if (b.status !== 0) return 1;
   }
-  const run = spawnSync('docker', ['run', '--rm', '-v', `${root}:/src:ro`, '-e', 'CI=true', '-e', 'UV_HTTP_TIMEOUT=180','-e', `${NESTED_PYTEST_SWITCH}=1`, IMAGE_TAG, 'bash', '-c', containerScript(only)], { stdio: 'inherit' });
+  const run = spawnSync('docker', ['run', '--rm', '-v', `${root}:/src:ro`, '-e', 'CI=true', '-e', 'UV_HTTP_TIMEOUT=180','-e', `${NESTED_PYTEST_SWITCH}=1`, '-e', `${SKIP_DOCKER_TESTS_SWITCH}=1`, IMAGE_TAG, 'bash', '-c', containerScript(only)], { stdio: 'inherit' });
   return run.status ?? 1;
 }
 

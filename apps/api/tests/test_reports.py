@@ -35,6 +35,7 @@ def report(epoch=1, transition=1, frm=S.REQUESTED, to=S.PROVISIONING, at="2026-1
 
 
 # ---- both hosts: every state change carries a transition number ----
+@pytest.mark.needs_reset
 def test_every_state_change_is_reported_with_a_transition_number_per_epoch(harness):
     req = create_request()
     harness.host.create(req)
@@ -53,6 +54,7 @@ def test_every_state_change_is_reported_with_a_transition_number_per_epoch(harne
     assert {r.instance_id for r in reports} == {req.instance_id}
 
 
+@pytest.mark.needs_reset
 def test_a_re_entrant_transition_has_its_own_number_and_is_not_a_duplicate(harness):
     req = create_request()
     harness.host.create(req)
@@ -68,6 +70,7 @@ def test_a_re_entrant_transition_has_its_own_number_and_is_not_a_duplicate(harne
     assert ingest.current(req.instance_id).transition == 8
 
 
+@pytest.mark.needs_reset
 def test_an_activity_that_changes_nothing_makes_no_report_and_takes_no_number(harness):
     req = create_request()
     harness.host.create(req)
@@ -79,6 +82,7 @@ def test_an_activity_that_changes_nothing_makes_no_report_and_takes_no_number(ha
     assert [r.transition for r in harness.reports()] == [1, 2, 3, 4, 5]
 
 
+@pytest.mark.needs_reset
 def test_the_reports_of_a_run_can_be_delivered_twice_and_in_any_order(harness):
     req = create_request()
     harness.host.create(req)

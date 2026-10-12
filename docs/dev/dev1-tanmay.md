@@ -161,7 +161,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Handoffs: H-118 (how to add an image; added by the story, 2026-10-12). Preparation done and tested locally (story plan, ADR 0032, D-51, runbook `docs/runbooks/deploy.md`); NOT ticked: the workflow run, the public package and the deploy to both VMs and the laptop are yours.
   - Done when: A hello stack from CI runs on both VMs and on the laptop.
 
-- [ ] **L-13. Orchestrator creates an instance from a template**
+- [x] **L-13. Orchestrator creates an instance from a template**
+  - Closed 2026-10-12 on the developer's instruction. Still open: the real S-4 run on vm-i (runbook `docs/runbooks/measure-instances.md`), the small L-13 PR, tell Sahil (T-09) when merged.
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
   - EARLY PR: yes. T-09 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -170,6 +171,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
   - Waits on: L-04, L-08.
   - Done when: An instance is never shown ready before flag injection finished and the cold-start time is measured and recorded (S-4).
   - Handoffs: H-57, H-58, H-59, H-60, H-61, H-64, H-66, H-67, H-68, H-69, H-70, H-71, H-72, H-79 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status (2026-10-12): engine done (state machine, builder, Docker backend, create and destroy; tests on a fake and on real Docker). Story 3.2 built the same day (the IF-5 service: signing, mTLS options, strict JSON, rate limit, capacity, accept and run, state reports, test backend, Dockerfile; the contract suites of apps/api pass against it; ADR 0034, D-53). NOT ticked: reset and idle detection (story 3.4), the reconciler (3.5) and the cold-start measurement S-4 are open, and the stories wait for review and the developer's confirmation.
+  - Status 2026-10-12: stories 3.1 and 3.2 built. Story 3.3 tool, runbook and research note built (`docs/runbooks/measure-instances.md`); the real run on vm-i is still to do, so L-13 stays unticked.
 
 - [ ] **L-14. Reset, teardown, timing defaults and reconciler**
   - Epic: `epic-orchestrator-and-instance-lifecycle`

@@ -96,3 +96,10 @@
 - source_plan: `docs/bmad/initiative-lab/epic-environments-and-deployment/story-vercel-project-same-origin-rewrite-and-live-stream-check-plan.md`
   summary: Prove on the live Vercel project that the `routes` transform expands `$ORIGIN_SECRET` and overwrites a visitor value, that SSE streams unbuffered through the rewrite and for how long, which Host header reaches the origin, and whether rewrite caching is off.
   evidence: The Vercel side is documented but unproven (maybe-false, medium if wrong): only the developer's S-14 run with `scripts/check-sse-rewrite.mjs` can settle it; the fallback (Routing Middleware) is written in the runbook.
+
+- source_plan: `docs/bmad/initiative-lab/epic-orchestrator-and-instance-lifecycle/story-state-machine-and-docker-instance-host-create-from-a-templat-plan.md`
+  summary: Replace the single engine lock by a lock per instance so one slow create does not block the others.
+  evidence: `Orchestrator.create` holds one RLock for the whole provisioning (up to the injector and health timeouts), so a second create or a destroy of another instance waits; the concurrency story (3.6, many instances at once) needs per-instance locks and a short global lock for the records dict.
+- source_plan: `docs/bmad/initiative-lab/epic-orchestrator-and-instance-lifecycle/story-state-machine-and-docker-instance-host-create-from-a-templat-plan.md`
+  summary: Akshay's test scripts/generate-api-code.test.mjs ("CRLF alone is not stale") fails deterministically on the Windows checkout of main.
+  evidence: Found while verifying story 3.1: the failure is in P-04 files that this branch does not touch (git diff against origin/main is empty for them); core.autocrlf is true on this PC. It probably passes on the Linux CI. Akshay should make the test independent of the checkout's line endings.

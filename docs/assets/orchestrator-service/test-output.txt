@@ -1,0 +1,39 @@
+
+$ uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
+........................................................................ [ 33%]
+........................................................................ [ 66%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+218 passed in 50.02s
+
+$ VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py
+SKIPPED [2] apps\api\tests\test_protocol.py:206: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_protocol.py:219: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_protocol.py:367: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_http_service.py:216: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_http_service.py:290: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_http_service.py:537: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_http_service.py:638: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_http_service.py:689: tests the Node fake, not the Python service
+SKIPPED [1] apps\api\tests\test_reports.py:38: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_reports.py:57: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_reports.py:73: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_reports.py:85: story 3.4: reset and idle detection are not in the Python service yet
+SKIPPED [1] apps\api\tests\test_mtls.py:48: story 3.4: reset and idle detection are not in the Python service yet
+375 passed, 18 skipped in 249.45s (0:04:09)
+
+$ uv run --locked --package vulnmart-api pytest -q
+........................................................................ [  9%]
+........................................................................ [ 18%]
+........................................................................ [ 27%]
+........................................................................ [ 36%]
+........................................................................ [ 45%]
+........................................................................ [ 54%]
+........................................................................ [ 63%]
+........................................................................ [ 73%]
+........................................................................ [ 82%]
+........................................................................ [ 91%]
+.....................................................................    [100%]
+789 passed in 283.01s (0:04:43)
+
+DONE

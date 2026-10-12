@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-12",
+  "images": "stub instance image (L-06), two components (injector and shop)",
+  "host": {
+    "os": "Windows",
+    "kernel": "11",
+    "machine": "AMD64",
+    "cpus": 12,
+    "mem_total_mb": null
+  },
+  "docker": "29.6.2",
+  "memory_limit_mb": 256,
+  "cold_start_s": {
+    "n": 2,
+    "min": 7.13,
+    "median": 7.44,
+    "p95": 7.75,
+    "max": 7.75
+  },
+  "create_while_n_running_s": {
+    "n": 2,
+    "min": 6.93,
+    "median": 7.05,
+    "p95": 7.17,
+    "max": 7.17
+  },
+  "instances_running": 2,
+  "container_memory_mb_per_instance": {
+    "n": 2,
+    "min": 30.39,
+    "median": 30.71,
+    "p95": 31.02,
+    "max": 31.02
+  },
+  "host_mem_available_drop_mb_total": null,
+  "host_mem_available_drop_mb_per_instance": null,
+  "failures": 0,
+  "leftovers_after": 0
+}
