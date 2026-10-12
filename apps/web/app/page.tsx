@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 type Health = { status: 'ok' | 'degraded' };
 type State = { kind: 'loading' } | { kind: 'done'; health: Health } | { kind: 'unreachable' };
 
-// Same-origin call: the browser asks this page's own origin; next.config.mjs forwards it to the API.
+// Same-origin call: the browser asks this page's own origin; proxy.ts forwards it to the API with the origin secret.
 async function loadHealth(): Promise<State> {
   try {
     // A hung proxy must end in "unreachable", not in an endless "Checking the API...".

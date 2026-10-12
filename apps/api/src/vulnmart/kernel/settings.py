@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     commit: str = "unknown"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     check_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+    # The x-origin-secret value(s) the dashboards' proxy adds (comma-separated during a rotation); unset: no check.
+    # Production reads it from a file (architecture 06 s3: secrets are files under /run/secrets); the file wins.
+    origin_secret: str | None = Field(default=None, repr=False)
+    origin_secret_file: str | None = None
+
+    def origin_secrets_value(self) -> str | None:
+        """The configured origin secret(s): the file's content when a file is named, else the environment value."""
+        if self.origin_secret_file:
+            with open(self.origin_secret_file, encoding="utf-8") as f:
+                return f.read().strip()
+        return self.origin_secret
 
 
 @lru_cache(maxsize=1)

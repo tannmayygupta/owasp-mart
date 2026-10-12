@@ -1,11 +1,16 @@
 import type { ReactNode } from 'react';
+import { headers } from 'next/headers';
+import './globals.css';
 
 export const metadata = { title: 'VulnMart' };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+// Reading the request headers makes every page render per request, which the CSP nonce needs (proxy.ts sets it;
+// Next.js puts it on its own scripts). Styles come from a stylesheet: the CSP allows no inline style in production.
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="en">
-      <body style={{ fontFamily: 'system-ui, sans-serif', margin: '2rem' }}>{children}</body>
+      <body data-nonce-set={nonce ? 'true' : 'false'}>{children}</body>
     </html>
   );
 }
