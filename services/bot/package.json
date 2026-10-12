@@ -1,0 +1,15 @@
+{
+  "name": "@vulnmart/bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Support-agent bot controller: visits only its own instance's allow-listed pages, time-bounded, memory-measurable. Node built-ins only.",
+  "scripts": {
+    "start": "node src/main.mjs",
+    "bot:check": "node instance-harness/bot-check.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

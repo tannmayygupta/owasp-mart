@@ -143,7 +143,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: A job runs in a fresh process and cannot reach the network or the database.
   - Handoffs: H-28, H-29, H-31, H-36, H-38 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-13. Support-agent bot**
+- [x] **T-13. Support-agent bot**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The bot controller that opens only pages of its own instance for a fixed time.

@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (T-13 support-agent bot, 2026-10-12, Sahil)
+- `services/bot/` (FR-SHP-11, spike S-5): a support-agent bot controller (port 9200) that on a `/visit` trigger opens only pages whose origin is its own instance target and whose path is allow-listed, refuses everything else (other origins, protocol-relative/absolute cross-origin URLs, non-allow-listed paths), bounds each visit by a timeout, and reports its memory. It is the controller with a pluggable visitor (default an HTTP GET, Node built-ins); the headless-browser visitor that executes page JS for C03 and its full memory profile are the S-5 spike / C03 work. 8 unit tests; a Docker harness (`pnpm --filter @vulnmart/bot run bot:check`) proves it visits an allowed page, refuses a disallowed path and an other-origin page, and measures its memory per instance (controller baseline ~17 MiB) — 5 checks PASS.
+
 ### Added (T-12 isolated import service, 2026-10-12, Sahil)
 - `services/import-service/` (FR-SHP-13): a unix-socket service that runs each product-import preview job in a fresh child process with a timeout, in a hardened container run with network_mode none and no /data mount — so the service has no network and no database access and any per-job state (a future C06 prototype pollution) dies with the job. Correct flow only: the preview merge is safe (drops `__proto__`/`constructor`/`prototype` at every level); the deliberate lodash-merge C06 is a later isolated path. 6 unit tests (fork isolation, safe merge, timeout, socket round-trip); a Docker isolation harness (`pnpm --filter @vulnmart/import-service run isolation:check`) proves a job runs in a fresh process and the service cannot reach the network or a database (7 checks PASS). Node built-ins only.
 
