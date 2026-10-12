@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from dataclasses import field as dc_field
@@ -25,9 +26,10 @@ OWNER_HASH = re.compile(r"^[0-9a-f]{64}$")
 CHALLENGE_KEY = re.compile(r"^C(0[1-9]|10|11)$")
 FLAG = re.compile(r"^VM\{[A-Z2-7]{24}\}$")
 SEED = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
-EVENT_KEY = re.compile(r"^[!-~]{32,128}$")
+EVENT_KEY = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-HOST = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
+HOST = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
+TEMPLATE_ID = re.compile(r"^[a-z][a-z0-9-]{2,31}$")
 MOUNT_TARGETS = frozenset({"/tmp", "/data", "/run/vm", "/run/import", "/run/placement/import", "/run/placement/mock"})
 ENV_NAMES = frozenset({
     "VM_INSTANCE_ID", "VM_EPOCH", "VM_PUBLIC_HOST", "VM_SIDECAR_EVENTS_URL", "VM_MOCK_URL", "VM_IMPORT_SOCKET", "VM_DB_PATH",
@@ -68,78 +70,162 @@ class CreateSpec:
     event_key: str = dc_field(repr=False)
     seed: str = dc_field(repr=False)
     max_minutes: int = 120
+    memory_mb: int = 256
+    cpu_limit: float = 1.0
+    pids_limit: int = 512
+    idle_minutes: int = 30
 
     def fingerprint(self) -> str:
-        """Hash of every field, so an identical repeat is recognised and nothing secret is kept in clear."""
+        """Hash of every field (the limits included; `cpu_limit` by value, so 2 and 2.0 are one request), so an identical repeat is\n        recognised and nothing secret is kept in clear."""
         body = json.dumps(
             [self.instance_id, self.template_id, self.epoch, self.owner_hash, self.hostname, self.flags, self.decoys,
-             self.flag_digests, self.event_key, self.seed, self.max_minutes],
+             self.flag_digests, self.event_key, self.seed, self.max_minutes, self.memory_mb, float(self.cpu_limit), self.pids_limit,
+             self.idle_minutes],
             separators=(",", ":"),
         )
         return hashlib.sha256(body.encode()).hexdigest()
 
 
-def _is_int(v: object, lo: int = 0) -> bool:
-    return type(v) is int and lo <= v <= 2**53 - 1
+MAX_INT = 2**53 - 1  # I-JSON: the largest integer every language reads back exactly (IF-5 section 2a)
+
+
+def _is_int(v: object, lo: int = 0, hi: int = MAX_INT) -> bool:
+    """An integer token: a real `int` (not a bool, not a float, not the out-of-range marker of `jsonstrict`) inside the range."""
+    return type(v) is int and lo <= v <= hi
+
+
+def _is_number(v: object) -> bool:
+    """`cpu_limit` is the one non-integer: any JSON number (int, float, or the float token of `jsonstrict`), never a boolean."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _pointer(name: object) -> str:
+    """A JSON Pointer segment (RFC 6901) for a member name; a name from the client is cut to 64 characters."""
+    return "/" + str(name).replace("~", "~0").replace("/", "~1")[:64]
+
+
+def _check_keys(body: object, allowed: tuple[str, ...]) -> dict:
+    """The closed-schema rules of IF-5 section 2: an object, no forbidden name (ORCH-FIELD-FORBIDDEN), no unknown or missing name."""
+    if not isinstance(body, dict):
+        raise ValidationFailed("the body must be a JSON object", field="")
+    for k in body:
+        if isinstance(k, str) and k.lower() in FORBIDDEN_FIELDS:
+            raise FieldForbidden("the orchestrator accepts no container fields", field=k[:64])
+    for k in body:
+        if k not in allowed:
+            raise ValidationFailed("unknown field", field=_pointer(k))
+    for k in allowed:
+        if k not in body:
+            raise ValidationFailed(f"{k} is required", field="/" + k)
+    return body
+
+
+def _need(cond: bool, field: str, msg: str) -> None:
+    if not cond:
+        raise ValidationFailed(msg, field=field)
+
+
+def _check_entry(item: object, i: int, group: str, keys: set[str]) -> dict:
+    _need(isinstance(item, dict) and set(item) == keys, f"/{group}/{i}", "an entry has the wrong fields")
+    return item  # type: ignore[return-value]
+
+
+def _parse_material(body: dict) -> tuple[tuple, tuple, tuple, str, str]:
+    """flags, decoys, flag_digests, event_key and seed of a create or reset body (IF-5 `FlagMaterial`)."""
+    flags, decoys, digests = body["flags"], body["decoys"], body["flag_digests"]
+    _need(isinstance(flags, list) and 1 <= len(flags) <= 11, "/flags", "flags: 1 to 11 entries")
+    f_out, d_out, g_out = [], [], []
+    for i, f in enumerate(flags):
+        _check_entry(f, i, "flags", {"challenge_key", "flag"})
+        _need(isinstance(f["challenge_key"], str) and CHALLENGE_KEY.fullmatch(f["challenge_key"]) is not None, f"/flags/{i}/challenge_key", "bad challenge key")
+        _need(isinstance(f["flag"], str) and FLAG.fullmatch(f["flag"]) is not None, f"/flags/{i}/flag", "bad flag format")
+        f_out.append((f["challenge_key"], f["flag"]))
+    _need(isinstance(decoys, list) and len(decoys) <= 64, "/decoys", "decoys: at most 64 entries")
+    for i, d in enumerate(decoys):
+        _check_entry(d, i, "decoys", {"challenge_key", "index", "value"})
+        _need(isinstance(d["challenge_key"], str) and CHALLENGE_KEY.fullmatch(d["challenge_key"]) is not None, f"/decoys/{i}/challenge_key", "bad challenge key")
+        _need(_is_int(d["index"]), f"/decoys/{i}/index", "bad decoy index")
+        _need(isinstance(d["value"], str) and FLAG.fullmatch(d["value"]) is not None, f"/decoys/{i}/value", "bad decoy format")
+        d_out.append((d["challenge_key"], d["index"], d["value"]))
+    _need(isinstance(digests, list) and 1 <= len(digests) <= 11, "/flag_digests", "flag_digests: 1 to 11 entries")
+    for i, g in enumerate(digests):
+        _check_entry(g, i, "flag_digests", {"challenge_key", "sha256"})
+        _need(isinstance(g["challenge_key"], str) and CHALLENGE_KEY.fullmatch(g["challenge_key"]) is not None, f"/flag_digests/{i}/challenge_key", "bad challenge key")
+        _need(isinstance(g["sha256"], str) and SHA256.fullmatch(g["sha256"]) is not None, f"/flag_digests/{i}/sha256", "bad digest")
+        g_out.append((g["challenge_key"], g["sha256"]))
+    _need(len({k for k, _ in f_out}) == len(f_out), "/flags", "one flag per challenge_key")
+    _need(len({k for k, _ in g_out}) == len(g_out), "/flag_digests", "one digest per challenge_key")
+    _need(isinstance(body["event_key"], str) and EVENT_KEY.fullmatch(body["event_key"]) is not None, "/event_key", "bad event key shape")
+    _need(isinstance(body["seed"], str) and SEED.fullmatch(body["seed"]) is not None, "/seed", "bad seed shape")
+    return tuple(f_out), tuple(d_out), tuple(g_out), body["event_key"], body["seed"]
+
+
+CREATE_FIELDS = (
+    "instance_id", "template_id", "epoch", "flags", "decoys", "flag_digests", "event_key", "seed", "owner_hash", "hostname", "limits",
+)
+RESET_FIELDS = ("epoch", "flags", "decoys", "flag_digests", "event_key", "seed")
+ACCESS_FIELDS = ("access", "access_epoch")
+LIMIT_FIELDS = ("memory_mb", "cpu_limit", "pids_limit", "idle_minutes", "max_minutes")
+ACCESS_VALUES = ("open", "frozen", "closed")
 
 
 def parse_create(body: object) -> CreateSpec:
-    """Validate a create body (the IF-5 field names) into a `CreateSpec`. Refuses any field that is not data."""
-    if not isinstance(body, dict):
-        raise ValidationFailed("the create body must be an object")
-    forbidden = sorted(k for k in body if k in FORBIDDEN_FIELDS)
-    if forbidden:
-        raise FieldForbidden(f"fields not allowed in a request: {', '.join(forbidden)}")
-    unknown = sorted(set(body) - ALLOWED_FIELDS)
-    if unknown:
-        raise ValidationFailed(f"unknown fields: {', '.join(unknown)}")
-    missing = sorted(ALLOWED_FIELDS - set(body))
-    if missing:
-        raise ValidationFailed(f"missing fields: {', '.join(missing)}")
+    """Validate a create body (the IF-5 field names and limits) into a `CreateSpec`. Refuses any field that is not data.
 
-    def need(cond: bool, msg: str) -> None:
-        if not cond:
-            raise ValidationFailed(msg)
-
+    Errors carry the JSON Pointer of the field (`ValidationFailed.field`), or the name for a forbidden field."""
+    body = _check_keys(body, CREATE_FIELDS)
     iid, tpl = body["instance_id"], body["template_id"]
-    need(isinstance(iid, str) and INSTANCE_ID.match(iid) is not None, "instance_id has the wrong shape")
-    need(isinstance(tpl, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", tpl) is not None, "template_id has the wrong shape")
-    need(_is_int(body["epoch"], 1), "epoch must be an integer of at least 1")
-    need(isinstance(body["owner_hash"], str) and OWNER_HASH.match(body["owner_hash"]) is not None, "owner_hash has the wrong shape")
-    need(isinstance(body["hostname"], str) and HOST.match(body["hostname"]) is not None, "hostname has the wrong shape")
-    need(isinstance(body["seed"], str) and SEED.match(body["seed"]) is not None, "seed has the wrong shape")
-    need(isinstance(body["event_key"], str) and EVENT_KEY.match(body["event_key"]) is not None, "event_key has the wrong shape")
+    _need(isinstance(iid, str) and INSTANCE_ID.fullmatch(iid) is not None, "/instance_id", "bad instance id")
+    _need(isinstance(tpl, str) and TEMPLATE_ID.fullmatch(tpl) is not None, "/template_id", "bad template name")
+    _need(_is_int(body["epoch"], 1), "/epoch", "epoch is an integer of at least 1")
+    _need(isinstance(body["owner_hash"], str) and OWNER_HASH.fullmatch(body["owner_hash"]) is not None, "/owner_hash", "owner_hash is 64 lowercase hex characters")
+    flags, decoys, digests, event_key, seed = _parse_material(body)
+    host = body["hostname"]
+    _need(isinstance(host, str) and len(host) <= 253 and HOST.fullmatch(host) is not None, "/hostname", "bad host name")
     limits = body["limits"]
-    need(isinstance(limits, dict) and _is_int(limits.get("max_minutes"), 1), "limits.max_minutes must be a positive integer")
-
-    flags, decoys, digests = body["flags"], body["decoys"], body["flag_digests"]
-    need(isinstance(flags, list) and 1 <= len(flags) <= 11, "flags must hold 1 to 11 entries")
-    need(isinstance(decoys, list) and len(decoys) <= 64, "decoys must be a list")
-    need(isinstance(digests, list) and 1 <= len(digests) <= 11, "flag_digests must hold 1 to 11 entries")
-    f_out, d_out, g_out = [], [], []
-    for f in flags:
-        need(isinstance(f, dict) and set(f) == {"challenge_key", "flag"}, "a flag entry has the wrong fields")
-        need(isinstance(f["challenge_key"], str) and CHALLENGE_KEY.match(f["challenge_key"]) is not None, "a challenge_key is invalid")
-        need(isinstance(f["flag"], str) and FLAG.match(f["flag"]) is not None, "a flag has the wrong shape")
-        f_out.append((f["challenge_key"], f["flag"]))
-    for d in decoys:
-        need(isinstance(d, dict) and set(d) == {"challenge_key", "index", "value"}, "a decoy entry has the wrong fields")
-        need(isinstance(d["challenge_key"], str) and CHALLENGE_KEY.match(d["challenge_key"]) is not None, "a challenge_key is invalid")
-        need(_is_int(d["index"]), "a decoy index is invalid")
-        need(isinstance(d["value"], str) and FLAG.match(d["value"]) is not None, "a decoy has the wrong shape")
-        d_out.append((d["challenge_key"], d["index"], d["value"]))
-    for g in digests:
-        need(isinstance(g, dict) and set(g) == {"challenge_key", "sha256"}, "a digest entry has the wrong fields")
-        need(isinstance(g["challenge_key"], str) and CHALLENGE_KEY.match(g["challenge_key"]) is not None, "a challenge_key is invalid")
-        need(isinstance(g["sha256"], str) and SHA256.match(g["sha256"]) is not None, "a digest has the wrong shape")
-        g_out.append((g["challenge_key"], g["sha256"]))
-    need(len({k for k, _ in f_out}) == len(f_out), "one flag per challenge_key")
-    need(len({k for k, _ in g_out}) == len(g_out), "one digest per challenge_key")
+    _need(isinstance(limits, dict), "/limits", "limits is an object")
+    for k in limits:
+        _need(k in LIMIT_FIELDS, "/limits" + _pointer(k), "unknown limit")
+    for k in LIMIT_FIELDS:
+        _need(k in limits, f"/limits/{k}", f"{k} is required")
+    _need(_is_int(limits["memory_mb"], 64, 8192), "/limits/memory_mb", "memory_mb is 64 to 8192")
+    cpu = limits["cpu_limit"]
+    _need(_is_number(cpu) and math.isfinite(cpu) and 0 < cpu <= 8, "/limits/cpu_limit", "cpu_limit is over 0 up to 8")
+    _need(_is_int(limits["pids_limit"], 16, 4096), "/limits/pids_limit", "pids_limit is 16 to 4096")
+    _need(_is_int(limits["idle_minutes"], 1, 1440), "/limits/idle_minutes", "idle_minutes is 1 to 1440")
+    _need(_is_int(limits["max_minutes"], 1, 1440), "/limits/max_minutes", "max_minutes is 1 to 1440")
     return CreateSpec(
-        instance_id=iid, template_id=tpl, epoch=body["epoch"], owner_hash=body["owner_hash"], hostname=body["hostname"],
-        flags=tuple(f_out), decoys=tuple(d_out), flag_digests=tuple(g_out), event_key=body["event_key"], seed=body["seed"],
-        max_minutes=limits["max_minutes"],
+        instance_id=iid, template_id=tpl, epoch=body["epoch"], owner_hash=body["owner_hash"], hostname=host,
+        flags=flags, decoys=decoys, flag_digests=digests, event_key=event_key, seed=seed,
+        max_minutes=limits["max_minutes"], memory_mb=limits["memory_mb"], cpu_limit=float(cpu),
+        pids_limit=limits["pids_limit"], idle_minutes=limits["idle_minutes"],
     )
+
+
+@dataclass(frozen=True, slots=True)
+class ResetSpec:
+    """A validated reset body (story 3.4 will use it; the service validates it today and answers a placeholder)."""
+
+    epoch: int
+    flags: tuple[tuple[str, str], ...] = dc_field(repr=False)
+    decoys: tuple[tuple[str, int, str], ...] = dc_field(repr=False)
+    flag_digests: tuple[tuple[str, str], ...] = dc_field(repr=False)
+    event_key: str = dc_field(repr=False)
+    seed: str = dc_field(repr=False)
+
+
+def parse_reset(body: object) -> ResetSpec:
+    body = _check_keys(body, RESET_FIELDS)
+    _need(_is_int(body["epoch"], 2), "/epoch", "epoch is an integer of at least 2")
+    flags, decoys, digests, event_key, seed = _parse_material(body)
+    return ResetSpec(body["epoch"], flags, decoys, digests, event_key, seed)
+
+
+def parse_access(body: object) -> tuple[str, int]:
+    body = _check_keys(body, ACCESS_FIELDS)
+    _need(isinstance(body["access"], str) and body["access"] in ACCESS_VALUES, "/access", "access is open, frozen or closed")
+    _need(_is_int(body["access_epoch"], 0), "/access_epoch", "access_epoch is an integer of at least 0")
+    return body["access"], body["access_epoch"]
 
 
 @dataclass(frozen=True, slots=True)

@@ -34,6 +34,7 @@ export const STEPS = [
   ['stub-instance-tests', 'node --test "contracts/mocks/stub-instance/**/*.test.mjs"'],
   ['pytest', 'uv run --locked --package vulnmart-api pytest -q'],
   ['pytest-orchestrator', 'uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests'],
+  ['pytest-orchestrator-service', 'VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py'],
   ['contracts-check', 'pnpm run contracts:check'],
   ['uv-lock-check', 'uv lock --check'],
   ['contract-rules', 'node scripts/check-contract-rules.mjs'],
@@ -41,7 +42,7 @@ export const STEPS = [
 ];
 
 // Steps that need the packages installed by `pnpm-install` (ajv for the validators and end-to-end tests). With `--only`, the install runs first for them.
-export const NEEDS_INSTALL = new Set(['unit-tests', 'errors-check', 'domain-events-check', 'api-check', 'stub-instance-tests', 'pytest', 'contracts-check', 'contract-rules', 'e2e']);
+export const NEEDS_INSTALL = new Set(['unit-tests', 'errors-check', 'domain-events-check', 'api-check', 'stub-instance-tests', 'pytest', 'pytest-orchestrator-service', 'contracts-check', 'contract-rules', 'e2e']);
 
 export const dockerfile = () => `FROM ${UV_IMAGE} AS uv
 FROM ${NODE_IMAGE}

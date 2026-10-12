@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import socket
+import threading
 import time
 from dataclasses import dataclass
 from dataclasses import field as dc_field
@@ -153,6 +154,45 @@ class FakeBackend:
         self._call("remove_volume", name)
         self.volumes.pop(name, None)
 
+
+# ---------------------------------------------------------------- test backend of the service
+
+FAIL_TEMPLATE = "shop-fail-v0"  # the template whose shop never becomes healthy (the fake orchestrator has the same one)
+
+
+class ServiceFakeBackend(FakeBackend):
+    """The in-memory backend for `--backend fake` (D9 of story 3.2): what the protocol suites run the Python service against, with no
+    Docker. Safe for the worker threads of the service (one lock around every call). An instance of the template `shop-fail-v0`
+    reports its healthchecks `unhealthy`, so it ends in `failed` with `INST-HEALTH-TIMEOUT`, like the fake orchestrator."""
+
+    def __init__(self) -> None:
+        super().__init__(injector_exit=0, healthy_after=1)
+        self._mu = threading.RLock()
+
+    def state(self, name: str) -> ContainerState:
+        with self._mu:
+            st = super().state(name)
+            spec = self.containers[name]
+            if spec.labels.get("vm.template") == FAIL_TEMPLATE and spec.healthcheck is not None and st.status == "running":
+                return ContainerState("running", None, "unhealthy")
+            return st
+
+
+def _locked(name: str):
+    parent = getattr(FakeBackend, name)
+
+    def call(self, *args, **kwargs):
+        with self._mu:
+            return parent(self, *args, **kwargs)
+
+    call.__name__ = name
+    return call
+
+
+for _name in ("create_network", "create_volume", "create_container", "start", "start_with_stdin", "wait_exit", "find",
+              "remove_container", "remove_network", "remove_volume"):
+    setattr(ServiceFakeBackend, _name, _locked(_name))
+del _name
 
 # ---------------------------------------------------------------- Docker SDK
 

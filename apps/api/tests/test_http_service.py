@@ -213,6 +213,7 @@ def test_a_malformed_instance_id_in_the_path_is_refused(svc):
 
 
 # ---- answers match the OpenAPI schemas and hold no secret ----
+@pytest.mark.needs_reset
 def test_answers_match_the_schemas_and_hold_no_secret(svc):
     req = create_request(tag="Q")
     secrets = [f.flag for f in req.material.flags] + [d.value for d in req.material.decoys] + [
@@ -286,6 +287,7 @@ def test_the_python_signer_reproduces_the_fixed_vector():
 
 
 # ---- state reports (the receiver is in support.py; transition numbers: test_reports.py) ----
+@pytest.mark.needs_reset
 def test_state_reports_are_signed_and_follow_the_state_machine():
     rx = ReportReceiver()
     svc = ServiceProcess(report_url=rx.url)
@@ -532,6 +534,7 @@ def test_reset_refuses_first_seq_and_an_owner_hash(svc):
     assert host.get(req.instance_id).epoch == 1
 
 
+@pytest.mark.needs_reset
 def test_no_get_answer_holds_the_owner_hash(svc):
     from support import owner_hash
     req = create_request(owner_tag="Z")
@@ -632,6 +635,7 @@ def test_bad_command_line_options_exit_2(args):
     assert r.stdout == ""
 
 
+@pytest.mark.needs_reset
 def test_activity_that_changes_nothing_makes_no_report():
     rx = ReportReceiver()
     svc = ServiceProcess(report_url=rx.url)
@@ -682,6 +686,7 @@ def test_a_state_report_that_hangs_is_given_up_on():
         stub.stop()
 
 
+@pytest.mark.node_only
 def test_a_service_that_never_prints_its_port_fails_the_test_instead_of_hanging(tmp_path, monkeypatch):
     import support
     script = tmp_path / "silent.mjs"

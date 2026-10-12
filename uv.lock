@@ -981,7 +981,9 @@ version = "0.0.0"
 source = { editable = "apps/orchestrator" }
 dependencies = [
     { name = "docker" },
+    { name = "fastapi" },
     { name = "jsonschema" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -993,7 +995,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "docker", specifier = "==7.1.0" },
+    { name = "fastapi", specifier = "==0.143.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "uvicorn", specifier = "==0.54.0" },
 ]
 
 [package.metadata.requires-dev]

@@ -102,5 +102,7 @@ test('preflight: no .git, a .git file (worktree) and a missing origin/main fail 
 test('the orchestrator tests run in the job scripts and in ci:linux, which skips the real-Docker ones (no daemon in the container)', () => {
   assert.ok(jobs.scripts.includes('uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests'));
   assert.ok(STEPS.some(([name]) => name === 'pytest-orchestrator'));
+  // story 3.2: the same suites of apps/api against the Python service, in CI and in ci:linux
+  assert.ok(STEPS.some(([name, command]) => name === 'pytest-orchestrator-service' && command.startsWith('VM_ORCH_SERVICE=python ')));
   assert.equal(SKIP_DOCKER_TESTS_SWITCH, 'VULNMART_SKIP_DOCKER_TESTS');
 });

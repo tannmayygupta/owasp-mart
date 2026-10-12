@@ -55,6 +55,12 @@ class ErrorCode:
     REQUEST_MISMATCH = "ORCH-REQUEST-MISMATCH"
     INSTANCE_EXISTS = "ORCH-INSTANCE-EXISTS"
     STALE_EPOCH = "ORCH-STALE-EPOCH"
+    INSTANCE_NOT_FOUND = "ORCH-INSTANCE-NOT-FOUND"
+    INVALID_STATE = "ORCH-INVALID-STATE"
+    STALE_ACCESS_EPOCH = "ORCH-STALE-ACCESS-EPOCH"
+    LABEL_UNKNOWN = "ORCH-LABEL-UNKNOWN"
+    CURSOR_INVALID = "ORCH-CURSOR-INVALID"
+    BUSY = "ORCH-BUSY"
     INJECT_BAD_DOCUMENT = "INST-INJECT-BAD-DOCUMENT"
     INJECT_SNAPSHOT_PATCH = "INST-INJECT-SNAPSHOT-PATCH"
     INJECT_PLACEMENT_WRITE = "INST-INJECT-PLACEMENT-WRITE"
@@ -83,8 +89,9 @@ class EngineError(Exception):
 
     code = "ORCH-ERROR"
 
-    def __init__(self, message: str = "") -> None:
+    def __init__(self, message: str = "", field: str | None = None) -> None:
         super().__init__(message or self.code)
+        self.field = field  # a JSON Pointer for a validation error, a name for a forbidden field
 
 
 class TemplateUnknown(EngineError):
@@ -111,6 +118,30 @@ class StaleEpoch(EngineError):
     code = ErrorCode.STALE_EPOCH
 
 
+class InstanceNotFound(EngineError):
+    code = ErrorCode.INSTANCE_NOT_FOUND
+
+
+class InvalidState(EngineError):
+    code = ErrorCode.INVALID_STATE
+
+
+class StaleAccessEpoch(EngineError):
+    code = ErrorCode.STALE_ACCESS_EPOCH
+
+
+class LabelUnknown(EngineError):
+    code = ErrorCode.LABEL_UNKNOWN
+
+
+class CursorInvalid(EngineError):
+    code = ErrorCode.CURSOR_INVALID
+
+
+class Busy(EngineError):
+    code = ErrorCode.BUSY
+
+
 @dataclass(frozen=True, slots=True)
 class Transition:
     """One numbered state change. Identity is (instance_id, epoch, transition); the number restarts at 1 in a new epoch."""
@@ -123,6 +154,7 @@ class Transition:
     at: str
     reason: str
     error_code: str | None
+    health: str = "unknown"  # unknown, healthy or unhealthy: the health of the instance after this change
 
 
 def check_transition(frm: InstanceState | None, to: InstanceState) -> None:

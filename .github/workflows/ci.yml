@@ -48,6 +48,8 @@ jobs:
       - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"
       - run: uv run --locked --package vulnmart-api pytest -q
       - run: uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
+      # story 3.2: the same protocol, wire, http, report and mTLS suites against the Python orchestrator service (reset cases skipped until story 3.4)
+      - run: VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py
       - run: pnpm run contracts:check
 
 

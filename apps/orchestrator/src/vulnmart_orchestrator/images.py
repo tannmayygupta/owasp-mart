@@ -81,3 +81,9 @@ class ImageAllowlist:
         if ref is None:
             raise ImageNotAllowed(f"image role {role!r} is not in the allowlist")
         return ref
+
+def fake_allowlist() -> ImageAllowlist:
+    """Image references for the test backend (`--backend fake`): well-formed and pinned by digest, never pulled."""
+    import hashlib
+
+    return ImageAllowlist({r: f"registry.invalid/vm/{r}@sha256:{hashlib.sha256(r.encode()).hexdigest()}" for r in ROLES})

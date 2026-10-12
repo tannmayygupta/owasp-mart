@@ -129,6 +129,7 @@ def test_first_seq_is_gone_from_the_requests_and_their_wire_form(harness):
     assert "event_key" in create_request().to_json() and "event_key" in reset_request(2).to_json()
 
 
+@pytest.mark.needs_reset
 def test_owner_hash_is_part_of_the_request_identity(harness):
     req = create_request(owner_tag="O")
     harness.host.create(req)
@@ -142,6 +143,7 @@ def test_owner_hash_is_part_of_the_request_identity(harness):
         harness.host.reset(req.instance_id, reset_request(2, tag="E"))  # another secret set for the same epoch is a different request
 
 
+@pytest.mark.needs_reset
 def test_a_reset_keeps_the_instance_and_needs_no_owner(harness):
     req = create_request()
     harness.host.create(req)
@@ -150,6 +152,7 @@ def test_a_reset_keeps_the_instance_and_needs_no_owner(harness):
     assert harness.host.reset(req.instance_id, reset_request(2)).status.epoch == 2
 
 
+@pytest.mark.needs_reset
 def test_create_with_an_older_epoch_is_stale(harness):
     req = create_request()
     harness.host.create(req)
@@ -189,6 +192,7 @@ def test_get_unknown_instance(harness):
 
 
 # ---- reset ----
+@pytest.mark.needs_reset
 def test_reset_from_ready_gives_a_new_epoch(harness):
     req = create_request()
     harness.host.create(req)
@@ -200,6 +204,7 @@ def test_reset_from_ready_gives_a_new_epoch(harness):
 
 
 @pytest.mark.parametrize("activity", [S.ACTIVE, S.IDLE])
+@pytest.mark.needs_reset
 def test_reset_from_active_and_idle(harness, activity):
     req = create_request()
     harness.host.create(req)
@@ -211,6 +216,7 @@ def test_reset_from_active_and_idle(harness, activity):
     assert harness.host.reset(req.instance_id, reset_request(2)).status.state is S.RESETTING
 
 
+@pytest.mark.needs_reset
 def test_reset_repeat_wrong_epoch_and_mismatch(harness):
     req = create_request()
     harness.host.create(req)
@@ -358,6 +364,7 @@ def test_host_reports_capacity_and_health(harness):
 
 
 # ---- no secret in any answer ----
+@pytest.mark.needs_reset
 def test_no_answer_holds_a_secret(harness):
     req = create_request(tag="Q")
     harness.host.create(req)
