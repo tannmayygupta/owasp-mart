@@ -1,8 +1,8 @@
-# VulnMart (repo `owasp-mart`)
+# VulnMart
 
 A containerized, flag-based, intentionally vulnerable online marketplace for OWASP Top 10 practice and for hiring assessments. Each user gets a private copy of the shop, attacks it, and every exploit is detected and scored automatically.
 
-Built by three developers with Claude Code. Final submission: first week of November 2026.
+Built by three developers. Final submission: first week of November 2026.
 
 ## Where to start
 
