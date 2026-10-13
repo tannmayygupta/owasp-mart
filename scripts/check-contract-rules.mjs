@@ -5,6 +5,8 @@
 //        base; a change to the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs the changelog line "registry change: <reason>".
 //        --trusted: trusted mode with the pins of this checkout; --bootstrap: the first pull request, the checker of the head ran (printed as a NOTICE);
 //        --untrusted-only: only the checks that run head code (table owners, Alembic, bundle), for the job contract-rules-untrusted.
+//        Approvals (story L-09, docs/adr/0029): --reviews <file> (the pull request reviews written by `gh api`, never fetched here), --require-reviews
+//        (a missing or invalid file is a FAIL instead of NOT-APPLICABLE), --pr-author <login>. The rule starts with the first tag contracts-v*.
 //        Without these options nothing changes: local runs compare the working tree with origin/main as before.
 // Base of the per-pull-request rules (changelog, mock, breaking declared): --base, else origin/$GITHUB_BASE_REF, else origin/main, always the merge
 // base with HEAD. When a tag contracts-v* exists, the breaking comparison is also made against the latest tag (a raised version is then required).
@@ -20,7 +22,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { diffSchemas } from './schema-diff.mjs';
-import { ensureOasdiff, runOasdiff, OasdiffError } from './oasdiff.mjs';
+import { ensureOasdiff, runOasdiff, loadConfig, OasdiffError } from './oasdiff.mjs';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PASS = 'PASS';
@@ -39,7 +41,8 @@ export const isBreakingMarker = (line) => {
 // D-46 (b): a pull request that changes the rules engine itself must say so in a new line of contracts/CHANGELOG.md. A human reads the reason.
 export const REGISTRY_CHANGE_LINE = /^\s*(?:[-*+]|\d+\.)\s+registry change:\s*\S/;
 // Files that make up the rules engine; in trusted mode a change to any of them is reported (FAIL without the declaration above).
-export const GUARDED_FILES = ['contracts/registry.json', 'scripts/check-contract-rules.mjs', 'scripts/schema-diff.mjs', 'scripts/oasdiff.mjs', 'tools/oasdiff.json'];
+// contracts/COMPAT.md is guarded too (ADR 0029): it holds the list of approvers, so an edit of it must carry a `registry change:` line.
+export const GUARDED_FILES = ['contracts/registry.json', 'contracts/COMPAT.md','scripts/check-contract-rules.mjs', 'scripts/schema-diff.mjs', 'scripts/oasdiff.mjs', 'tools/oasdiff.json'];
 export const GUARDED_PREFIXES = ['.github/workflows/'];
 export const isGuarded = (p) => GUARDED_FILES.includes(p) || GUARDED_PREFIXES.some((x) => p.startsWith(x));
 // Marker that CI greps in the base copy of this file to know that it understands --trusted (see .github/workflows/ci.yml): trusted-base-checker-v1
@@ -462,29 +465,197 @@ function deletedInput(result, existedInBase, what, baseRef) {
 // Proposed format (for Akshay, handoff in docs/dev/HANDOFFS.md): a Markdown table whose first two columns are the contract id of
 // contracts/registry.json and the contract version (X.Y.Z, optionally written contracts-vX.Y.Z); more columns are free. The first table row is the
 // header (whatever it is called); separator rows are skipped; bold and backticks in a cell are ignored.
+// Story L-09 (ADR 0029): COMPAT.md has more than one table, so each table sits under its own `## ` heading. The table of versions is the one under
+// `## Versions`; the table of approvers is the one under `## Approvals`. A file with no `## ` heading at all is read as one table of versions (the
+// first format of this proposal).
 const stripMd = (s) => s.replace(/[*_`]/g, '').trim();
+const SEPARATOR_ROW = (cells) => cells.every((c) => /^:?-{3,}:?$/.test(c) || c === '');
+// The lines under a `## <name>` heading (case-insensitive) up to the next `## ` heading, with the 0-based index of the first one; null when absent.
+export function compatSection(text, name) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => /^##\s/.test(l) && l.slice(2).trim().toLowerCase() === name.toLowerCase());
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) if (/^##\s/.test(lines[i])) { end = i; break; }
+  return { lines: lines.slice(start + 1, end), offset: start + 1 };
+}
+// The first pipe line is the header; separator rows are skipped. `line` is the 1-based line number in the whole file.
+export function tableOf(section) {
+  let header = null;
+  const rows = [];
+  section.lines.forEach((line, i) => {
+    // A table line starts with a pipe, or has at least six pipes without the outer ones: the Approvals table is written that way so that the
+    // older checker of the base commit (it reads every `|` line of the file as a row of versions) skips it.
+    if (!line.trim().startsWith('|') && line.trim().split('|').length < 7) return;
+    const cells = line.trim().replace(/^\||\|$/g, '').split('|').map(stripMd);
+    if (!header) { header = cells; return; }
+    if (SEPARATOR_ROW(cells)) return;
+    rows.push({ cells, line: section.offset + i + 1 });
+  });
+  return { header, rows };
+}
+export const APPROVAL_COLUMNS = ['contract', 'stream', 'handle', 'role', 'version', 'date', 'status'];
+export const APPROVAL_STATUSES = ['pending', 'approved'];
+const HANDLE = /^@[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+// The approvers of the contracts: one row per contract, stream, handle and role (owner or consumer). Returns the rows and the problems found.
+export function parseApprovers(text, reg) {
+  const section = compatSection(text, 'Approvals');
+  if (!section) return { rows: [], problems: ['contracts/COMPAT.md has no "## Approvals" section'] };
+  const { header, rows } = tableOf(section);
+  const problems = [];
+  if (!header || APPROVAL_COLUMNS.some((c, i) => (header[i] ?? '').toLowerCase() !== c)) {
+    return { rows: [], problems: [`the Approvals table must start with the columns ${APPROVAL_COLUMNS.join(' | ')} (found: ${(header ?? []).join(' | ') || 'no table'})`] };
+  }
+  const out = [];
+  for (const { cells, line } of rows) {
+    const [contract, stream, handle, role, version, date, status] = cells;
+    const at = `line ${line}`;
+    if (!reg.contracts.some((c) => c.id === contract)) { problems.push(`${at}: contract "${contract}" is not in contracts/registry.json`); continue; }
+    if (!['L', 'P', 'T'].includes(stream)) problems.push(`${at}: stream "${stream}" must be L, P or T`);
+    if (!HANDLE.test(handle ?? '')) { problems.push(`${at}: handle "${handle}" must look like @github-login`); continue; }
+    if (!['owner', 'consumer'].includes(role)) { problems.push(`${at}: role "${role}" must be owner or consumer`); continue; }
+    if (parseVersion(version ?? '').length !== 3) problems.push(`${at}: version "${version}" is not X.Y.Z`);
+    if (!APPROVAL_STATUSES.includes(status)) problems.push(`${at}: status "${status}" must be ${APPROVAL_STATUSES.join(' or ')}`);
+    out.push({ contract, stream, handle: handle.slice(1).toLowerCase(), role, version, date, status, line });
+  }
+  return { rows: out, problems };
+}
+
 function checkCompat(root, reg, headLog) {
   const text = headText(root, 'contracts/COMPAT.md');
   if (text === null) return { status: NA, details: ['contracts/COMPAT.md does not exist yet'] };
   const tags = new Set(git(root, ['tag', '--list', TAG_GLOB]).split('\n').map((t) => t.trim()).filter(Boolean));
   const problems = [];
-  let rows = 0;
-  let seenHeader = false;
-  text.split('\n').forEach((line, i) => {
-    if (!line.trim().startsWith('|')) return;
-    const cells = line.trim().replace(/^\||\|$/g, '').split('|').map(stripMd);
-    if (!seenHeader) { seenHeader = true; return; }
-    if (cells.every((c) => /^:?-{3,}:?$/.test(c) || c === '')) return;
-    rows++;
+  const sectioned = text.split('\n').some((l) => /^##\s/.test(l));
+  const section = sectioned ? compatSection(text, 'Versions') : { lines: text.split('\n'), offset: 0 };
+  if (!section) return { status: FAIL, details: ['contracts/COMPAT.md has sections but no "## Versions" section (the table of | contract id | version | rows)'] };
+  const { rows } = tableOf(section);
+  for (const { cells, line } of rows) {
     const c = reg.contracts.find((x) => x.id === cells[0]);
-    if (!c) { problems.push(`line ${i + 1}: contract "${cells[0]}" is not in contracts/registry.json`); return; }
+    if (!c) { problems.push(`line ${line}: contract "${cells[0]}" is not in contracts/registry.json`); continue; }
     const v = parseVersion((cells[1] ?? '').replace(/^contracts-/, ''));
-    if (v.length !== 3) { problems.push(`line ${i + 1}: ${c.id} lists the version "${cells[1] ?? ''}", which is not X.Y.Z`); return; }
+    if (v.length !== 3) { problems.push(`line ${line}: ${c.id} lists the version "${cells[1] ?? ''}", which is not X.Y.Z`); continue; }
     const inLog = sectionVersions(changelogSection(headLog, c.changelog)).some((x) => cmpVersion(x, v) === 0);
-    if (!inLog && !tags.has(`contracts-v${v.join('.')}`)) problems.push(`line ${i + 1}: ${c.id} lists version ${v.join('.')}, which is neither a changelog entry nor a tag contracts-v${v.join('.')}`);
-  });
+    if (!inLog && !tags.has(`contracts-v${v.join('.')}`)) problems.push(`line ${line}: ${c.id} lists version ${v.join('.')}, which is neither a changelog entry nor a tag contracts-v${v.join('.')}`);
+  }
+  let approvers = 0;
+  if (sectioned && compatSection(text, 'Approvals')) {
+    const a = parseApprovers(text, reg);
+    problems.push(...a.problems);
+    approvers = a.rows.length;
+  }
   if (problems.length) return { status: FAIL, details: problems };
-  return rows ? { status: PASS, details: [`${rows} row(s), every listed version exists`] } : { status: FAIL, details: ['contracts/COMPAT.md has no table row of the form | contract id | version |'] };
+  if (!rows.length) return { status: FAIL, details: ['contracts/COMPAT.md has no table row of the form | contract id | version |'] };
+  return { status: PASS, details: [`${rows.length} row(s), every listed version exists${approvers ? `; ${approvers} approver row(s)` : ''}`] };
+}
+
+// Approvals (story L-09, ADR 0029) -----------------------------------------------------------------------------------------------------------
+// Starts with the first tag contracts-v*. A pull request that changes the files of a contract needs: one approval from an owner or consumer of that
+// contract (additive change), or from every consumer (a change declared BREAKING in its new changelog entry; D-46 d), never counting the author's own
+// review. The table of approvers is read from the BASE copy of COMPAT.md (ADR 0026: a pull request cannot add itself). The reviews come from a JSON
+// file written by a separate CI step (`gh api`), so this script never holds a token. An approval counts only when the reviewer is listed, is not the
+// author, the latest review state of that person is APPROVED, and no file of the contract folders differs between the reviewed commit and the head.
+const REVIEW_STATES = ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'];
+export function loadReviews(input) {
+  let data = input;
+  if (typeof input === 'string') {
+    if (!fs.existsSync(input)) return { error: `the reviews file ${input} does not exist` };
+    try {
+      data = JSON.parse(fs.readFileSync(input, 'utf8'));
+    } catch (e) {
+      return { error: `the reviews file ${input} is not valid JSON: ${e.message}` };
+    }
+  }
+  if (!Array.isArray(data)) return { error: 'the reviews are not a JSON array (expected the output of `gh api --paginate --slurp .../pulls/N/reviews`)' };
+  const flat = data.flatMap((x) => (Array.isArray(x) ? x : [x]));
+  const out = [];
+  for (const [i, r] of flat.entries()) {
+    if (!r || typeof r !== 'object') return { error: `review ${i + 1} is not an object` };
+    if (!REVIEW_STATES.includes(String(r.state ?? '').toUpperCase())) continue; // a comment or a pending review decides nothing and may lack fields
+    if (r.user === null) continue; // a deleted account
+    if (typeof r.user?.login !== 'string' || typeof r.state !== 'string' || !/^[0-9a-f]{7,40}$/i.test(r.commit_id ?? '')) return { error: `review ${i + 1} lacks user.login, state or a commit_id` };
+    out.push({ login: r.user.login.toLowerCase(), state: r.state.toUpperCase(), commit: r.commit_id.toLowerCase(), at: String(r.submitted_at ?? ''), id: Number(r.id) || 0, i });
+  }
+  return { reviews: out };
+}
+// The latest meaningful review of each person (a plain comment never replaces an approval, as on GitHub).
+function latestReviews(reviews) {
+  const by = new Map();
+  for (const r of [...reviews].sort((a, b) => a.at.localeCompare(b.at) || a.id - b.id || a.i - b.i)) if (REVIEW_STATES.includes(r.state)) by.set(r.login, r);
+  return by;
+}
+// Did a file of these folders change between the reviewed commit and the head (the working tree)? null when it cannot be told.
+function changedSince(root, commit, folders) {
+  if (spawn('git cat-file', 'git', ['-C', root, 'cat-file', '-e', `${commit}^{commit}`], {}, TIMEOUT_MS.git).status !== 0) return null;
+  const d = spawn('git diff', 'git', ['-C', root, 'diff', '--quiet', commit, '--', ...folders], {}, TIMEOUT_MS.git);
+  if (d.status === 1) return true;
+  if (d.status !== 0) return null;
+  return git(root, ['ls-files', '--others', '--exclude-standard', '-z', '--', ...folders]).split('\0').some(Boolean);
+}
+const handles = (rows) => [...new Set(rows.map((r) => r.handle))];
+const at = (hs) => hs.map((h) => `@${h}`).join(', ');
+
+export function approvalsCheck({ root, reg, baseReg, base, tag, changed, baseLog, headLog, reviews: reviewsInput, requireReviews = false, prAuthor }) {
+  if (!tag) return { status: NA, details: ['the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet'] };
+  const compatBase = baseText(root, base.tip ?? base.sha, 'contracts/COMPAT.md');
+  if (compatBase === null) return { status: FAIL, details: [`tag exists (${tag.tag}) but the base (${base.ref}) has no contracts/COMPAT.md, so nobody is listed to approve; restore it in the base before changing a contract`] };
+  if (reviewsInput === undefined && !requireReviews) return { status: NA, details: ['no reviews file given (a local run); CI passes --reviews and --require-reviews'] };
+  const loaded = reviewsInput === undefined ? { error: 'no reviews file given, but the reviews are required (--require-reviews needs --reviews <file>)' } : loadReviews(reviewsInput);
+  if (loaded.error) return { status: FAIL, details: [loaded.error] };
+  const parsed = parseApprovers(compatBase, baseReg ?? reg);
+  if (parsed.problems.length) return { status: FAIL, details: [`the Approvals table of contracts/COMPAT.md in ${base.ref} is not usable:`, ...parsed.problems.map((p) => `  ${p}`)] };
+
+  // which contracts changed, and which of them declare a breaking change
+  const ids = [...new Set([...reg.contracts.map((c) => c.id), ...(baseReg?.contracts ?? []).map((c) => c.id)])];
+  const work = [];
+  for (const id of ids) {
+    const c = reg.contracts.find((x) => x.id === id);
+    const bc = baseReg?.contracts.find((x) => x.id === id);
+    const folders = [...new Set([...(c?.folders ?? []), ...(bc?.folders ?? [])])];
+    const under = [...changed.keys()].filter((p) => inFolder(p, folders));
+    if (!under.length) continue;
+    const fresh = c ? newEntries(changelogSection(baseLog, bc?.changelog ?? c.changelog), changelogSection(headLog, c.changelog)) : [];
+    const breaking = !c || fresh.some((e) => e.lines.some(isBreakingMarker));
+    work.push({ id, folders, breaking, why: !c ? 'the contract was removed' : breaking ? 'declared BREAKING in its new changelog entry' : 'additive' });
+  }
+  if (!work.length) return { status: PASS, details: ['no file of any contract changed, so no approval is needed'] };
+  if (!prAuthor) return { status: FAIL, details: ['the author of the pull request is unknown (--pr-author <login>), so an own review cannot be left out'] };
+  const author = prAuthor.replace(/^@/, '').toLowerCase();
+  const latest = latestReviews(loaded.reviews);
+
+  const details = [];
+  let failed = false;
+  for (const w of work) {
+    const rows = parsed.rows.filter((r) => r.contract === w.id);
+    if (!rows.length) { failed = true; details.push(`${w.id} (${w.why}): the base COMPAT.md lists no approver for it`); continue; }
+    const consumers = handles(rows.filter((r) => r.role === 'consumer')).filter((h) => h !== author);
+    const eligible = handles(rows);
+    if (!eligible.some((h) => h !== author)) { failed = true; details.push(`${w.id} (${w.why}): no listed person other than the author can approve (the base COMPAT.md lists only @${author} for it)`); continue; }
+    const needed = w.breaking && consumers.length ? consumers : null; // null: one approval from any listed person is enough
+    const ignored = [];
+    const good = new Map();
+    const blockers = [];
+    for (const [login, r] of latest) {
+      if (r.state === 'CHANGES_REQUESTED' && eligible.includes(login) && login !== author) blockers.push(login);
+      if (r.state !== 'APPROVED') { if (eligible.includes(login)) ignored.push(`@${login}: latest review is ${r.state}, not an approval`); continue; }
+      if (login === author) { ignored.push(`@${login} is the author: an own review never counts`); continue; }
+      if (!eligible.includes(login)) { ignored.push(`@${login} is not listed for ${w.id} in the Approvals table of the base COMPAT.md`); continue; }
+      const stale = changedSince(root, r.commit, w.folders);
+      if (stale === null) { ignored.push(`@${login} approved ${r.commit.slice(0, 7)}, which cannot be compared with the head (not in this clone)`); continue; }
+      if (stale) { ignored.push(`@${login} approved ${r.commit.slice(0, 7)}, but the files of ${w.id} changed after it`); continue; }
+      good.set(login, r.commit.slice(0, 7));
+    }
+    if (blockers.length) { failed = true; details.push(`${w.id} (${w.why}): ${at(blockers)} requested changes in the latest review (an approval by someone else does not outweigh it)`); }
+    const missing = needed ? needed.filter((h) => !good.has(h)) : good.size ? [] : eligible.filter((h) => h !== author);
+    if (missing.length) {
+      failed = true;
+      details.push(`${w.id} (${w.why}): ${needed ? `needs the approval of every consumer, missing ${at(missing)}` : `needs one approval from ${at(missing)} (owner or consumer, not the author)`}`);
+    } else {
+      details.push(`${w.id} (${w.why}): approved by ${[...good].map(([h, c]) => `@${h} at ${c}`).join(', ')}`);
+    }
+    for (const x of ignored) details.push(`  ignored: ${x}`);
+  }
+  return { status: failed ? FAIL : PASS, details };
 }
 
 // Bundle ----------------------------------------------------------------------------------------------------------------------------------
@@ -545,8 +716,9 @@ function guardCheck(root, base, changed, baseLog, headLog) {
   return { status: FAIL, details: [`this pull request changes files that define or run the contract rules: ${touched.join(', ')}; the rules of the base were applied. Add a new line "- registry change: <reason>" to a new entry of contracts/CHANGELOG.md; a reviewer (CODEOWNERS) must approve it`] };
 }
 
-export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.env, oasdiffBin, skip = [], trusted = false, bootstrap = false, tools, checkerRoot = REPO_ROOT, untrustedOnly = false } = {}) {
+export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.env, oasdiffBin, skip = [], trusted = false, bootstrap = false, tools, checkerRoot = REPO_ROOT, untrustedOnly = false, reviews, requireReviews = false, prAuthor } = {}) {
   const results = [];
+  let approvalsInput = null; // set when the comparison with the base worked: what the rule `approvals` needs
   const push = (name, r) => results.push({ name, ...r });
   const notices = [];
   if (trusted) {
@@ -614,6 +786,7 @@ export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.
         push('base', { status: PASS, details: detail });
         if (trusted) push('trusted-base', guardCheck(root, base, changed, baseText(root, base.sha, 'contracts/CHANGELOG.md'), headText(root, 'contracts/CHANGELOG.md')));
         results.push(...(await contractChecks({ root, reg, base, tag, changed, getOasdiff })));
+        approvalsInput = { root, reg, baseReg: registryAt(root, base.tip ?? base.sha), base, tag, changed, baseLog: baseText(root, base.sha, 'contracts/CHANGELOG.md'), headLog: headText(root, 'contracts/CHANGELOG.md'), reviews, requireReviews, prAuthor };
       }
     }
   } catch (e) {
@@ -622,6 +795,11 @@ export async function runRules({ root = REPO_ROOT, base: baseArg, env = process.
   }
 
   push('compat', deletedInput(checkCompat(root, reg, headText(root, 'contracts/CHANGELOG.md')), inBase('contracts/COMPAT.md'), 'contracts/COMPAT.md', base?.ref));
+  try {
+    push('approvals', approvalsInput ? approvalsCheck(approvalsInput) : { status: FAIL, details: ['not evaluated: the comparison with the base failed (see the check "base")'] });
+  } catch (e) {
+    push('approvals', { status: FAIL, details: [`the approvals rule could not run: ${e.message}`] });
+  }
   if (!trusted) untrustedChecks();
   return results;
 }
@@ -647,7 +825,7 @@ async function main(argv) {
   const trusted = argv.includes('--trusted') || !!tools;
   let results;
   try {
-    results = await runRules({ root, base: opt('--base'), trusted, bootstrap: argv.includes('--bootstrap'), tools, untrustedOnly: argv.includes('--untrusted-only') });
+    results = await runRules({ root, base: opt('--base'), trusted, bootstrap: argv.includes('--bootstrap'), tools, untrustedOnly: argv.includes('--untrusted-only'), reviews: opt('--reviews') ? path.resolve(opt('--reviews')) : undefined, requireReviews: argv.includes('--require-reviews'), prAuthor: opt('--pr-author') });
   } catch (e) {
     process.stderr.write(`contract rules could not run: ${e.message}\n`);
     return 2;

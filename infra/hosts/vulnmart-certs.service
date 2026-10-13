@@ -1,0 +1,14 @@
+[Unit]
+Description=VulnMart certificate renewal (lego, DNS-01 with DuckDNS; D-49)
+After=network-online.target
+Wants=network-online.target
+# A host without /etc/vulnmart/certs.env (not configured yet) skips the run instead of failing.
+ConditionPathExists=/etc/vulnmart/certs.env
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/vulnmart/certs.env
+ExecStart=/usr/local/sbin/vulnmart-certs.sh renew
+TimeoutStartSec=30min
+# After the run (the files are replaced by then), tell the origin Caddy to reload through its admin socket (unix socket in the container's tmpfs, never a port). The leading "-" means a failed reload (container not running yet, no docker) never fails the unit; the journal still shows the error. The container is named by compose project vulnmart-origin, service caddy (infra/caddy/compose.p.yaml).
+ExecStartPost=-/usr/bin/docker exec vulnmart-origin-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --address unix//tmp/caddy-admin.sock

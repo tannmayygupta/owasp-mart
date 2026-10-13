@@ -23,8 +23,13 @@ locals {
     docker_daemon     = base64encode(file("${local.hosts_dir}/docker-daemon.json"))
     keepalive_py      = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.py"))
     keepalive_unit    = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.service"))
-    egress_sh         = base64encode(file("${local.hosts_dir}/vulnmart-egress.sh"))
+    egress_sh         = indent(6, file("${local.hosts_dir}/vulnmart-egress.sh"))
     egress_unit       = base64encode(file("${local.hosts_dir}/vulnmart-egress.service"))
+    certs_sh          = indent(6, file("${local.hosts_dir}/vulnmart-certs.sh"))
+    certs_unit        = indent(6, file("${local.hosts_dir}/vulnmart-certs.service"))
+    certs_timer       = indent(6, file("${local.hosts_dir}/vulnmart-certs.timer"))
+    lego_pin          = indent(6, file("${local.hosts_dir}/lego.pin.json"))
+    lego_install_sh   = indent(6, file("${local.hosts_dir}/vulnmart-install-lego.sh"))
     egress_env        = jsonencode("# Not used on Oracle: no LABS_HOST_SUBNET, so vulnmart-egress.sh does nothing.\n")
     private_cidr      = local.rules.subnet_cidr
     ntp_server        = "169.254.169.254"

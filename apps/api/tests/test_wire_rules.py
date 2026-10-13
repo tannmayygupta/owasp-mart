@@ -102,7 +102,7 @@ def test_an_integer_above_two_to_the_53_minus_1_is_refused(harness, big):
 def test_a_list_limit_that_is_not_a_plain_integer_in_range_is_refused(harness, bad):
     with pytest.raises(ValidationFailed) as err:
         harness.host.list_instances(limit=bad)
-    assert err.value.field == "limit"
+    assert err.value.field == "/query/limit"
 
 
 # ---- a cursor is the same thing on both hosts ----
@@ -113,7 +113,7 @@ GARBAGE_CURSORS = ["!!", "AAAA", "x" * 200, "", "a" * 23, "a" * 25, "bm90LWFuLWl
 def test_a_garbage_cursor_is_refused_with_its_own_problem_type(harness, cursor):
     with pytest.raises(CursorInvalid) as err:
         harness.host.list_instances(cursor=cursor)
-    assert err.value.code == "ORCH-CURSOR-INVALID" and err.value.field == "cursor"
+    assert err.value.code == "ORCH-CURSOR-INVALID" and err.value.field == "/query/cursor"
 
 
 def test_a_cursor_from_a_page_still_works(harness):

@@ -1,0 +1,36 @@
+$ node --test scripts/certs-host.test.mjs
+ℹ tests 27
+ℹ pass 26
+ℹ fail 0
+ℹ skipped 1
+$ node --test scripts/cloud-hosts.test.mjs
+ℹ tests 38
+ℹ pass 38
+ℹ fail 0
+ℹ skipped 0
+$ node --test scripts/check-network-rules.test.mjs
+ℹ tests 45
+ℹ pass 45
+ℹ fail 0
+ℹ skipped 0
+$ node --test scripts/infra-isolation.test.mjs
+ℹ tests 13
+ℹ pass 13
+ℹ fail 0
+ℹ skipped 0
+$ node --test scripts/check-duckdns.test.mjs
+ℹ tests 6
+ℹ pass 6
+ℹ fail 0
+ℹ skipped 0
+$ node scripts/check-text-files.mjs
+PASS no control character, BOM or mojibake in the tracked text files
+$ node scripts/scan-secrets.mjs
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree
+$ terraform fmt -check -recursive (clean copy of infra/ in the job temp folder): exit 0
+$ terraform validate (aws): Success! The configuration is valid.
+$ terraform test (aws): Success! 37 passed, 0 failed.
+$ terraform validate (oci): Success! The configuration is valid.
+$ terraform test (oci): Success! 10 passed, 0 failed.
+
+Note: the "already running" lock test is skipped on this Windows PC (no flock in Git bash); it runs on Linux CI. The full scripts/*.test.mjs suite was run by the coordinator, not here after the review fixes.

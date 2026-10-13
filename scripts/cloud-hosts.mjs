@@ -82,9 +82,9 @@ export function tcpProbe(host, port, timeoutMs = 4000) {
 
 /** Real ssh runner. Returns { code, stdout, stderr }. Never prints keys; the identity is only a path. */
 export function sshRun({ host, user = 'ubuntu', identity, command, input, options = [], timeoutMs = 60000 }) {
-  const args = ['-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes', ...options];
+  const args = ['-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'BatchMode=yes', ...options];
   if (identity) args.push('-i', identity, '-o', 'IdentitiesOnly=yes');
-  args.push(`${user}@${host}`);
+  args.push('--', `${user}@${host}`);
   if (command !== undefined) args.push(command);
   return new Promise((resolve) => {
     const p = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'pipe'] });

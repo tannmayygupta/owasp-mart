@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from support import create_request, material, new_id, owner_hash, reset_request
+from support import create_request, instance_memory_mb, material, new_id, owner_hash, reset_request
 from vulnmart.ports.instance_host import (
     Access, Busy, Health, HostHealth, InstanceExists, InstanceHost, InstanceNotFound, InstanceState, InvalidState,
     LabelUnknown, RequestMismatch, StaleAccessEpoch, StaleEpoch, TemplateUnknown, ValidationFailed,
@@ -69,7 +69,8 @@ def test_unknown_template_creates_nothing(harness):
 
 
 def test_busy_host_refuses_and_creates_nothing(make, kind):
-    h = make(kind, capacity_mb=512)
+    unit = instance_memory_mb(kind, 256)
+    h = make(kind, capacity_mb=2 * unit)
     a, b, c = (create_request(memory_mb=256) for _ in range(3))
     h.host.create(a)
     h.host.create(b)
@@ -129,6 +130,7 @@ def test_first_seq_is_gone_from_the_requests_and_their_wire_form(harness):
     assert "event_key" in create_request().to_json() and "event_key" in reset_request(2).to_json()
 
 
+@pytest.mark.needs_reset
 def test_owner_hash_is_part_of_the_request_identity(harness):
     req = create_request(owner_tag="O")
     harness.host.create(req)
@@ -142,6 +144,7 @@ def test_owner_hash_is_part_of_the_request_identity(harness):
         harness.host.reset(req.instance_id, reset_request(2, tag="E"))  # another secret set for the same epoch is a different request
 
 
+@pytest.mark.needs_reset
 def test_a_reset_keeps_the_instance_and_needs_no_owner(harness):
     req = create_request()
     harness.host.create(req)
@@ -150,6 +153,7 @@ def test_a_reset_keeps_the_instance_and_needs_no_owner(harness):
     assert harness.host.reset(req.instance_id, reset_request(2)).status.epoch == 2
 
 
+@pytest.mark.needs_reset
 def test_create_with_an_older_epoch_is_stale(harness):
     req = create_request()
     harness.host.create(req)
@@ -189,6 +193,7 @@ def test_get_unknown_instance(harness):
 
 
 # ---- reset ----
+@pytest.mark.needs_reset
 def test_reset_from_ready_gives_a_new_epoch(harness):
     req = create_request()
     harness.host.create(req)
@@ -200,6 +205,7 @@ def test_reset_from_ready_gives_a_new_epoch(harness):
 
 
 @pytest.mark.parametrize("activity", [S.ACTIVE, S.IDLE])
+@pytest.mark.needs_reset
 def test_reset_from_active_and_idle(harness, activity):
     req = create_request()
     harness.host.create(req)
@@ -211,6 +217,7 @@ def test_reset_from_active_and_idle(harness, activity):
     assert harness.host.reset(req.instance_id, reset_request(2)).status.state is S.RESETTING
 
 
+@pytest.mark.needs_reset
 def test_reset_repeat_wrong_epoch_and_mismatch(harness):
     req = create_request()
     harness.host.create(req)
@@ -350,7 +357,7 @@ def test_host_reports_capacity_and_health(harness):
     req = create_request(memory_mb=300)
     harness.host.create(req)
     during = harness.host.host_status()
-    assert during.used_memory_mb == 300 and during.instances == 1
+    assert during.used_memory_mb == instance_memory_mb(harness.kind, 300) and during.instances == 1
     harness.host.destroy(req.instance_id)
     harness.settle(req.instance_id, S.DESTROYED)
     after = harness.host.host_status()
@@ -358,6 +365,7 @@ def test_host_reports_capacity_and_health(harness):
 
 
 # ---- no secret in any answer ----
+@pytest.mark.needs_reset
 def test_no_answer_holds_a_secret(harness):
     req = create_request(tag="Q")
     harness.host.create(req)

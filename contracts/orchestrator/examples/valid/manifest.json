@@ -16,5 +16,6 @@
   "error.bad-signature.json": "Problem",
   "error.cursor-invalid.json": "Problem",
   "error.unsupported-media-type.json": "Problem",
-  "error.extension-member.json": "Problem"
+  "error.busy.json": "Problem",
+  "error.validation-errors.json": "Problem"
 }

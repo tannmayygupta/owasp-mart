@@ -9,7 +9,7 @@ says `ready`. With `auto_advance=False` nothing moves until the test calls `adva
 state such as `starting` or `resetting` easy to hold.
 
 Test hooks that are not part of the contract: `advance`, `set_activity`, and the template name
-`shop-fail-v0`, which ends in `failed` with the placeholder code `INST-HEALTH-TIMEOUT`.
+`shop-fail-v0`, which ends in `failed` with the code `INST-HEALTH-TIMEOUT`.
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def encode_cursor(instance_id: str) -> str:
 
 def decode_cursor(cursor: str) -> str:
     """The instance id a cursor stands for. Anything this orchestrator would not have handed out is CursorInvalid."""
-    bad = CursorInvalid("the cursor is not one this orchestrator handed out", field="cursor")
+    bad = CursorInvalid("the cursor is not one this orchestrator handed out", field="/query/cursor")
     if not isinstance(cursor, str) or not _CURSOR.match(cursor):
         raise bad
     try:
@@ -325,15 +325,15 @@ class FakeInstanceHost:
         labels = dict(labels or {})
         for name in labels:
             if name not in LIST_LABELS:
-                raise LabelUnknown(f"{name} is not a label filter", field=name)
+                raise LabelUnknown(f"{name} is not a label filter", field="/query/" + name.replace("~", "~0").replace("/", "~1"))
         if not is_wire_int(limit, 1, 500):
-            raise ValidationFailed("limit is 1 to 500", field="limit")
+            raise ValidationFailed("limit is 1 to 500", field="/query/limit")
         epoch = None
         if "instance" in labels and not INSTANCE_ID.match(str(labels["instance"])):
-            raise ValidationFailed("bad instance id", field="instance")
+            raise ValidationFailed("bad instance id", field="/query/instance")
         if "epoch" in labels:
             if not _EPOCH_LABEL.match(str(labels["epoch"])):
-                raise ValidationFailed("epoch is a positive integer", field="epoch")
+                raise ValidationFailed("epoch is a positive integer", field="/query/epoch")
             epoch = int(labels["epoch"])
         after = None
         if cursor is not None:

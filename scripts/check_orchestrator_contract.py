@@ -5,7 +5,7 @@ matches its schema; every invalid example fails at the path its manifest names; 
 hold a secret; the signing vector reproduces; no real-looking flag is in the contract. Since 0.3.0 (ADR 0028) it also
 checks that every integer schema is `int64` with a minimum and a maximum of at most 2^53 - 1, that the examples are
 read with a strict integer rule (`1.0` and `1e0` are not integers, a boolean is not an integer), that the Problem
-schema is open and has the RFC 9457 members, and that every error response is `application/problem+json`. Run through
+schema equals the closed IF-8 body (contracts/errors/problem.schema.json), and that every error response is `application/problem+json`. Run through
 `pnpm run contracts:check` (after the instance contract check) or on its own:
 
     uv run --package vulnmart-api python scripts/check_orchestrator_contract.py [--dir <folder>]
@@ -38,8 +38,9 @@ OPERATIONS = {
 SECRET_NAMES = {"flags", "flag", "decoys", "decoy", "flag_digests", "sha256", "seed", "event_key", "value", "owner_hash"}
 FREE_FORM = "<free-form object>"
 MAX_INT = 2**53 - 1  # the largest integer every JSON implementation reads back exactly (RFC 7493 section 2.2)
-OPEN_SCHEMAS = {"#/components/schemas/Problem"}  # RFC 9457: open on purpose (extension members), see ADR 0028
-PROBLEM_REQUIRED = {"type", "title", "status", "detail", "instance", "code", "request_id"}
+OPEN_SCHEMAS: set[str] = set()  # no schema may be open any more: the Problem schema is the closed IF-8 body (story: IF-8 error bodies)
+IF8_PROBLEM = ROOT / "contracts" / "errors" / "problem.schema.json"
+IF8_REGISTRY = {c["code"]: c for c in yaml.safe_load((ROOT / "contracts" / "errors" / "error-codes.yaml").read_text(encoding="utf-8"))["codes"]}
 PROBLEM_MEDIA = "application/problem+json"
 FAKE_FLAG = re.compile(r"^VM\{([A-Z2-7])\1{23}\}$")
 FLAG_LIKE = re.compile(r"VM\{[A-Z2-7]{24}\}")
@@ -97,6 +98,23 @@ def _resolve(spec: dict, ref: str):
         node = node[part.replace("~1", "/").replace("~0", "~")]
     return node
 
+
+def problem_differs_from_if8(problem_schema: dict) -> list[str]:
+    """The Problem schema of a fragment is the IF-8 body (contracts/errors/problem.schema.json), copied so the fragment stays
+    self-contained. Descriptions are free, everything else must be equal, and the schema must be closed."""
+    from check_platform_contract import same  # the one comparison that ignores only descriptions, titles and examples
+
+    theirs = json.loads(IF8_PROBLEM.read_text(encoding="utf-8"))
+    theirs = {k: v for k, v in theirs.items() if k not in ("$schema", "$id")}
+    # IF-5 says `format: int64` on every integer (a rule of this checker); the IF-8 schema does not, so that one key is ignored.
+    problem_schema = json.loads(json.dumps(problem_schema))
+    problem_schema.get("properties", {}).get("status", {}).pop("format", None)
+    out = []
+    if problem_schema.get("additionalProperties") is not False:
+        out.append("the Problem schema must be closed (additionalProperties: false), as the IF-8 body is")
+    if not same(problem_schema, theirs):
+        out.append("the Problem schema differs from contracts/errors/problem.schema.json (IF-8)")
+    return out
 
 def _walk_properties(spec: dict, schema, seen=None, open_ok: bool = False):
     """Yield every property name reachable from a schema (follows local $refs), and the marker
@@ -192,7 +210,7 @@ def run(folder: Path) -> tuple[list[str], dict[str, int]]:
     for problem in integer_problems(spec):
         fail(f"{SPEC} {problem}")
 
-    # RFC 9457 (ADR 0028): every error response is application/problem+json with the Problem schema, and Problem is open.
+    # IF-8: every error response is application/problem+json with the Problem schema, and Problem is the closed IF-8 body.
     for path, item in spec["paths"].items():
         for method, op in item.items():
             if method not in {"get", "post", "put", "delete", "patch"}:
@@ -210,16 +228,10 @@ def run(folder: Path) -> tuple[list[str], dict[str, int]]:
                         fail(f"{method.upper()} {path} {status}: an error answer must use the Problem schema")
     problem_schema = (spec["components"].get("schemas") or {}).get("Problem")
     if isinstance(problem_schema, dict):
-        if problem_schema.get("additionalProperties") is False:
-            fail("the Problem schema must be open (no additionalProperties: false): extension members can be added later without breaking a client")
-        missing = PROBLEM_REQUIRED - set(problem_schema.get("required") or [])
-        if missing:
-            fail(f"the Problem schema must require {sorted(missing)}")
-        if "message" in (problem_schema.get("required") or []):
-            fail("the Problem schema must not require the old-style message member")
+        for message in problem_differs_from_if8(problem_schema):
+            fail(message)
     else:
         fail("the Problem schema is missing")
-
     # Every GET answer must be unable to carry a secret.
     for path, item in spec["paths"].items():
         op = item.get("get")
@@ -257,6 +269,16 @@ def run(folder: Path) -> tuple[list[str], dict[str, int]]:
             continue
         for err in schema_validator(spec, schema).iter_errors(data):
             fail(f"valid/{name} does not match {schema}: {error_path(err)} {err.message}")
+        if schema == "Problem" and isinstance(data, dict):  # the parts of a problem that a schema cannot tie together (IF-8 registry)
+            info = IF8_REGISTRY.get(str(data.get("code")))
+            if info is None:
+                fail(f"valid/{name}: the code {data.get('code')!r} is not in the error registry (contracts/errors/error-codes.yaml)")
+            elif info.get("status") != data.get("status") or info.get("title") != data.get("title"):
+                fail(f"valid/{name}: status and title must be the registry's for the code")
+            elif data.get("type") != "urn:vulnmart:error:" + str(data.get("code")):
+                fail(f"valid/{name}: type must be urn:vulnmart:error: plus the code")
+            elif ("field" in data or "errors" in data) and data.get("status") != 422:
+                fail(f"valid/{name}: field and errors are for a 422 only")
     for name in vman:
         if name not in vfiles:
             fail(f"valid manifest names {name}, which does not exist")

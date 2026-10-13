@@ -12,8 +12,13 @@ locals {
     docker_daemon     = base64encode(file("${local.hosts_dir}/docker-daemon.json"))
     keepalive_py      = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.py"))
     keepalive_unit    = base64encode(file("${local.hosts_dir}/vulnmart-keepalive.service"))
-    egress_sh         = base64encode(file("${local.hosts_dir}/vulnmart-egress.sh"))
+    egress_sh         = indent(6, file("${local.hosts_dir}/vulnmart-egress.sh"))
     egress_unit       = base64encode(file("${local.hosts_dir}/vulnmart-egress.service"))
+    certs_sh          = indent(6, file("${local.hosts_dir}/vulnmart-certs.sh"))
+    certs_unit        = indent(6, file("${local.hosts_dir}/vulnmart-certs.service"))
+    certs_timer       = indent(6, file("${local.hosts_dir}/vulnmart-certs.timer"))
+    lego_pin          = indent(6, file("${local.hosts_dir}/lego.pin.json"))
+    lego_install_sh   = indent(6, file("${local.hosts_dir}/vulnmart-install-lego.sh"))
     egress_env        = jsonencode(local.egress_env) # a JSON string is a valid YAML double-quoted scalar
     private_cidr      = local.rules.vcn_cidr         # host INPUT rules for the private ports accept the VPC range; the security groups and ACLs name the exact subnet and host
     ntp_server        = "169.254.169.123"            # Amazon Time Sync Service (link-local)

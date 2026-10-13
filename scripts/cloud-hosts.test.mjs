@@ -6,6 +6,9 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHosts, redact, parseKeyValues, parseArgs, printChecks, resolveHostsFile, loadHosts, PROVIDER_HOSTS_FILES } from './cloud-hosts.mjs';
+import { gzipSync } from 'node:zlib';
+import { randomBytes } from 'node:crypto';
+import yaml from 'js-yaml';
 import { verifyHosts, remoteBaseline, BASELINE_FILES, localBaselineHashes, metadataCommand, pullCommand, verifyOptions, tempListenerStart, IMDS_PY, IMDS_IMAGE } from './verify-hosts.mjs';
 import { checkPrivateLink, unlistedPort, SERVER_PY, CLIENT_PY, SERVER_SECONDS, CLIENT_STEPS_PER_LINK, SECONDS_PER_STEP } from './private-link-check.mjs';
 import { RULES_FILE } from './check-network-rules.mjs';
@@ -60,12 +63,12 @@ test('printChecks returns false when a check fails', () => {
 // ---- verify-hosts ----
 const fakeHashes = Object.fromEntries(BASELINE_FILES.map((f) => [f.remote, f.remote.length.toString(16).padStart(2, '0').repeat(32)]));
 
-function baselineOutput(vm, { fw = {}, marker = 'ok', hashes = fakeHashes, os = '24.04', sshd, keepalive = 'inactive', arch = 'x86_64', reboot = 'no', cloudinit = 'status:_done' } = {}) {
+function baselineOutput(vm, { fw = {}, marker = 'ok', hashes = fakeHashes, os = '24.04', sshd, keepalive = 'inactive', arch = 'x86_64', reboot = 'no', cloudinit = 'status:_done', certs, certtimer = 'enabled', certtooling } = {}) {
   const wanted = [...rules.public_ingress.map((r) => r.port), ...rules.private_ingress.filter((r) => r.to === vm).map((r) => r.port)];
   const lines = [
     `arch=${arch}`, `os=${os}`,
     `sshd=${sshd ?? 'authenticationmethods:publickey,kbdinteractiveauthentication:no,passwordauthentication:no,permitrootlogin:no,'}`,
-    'secrets=700:root', 'docker=Docker_version_27', `keepalive=${keepalive}`, `reboot=${reboot}`, `cloudinit=${cloudinit}`, `marker=${marker}`,
+    'secrets=700:root', 'docker=Docker_version_27', `keepalive=${keepalive}`, `reboot=${reboot}`, `cloudinit=${cloudinit}`, `marker=${marker}`, ...(certs === undefined ? [] : [`certs=${certs}`, `certtimer=${certtimer}`, ...(certtooling === undefined ? [] : [`certtooling=${certtooling}`])]),
     ...wanted.map((p) => `fw_${p}=${fw[p] ?? 'yes'}`),
     ...Object.entries(hashes).map(([p, h]) => (h === 'MISSING' ? `sha MISSING  ${p}` : `sha ${h}  ${p}`)),
   ];
@@ -194,13 +197,69 @@ test('verify-hosts detects drift: a host file that differs from the repository f
 
 test('BASELINE_FILES covers every repository file that cloud-init writes, and the local hashes are real', () => {
   const ci = readFileSync(path.join(ROOT, 'infra', 'hosts', 'cloud-init.yaml.tftpl'), 'utf8');
-  const b64Paths = [...ci.matchAll(/- path: (\S+)\n\s+encoding: b64/g)].map((m) => m[1]).sort();
+  const b64Paths = [...ci.matchAll(/- path: (\S+)\n\s+encoding: b64/g), ...ci.matchAll(/- path: (\S+)\n\s+permissions: "\d+"\n\s+content: \|\n\s+\$\{\w+\}\n/g)].map((m) => m[1]).sort();
   assert.deepEqual(BASELINE_FILES.map((f) => f.remote).sort(), b64Paths);
   const hashes = localBaselineHashes();
   assert.equal(Object.keys(hashes).length, BASELINE_FILES.length);
   assert.ok(Object.values(hashes).every((h) => /^[0-9a-f]{64}$/.test(h)));
 });
 
+test('certificate checks: none yet is a warning, ok with enough days passes, few days or a failure marker fails, an old answer without the field adds nothing', async () => {
+  const run = async (o) => (await verify({ ssh: fakeSsh({ out: (vm) => baselineOutput(vm, o) }) })).filter((c) => /certificate/.test(c.name));
+  assert.deepEqual(await run({}), []);
+  const none = await run({ certs: 'none:na' });
+  assert.ok(none.every((c) => c.ok) && none.some((c) => c.warn && /none issued yet/.test(c.detail)));
+  assert.ok((await run({ certs: 'ok:59' })).every((c) => c.ok && !c.warn));
+  assert.ok((await run({ certs: 'ok:9' })).some((c) => !c.ok && /more than 14 days/.test(c.name)));
+  assert.ok((await run({ certs: 'failed:40' })).some((c) => !c.ok && /has not failed/.test(c.name)));
+  assert.ok((await run({ certs: 'ok:59', certtimer: 'disabled' })).some((c) => !c.ok && /timer enabled/.test(c.name)));
+  // an empty or unknown answer is a warning, never "more than 14 days"
+  for (const bad of ['', 'garbage', ':']) {
+    const r = await run({ certs: bad });
+    assert.ok(r.length > 0 && r.every((c) => c.ok && c.warn && /not installed or answer unreadable/.test(c.detail)), `answer "${bad}"`);
+    assert.ok(!r.some((c) => /more than 14 days/.test(c.name)));
+  }
+  // a failed tooling install at first boot is a warning
+  const tool = await run({ certs: 'none:na', certtooling: 'failed' });
+  assert.ok(tool.every((c) => c.ok) && tool.some((c) => c.warn && /certs-tooling-failed/.test(c.detail)));
+});
+
+test('the remote command asks for certificate status and the timer state', () => {
+  const cmd = remoteBaseline(rules, 'vm-p');
+  assert.match(cmd, /vulnmart-certs\.sh status --short/);
+  assert.match(cmd, /is-enabled vulnmart-certs\.timer/);
+});
+
+test('rendered cloud-init parses as YAML, carries the plain-text host files unchanged, and stays under the 16384 byte user-data limit (gzip, 3 distinct keys)', () => {
+  const host = (n) => readFileSync(path.join(ROOT, 'infra', 'hosts', n));
+  const b64 = (n) => host(n).toString('base64');
+  // Terraform indent(6, text): every newline is followed by 6 spaces (the first line is not indented).
+  const indent6 = (n) => host(n).toString('utf8').replace(/\n/g, '\n      ');
+  // Distinct random ed25519-looking key lines (random bytes, not real keys).
+  const fakeKey = (i) => `ssh-ed25519 ${Buffer.concat([Buffer.from([0, 0, 0, 11]), Buffer.from('ssh-ed25519'), Buffer.from([0, 0, 0, 32]), randomBytes(32)]).toString('base64')} dev${i}@laptop`;
+  const v = {
+    sshd_conf: b64('sshd-hardening.conf'), firewall_sh: b64('vulnmart-firewall.sh'), docker_sh: b64('vulnmart-install-docker.sh'), baseline_sh: b64('vulnmart-baseline.sh'),
+    docker_daemon: b64('docker-daemon.json'), keepalive_py: b64('vulnmart-keepalive.py'), keepalive_unit: b64('vulnmart-keepalive.service'), egress_sh: indent6('vulnmart-egress.sh'),
+    egress_unit: b64('vulnmart-egress.service'), certs_sh: indent6('vulnmart-certs.sh'), certs_unit: indent6('vulnmart-certs.service'), certs_timer: indent6('vulnmart-certs.timer'),
+    lego_pin: indent6('lego.pin.json'), lego_install_sh: indent6('vulnmart-install-lego.sh'),
+    egress_env: JSON.stringify('VPC_CIDR=10.0.0.0/16\nVPC_RESOLVER=10.0.0.2\nPLATFORM_SUBNET=10.0.0.0/24\nLABS_HOST_SUBNET=10.0.1.0/24\nLABS_DOCKER_SUBNETS="172.17.0.0/16 172.30.0.0/16"\nINGEST_PORT=9444\n'),
+    private_cidr: '10.0.0.0/16', ntp_server: '169.254.169.123', keepalive_enabled: 'no',
+    ssh_keys_json: JSON.stringify([1, 2, 3].map(fakeKey)),
+  };
+  assert.equal(new Set(JSON.parse(v.ssh_keys_json)).size, 3, 'the keys are distinct');
+  const text = readFileSync(path.join(ROOT, 'infra', 'hosts', 'cloud-init.yaml.tftpl'), 'utf8').replace(/\$\{(\w+)\}/g, (_, k) => { assert.ok(k in v, `unknown template variable ${k}`); return v[k]; });
+  const doc = yaml.load(text);
+  const plain = { '/usr/local/sbin/vulnmart-egress.sh': 'vulnmart-egress.sh', '/usr/local/sbin/vulnmart-certs.sh': 'vulnmart-certs.sh', '/etc/systemd/system/vulnmart-certs.service': 'vulnmart-certs.service', '/etc/systemd/system/vulnmart-certs.timer': 'vulnmart-certs.timer', '/etc/vulnmart/lego.pin.json': 'lego.pin.json', '/usr/local/sbin/vulnmart-install-lego.sh': 'vulnmart-install-lego.sh' };
+  for (const [remote, file] of Object.entries(plain)) {
+    const entry = doc.write_files.find((w) => w.path === remote);
+    assert.ok(entry, `${remote} is in write_files`);
+    assert.equal(entry.encoding, undefined, `${remote} is plain text`);
+    assert.equal(entry.content.replace(/\n$/, ''), host(file).toString('utf8').replace(/\n$/, ''), `${remote} content equals ${file}`);
+  }
+  const gz = gzipSync(text).length;
+  console.log(`# rendered cloud-init: ${text.length} bytes, ${gz} bytes gzipped (limit 16384, 3 keys)`);
+  assert.ok(gz < 16384, `gzip size ${gz}`);
+});
 // ---- private-link-check ----
 function linkSsh({ mtls = true, nocert = '{"ok": false, "error": "SSLError"}', tail = 'rejected: SSLError', probe = '{"state": "timeout"}', cleanLeft = false } = {}) {
   const log = [];

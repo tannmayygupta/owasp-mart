@@ -1,0 +1,49 @@
+PASS            registry: 6 contracts, 13 folders under contracts/ all registered
+PASS            base: compared with origin/main (merge base 65b49255b9); 703 file(s) differ
+                NOTICE: no tag contracts-v* exists, so the comparison with the latest tag did not run (only the pull request base is compared)
+PASS            changelog[IF-6]: new entries for IF-6: 0.3.1 (2026-10-11, Tanmay, story L-09 preparation); 0.3.0 (2026-10-11, Tanmay, story 1.15, instance template hardening; a minor step because it is breaking before v1.0.0); 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42); 0.1.1 (2026-10-09, Tanmay, story L-03); 0.1.2 (2026-10-09, Tanmay, story L-04 follow-up); 0.1.3 (2026-10-10, Tanmay, story L-06)
+PASS            mock[IF-6]: a mock file changed with the contract
+PASS            breaking[IF-6]: BREAKING declared in the new entry with a raised version (0.3.1):
+                  notice: contracts/instance/instance-template.schema.json #/properties/volumes/items/properties/size_mb/maximum: maximum 64 added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/mount/properties/size_mb/maximum: maximum 512 added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/labels/properties/vm.expires/pattern: pattern changed from "^(\\{expires\\}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z)$" to "^(\\{expires\\}|20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?Z)$" (treated as tightened)
+                  notice: contracts/instance/instance-template.schema.json #/$defs/flag_delivery_env/properties/reason/pattern: pattern changed from "^\\S.*\\S$" to "^(?!.*(.)\\1{3})(?!.*\\s\\s)(?=(?:.*?\\b[A-Za-z]{2,}\\b){3})\\S.*\\S$" (treated as tightened)
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/properties/name/$ref: keyword $ref removed
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/properties/name/enum: enum constraint added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/properties/user/const: keyword const added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/properties/memory_mb/maximum: maximum 1024 added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/properties/cpu_limit/maximum: maximum 2 added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/properties/pids_limit/maximum: maximum 512 added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/properties/env/minProperties: minProperties 1 added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/allOf: allOf branch added (narrows the accepted values)
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/allOf/3/then: keyword then added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/allOf/3/if: if condition changed: flagged breaking conservatively, because it decides which then/else branch applies and this diff does not evaluate that
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/allOf/4/if: if condition changed: flagged breaking conservatively, because it decides which then/else branch applies and this diff does not evaluate that
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/allOf/5/then: keyword then added
+                  notice: contracts/instance/instance-template.schema.json #/$defs/component/allOf/5/if: if condition changed: flagged breaking conservatively, because it decides which then/else branch applies and this diff does not evaluate that
+                contracts/instance/sidecar-start.schema.json: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-4]: new entries for IF-4: 0.2.1 (2026-10-11, Tanmay, story L-09 preparation); 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42, decided on the developer's delegation; to be confirmed); 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft); 0.1.0 (2026-10-08, Tanmay, story L-03)
+PASS            mock[IF-4]: a mock file changed with the contract
+PASS            breaking[IF-4]: contracts/events/instance-events.schema.json: new file, not compared (a new file is not a breaking change)
+                contracts/events/instance-events.posted.schema.json: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-5]: new entries for IF-5: 0.3.0 (2026-10-11, Tanmay, story 1.15, review findings of pull request 3; decided on the developer's delegation, ADR 0028; to be confirmed); 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42; only the `first_seq` and `event_key` lines; other IF-5 changes of this story are listed by their own entries); 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft, nothing was confirmed yet); 0.1.0 (2026-10-09, Tanmay, story L-04)
+PASS            mock[IF-5]: a mock file changed with the contract
+PASS            breaking[IF-5]: contracts/orchestrator/orchestrator.openapi.yaml: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-2]: new entries for IF-2: 0.2.0 (2026-10-11, Tanmay, story 1.15 part B4, which also carries story 1.12 for IF-2; to be confirmed by Akshay); 0.1.0 (2026-10-09, Tanmay, story L-05)
+PASS            mock[IF-2]: a mock file changed with the contract
+PASS            breaking[IF-2]: contracts/api/lab/lab.openapi.yaml: new file, not compared (a new file is not a breaking change)
+PASS            changelog[DB]: new entry for DB: 0.1.0 (2026-10-10, Tanmay, story L-07)
+PASS            mock[DB]: no mock by design: the table-owners list is read by CI only, nothing runs against it
+PASS            breaking[DB]: contracts/db/table-owners.schema.json: new file, not compared (a new file is not a breaking change)
+PASS            contract[IF-7]: no file of this contract changed
+PASS            compat: 6 row(s), every listed version exists; 16 approver row(s)
+NOT-APPLICABLE  approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+NOT-APPLICABLE  table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE  alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE  bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet
+
+SUMMARY: 19 PASS, 0 FAIL, 4 NOT-APPLICABLE
+NOT-APPLICABLE: approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+NOT-APPLICABLE: table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE: alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE: bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet

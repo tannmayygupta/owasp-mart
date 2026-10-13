@@ -1,0 +1,12 @@
+{
+  "registry": "ghcr.io",
+  "images": [
+    {
+      "name": "hello",
+      "context": "infra/hello",
+      "dockerfile": "infra/hello/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true
+    }
+  ]
+}

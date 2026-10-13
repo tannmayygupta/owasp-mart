@@ -17,6 +17,7 @@ import pytest
 import yaml
 from jsonschema import Draft202012Validator
 from openapi_spec_validator import validate
+from vulnmart_models.error_codes import ERRORS, ErrorCode
 
 from support import ROOT
 
@@ -111,10 +112,12 @@ class Mock:
             return
         media = hdr["content-type"].split(";")[0]
         assert media in content, f"{method} {path} {status}: content type {media} is not declared"
-        if media == "application/problem+json":  # RFC 9457: the standard members, tied to the status and the code
-            assert body["status"] == status and body["type"] == "https://vulnmart.invalid/problems/" + body["code"], (path, body)
-            assert body["instance"] == "urn:vulnmart:request:" + body["request_id"] and body["title"] and "message" not in body, (path, body)
-            assert body["title"].endswith(".") and len(body["title"]) <= 120, body
+        if media == "application/problem+json":  # IF-8: the closed body, tied to the status, the code and the registry
+            assert body["status"] == status and body["type"] == "urn:vulnmart:error:" + body["code"], (path, body)
+            assert not {"detail", "instance", "message"} & set(body), (path, body)
+            info = ERRORS[ErrorCode(body["code"])]
+            assert body["status"] == info.status and body["title"] == info.title, (path, body)
+            assert ("field" in body) <= (status == 422), (path, body)
         errors = list(Draft202012Validator({"$ref": "#/components/schemas/__x", "components": _components(content[media]["schema"])}).iter_errors(body))
         assert errors == [], f"{method} {path} {status}: " + "; ".join(f"{base.error_path(e)} {e.message}" for e in errors)
 
@@ -230,11 +233,12 @@ def test_the_text_lists_every_operation_and_has_open_points():
 def test_error_codes_in_the_text_are_in_the_pattern_and_examples_use_them():
     text = (LAB_DIR / contract.TEXT).read_text(encoding="utf-8")
     section = text.split("## 5. Error codes")[1].split("## 6.")[0]
-    pattern = re.compile(SPEC["components"]["schemas"]["ProblemCode"]["pattern"])
-    codes = set(re.findall(r"`((?:auth|att|inst|req)_[a-z_]+)`", section))
+    pattern = re.compile(SPEC["components"]["schemas"]["Problem"]["properties"]["code"]["pattern"])
+    codes = set(re.findall(r"`((?:AUTH|ATT|INST|REQ)-[A-Z-]+)`", section))
     assert len(codes) >= 15 and all(pattern.match(c) for c in codes)
-    declared = set(re.findall(r"[a-z]+_[a-z_]+", SPEC["components"]["schemas"]["ProblemCode"]["description"]))
-    assert codes <= declared, codes - declared
+    from vulnmart_models.error_codes import ErrorCode
+
+    assert all(ErrorCode(c) for c in codes)  # every code of the text is in the registry
 
 
 # ---- the check fails when a rule is broken ----
@@ -408,7 +412,7 @@ def test_read_as_owner_and_by_a_reviewer(mock):
 
 def test_no_session_is_401(mock):
     status, body, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}", None)
-    assert status == 401 and body["code"] == "auth_session_required"
+    assert status == 401 and body["code"] == "AUTH-SESSION-REQUIRED"
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}", "ada", cookie=False)[0] == 401
 
 
@@ -421,7 +425,7 @@ def test_a_post_without_csrf_or_with_another_origin_is_403_and_changes_nothing(f
     s3, b3, _ = m.call("POST", path, "ada", body, origin="https://evil.example.invalid")
     s4, b4, _ = m.call("POST", path, "ada", body, origin=None)
     assert (s1, s2, s3, s4) == (403, 403, 403, 403)
-    assert (b1["code"], b2["code"]) == ("auth_csrf_failed", "auth_csrf_failed") and b3["code"] == b4["code"] == "auth_origin_forbidden"
+    assert (b1["code"], b2["code"]) == ("AUTH-CSRF-FAILED", "AUTH-CSRF-FAILED") and b3["code"] == b4["code"] == "AUTH-ORIGIN-FORBIDDEN"
     assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/timeline")[1]["items"] == []  # nothing changed
 
 
@@ -430,13 +434,13 @@ def test_not_yours_and_missing_give_the_same_404(mock):
     s2, b2, _ = mock.call("GET", "/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ", "eve")
     s3, b3, _ = mock.call("GET", "/api/v1/attempts/not-an-id", "eve")
     assert (s1, s2, s3) == (404, 404, 404)
-    own = lambda b: {k: v for k, v in b.items() if k not in ("request_id", "instance")}  # noqa: E731
+    own = lambda b: {k: v for k, v in b.items() if k != "request_id"}  # noqa: E731
     assert own(b1) == own(b2) == own(b3)
     i1 = mock.call("GET", f"/api/v1/instances/{I_CAND}", "eve")
     i2 = mock.call("GET", "/api/v1/instances/i-ZZZZZZZZZZZZZZZZ", "eve")
-    assert i1[0] == i2[0] == 404 and i1[1]["code"] == i2[1]["code"] == "inst_not_found"
+    assert i1[0] == i2[0] == 404 and i1[1]["code"] == i2[1]["code"] == "INST-NOT-FOUND"
     # a body error does not tell an existing id from a missing one
-    assert mock.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "eve", {"nope": 1})[1]["code"] == "att_not_found"
+    assert mock.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "eve", {"nope": 1})[1]["code"] == "ATT-NOT-FOUND"
     # a recruiter does not read a learner practice attempt, and a learner does not read a candidate report
     assert mock.call("GET", f"/api/v1/attempts/{A_LEARNER}", "rex")[0] == 404
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/report", "cam")[0] == 404
@@ -475,7 +479,7 @@ def test_more_than_five_wrong_in_ten_minutes_is_429_with_retry_after(fresh):
     for n in range(5):
         assert m.call("POST", path, "ada", {"challenge_key": "C05", "flag": f"wrong {n}"})[1]["result"] == "incorrect"
     s, b, h = m.call("POST", path, "ada", {"challenge_key": "C05", "flag": flag("A")})  # even a correct value is refused
-    assert s == 429 and b["code"] == "att_flag_rate_limited" and 1 <= int(h["retry-after"]) <= 600
+    assert s == 429 and b["code"] == "ATT-FLAG-RATE-LIMITED" and 1 <= int(h["retry-after"]) <= 600
     assert m.call("POST", path, "ada", {"challenge_key": "C06", "flag": flag("A")})[0] == 200  # the limit is per challenge
 
 
@@ -487,7 +491,7 @@ def test_decoy_other_instance_and_stale_epoch_submits_count_for_the_rate_limit(f
         s, b, _ = m.call("POST", path, "ada", {"challenge_key": "C07", "flag": flag(letter)})
         assert s == 200 and b["result"] == "incorrect"
     s, b, h = m.call("POST", path, "ada", {"challenge_key": "C07", "flag": "anything"})
-    assert s == 429 and b["code"] == "att_flag_rate_limited" and int(h["retry-after"]) >= 1
+    assert s == 429 and b["code"] == "ATT-FLAG-RATE-LIMITED" and int(h["retry-after"]) >= 1
 
 
 def test_a_repeated_correct_flag_is_answered_before_the_rate_limit(fresh):
@@ -504,7 +508,7 @@ def test_a_repeated_correct_flag_is_answered_before_the_rate_limit(fresh):
 def test_hints_off_refuses_list_and_unlock_with_404(mock):
     for method, path in [("GET", f"/api/v1/attempts/{A_CAND}/challenges/C01/hints"), ("POST", f"/api/v1/attempts/{A_CAND}/challenges/C01/hints/1/unlock")]:
         s, b, _ = mock.call(method, path, "cam")
-        assert s == 404 and b["code"] == "att_hints_disabled"
+        assert s == 404 and b["code"] == "ATT-HINTS-DISABLED"
     assert mock.call("GET", f"/api/v1/attempts/{A_CAND}/challenges", "cam")[1]["items"][0]["hints_available"] is False
 
 
@@ -521,20 +525,20 @@ def test_hints_text_is_null_until_unlocked_and_unlock_is_repeatable(fresh):
 
 def test_wrong_state_is_409(mock):
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_DONE}/submit", "cam", {"confirm": True})
-    assert s == 409 and b["code"] == "att_invalid_state"
+    assert s == 409 and b["code"] == "ATT-INVALID-STATE"
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_DONE}/flags", "cam", {"challenge_key": "C01", "flag": "x"})
-    assert s == 409 and b["code"] == "att_invalid_state"
+    assert s == 409 and b["code"] == "ATT-INVALID-STATE"
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_CAND}/start", "cam")  # already running
-    assert s == 409 and b["code"] == "att_invalid_state"
+    assert s == 409 and b["code"] == "ATT-INVALID-STATE"
 
 
 def test_reset_raises_the_epoch_and_other_states_are_409(fresh):
     m = fresh("--step-delay-ms", "600000")
     iid = m.call("POST", "/api/v1/instances", "ada", {"kind": "learner"})[1]["instance_id"]
     s, b, _ = m.call("POST", f"/api/v1/instances/{iid}/reset", "ada", {"confirm": True})  # still requested
-    assert s == 409 and b["code"] == "inst_invalid_state"
+    assert s == 409 and b["code"] == "INST-INVALID-STATE"
     s, b, _ = m.call("POST", f"/api/v1/instances/{iid}/open")
-    assert s == 409 and b["code"] == "inst_not_ready"
+    assert s == 409 and b["code"] == "INST-NOT-READY"
     s, b, _ = m.call("POST", f"/api/v1/instances/{I_CAND}/reset", "cam", {"confirm": True})  # seeded ready instance, steps held
     assert s == 202 and b["epoch"] == 2 and b["state"] == "resetting"
     assert m.call("POST", f"/api/v1/instances/{I_CAND}/reset", "cam", {"confirm": True})[0] == 409  # already resetting
@@ -574,7 +578,7 @@ DECISION = f"/api/v1/attempts/{A_CAND}/integrity-flags/g-AAAAAAAAAAAAAAAA/decisi
 ])
 def test_a_bad_body_is_422_with_the_exact_field_pointer(mock, user, path, body, field):
     s, b, _ = mock.call("POST", path, user, body)
-    assert s == 422 and b["code"] == "req_validation" and b["field"] == field
+    assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == field
 
 
 def test_422_names_the_field_and_never_repeats_the_value(mock):
@@ -582,7 +586,7 @@ def test_422_names_the_field_and_never_repeats_the_value(mock):
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", {"challenge_key": "C01", "flag": 7, secret: 1})
     assert s == 422 and secret not in json.dumps(b) and b["field"] == ""
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", {"challenge_key": "C01", "flag": 7})
-    assert b["field"] == "/flag" and "7" not in b["detail"]
+    assert b["field"] == "/flag" and "detail" not in b and "7" not in (b["title"] + b["field"])
 
 
 def test_json_only_size_and_a_body_where_none_is_allowed(mock):
@@ -592,7 +596,7 @@ def test_json_only_size_and_a_body_where_none_is_allowed(mock):
     assert mock.call("POST", f"/api/v1/instances/{I_CAND}/open", "cam", raw=b"{}")[0] == 422
     # a body a little over the limit: the client always reads the 413 (the mock reads and discards the rest before it closes)
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{" + b" " * (70 * 1024) + b"}")
-    assert s == 413 and b["code"] == "req_too_large"
+    assert s == 413 and b["code"] == "REQ-TOO-LARGE"
 
 
 def test_a_huge_body_gets_413_or_a_dropped_connection_and_the_service_goes_on(fresh):
@@ -600,7 +604,7 @@ def test_a_huge_body_gets_413_or_a_dropped_connection_and_the_service_goes_on(fr
     m = fresh()
     try:
         s, b, _ = m.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", raw=b"{" + b" " * (4 * 1024 * 1024) + b"}")
-        assert s == 413 and b["code"] == "req_too_large"
+        assert s == 413 and b["code"] == "REQ-TOO-LARGE"
     except (urllib.error.URLError, ConnectionError):
         pass  # reset or broken pipe: the connection was dropped, which the contract allows here and nowhere else
     assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}", "ada")[0] == 200
@@ -608,9 +612,9 @@ def test_a_huge_body_gets_413_or_a_dropped_connection_and_the_service_goes_on(fr
 
 def test_unknown_path_and_method(mock):
     s, b, _ = mock.call("GET", "/api/v1/nothing", "ada")
-    assert s == 404 and b["code"] == "req_route_unknown"
+    assert s == 404 and b["code"] == "REQ-ROUTE-UNKNOWN"
     s, b, h = mock.call("DELETE", f"/api/v1/instances/{I_CAND}", "cam")
-    assert s == 405 and b["code"] == "req_method_not_allowed" and h["allow"] == "GET"
+    assert s == 405 and b["code"] == "REQ-METHOD-NOT-ALLOWED" and h["allow"] == "GET"
     s, b, h = mock.call("GET", f"/api/v1/attempts/{A_LEARNER}/flags", "ada")
     assert s == 405 and h["allow"] == "POST"
     assert mock.call("GET", "/api/v1/instances", "ada")[0] == 405
@@ -651,7 +655,7 @@ def test_a_second_instance_request_is_refused_by_the_quota_rule(fresh):
     m = fresh()
     assert m.call("POST", "/api/v1/instances", "ada", {"kind": "learner"})[0] == 202
     s, b, _ = m.call("POST", "/api/v1/instances", "ada", {"kind": "learner"})
-    assert s == 409 and b["code"] == "inst_quota_reached"
+    assert s == 409 and b["code"] == "INST-QUOTA-REACHED"
     assert m.call("POST", "/api/v1/instances", "eve", {"kind": "learner"})[0] == 202  # another user is fine
 
 
@@ -721,7 +725,7 @@ def test_hint_levels_unlock_in_order_and_an_early_level_unlocks_nothing(fresh):
     m = fresh()
     base_path = f"/api/v1/attempts/{A_LEARNER}/challenges/C04/hints"
     s, b, _ = m.call("POST", base_path + "/3/unlock")
-    assert s == 409 and b["code"] == "att_invalid_state" and b["field"] == "/level"
+    assert s == 409 and b["code"] == "ATT-INVALID-STATE" and "field" not in b  # only a 422 carries a field (IF-8)
     assert m.call("POST", base_path + "/2/unlock")[0] == 409
     assert [h["unlocked"] for h in m.call("GET", base_path)[1]["items"]] == [False, False, False]
     assert _timeline(m, "ada") == []
@@ -741,7 +745,7 @@ def _cursor(text):
                                   "f.1.1e3", "f.1.0x10", "f.-1.5", "", "f.9999999999.5", "f.1.99999999999999999", "abc", "f.1.1.0"])
 def test_a_cursor_that_is_not_a_canonical_key_is_422(mock, text):
     s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?cursor={_cursor(text)}", "rex")
-    assert s == 422 and b["field"] == "/cursor" and b["code"] == "req_validation", text
+    assert s == 422 and b["field"] == "/query/cursor" and b["code"] == "REQ-VALIDATION", text
 
 
 def test_a_cursor_that_is_not_the_canonical_encoding_is_422(mock):
@@ -854,16 +858,16 @@ GET_PATHS = [f"/api/v1/instances/{I_CAND}", f"/api/v1/attempts/{A_CAND}", f"/api
 def test_every_get_refuses_an_unknown_or_repeated_query_parameter(mock, path):
     user = "cam" if "instances" in path else "rex"
     s, b, _ = mock.call("GET", path + "?surprise=1", user)
-    assert s == 422 and b["code"] == "req_validation" and b["field"] == "/surprise"
+    assert s == 422 and b["code"] == "REQ-VALIDATION" and b["field"] == "/query/surprise"
     s, b, _ = mock.call("GET", path + ("?limit=1&limit=2" if path.endswith("timeline") else "?x=1&x=2"), user)
-    assert s == 422 and b["field"] in ("/limit", "/x")
+    assert s == 422 and b["field"] in ("/query/limit", "/query/x")
     assert mock.call("GET", path, user)[0] == 200
 
 
 def test_the_hints_get_refuses_a_query_parameter_and_a_hostile_name_is_not_echoed(fresh):
     m = fresh()
     s, b, _ = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges/C01/hints?surprise=1")
-    assert s == 422 and b["field"] == "/surprise"
+    assert s == 422 and b["field"] == "/query/surprise"
     s, b, _ = m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score?%3Cscript%3E=1")
     assert s == 422 and b["field"] == "" and "script" not in json.dumps(b)
     # an outsider still gets the uniform 404 first, not a validation answer
@@ -874,28 +878,28 @@ def test_the_hints_get_refuses_a_query_parameter_and_a_hostile_name_is_not_echoe
 def test_a_prototype_key_is_not_a_session(mock):
     for name in ("constructor", "__proto__", "toString", "hasOwnProperty"):
         s, b, _ = mock.call("GET", f"/api/v1/attempts/{A_CAND}", None, cookie=False, extra_headers={"Cookie": f"__Host-vm_session={name}"})
-        assert s == 401 and b["code"] == "auth_session_required", name
+        assert s == 401 and b["code"] == "AUTH-SESSION-REQUIRED", name
 
 
 def test_a_csrf_header_of_another_length_is_403_not_500(mock):
     for token in ("x", "X" * 200):
         s, b, _ = mock.call("POST", FLAGS, "ada", {"challenge_key": "C01", "flag": "x"}, csrf=token)
-        assert s == 403 and b["code"] == "auth_csrf_failed"
+        assert s == 403 and b["code"] == "AUTH-CSRF-FAILED"
 
 
 @pytest.mark.parametrize("path", ["/api/v1/attempts/%ZZ", "/api/v1/instances/%", "/api/v1/attempts/a-AAAAAAAAAAAAAAAA/challenges/%E0%A4%A/hints"])
 def test_bad_percent_encoding_is_the_uniform_404(mock, path):
     s, b, _ = mock.call("GET", path, "ada")
-    assert s == 404 and b["code"] == "req_route_unknown"
+    assert s == 404 and b["code"] == "REQ-ROUTE-UNKNOWN"
 
 
 def test_reset_and_stop_after_submit_are_409_and_the_freeze_holds(fresh):
     m = fresh()
     assert m.call("POST", f"/api/v1/attempts/{A_CAND}/submit", "cam", {"confirm": True})[0] == 200
     s, b, _ = m.call("POST", f"/api/v1/instances/{I_CAND}/reset", "cam", {"confirm": True})
-    assert s == 409 and b["code"] == "inst_invalid_state"
+    assert s == 409 and b["code"] == "INST-INVALID-STATE"
     s, b, _ = m.call("POST", f"/api/v1/instances/{I_CAND}/stop", "cam")
-    assert s == 409 and b["code"] == "inst_invalid_state"
+    assert s == 409 and b["code"] == "INST-INVALID-STATE"
     inst = m.call("GET", f"/api/v1/instances/{I_CAND}", "cam")[1]
     assert inst["access"] == "frozen" and inst["epoch"] == 1 and inst["state"] == "ready"
 
@@ -914,7 +918,7 @@ def test_the_owner_of_a_learner_attempt_cannot_decide_and_is_not_told_the_reason
     assert m.call("POST", FLAGS, "ada", {"challenge_key": "C01", "flag": flag("B")})[1]["result"] == "incorrect"
     assert m.call("GET", f"/api/v1/attempts/{A_LEARNER}/integrity-flags", "ada")[1]["items"] == []
     s, b, _ = m.call("POST", f"/api/v1/attempts/{A_LEARNER}/integrity-flags/g-AAAAAAAAAAAAAAAA/decision", "ada", {"decision": "accept", "note": "x"})
-    assert s == 404 and b["code"] == "att_not_found"
+    assert s == 404 and b["code"] == "ATT-NOT-FOUND"
 
 
 def test_check_fails_when_a_secret_name_is_in_a_post_answer_schema(copy_of_contract):
@@ -955,50 +959,51 @@ def test_a_non_string_valid_manifest_value_is_reported_and_the_check_continues(c
 
 
 # ---- story 1.15 part B4: problem details, lists, order of checks, roles, states, the oracle ----
-def test_every_error_is_rfc_9457_problem_details_with_the_extension_members(fresh):
+def test_every_error_is_the_closed_if8_body_with_the_registry_title_and_status(fresh):
     m = fresh()
-    cases = [("GET", f"/api/v1/attempts/{A_CAND}", None, None, 401, "auth_session_required"),
-             ("GET", f"/api/v1/attempts/{A_CAND}", "eve", None, 404, "att_not_found"),
-             ("POST", FLAGS, "ada", {"challenge_key": "C01"}, 422, "req_validation"),
+    cases = [("GET", f"/api/v1/attempts/{A_CAND}", None, None, 401, "AUTH-SESSION-REQUIRED"),
+             ("GET", f"/api/v1/attempts/{A_CAND}", "eve", None, 404, "ATT-NOT-FOUND"),
+             ("POST", FLAGS, "ada", {"challenge_key": "C01"}, 422, "REQ-VALIDATION"),
              ("POST", FLAGS, "ada", {"challenge_key": "C01", "flag": "x"}, 200, None),
-             ("GET", "/api/v1/nothing", "ada", None, 404, "req_route_unknown"),
-             ("DELETE", f"/api/v1/instances/{I_CAND}", "cam", None, 405, "req_method_not_allowed")]
+             ("GET", "/api/v1/nothing", "ada", None, 404, "REQ-ROUTE-UNKNOWN"),
+             ("DELETE", f"/api/v1/instances/{I_CAND}", "cam", None, 405, "REQ-METHOD-NOT-ALLOWED")]
     for method, path, user, body, status, code in cases:
         s, b, h = m.call(method, path, user, body)
         assert s == status
         if code:
             assert h["content-type"].split(";")[0] == "application/problem+json"
-            assert b["code"] == code and b["type"] == "https://vulnmart.invalid/problems/" + code and b["status"] == status
+            assert b["code"] == code and b["type"] == "urn:vulnmart:error:" + code and b["status"] == status
+            info = ERRORS[ErrorCode(code)]
+            assert b["title"] == info.title and b["status"] == info.status
     s, b, h = m.call("POST", FLAGS, "ada", {"challenge_key": "C01"})
-    assert b["field"] == "/flag" and b["detail"] and b["title"] and b["instance"].endswith(b["request_id"])
-    assert "message" not in b
+    assert b["field"] == "/flag" and b["title"] and set(b) == {"type", "title", "status", "code", "request_id", "field"}
 
 
-def test_the_title_is_the_same_for_every_answer_with_one_code_and_the_detail_is_not_a_value(fresh):
+def test_the_title_is_the_same_for_every_answer_with_one_code(fresh):
     m = fresh()
     titles = {m.call("GET", f"/api/v1/attempts/{x}", "eve")[1]["title"] for x in (A_CAND, "a-ZZZZZZZZZZZZZZZZ", "bad")}
     assert len(titles) == 1
 
 
-def test_the_problem_schema_is_open_but_never_carries_a_stack_trace():
+def test_the_problem_schema_is_closed_and_never_carries_a_stack_trace():
     schema = SPEC["components"]["schemas"]["Problem"]
-    assert schema.get("additionalProperties", True) is not False
+    assert schema["additionalProperties"] is False
     validator = Draft202012Validator({"$ref": "#/components/schemas/Problem", "components": SPEC["components"]})
     good = json.loads((LAB_DIR / "examples" / "valid" / "error.not-found.json").read_text(encoding="utf-8"))
-    assert list(validator.iter_errors({**good, "future_member": {"a": 1}})) == []  # a member we do not know is ignored
-    assert list(validator.iter_errors({**good, "stack": "at x"})) != []
-
+    assert list(validator.iter_errors(good)) == []
+    for extra in ("future_member", "stack", "detail", "instance", "message"):
+        assert list(validator.iter_errors({**good, extra: "x"})) != [], extra  # closed: no member may be added
 
 def test_a_non_json_post_is_415_before_the_lookup_404(fresh):
     m = fresh()
     for path in (f"/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ/flags", f"/api/v1/attempts/{A_CAND}/flags", "/api/v1/instances/i-ZZZZZZZZZZZZZZZZ/reset"):
         s, b, _ = m.call("POST", path, "eve", raw=b"x=1", ctype="text/plain")
-        assert s == 415 and b["code"] == "req_unsupported_media_type", path
+        assert s == 415 and b["code"] == "REQ-UNSUPPORTED-MEDIA-TYPE", path
     # the 403 of CSRF and Origin still comes before the 415, and the 404 comes before the 422
     assert m.call("POST", f"/api/v1/attempts/{A_CAND}/flags", "eve", raw=b"x=1", ctype="text/plain", csrf=None)[0] == 403
-    assert m.call("POST", f"/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ/flags", "eve", {"nope": 1})[1]["code"] == "att_not_found"
+    assert m.call("POST", f"/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ/flags", "eve", {"nope": 1})[1]["code"] == "ATT-NOT-FOUND"
     # a call that takes no body has no media type to check
-    assert m.call("POST", f"/api/v1/instances/i-ZZZZZZZZZZZZZZZZ/open", "eve")[1]["code"] == "inst_not_found"
+    assert m.call("POST", f"/api/v1/instances/i-ZZZZZZZZZZZZZZZZ/open", "eve")[1]["code"] == "INST-NOT-FOUND"
 
 
 def test_every_list_answer_has_has_more_and_the_capped_lists_take_a_limit(fresh):
@@ -1011,7 +1016,7 @@ def test_every_list_answer_has_has_more_and_the_capped_lists_take_a_limit(fresh)
     for path in (f"/api/v1/attempts/{A_CAND}/evidence", f"/api/v1/attempts/{A_CAND}/integrity-flags"):
         for bad in ("101", "0", "-1", "x", "1000"):
             s, b, _ = m.call("GET", f"{path}?limit={bad}", "rex")
-            assert s == 422 and b["field"] == "/limit", (path, bad)
+            assert s == 422 and b["field"] == "/query/limit", (path, bad)
         assert m.call("GET", f"{path}?limit=100", "rex")[0] == 200
     assert m.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?limit=201", "rex")[0] == 422
     assert m.call("GET", f"/api/v1/attempts/{A_CAND}/timeline?limit=200", "rex")[0] == 200
@@ -1079,10 +1084,10 @@ def test_a_withdrawn_or_cancelled_attempt_shows_its_state_and_its_data_is_gone(m
         assert s == 200 and b["state"] == state
     for part in ("score", "challenges", "timeline", "evidence", "integrity-flags", "report", "challenges/C01/hints"):
         s, b, _ = mock.call("GET", f"/api/v1/attempts/{attempt}/{part}", "cam" if part in ("score", "challenges", "timeline", "challenges/C01/hints") else "rex")
-        assert s == 410 and b["code"] == "att_gone" and b["status"] == 410, part
+        assert s == 410 and b["code"] == "ATT-GONE" and b["status"] == 410, part
     assert mock.call("GET", f"/api/v1/attempts/{attempt}/score", "eve")[0] == 404  # ownership is checked first
     s, b, _ = mock.call("POST", f"/api/v1/attempts/{attempt}/flags", "cam", {"challenge_key": "C01", "flag": "x"})
-    assert s == 409 and b["code"] == "att_invalid_state"
+    assert s == 409 and b["code"] == "ATT-INVALID-STATE"
     assert mock.call("POST", f"/api/v1/attempts/{attempt}/submit", "cam", {"confirm": True})[0] == 409
     assert mock.call("POST", f"/api/v1/attempts/{attempt}/start", "cam")[0] == 409
 
@@ -1092,7 +1097,7 @@ def test_a_deleted_attempt_is_the_same_404_as_a_missing_one(mock):
                                      ("cam", "POST", "/flags", {"challenge_key": "C01", "flag": "x"}), ("cam", "POST", "/submit", {"confirm": True})]:
         s, b, _ = mock.call(method, f"/api/v1/attempts/{A_DELETED}{part}", user, body)
         s2, b2, _ = mock.call(method, f"/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ{part}", user, body)
-        assert (s, b["code"], b["title"]) == (s2, b2["code"], b2["title"]) == (404, "att_not_found", b["title"]), part
+        assert (s, b["code"], b["title"]) == (s2, b2["code"], b2["title"]) == (404, "ATT-NOT-FOUND", b["title"]), part
 
 
 def test_the_flag_result_never_names_the_reason_and_the_check_forbids_it(copy_of_contract):
@@ -1105,16 +1110,25 @@ def test_the_flag_result_never_names_the_reason_and_the_check_forbids_it(copy_of
 def test_check_fails_when_a_problem_type_does_not_match_its_code(copy_of_contract):
     f = copy_of_contract / "examples" / "valid" / "error.not-found.json"
     data = json.loads(f.read_text(encoding="utf-8"))
-    data["type"] = "https://vulnmart.invalid/problems/att_gone"
+    data["type"] = "urn:vulnmart:error:ATT-GONE"
     f.write_text(json.dumps(data), encoding="utf-8")
     errors, _ = contract.run(copy_of_contract)
     assert any("error.not-found.json: type must be" in e for e in errors), errors
 
 
-def test_check_fails_when_a_problem_example_still_has_the_old_message_member(copy_of_contract):
+def test_check_fails_when_a_problem_example_still_has_the_old_detail_member(copy_of_contract):
     f = copy_of_contract / "examples" / "valid" / "error.not-found.json"
     data = json.loads(f.read_text(encoding="utf-8"))
-    data["message"] = "x"
+    data["detail"] = "x"
     f.write_text(json.dumps(data), encoding="utf-8")
     errors, _ = contract.run(copy_of_contract)
-    assert any("old member message" in e for e in errors), errors
+    assert any("error.not-found.json does not match Problem" in e for e in errors), errors
+
+
+def test_check_fails_when_a_problem_example_has_a_title_that_is_not_the_registrys(copy_of_contract):
+    f = copy_of_contract / "examples" / "valid" / "error.not-found.json"
+    data = json.loads(f.read_text(encoding="utf-8"))
+    data["title"] = "Something else."
+    f.write_text(json.dumps(data), encoding="utf-8")
+    errors, _ = contract.run(copy_of_contract)
+    assert any("title must be the registry" in e for e in errors), errors

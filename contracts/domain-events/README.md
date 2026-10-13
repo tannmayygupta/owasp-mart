@@ -1,6 +1,6 @@
 # IF-3: domain events (what the live stream carries)
 
-Version **0.1.0** (story P-03). Owner: stream P (Akshay); stream L adds types by pull request. Consumers: the dashboards, the SSE hub (P-22) and stream L's publishers. Architecture: `docs/architecture/07-repo-and-workstreams.md` section 3.1 and ADR 0006. Requirements: FR-LIV-01, 05, 06, FR-DSH-01, 03, 06.
+Version **1.0.0** (story P-03). Owner: stream P (Akshay); stream L adds types by pull request. Consumers: the dashboards, the SSE hub (P-22) and stream L's publishers. Architecture: `docs/architecture/07-repo-and-workstreams.md` section 3.1 and ADR 0006. Requirements: FR-LIV-01, 05, 06, FR-DSH-01, 03, 06.
 
 This contract lives in its own folder, not in `contracts/events/`: that folder is IF-4's in `contracts/registry.json`.
 

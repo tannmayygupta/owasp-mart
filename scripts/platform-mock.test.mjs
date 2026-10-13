@@ -245,7 +245,7 @@ test('lab routes are forwarded to the fake lab: every lab operation reaches a la
   const labHeaders = { cookie: '__Host-vm_session=FAKE-SESSION-ADA; __Host-vm_csrf=tok', origin: DEFAULT_ORIGIN, 'x-csrf-token': 'tok' };
   for (const o of labOps) {
     const r = await call(o, { url: labBase, headers: labHeaders, body: o.method === 'POST' ? {} : undefined });
-    assert.notEqual(r.json?.code, 'req_route_unknown', `${o.method} ${o.path} did not reach a lab route`);
+    assert.notEqual(r.json?.code, 'REQ-ROUTE-UNKNOWN', `${o.method} ${o.path} did not reach a lab route`);
     assert.notEqual(r.json?.code, 'REQ-ROUTE-UNKNOWN', `${o.method} ${o.path} was answered by the platform mock`);
     assert.notEqual(r.status, 500, `${o.method} ${o.path}`);
   }

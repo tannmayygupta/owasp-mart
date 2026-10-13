@@ -392,22 +392,12 @@
   "problem-bad-code.json": {
     "schema": "Problem",
     "path": "/code",
-    "rule": "code shape: lower-case words with underscores"
-  },
-  "problem-orch-code.json": {
-    "schema": "Problem",
-    "path": "/code",
-    "rule": "no ORCH code in a browser answer"
+    "rule": "code is upper case words joined by hyphens"
   },
   "problem-extra-stack.json": {
     "schema": "Problem",
-    "path": "",
-    "rule": "no stack trace member"
-  },
-  "problem-message-too-long.json": {
-    "schema": "Problem",
-    "path": "/detail",
-    "rule": "detail at most 500 characters"
+    "path": "/stack",
+    "rule": "no stack trace member; the schema is closed"
   },
   "flag-result-reason-decoy.json": {
     "schema": "FlagSubmissionResult",
@@ -429,11 +419,6 @@
     "path": "/result",
     "rule": "the reason is never given to the submitter (only correct or incorrect)"
   },
-  "problem-old-upper-code.json": {
-    "schema": "Problem",
-    "path": "/code",
-    "rule": "codes are lower case: an old style code is refused"
-  },
   "problem-missing-type.json": {
     "schema": "Problem",
     "path": "/type",
@@ -442,7 +427,7 @@
   "problem-type-other-host.json": {
     "schema": "Problem",
     "path": "/type",
-    "rule": "type is on https://vulnmart.invalid/problems/"
+    "rule": "type is urn:vulnmart:error: plus the code"
   },
   "problem-missing-title.json": {
     "schema": "Problem",
@@ -458,11 +443,6 @@
     "schema": "Problem",
     "path": "/type",
     "rule": "an old style body (message, no RFC 9457 members) is refused"
-  },
-  "problem-bad-instance.json": {
-    "schema": "Problem",
-    "path": "/instance",
-    "rule": "instance is urn:vulnmart:request:<request_id>"
   },
   "timeline-missing-has-more.json": {
     "schema": "Timeline",
@@ -503,5 +483,25 @@
     "schema": "IntegrityFlagList",
     "path": "/has_more",
     "rule": "has_more is required"
+  },
+  "problem-has-instance.json": {
+    "schema": "Problem",
+    "path": "/instance",
+    "rule": "instance is not used"
+  },
+  "problem-has-detail.json": {
+    "schema": "Problem",
+    "path": "/detail",
+    "rule": "detail is not used: no free text reaches a client"
+  },
+  "problem-old-lower-code.json": {
+    "schema": "Problem",
+    "path": "/code",
+    "rule": "codes are upper case: the old lower-case spelling is refused"
+  },
+  "problem-type-old-url.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "the old https type is gone; type is urn:vulnmart:error: plus the code"
   }
 }

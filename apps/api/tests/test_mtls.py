@@ -45,6 +45,7 @@ def assert_nothing_created(pki, tls_svc, instance_id: str) -> None:
         good(pki, tls_svc).get(instance_id)
 
 
+@pytest.mark.needs_reset
 def test_the_full_lifecycle_works_over_mtls(pki, tls_svc):
     host = good(pki, tls_svc)
     req = create_request()

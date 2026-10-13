@@ -47,6 +47,9 @@ jobs:
       - run: pnpm run api:check
       - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"
       - run: uv run --locked --package vulnmart-api pytest -q
+      - run: uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
+      # story 3.2: the same protocol, wire, http, report and mTLS suites against the Python orchestrator service (reset cases skipped until story 3.4)
+      - run: VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py
       - run: pnpm run contracts:check
 
 
@@ -59,8 +62,10 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 10
     runs-on: ubuntu-24.04
+    # pull-requests: read is for the one step that fetches the reviews (story L-09, docs/adr/0029); nothing here can write.
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: Checkout the pull request head (data only, never executed here)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,16 +89,36 @@ jobs:
       - name: Install the dependencies of the base commit
         working-directory: base
         run: pnpm install --frozen-lockfile
+      # The only step that holds a token. It writes the reviews of this pull request to a file outside both checkouts and runs no repository code;
+      # the checker below reads that file as data and never sees the token (the rule "approvals" starts with the first tag contracts-v*).
+      - name: Fetch the pull request reviews (read-only token, this step only)
+        # a failed fetch must not fail every pull request before the tag: the checker then finds no file (NOT-APPLICABLE before the tag, FAIL after it)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWS_URL: repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews
+        run: gh api --paginate --slurp "$REVIEWS_URL" > "$RUNNER_TEMP/reviews.json"
       - name: Run the contract rules from the base commit
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
+          # The checker writes to a file and the job prints it without the long `notice:` lines of oasdiff (a pull request that changes many responses made
+          # the log longer than the runner keeps, and the verdict line was lost). The exit code of the checker is the exit code of this step.
+          OUT="$RUNNER_TEMP/contract-rules.txt"
           if [ -f base/scripts/check-contract-rules.mjs ] && grep -q 'trusted-base-checker-v1' base/scripts/check-contract-rules.mjs; then
-            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --tools base/tools/oasdiff.json
+            # --trusted instead of --tools: both switch on trusted mode (the head code checks run in the other job), the checker of the base commit reads its own
+            # tools/oasdiff.json by default (the same file as --tools base/tools/oasdiff.json), and the base checker of the first v1 pull request crashes on --tools
+            code=0
+            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR" > "$OUT" 2>&1 || code=$?
           else
             echo "::notice title=contract rules bootstrap::The base commit has no trusted-mode checker yet, so the checker of the pull request head runs. This run does not protect against a pull request that weakens the rules; review it by hand."
-            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --bootstrap --tools head/tools/oasdiff.json
+            code=0
+            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --bootstrap --tools head/tools/oasdiff.json --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR" > "$OUT" 2>&1 || code=$?
           fi
+          grep -v '^ *notice:' "$OUT" | cut -c1-400 || true
+          echo "oasdiff notice lines left out of this log: $(grep -c '^ *notice:' "$OUT" || true); checker exit code: $code"
+          exit "$code"
 
   # The checks that must run code of the pull request (the bundle script of package.json, Alembic and table owners with Python). No credentials are kept
   # (persist-credentials false, contents: read only, no secrets). Its verdict is the check named here; the trusted job above never runs head code.
@@ -210,6 +235,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The fake orchestrator of the tests (contracts/mocks) is Node and imports js-yaml (story 1.16), so the workspace must be installed.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: 0.12.23
@@ -230,6 +261,8 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: 0.12.23
+      # caddy-origin.e2e.test.mjs imports js-yaml, so the workspace must be installed.
+      - run: pnpm install --frozen-lockfile
       - run: docker compose -f infra/compose/compose.yaml config -q
       - run: docker compose -f infra/compose/compose.yaml --profile platform --profile web config -q
       # The API image copies packages/py-models: build it so a broken Dockerfile or .dockerignore fails here.
@@ -238,6 +271,8 @@ jobs:
       - run: node scripts/dev.mjs harness
       - run: node --test scripts/e2e/harness.e2e.test.mjs
       - run: node --test scripts/e2e/dev.e2e.test.mjs
+      # Story LE-3 (docs/adr/0031): the origin-secret gate and the unbuffered stream, tested with stock Caddy and the probe upstream (digests of infra/caddy/compose.p.yaml).
+      - run: node --test scripts/e2e/caddy-origin.e2e.test.mjs
   e2e:
     name: end-to-end tests (lab, orchestrator, events)
     timeout-minutes: 15

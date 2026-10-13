@@ -310,7 +310,7 @@ class ReportIngest:
             return sorted((r for k, r in self._by_key.items() if k[0] == instance_id), key=lambda r: (r.epoch, r.transition))
 
 
-# ---- errors: one class per code of the contract (placeholders until IF-8) ----
+# ---- errors: one class per ORCH-* code of the contract (the codes of the IF-8 registry) ----
 
 class OrchestratorError(Exception):
     """Base of every orchestrator error. `code` is the ORCH-* code, `http_status` the HTTP status."""

@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/inst_not_ready",
-  "title": "The instance is not ready.",
+  "type": "urn:vulnmart:error:INST-NOT-READY",
+  "title": "The instance is not ready yet.",
   "status": 409,
-  "detail": "the instance is not ready to open",
-  "instance": "urn:vulnmart:request:req-0123456789ab",
-  "code": "inst_not_ready",
+  "code": "INST-NOT-READY",
   "request_id": "req-0123456789ab"
 }
