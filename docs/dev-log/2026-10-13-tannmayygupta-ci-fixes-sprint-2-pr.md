@@ -49,6 +49,12 @@ A first attempt to change the checker call and the table format in one step was 
 - `compose and hello`: 12 of 15 tests of `caddy-origin.e2e.test.mjs` passed; the 3 "production shape" tests failed with "caddy did not come up". Likely cause (not proven): the folders made by `mkdtemp` are mode 0700 and Caddy runs as root with `cap_drop: ALL`, so it cannot read files of another owner on a Linux runner (Docker Desktop on Windows does not enforce this). The test now makes those folders 0755 and prints the Caddy log on failure. Not run: Docker Desktop was not running on this PC.
 - `contract rules`: the pasted log was cut off before the failing line, so the cause is not known yet; the base checker run locally (copy of origin/main) gave 29 PASS, 0 FAIL.
 
+## Third round (log archive of the second run)
+- The developer saved the log archive; the per-step file of `contract rules` ends mid-line (about 75 KB with timestamps, about 65 KB of output) with exit code 1 and no SUMMARY. Cause of the cut: `check-contract-rules.mjs` writes about 129 KB (oasdiff notice lines of the IF-8 error-body changes) with `process.stdout.write` and then calls `process.exit`; on a pipe the tail is lost. The first run had a short output (the base comparison failed), so it was complete.
+- The checker run locally in the exact CI layout (base and head folders, `--reviews`, `--require-reviews`, `--pr-author`) gives 29 PASS, 0 FAIL, exit 0, so the real FAIL line of the Linux run is still unknown.
+- Change: the step writes the output to a file, prints it without `notice:` lines and with the count of left-out lines, and exits with the checker's code. Tried locally with Git Bash in the CI layout: 32 lines, SUMMARY visible, exit 0. The next run on GitHub shows the verdict.
+- The `script tests` run of the archive ended with "The operation was canceled" in the Python-service step at 73%: the next push cancelled it (concurrency group), not a failure. The jobs `api tests`, `end-to-end`, `exploit runner`, `app tests`, `verify skills`, `installs`, `terraform` and `contract rules (head code)` passed in that run.
+
 ## Security notes (vulnerable parts only)
 None.
 

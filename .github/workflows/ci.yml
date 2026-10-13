@@ -103,13 +103,21 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
+          # The checker writes to a file and the job prints it without the long `notice:` lines of oasdiff (a pull request that changes many responses made
+          # the log longer than the runner keeps, and the verdict line was lost). The exit code of the checker is the exit code of this step.
+          OUT="$RUNNER_TEMP/contract-rules.txt"
           if [ -f base/scripts/check-contract-rules.mjs ] && grep -q 'trusted-base-checker-v1' base/scripts/check-contract-rules.mjs; then
             # no --tools: the checker of the base commit reads its own tools/oasdiff.json by default (the same file), and the base checker of the first v1 pull request crashes on that flag
-            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR"
+            code=0
+            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR" > "$OUT" 2>&1 || code=$?
           else
             echo "::notice title=contract rules bootstrap::The base commit has no trusted-mode checker yet, so the checker of the pull request head runs. This run does not protect against a pull request that weakens the rules; review it by hand."
-            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --bootstrap --tools head/tools/oasdiff.json --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR"
+            code=0
+            node head/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --bootstrap --tools head/tools/oasdiff.json --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR" > "$OUT" 2>&1 || code=$?
           fi
+          grep -v '^ *notice:' "$OUT" | cut -c1-400 || true
+          echo "oasdiff notice lines left out of this log: $(grep -c '^ *notice:' "$OUT" || true); checker exit code: $code"
+          exit "$code"
 
   # The checks that must run code of the pull request (the bundle script of package.json, Alembic and table owners with Python). No credentials are kept
   # (persist-credentials false, contents: read only, no secrets). Its verdict is the check named here; the trusted job above never runs head code.

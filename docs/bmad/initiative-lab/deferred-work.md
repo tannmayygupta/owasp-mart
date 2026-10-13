@@ -114,3 +114,4 @@
   summary: First CI run of the pull request failed in three jobs (api tests, compose and hello, contract rules); fixed in the commit that adds this note. Only the next CI run on GitHub proves it.
   evidence: `docs/dev-log/2026-10-13-tannmayygupta-ci-fixes-sprint-2-pr.md`
   second round (2026-10-13): caddy-origin production-shape tests made readable for a root container without DAC override; contract rules failure of the second run still to be read from the full log.
+  third round (2026-10-13): contract rules step prints a short verdict (output to a file, notice lines left out); real FAIL line of the Linux run still to be read from the next run.
