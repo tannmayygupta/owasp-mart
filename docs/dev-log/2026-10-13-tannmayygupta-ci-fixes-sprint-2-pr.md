@@ -55,6 +55,11 @@ A first attempt to change the checker call and the table format in one step was 
 - Change: the step writes the output to a file, prints it without `notice:` lines and with the count of left-out lines, and exits with the checker's code. Tried locally with Git Bash in the CI layout: 32 lines, SUMMARY visible, exit 0. The next run on GitHub shows the verdict.
 - The `script tests` run of the archive ended with "The operation was canceled" in the Python-service step at 73%: the next push cancelled it (concurrency group), not a failure. The jobs `api tests`, `end-to-end`, `exploit runner`, `app tests`, `verify skills`, `installs`, `terraform` and `contract rules (head code)` passed in that run.
 
+## Fourth round (log archive of the third run)
+- Only `contract rules` was red; the other ten jobs passed (the three Caddy production-shape tests too). The new short report showed: `FAIL table-owners` and `FAIL alembic` ("needs uv"), `SUMMARY: 27 PASS, 2 FAIL`.
+- Cause, my mistake of the first round: in the base checker `--tools` also means trusted mode. I removed `--tools` (to avoid the `loadConfig` crash) and so the trusted job started to run the head-code checks itself; they need uv and the Python workspace, which only the job `contract-rules-untrusted` has. The statement of the first round ("the rules are not weaker") was wrong for that moment: the trusted job had stopped being trusted.
+- Fix: `--trusted` instead of `--tools` (same trusted mode, the base checker reads its own `tools/oasdiff.json` by default, no crash). Tried locally in the CI layout (base and head folders, step extracted from `ci.yml`, run with Git Bash, `uv` removed from PATH): the report has the line "trusted mode: ...", `SUMMARY: 27 PASS, 0 FAIL`, exit 0.
+
 ## Security notes (vulnerable parts only)
 None.
 

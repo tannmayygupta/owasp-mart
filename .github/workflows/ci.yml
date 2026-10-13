@@ -107,9 +107,10 @@ jobs:
           # the log longer than the runner keeps, and the verdict line was lost). The exit code of the checker is the exit code of this step.
           OUT="$RUNNER_TEMP/contract-rules.txt"
           if [ -f base/scripts/check-contract-rules.mjs ] && grep -q 'trusted-base-checker-v1' base/scripts/check-contract-rules.mjs; then
-            # no --tools: the checker of the base commit reads its own tools/oasdiff.json by default (the same file), and the base checker of the first v1 pull request crashes on that flag
+            # --trusted instead of --tools: both switch on trusted mode (the head code checks run in the other job), the checker of the base commit reads its own
+            # tools/oasdiff.json by default (the same file as --tools base/tools/oasdiff.json), and the base checker of the first v1 pull request crashes on --tools
             code=0
-            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR" > "$OUT" 2>&1 || code=$?
+            node base/scripts/check-contract-rules.mjs --root head --base "$BASE_SHA" --trusted --reviews "$RUNNER_TEMP/reviews.json" --require-reviews --pr-author "$PR_AUTHOR" > "$OUT" 2>&1 || code=$?
           else
             echo "::notice title=contract rules bootstrap::The base commit has no trusted-mode checker yet, so the checker of the pull request head runs. This run does not protect against a pull request that weakens the rules; review it by hand."
             code=0

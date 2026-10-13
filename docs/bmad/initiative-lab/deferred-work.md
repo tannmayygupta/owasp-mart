@@ -115,3 +115,4 @@
   evidence: `docs/dev-log/2026-10-13-tannmayygupta-ci-fixes-sprint-2-pr.md`
   second round (2026-10-13): caddy-origin production-shape tests made readable for a root container without DAC override; contract rules failure of the second run still to be read from the full log.
   third round (2026-10-13): contract rules step prints a short verdict (output to a file, notice lines left out); real FAIL line of the Linux run still to be read from the next run.
+  fourth round (2026-10-13): contract rules uses --trusted (trusted mode restored); the first-round removal of --tools had switched it off.
