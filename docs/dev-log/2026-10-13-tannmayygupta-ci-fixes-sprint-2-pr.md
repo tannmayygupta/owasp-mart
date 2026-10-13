@@ -44,6 +44,11 @@ Pasted CI logs of the developer (run of the pull request); local outputs as abov
 ## Problems met and how they were fixed
 A first attempt to change the checker call and the table format in one step was blocked by the tool guard as a CI bypass, so the edits were made one by one with the reason written down.
 
+## Second round (second CI run)
+- `api tests` and the jobs that start the fake orchestrator moved on (js-yaml found). The orchestrator pytest job passed on Linux: 258 passed.
+- `compose and hello`: 12 of 15 tests of `caddy-origin.e2e.test.mjs` passed; the 3 "production shape" tests failed with "caddy did not come up". Likely cause (not proven): the folders made by `mkdtemp` are mode 0700 and Caddy runs as root with `cap_drop: ALL`, so it cannot read files of another owner on a Linux runner (Docker Desktop on Windows does not enforce this). The test now makes those folders 0755 and prints the Caddy log on failure. Not run: Docker Desktop was not running on this PC.
+- `contract rules`: the pasted log was cut off before the failing line, so the cause is not known yet; the base checker run locally (copy of origin/main) gave 29 PASS, 0 FAIL.
+
 ## Security notes (vulnerable parts only)
 None.
 

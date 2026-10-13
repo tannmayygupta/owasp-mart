@@ -318,11 +318,15 @@ async function startProduction(tag, { certDir, curFile, prevFile }) {
   assert.equal(r.status, 0, r.stderr);
   containers.push(name);
   const p = hostPort(name, 443);
-  await waitUp(p, true);
+  try { await waitUp(p, true); } catch (e) {
+    const l = sh(['logs', '--tail', '40', name]); // the container's own words in the failure (a Linux runner differs from Docker Desktop)
+    throw new Error(`${e.message}\n${l.stdout}${l.stderr}`);
+  }
   return { name, port: p };
 }
 function makeCert() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-origin-certs-'));
+  fs.chmodSync(dir, 0o755); // mkdtemp makes 0700; the container (root without CAP_DAC_OVERRIDE, cap_drop ALL) is not the owner on a Linux runner
   extraDirs.push(dir);
   const g = spawnSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(dir, 'privkey.pem'), '-out', path.join(dir, 'fullchain.pem'), '-days', '1', '-subj', '/CN=localhost'], { encoding: 'utf8' });
   assert.equal(g.status, 0, g.stderr);
@@ -336,6 +340,7 @@ test('production shape: the real Caddyfile.p with the flags of compose.p.yaml se
   await ready();
   const certDir = makeCert();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-origin-prod-'));
+  fs.chmodSync(dir, 0o755);
   extraDirs.push(dir);
   const secret = hex();
   const prod = await startProduction('ok', { certDir, curFile: tmpFile(dir, CUR, `${secret}\n`), prevFile: tmpFile(dir, PREV, '') });
@@ -364,6 +369,7 @@ test('production shape, secret file missing at start: Docker creates a directory
   await ready();
   const certDir = makeCert();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-origin-prod-'));
+  fs.chmodSync(dir, 0o755);
   extraDirs.push(dir);
   const missingCur = path.join(dir, CUR); // never created: the short -v syntax (and compose) make Docker create a DIRECTORY here
   const prevFile = tmpFile(dir, PREV, '');
@@ -383,6 +389,7 @@ test('production shape, previous file missing at start (a directory) but current
   await ready();
   const certDir = makeCert();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-origin-prod-'));
+  fs.chmodSync(dir, 0o755);
   extraDirs.push(dir);
   const secret = hex();
   const missingPrev = path.join(dir, PREV);

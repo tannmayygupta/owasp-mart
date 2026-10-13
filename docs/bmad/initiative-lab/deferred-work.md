@@ -113,3 +113,4 @@
 - source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
   summary: First CI run of the pull request failed in three jobs (api tests, compose and hello, contract rules); fixed in the commit that adds this note. Only the next CI run on GitHub proves it.
   evidence: `docs/dev-log/2026-10-13-tannmayygupta-ci-fixes-sprint-2-pr.md`
+  second round (2026-10-13): caddy-origin production-shape tests made readable for a root container without DAC override; contract rules failure of the second run still to be read from the full log.
