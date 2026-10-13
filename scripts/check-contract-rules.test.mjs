@@ -990,6 +990,10 @@ test('matrix: two tables in COMPAT.md: compat reads only the Versions table, and
   assert.match(cols.compat.details[0], /must start with the columns contract \| stream \| handle/);
   const handle = parseApprovers(COMPAT2.replace('@alice | owner', 'alice | owner'), REGISTRY);
   assert.match(handle.problems[0], /handle "alice" must look like @github-login/);
+  // the Approvals table written without outer pipes (so that the base checker before the tag skips it) reads the same
+  const bare = COMPAT2.split('\n').map((l, i, all) => (i > all.findIndex((x) => x.trim() === '## Approvals') && l.startsWith('|') ? l.trim().replace(/^\||\|$/g, '').trim() : l)).join('\n');
+  assert.deepEqual(parseApprovers(bare, REGISTRY).rows, parseApprovers(COMPAT2, REGISTRY).rows);
+  assert.equal(parseApprovers(bare, REGISTRY).problems.length, 0);
 });
 
 const rv = (login, state, commit, n = 1) => ({ id: n, user: { login }, state, commit_id: commit, submitted_at: `2026-10-11T10:0${n}:00Z` });

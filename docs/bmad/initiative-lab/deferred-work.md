@@ -108,3 +108,8 @@
 - source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
   summary: Accepted risk (audit 2026-10-13): the rules-engine guard accepts a self-written `registry change:` line and CODEOWNERS needs one owner; GitHub branch protection with required code-owner review is the control; check Settings > Branches (open question to the developer, ADR 0029).
   evidence: Audit of 2026-10-13; unverified until the developer looks at Settings, Branches. All rows must be re-confirmed at 1.0.0 (release commit 0a2a43b); the P-08 review of 2026-10-12 does not satisfy the tag.
+
+## CI fixes of the sprint 2 pull request (2026-10-13)
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: First CI run of the pull request failed in three jobs (api tests, compose and hello, contract rules); fixed in the commit that adds this note. Only the next CI run on GitHub proves it.
+  evidence: `docs/dev-log/2026-10-13-tannmayygupta-ci-fixes-sprint-2-pr.md`

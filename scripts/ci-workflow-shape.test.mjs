@@ -40,7 +40,7 @@ test('contract-rules: base commit is the trusted source, the head goes to head/,
   assert.equal((j.match(/uses: actions\/checkout@/g) ?? []).length, 2);
   assert.equal((j.match(/persist-credentials: false/g) ?? []).length, 2, 'both checkouts drop the token');
   assert.match(j, /working-directory: base\n\s+run: pnpm install --frozen-lockfile/);
-  assert.match(j, /node base\/scripts\/check-contract-rules\.mjs --root head --base "\$BASE_SHA" --tools base\/tools\/oasdiff\.json/);
+  assert.match(j, /node base\/scripts\/check-contract-rules\.mjs --root head --base "\$BASE_SHA" --reviews/);
   assert.match(j, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
   assert.match(j, /grep -q 'trusted-base-checker-v1' base\/scripts\/check-contract-rules\.mjs/, 'the bootstrap fallback is explicit');
   assert.match(j, /bootstrap/);

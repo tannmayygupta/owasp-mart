@@ -22,7 +22,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { diffSchemas } from './schema-diff.mjs';
-import { ensureOasdiff, runOasdiff, OasdiffError } from './oasdiff.mjs';
+import { ensureOasdiff, runOasdiff, loadConfig, OasdiffError } from './oasdiff.mjs';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PASS = 'PASS';
@@ -484,7 +484,9 @@ export function tableOf(section) {
   let header = null;
   const rows = [];
   section.lines.forEach((line, i) => {
-    if (!line.trim().startsWith('|')) return;
+    // A table line starts with a pipe, or has at least six pipes without the outer ones: the Approvals table is written that way so that the
+    // older checker of the base commit (it reads every `|` line of the file as a row of versions) skips it.
+    if (!line.trim().startsWith('|') && line.trim().split('|').length < 7) return;
     const cells = line.trim().replace(/^\||\|$/g, '').split('|').map(stripMd);
     if (!header) { header = cells; return; }
     if (SEPARATOR_ROW(cells)) return;
