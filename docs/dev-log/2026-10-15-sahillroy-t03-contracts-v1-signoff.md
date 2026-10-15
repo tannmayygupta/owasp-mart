@@ -38,12 +38,14 @@ The `contracts-v1.0.0` tag waits on each stream's sign-off (H-80/H-120/H-121); t
 The remaining Sahil rows (H-25/26/28/31/32/34/37-40/42-55) stay open: the per-challenge event names/data fields (H-43–H-55) are challenge-epic work; the injector-side (H-26) and S-4/S-5-gated (H-31) rows are not the shop's. Recorded in the H-121 answer.
 
 ## Problems met and how they were fixed
-Docker Desktop was not running on 2026-10-15, so the Docker instance harnesses could not be re-run against the merged mocks, and `scripts/dev.mjs demo` could not run. The sign-off does not depend on them: the only merge change touching the shop's integration is the fake-ingest's error-**body** shape, which my T-10 negative control asserts by **status code** (401, unchanged). The harness re-run and the demo are done once Docker is restarted (confirmatory).
+Docker Desktop was off earlier on 2026-10-15; once restarted, the confirmatory runs completed:
+- **Instance harnesses re-run against the merged mocks — all pass:** T-09 shop-instance 9/9, T-10 shop-events 9/9 (incl. the IF-8-body fake-ingest; the negative control still asserts status 401), T-11 mock-services 6/6, T-12 import-service 7/7, T-13 bot 5/5 — **36 checks, 0 FAIL**. So the v1.0.0 contracts fit the shop/services.
+- **`node scripts/dev.mjs demo --no-web` — PASSED (165 s):** the real Python orchestrator built an instance from the template with the real `apps/shop` image: `shop-role`, `orchestrator-start`, `client:create-and-ready` (became ready, health healthy), `client:shop-readyz-inside` (HTTP 200), `client:get-has-no-secrets` (0 of 7 found), create-idempotent, destroy, destroy-idempotent and nothing-left-over all PASS. The first demo run had failed only at `platform-stack-up` (the platform compose, Akshay's stack) from a transient concurrent-build contention — the `api` image builds fine standalone (repo-root context), and the re-run passed; not a shop/service defect.
 
 ## Security notes (vulnerable parts only)
 No code weakness. The image entries are public (code only, no secrets; flags are injected at runtime). The sign-off is a review action.
 
 ## Limitations and follow-ups
-- Re-run the Docker instance harnesses against the merged mocks and `node scripts/dev.mjs demo` once Docker is up; report the demo result to Tanmay.
+- Done: the Docker instance harnesses re-ran against the merged mocks (36/36) and `scripts/dev.mjs demo` passed with the real orchestrator + real shop (above) — reported to Tanmay.
 - Two items to confirm with Tanmay: whether he wants the `shop` image entry here or adds it himself; and the orchestrator allowlist `healthchecks` entries for my distroless images (no `wget`; the Dockerfiles use node-based HEALTHCHECK).
 - The `contracts-v1.0.0` tag waits on Akshay's (H-120) and Tanmay's sign-offs and the remaining checklist rows.
