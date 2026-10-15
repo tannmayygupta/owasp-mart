@@ -14,9 +14,10 @@ from pathlib import Path
 import pytest
 
 from support import (
-    CONTRACT_DIR, PLATFORM_KEY, ROOT, WRONG_KEY, ReportReceiver, ServiceProcess, create_request, material, new_id,
+    CONTRACT_DIR, PLATFORM_KEY, ROOT, WRONG_KEY, ReportReceiver, ServiceProcess, create_request, instance_memory_mb, material, new_id,
     raw_call, reset_request,
 )
+from vulnmart_models.error_codes import ERRORS, ErrorCode
 from vulnmart.ports.http_instance_host import HttpInstanceHost, utc_timestamp
 from vulnmart.ports.instance_host import (
     Access, BadSignature, Busy, InstanceNotFound, InstanceState, OrchestratorUnavailable, RateLimited, ValidationFailed,
@@ -47,15 +48,17 @@ def body_of(req) -> bytes:
 
 
 def problem(status_body: tuple[int, bytes, dict]) -> dict:
-    """The body of an error answer, after the RFC 9457 checks: media type, the standard members agree with the answer."""
+    """The body of an error answer, after the IF-8 checks: media type, the closed schema, the registry's status and title."""
     status, body, headers = status_body
     data = json.loads(body)
     assert headers["content-type"] == "application/problem+json"
     conforms("Problem", data)
     assert data["status"] == status
-    assert data["type"] == "https://vulnmart.invalid/problems/" + data["code"].lower()
-    assert data["instance"] == "urn:vulnmart:request:" + data["request_id"]
-    assert "message" not in data  # the old-style member is gone (ADR 0028)
+    assert data["type"] == "urn:vulnmart:error:" + data["code"]
+    info = ERRORS[ErrorCode(data["code"])]
+    assert data["status"] == info.status and data["title"] == info.title  # status and title come from the registry
+    assert not {"detail", "instance", "message"} & set(data)  # closed: no free text reaches a client (IF-8)
+    assert ("field" in data) <= (status == 422)  # a field is for a 422 only
     return data
 
 
@@ -127,7 +130,7 @@ def test_the_error_does_not_say_which_check_failed(svc):
     wrong = signed_headers(WRONG_KEY, "GET", "/v1/host", b"")
     a = problem(raw_call(svc.url, "GET", "/v1/host", headers=stale))
     b = problem(raw_call(svc.url, "GET", "/v1/host", headers=wrong))
-    assert a["detail"] == b["detail"] and a["title"] == b["title"]
+    assert {k: v for k, v in a.items() if k != "request_id"} == {k: v for k, v in b.items() if k != "request_id"}
 
 
 # ---- what the orchestrator accepts (NFR-SEC-04) ----
@@ -143,7 +146,7 @@ def test_a_forbidden_field_is_refused_and_nothing_is_created(svc, name, value):
     res = raw_call(svc.url, "POST", "/v1/instances", json.dumps(body).encode())
     assert res[0] == 422
     p = problem(res)
-    assert p["code"] == "ORCH-FIELD-FORBIDDEN" and p["field"] == name
+    assert p["code"] == "ORCH-FIELD-FORBIDDEN" and p["field"] == "/" + name
     host = HttpInstanceHost(svc.url, PLATFORM_KEY)
     with pytest.raises(InstanceNotFound):
         host.get(req.instance_id)
@@ -213,6 +216,7 @@ def test_a_malformed_instance_id_in_the_path_is_refused(svc):
 
 
 # ---- answers match the OpenAPI schemas and hold no secret ----
+@pytest.mark.needs_reset
 def test_answers_match_the_schemas_and_hold_no_secret(svc):
     req = create_request(tag="Q")
     secrets = [f.flag for f in req.material.flags] + [d.value for d in req.material.decoys] + [
@@ -286,6 +290,7 @@ def test_the_python_signer_reproduces_the_fixed_vector():
 
 
 # ---- state reports (the receiver is in support.py; transition numbers: test_reports.py) ----
+@pytest.mark.needs_reset
 def test_state_reports_are_signed_and_follow_the_state_machine():
     rx = ReportReceiver()
     svc = ServiceProcess(report_url=rx.url)
@@ -375,10 +380,10 @@ def _truncated(h):
 
 
 def _problem_body(code: str, status: int, **extra) -> bytes:
-    """An RFC 9457 body as the contract writes it (plus any extension member a test adds)."""
+    """An IF-8 body as the contract writes it (plus any extra member a test adds, to prove the client ignores it)."""
     return json.dumps({
-        "type": "https://vulnmart.invalid/problems/" + code.lower(), "title": "t", "status": status, "detail": "d",
-        "instance": "urn:vulnmart:request:req-00000001", "code": code, "request_id": "req-00000001", **extra,
+        "type": "urn:vulnmart:error:" + code, "title": "A fixed title.", "status": status,
+        "code": code, "request_id": "req-00000001", **extra,
     }).encode()
 
 
@@ -532,6 +537,7 @@ def test_reset_refuses_first_seq_and_an_owner_hash(svc):
     assert host.get(req.instance_id).epoch == 1
 
 
+@pytest.mark.needs_reset
 def test_no_get_answer_holds_the_owner_hash(svc):
     from support import owner_hash
     req = create_request(owner_tag="Z")
@@ -581,7 +587,7 @@ def test_an_unknown_key_is_truncated_when_echoed(svc):
     res = raw_call(svc.url, "POST", "/v1/instances", json.dumps(body).encode())
     p = problem(res)
     assert res[0] == 422 and p["code"] == "ORCH-VALIDATION"
-    assert len(p["field"]) <= 65 and len(p["detail"]) < 100
+    assert len(p["field"]) <= 65 and "detail" not in p
 
 
 @pytest.mark.parametrize("limit", ["0", "501", "1e2", "0x10", "-1", "5000", "1.5", "", "01", " 5"])
@@ -589,7 +595,7 @@ def test_a_bad_limit_is_refused(svc, limit):
     res = raw_call(svc.url, "GET", f"/v1/instances?limit={limit.replace(' ', '%20')}")
     assert res[0] == 422
     p = problem(res)
-    assert p["code"] == "ORCH-VALIDATION" and p["field"] == "limit"
+    assert p["code"] == "ORCH-VALIDATION" and p["field"] == "/query/limit"
 
 
 def test_the_largest_limit_is_accepted(svc):
@@ -600,7 +606,7 @@ def test_the_largest_limit_is_accepted(svc):
 def test_a_repeated_query_parameter_is_refused(svc, query, name):
     res = raw_call(svc.url, "GET", f"/v1/instances?{query}")
     p = problem(res)
-    assert res[0] == 422 and p["code"] == "ORCH-VALIDATION" and p["field"] == name
+    assert res[0] == 422 and p["code"] == "ORCH-VALIDATION" and p["field"] == "/query/" + name
 
 
 @pytest.mark.parametrize("method,target,allow", [
@@ -632,6 +638,7 @@ def test_bad_command_line_options_exit_2(args):
     assert r.stdout == ""
 
 
+@pytest.mark.needs_reset
 def test_activity_that_changes_nothing_makes_no_report():
     rx = ReportReceiver()
     svc = ServiceProcess(report_url=rx.url)
@@ -682,6 +689,7 @@ def test_a_state_report_that_hangs_is_given_up_on():
         stub.stop()
 
 
+@pytest.mark.node_only
 def test_a_service_that_never_prints_its_port_fails_the_test_instead_of_hanging(tmp_path, monkeypatch):
     import support
     script = tmp_path / "silent.mjs"
@@ -709,9 +717,9 @@ def _wait_for(predicate, timeout=10.0):
 def test_access_values_are_the_enum():
     assert {a.value for a in Access} == {"open", "frozen", "closed"}
 
-# ---- RFC 9457 problem details (ADR 0028) ----
-def test_every_error_answer_is_problem_json_with_the_standard_members(svc):
-    small = ServiceProcess(capacity_mb=300)
+# ---- the closed IF-8 error body ----
+def test_every_error_answer_is_problem_json_with_the_if8_members(svc):
+    small = ServiceProcess(capacity_mb=instance_memory_mb("http", 256) + 44)  # room for one instance only
     try:
         HttpInstanceHost(small.url, PLATFORM_KEY).create(create_request(memory_mb=256))
         answers = {
@@ -730,8 +738,8 @@ def test_every_error_answer_is_problem_json_with_the_standard_members(svc):
     for status, res in answers.items():
         assert res[0] == status, (status, res[1])
         p = problem(res)
-        assert {"type", "title", "status", "detail", "instance", "code", "request_id"} <= set(p)
-        assert p["title"] and p["detail"]
+        assert {"type", "title", "status", "code", "request_id"} <= set(p) <= {"type", "title", "status", "code", "request_id", "field"}
+        assert p["title"] and "detail" not in p and "instance" not in p
     assert answers[429][2]["retry-after"] == "5" and answers[405][2]["allow"] == "GET"
     assert problem(raw_call(svc.url, "GET", "/v1/nothing"))["code"] == "ORCH-ROUTE-UNKNOWN"
 
@@ -740,7 +748,7 @@ def test_the_title_of_a_code_does_not_change_between_answers(svc):
     a = problem(raw_call(svc.url, "GET", f"/v1/instances/{new_id()}"))
     b = problem(raw_call(svc.url, "GET", f"/v1/instances/{new_id()}"))
     assert a["title"] == b["title"] and a["type"] == b["type"]
-    assert a["request_id"] != b["request_id"] and a["instance"] != b["instance"]
+    assert a["request_id"] != b["request_id"]
 
 
 def test_the_client_ignores_problem_members_it_does_not_know():
@@ -749,7 +757,7 @@ def test_the_client_ignores_problem_members_it_does_not_know():
     try:
         with pytest.raises(InvalidState) as err:
             HttpInstanceHost(stub.url, PLATFORM_KEY).host_status()
-        assert err.value.message == "d" and err.value.request_id == "req-00000001" and err.value.field is None
+        assert err.value.message == "A fixed title." and err.value.request_id == "req-00000001" and err.value.field is None
     finally:
         stub.stop()
 

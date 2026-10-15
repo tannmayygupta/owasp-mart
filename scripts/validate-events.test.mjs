@@ -252,14 +252,14 @@ test('fake ingest: valid -> 202 stored; duplicate -> 200 not stored twice', () =
   assert.equal(ing.stored.length, 1);
 });
 
-test('fake ingest: 401 for bad signature and wrong instance, problem-details body, nothing stored', () => {
+test('fake ingest: 401 for bad signature and wrong instance, IF-8 body, nothing stored', () => {
   const ing = ingest();
   const ev = get('proxy.request');
   const wrong = ing.handle(signEvent('FAKE-OTHER-KEY-NOT-REAL-000000000000', ev));
   assert.equal(wrong.status, 401);
   assert.equal(wrong.headers['content-type'], 'application/problem+json');
   assert.equal(wrong.body.code, 'EVT-BAD-SIGNATURE');
-  for (const k of ['type', 'title', 'status', 'code', 'message', 'request_id']) assert.ok(k in wrong.body, k);
+  assert.deepEqual(Object.keys(wrong.body).sort(), ['code', 'request_id', 'status', 'title', 'type']); // closed: no message\n  assert.equal(wrong.body.type, 'urn:vulnmart:error:EVT-BAD-SIGNATURE');
   const other = { ...ev, instance_id: 'i-BBBBBBBBBBBBBBBB' };
   assert.equal(ing.handle(signEvent(TEST_KEY, other)).status, 401);
   const s = signEvent(TEST_KEY, ev);
@@ -281,7 +281,7 @@ test('fake ingest: 422 names the JSON path and never echoes a flag-like value', 
   ev.data.route_template = 'VM{AAAAAAAAAAAAAAAAAAAAAAAA}';
   const r = ing.handle(signEvent(TEST_KEY, ev));
   assert.equal(r.status, 422);
-  assert.ok(r.body.errors.some((e) => e.path === '/data/route_template'));
+  assert.ok(r.body.errors.some((e) => e.pointer === '/data/route_template'));
   assert.ok(!JSON.stringify(r.body).includes('VM{'));
   assert.equal(ing.stored.length, 0);
   const notJson = ing.handle({ headers: { 'content-type': 'application/json' }, body: '{nope' });
@@ -290,7 +290,7 @@ test('fake ingest: 422 names the JSON path and never echoes a flag-like value', 
   assert.equal(noType.status, 422);
   const noSeq = ing.handle({ headers: { 'content-type': 'application/json' }, body: JSON.stringify({ instance_id: TEST_INSTANCE }) });
   assert.equal(noSeq.status, 422);
-  assert.deepEqual(noSeq.body.errors.map((e) => e.path), ['/epoch', '/seq']);
+  assert.deepEqual(noSeq.body.errors.map((e) => e.pointer), ['/epoch', '/seq']);
 });
 
 test('fake ingest: 413 above 16 KiB and for an evidence body above 8 KiB (bytes, not characters)', () => {
@@ -316,7 +316,7 @@ test('fake ingest: a ts more than 10 minutes ahead is refused, an old ts is acce
   late.ts = '2026-06-01T12:10:01Z';
   const r = ing.handle(signEvent(TEST_KEY, late));
   assert.equal(r.status, 422);
-  assert.ok(r.body.errors.some((e) => e.path === '/ts'));
+  assert.ok(r.body.errors.some((e) => e.pointer === '/ts'));
   const old = get('proxy.flag_seen');
   old.ts = '2020-01-01T00:00:00Z';
   assert.equal(ing.handle(signEvent(TEST_KEY, old)).status, 202);
@@ -435,13 +435,13 @@ test('error paths never echo a flag-like property name; a leap second is "not a 
   ev.data['vm%7Bsecret'] = 'x';
   const r = ing.handle(signEvent(TEST_KEY, ev));
   assert.equal(r.status, 422);
-  assert.ok(r.body.errors.some((e) => e.path === '/data/<redacted>'));
+  assert.ok(r.body.errors.some((e) => e.pointer === '/data/<redacted>'));
   assert.ok(!/AAAAAAAA|secret/.test(JSON.stringify(r.body)));
   const leap = get('proxy.crs_match');
   leap.ts = '2016-12-31T23:59:60Z';
   const l = ing.handle(signEvent(TEST_KEY, leap));
   assert.equal(l.status, 422);
-  assert.ok(l.body.errors.some((e) => e.path === '/ts' && /not a usable time/.test(e.message)));
+  assert.ok(l.body.errors.some((e) => e.pointer === '/ts' && /not a usable time/.test(e.detail)));
 });
 
 test('schema: flag-like check ignores letter case and sees an encoded brace; internal is not for the shop', () => {
@@ -471,7 +471,7 @@ test('proxy.flag_seen: envelope and data challenge_key must agree when both are 
   g.challenge_key = g.data.challenge_key === 'C02' ? 'C03' : 'C02';
   const r = ing.handle(signEvent(TEST_KEY, g));
   assert.equal(r.status, 422);
-  assert.ok(r.body.errors.some((e) => e.path === '/challenge_key'));
+  assert.ok(r.body.errors.some((e) => e.pointer === '/challenge_key'));
 });
 
 test('the evidence example shows the [FLAG-REDACTED] marker and is accepted', () => {
@@ -612,7 +612,7 @@ test('D-42: every source has its own seq lane, checked at both ends and one step
       ev.seq = seq;
       const r = ingest().handle(signEvent(TEST_KEY, ev));
       assert.equal(r.status, want, `${source} seq ${seq}: ${JSON.stringify(r.body.errors)}`);
-      if (want === 422) assert.ok(r.body.errors.some((e) => e.path === '/seq'), `${source} seq ${seq} names /seq`);
+      if (want === 422) assert.ok(r.body.errors.some((e) => e.pointer === '/seq'), `${source} seq ${seq} names /seq`);
       n++;
     }
   }
@@ -626,7 +626,7 @@ test('D-42: epoch is required, an integer and at least 1 on the wire; the posted
     mutate(ev);
     const r = ing.handle(signEvent(TEST_KEY, ev));
     assert.equal(r.status, 422, label);
-    assert.ok(r.body.errors.some((e) => e.path === '/epoch'), label);
+    assert.ok(r.body.errors.some((e) => e.pointer === '/epoch'), label);
   }
   const posted = derivePosted(readJ(SCHEMA));
   const sidecarOnly = readJ(path.join(DEFAULT_DIR, 'examples', 'invalid', 'posted', 'includes-epoch.json'));

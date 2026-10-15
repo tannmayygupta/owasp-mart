@@ -12,6 +12,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+
 ### 0.1.0 (2026-10-11, Akshay, story P-04)
 - registry change: IF-1 is registered in `contracts/registry.json` (new contract; `contracts/api/platform` was a reserved folder, now owned by stream P with its OpenAPI file, mock, conformance scripts and generated code).- First draft: `platform.openapi.yaml` (OpenAPI 3.1, 25 operations on 21 paths under `/api/v1/`): health; account creation and e-mail verification; session (sign in, MFA step, read, sign out); profile, password and MFA enrolment; password reset; consent notice and record; challenge catalogue; own attempts; live stream (`GET /live` as SSE, `GET /live/snapshot`, `POST /live/ticket` marked `x-pending` until story S-14). Session cookie `__Host-vm_session`, CSRF header `X-CSRF-Token` on every authenticated unsafe call (public ones have no session and no token, but the Origin check and a rate limit), every error is the closed IF-8 body (`application/problem+json`), public operations say `security: []`, every answer says `Cache-Control: private, no-store`. Every authenticated state-changing route that takes a body also declares 429.
 - Bundle: `contracts/api/bundle/openapi.json` (43 operations: this fragment plus IF-2, written by `node scripts/bundle-openapi.mjs`, proven current by `pnpm run contracts:bundle:check`). IF-2 components that differ from a platform component of the same name are renamed with the prefix `Lab`; IF-2 keeps its own error bodies in the bundle (see the change request to stream L).
@@ -22,6 +26,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Domain events (IF-3), `contracts/domain-events/`
 
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+- BREAKING: none in substance. The only change is the `contract_version` label in `audiences.json` (0.1.0 to 1.0.0); the rules engine flags a changed value as breaking on the safe side. Checked by hand: no member added, removed or retyped.
+
 ### 0.1.0 (2026-10-11, Akshay, story P-03)
 - registry change: IF-3 is registered in `contracts/registry.json` (new contract in its own folder: `contracts/events/` is IF-4's folder in the registry, so the architecture's path `contracts/events/domain-events.schema.json` moved to `contracts/domain-events/`; `docs/architecture/07-repo-and-workstreams.md` is updated).
 - First draft: `domain-events.schema.json` (one closed JSON Schema, seven types: `instance.state_changed`, `attempt.state_changed`, `attempt.milestone_reached`, `attempt.flag_captured`, `attempt.score_updated`, `attempt.hint_unlocked` and the control event `stream.resync`), `audiences.json` (who may receive what by attempt mode: learner practice never reaches a company; the candidate does not receive their own milestones, captures or score while OI-15 is open), the SSE wire format and the `Last-Event-ID` and `resync` rules (README), `fixtures/session.json` (18 ordered records), 8 valid and 25 invalid example events. The schema rejects impossible dates and a failed instance without an `error_code` (or a code on another state).
@@ -31,6 +40,17 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting review by Tanmay (publisher side, `stream.resync`, audience table).
 
 ## Error codes and error format (IF-8), `contracts/errors/`
+
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, label change plus one code (below); no mock change. Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+- registry change: one code added before the tag, no breaking change: `INST-START-FAILED` (`status` null, `retryable` true), the `error_code` the orchestrator sets on an instance that could not be started (`apps/orchestrator`, states). Checked by hand: 1 added, 0 removed, 0 changed.
+
+### 0.4.0 (2026-10-12, Tanmay for stream L, story "IF-8 error bodies", condition F-2 of the contracts sign-off; for Akshay to confirm)
+- Additive: three codes that the Python orchestrator service and the IF-5 contract name and that the seed did not have: `ORCH-CURSOR-INVALID` (422, a list cursor that this orchestrator did not hand out), `ORCH-UNSUPPORTED-MEDIA-TYPE` (415) and `ORCH-NOT-IMPLEMENTED` (501, the reset placeholder of the Python service; never in the OpenAPI file). Titles are generic sentences like the others. Constants regenerated (59 codes).
+- BREAKING: none in substance. This line only satisfies the rules engine, which cannot compare `error-codes.yaml` and flags any change to it as breaking on the safe side. Checked by hand: 3 added, 0 removed, 0 changed.
+- registry change: `contracts/registry.json` names `contracts/mocks/shared` (the one builder of the IF-8 body for the Node mocks) as a mock of IF-8, and `contracts/COMPAT.md` is edited: the Versions and Approvals rows of IF-8, IF-2, IF-4, IF-5 and IF-6 name the new versions (all Approvals stay `pending`; nobody is marked approved).
+- no mock change: the generated constants are the stub of this contract (`noMock` in the registry).
 
 ### 0.3.0 (2026-10-11, Akshay, story P-04, code review)
 - Additive: `AUTH-MFA-STATE` (409: the second factor is already active, or an admin turns it off) and `ATT-CONSENT-STALE` (409: the consent notice the person saw is not the current one). They replace the use of `ATT-INVALID-STATE` for these two cases in IF-1. Constants regenerated (56 codes).
@@ -53,6 +73,24 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting review by Tanmay (statuses, titles, the body shape change for IF-2, IF-4 and IF-5).
 
 ## Instance contract (IF-6), `contracts/instance/`
+
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+
+### 0.3.2 (2026-10-12, Tanmay, story "IF-8 error bodies")
+- Editorial, no schema change: the words "placeholder until the registry is merged" are removed from `instance-contract.md` (the `INST-*` names, among them the injector codes of section 5, are the codes of the IF-8 registry).
+
+### 0.3.1 (2026-10-11, Tanmay, story L-09 preparation)
+- Editorial, no schema change: the template-hardening entry below was numbered 0.2.0 a second time; it is renumbered 0.3.0 so that every IF-6 version is unique (`contracts/COMPAT.md` lists versions). Open points 20, 21 and 26 of `instance-contract.md` are marked confirmed on delegation by Tanmay (handoff H-82); the written proposals stand.
+
+### 0.3.0 (2026-10-11, Tanmay, story 1.15, instance template hardening; a minor step because it is breaking before v1.0.0)
+- `instance-template.schema.json` now closes the holes found in the audit. Component `name` is one of the six role names and equals its role; `image` is exactly `{image:<role>}`; `network_mode` is fixed per role (`instance` for the shop, sidecar, mock-services and bot controller, `none` for the injector and import service); the injector has no `ports` and no `healthcheck`; the shop healthcheck path is `/readyz` (the contract text always said `/readyz`; the schema did not check it); `user` is exactly `65532:65532`; `memory_mb` 16 to 1024, `cpu_limit` above 0 up to 2, `pids_limit` 1 to 512, volume `size_mb` up to 64, tmpfs `size_mb` up to 512 (maxima are about twice the largest example and are proposals, to confirm after spikes S-4 and S-5); each `env` name has a value pattern or fixed value (URLs, socket, database and snapshot paths, `TZ`, log level, `PORT`) and `env` is not empty; `vm.expires` is a token or a UTC date-time with a valid month, day, hour, minute and second; `flag_delivery_env.reason` must be a real sentence (no run of four equal characters, no double whitespace, at least three words).
+- `scripts/validate-contracts.mjs` adds three semantic rules: `PORT` is one of `ports`, `vm.expires` is a real calendar date, a flag-in-env `reason` has at least 8 different letters or digits. Section 7 and open point text of `instance-contract.md` describe them.
+- 40 new invalid examples under `examples/invalid/instance-template/` (each with its path in `examples/invalid/manifest.json`); no valid example changed.
+- BREAKING: a template that used another run user than 65532:65532, a component name or image other than the role's own, network_mode other than the role's fixed value, a shop healthcheck path other than /readyz, limits above the new maxima, an env value outside its pattern or an empty env is now invalid
+- no mock change: the stub instance mock (`contracts/mocks/stub-instance`) does not read `instance-template.schema.json`; the checkers that use it are `scripts/validate-contracts.mjs` and `scripts/check-instance-conformance.mjs`, both changed here with tests.
+- `scripts/check-instance-conformance.mjs`: the helper-name allowlist (`ingest`, `volume-keeper`) is frozen and no longer a way to skip rules (new rule `harness-helpers-minimal`; `no-outside-network` now covers helpers too).
 
 ### 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42)
 - BREAKING: `first_seq` is removed from the sidecar start document (`sidecar-start.schema.json`: no longer required, no longer allowed); the sidecar restarts its sequence counter at 1 in every epoch and stamps the `epoch` of the start document on every event (IF-4 0.2.0). The `event_key` in the document is now the 43-character base64url key derived per `(instance, epoch)`; the accepted shape (32 to 128 printable ASCII characters) is unchanged.
@@ -79,15 +117,19 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Additive note in section 7 and new open point 36: a Docker tmpfs volume is lost when its last container stops, so something must keep the four volumes mounted while the injector exits and the shop starts (found while building the L-06 harness).
 - No change to the other three schemas, to IF-4, IF-5, IF-1 or IF-2.
 
-### 0.2.0 (2026-10-11, Tanmay, story 1.15, instance template hardening; a minor step because it is breaking before v1.0.0)
-- `instance-template.schema.json` now closes the holes found in the audit. Component `name` is one of the six role names and equals its role; `image` is exactly `{image:<role>}`; `network_mode` is fixed per role (`instance` for the shop, sidecar, mock-services and bot controller, `none` for the injector and import service); the injector has no `ports` and no `healthcheck`; the shop healthcheck path is `/readyz` (the contract text always said `/readyz`; the schema did not check it); `user` is exactly `65532:65532`; `memory_mb` 16 to 1024, `cpu_limit` above 0 up to 2, `pids_limit` 1 to 512, volume `size_mb` up to 64, tmpfs `size_mb` up to 512 (maxima are about twice the largest example and are proposals, to confirm after spikes S-4 and S-5); each `env` name has a value pattern or fixed value (URLs, socket, database and snapshot paths, `TZ`, log level, `PORT`) and `env` is not empty; `vm.expires` is a token or a UTC date-time with a valid month, day, hour, minute and second; `flag_delivery_env.reason` must be a real sentence (no run of four equal characters, no double whitespace, at least three words).
-- `scripts/validate-contracts.mjs` adds three semantic rules: `PORT` is one of `ports`, `vm.expires` is a real calendar date, a flag-in-env `reason` has at least 8 different letters or digits. Section 7 and open point text of `instance-contract.md` describe them.
-- 40 new invalid examples under `examples/invalid/instance-template/` (each with its path in `examples/invalid/manifest.json`); no valid example changed.
-- BREAKING: a template that used another run user than 65532:65532, a component name or image other than the role's own, network_mode other than the role's fixed value, a shop healthcheck path other than /readyz, limits above the new maxima, an env value outside its pattern or an empty env is now invalid
-- no mock change: the stub instance mock (`contracts/mocks/stub-instance`) does not read `instance-template.schema.json`; the checkers that use it are `scripts/validate-contracts.mjs` and `scripts/check-instance-conformance.mjs`, both changed here with tests.
-- `scripts/check-instance-conformance.mjs`: the helper-name allowlist (`ingest`, `volume-keeper`) is frozen and no longer a way to skip rules (new rule `harness-helpers-minimal`; `no-outside-network` now covers helpers too).
-
 ## Lab API (IF-2), `contracts/api/lab/`
+
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+
+### 0.3.0 (2026-10-12, Tanmay, story "IF-8 error bodies", condition F-2 of the contracts sign-off; to be confirmed by Akshay)
+- BREAKING: every error answer is the closed IF-8 body (`contracts/errors/problem.schema.json`): `type` is `urn:vulnmart:error:<CODE>` (was `https://vulnmart.invalid/problems/<code>`), `code` is the registry code in upper case with hyphens (`ATT-NOT-FOUND`, was `att_not_found`), `title` is the registry's fixed sentence, the members `detail` and `instance` are removed, and the `Problem` schema is closed (`additionalProperties: false`; it was open). `ProblemCode` is removed. `Problem` is now identical to the platform one, so the bundle shares it (0 renamed components). `scripts/check_lab_contract.py` compares it with the IF-8 schema.
+- BREAKING: `field` is a 422 only and is a pointer whose first segment names the location for a query parameter: `/query/limit`, `/query/cursor`, `/query/<name>` (was `/limit`, `/cursor`, `/<name>`). The 409 `ATT-INVALID-STATE` for an early hint level no longer carries `field` `/level`. A 422 can also use `errors` (a list of `pointer` and `detail`).
+- The placeholder wording is removed from `lab-api.md` and `lab.openapi.yaml`: the code names are final in IF-8.
+- Examples: 12 valid problem examples rewritten to the new body (plus `error.validation-errors`), the invalid ones rewritten and extended (`detail`, `instance` and the old https `type` are refused; the old lower-case code is refused).
+- Generated code and bundle regenerated: `contracts/api/bundle/`, `packages/ts-client/src/api.d.ts`, `packages/py-models/src/vulnmart_models/api.py`.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (the body comes from `contracts/mocks/shared/problem.mjs`, which reads the registry).
 
 ### 0.2.0 (2026-10-11, Tanmay, story 1.15 part B4, which also carries story 1.12 for IF-2; to be confirmed by Akshay)
 - BREAKING: the timeline is paged by an opaque forward cursor keyed by `(epoch, seq)` instead of a decimal offset; entries are sorted by that key, a cursor of version 0.1.0 (a base64url decimal offset) is now 422 `req_validation` with field `/cursor`, and the cursor never moves back (a client that wants a late IF-4 event of a smaller key reads again from the start, `cursor` left out). The Timeline answer gains the required boolean `has_more`.
@@ -107,6 +149,17 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting optional confirmation by Akshay (consumer; handoffs H-84 to H-89).
 
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
+
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+
+### 0.4.0 (2026-10-12, Tanmay, story "IF-8 error bodies", condition F-2 of the contracts sign-off; to be confirmed by Akshay)
+- BREAKING: every error answer is the closed IF-8 body: `type` is `urn:vulnmart:error:<CODE>` (was `https://vulnmart.invalid/problems/<lower-case code>`), `title` and `status` are the registry's, the members `detail` and `instance` are removed and the `Problem` schema is closed (it was open on purpose in 0.3.0). What happened this time is written to the log under the `request_id`, never into the answer. `scripts/check_orchestrator_contract.py` compares the schema with the IF-8 one.
+- BREAKING: `field` is a 422 only and always a JSON Pointer: `/image` for `ORCH-FIELD-FORBIDDEN` (was the bare name `image`), `/query/limit`, `/query/epoch`, `/query/instance`, `/query/<name>` and `/query/cursor` for the list query (were `limit`, `epoch`, `instance`, the name, `cursor`), `/path/instance_id` for a bad id in the path (was `/instance_id`).
+- The placeholder wording is removed from `orchestrator-api.md` and the OpenAPI file: the `ORCH-*` and `INST-*` names are the registry's. `ORCH-CURSOR-INVALID`, `ORCH-UNSUPPORTED-MEDIA-TYPE` and `ORCH-NOT-IMPLEMENTED` are registered in IF-8 0.4.0 (they were missing from the seed).
+- Examples: the valid error examples rewritten (the open `error.extension-member` is replaced by `error.busy` and `error.validation-errors`); the invalid ones rewritten and extended (`detail`, `instance`, the old https `type`, an extension member).
+- Mocks and services changed with it: `contracts/mocks/fake-orchestrator/server.mjs` (body from `contracts/mocks/shared/problem.mjs`, the test control route answers 404 instead of 403 outside loopback so that the status is the registry's), the Python service `apps/orchestrator/` (`problems.py` takes title and status from `vulnmart_models.error_codes`; the package now depends on `vulnmart-models`), the Python client `apps/api/src/vulnmart/ports/` (the exception message is the `title`; the fake host gives the `/query/...` pointers).
 
 ### 0.3.0 (2026-10-11, Tanmay, story 1.15, review findings of pull request 3; decided on the developer's delegation, ADR 0028; to be confirmed)
 - BREAKING: `StateReport` has a new required member `transition` (integer from 1 to 2^53 - 1), assigned by the orchestrator per `(instance_id, epoch)` (1, 2, 3 ... without gaps; a reset starts again at 1). The identity of a report is `(instance_id, epoch, transition)`; the platform answers 204 for a new one, 200 for an identical repeat, 409 `ORCH-REQUEST-MISMATCH` for another body, and keeps a lower number as history without moving the state back. A real re-entrant change (the same state twice) has its own number. `at` orders nothing. The platform answers of `POST /internal/v1/orch/state` gain 200, 409 and 415. A sender that does not send `transition` is refused with 422.
@@ -136,6 +189,17 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance events (IF-4), `contracts/events/`
 
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+
+### 0.3.0 (2026-10-12, Tanmay, story "IF-8 error bodies", condition F-2 of the contracts sign-off; to be confirmed by Sahil and Akshay)
+- BREAKING: every error answer of the ingest is the closed IF-8 body: the member `message` is removed, `type` is `urn:vulnmart:error:<CODE>` (was `about:blank`), `title` and `status` are the registry's, and the 422 `errors` entries are `{ "pointer", "detail" }` (were `{ "path", "message" }`). The `EVT-*` codes are final (IF-8). Section 5 of `app-events.md` says so; the schemas `instance-events.schema.json` and `instance-events.posted.schema.json` do not change.
+- no mock change in the schemas; the fake ingest changed with it: `contracts/mocks/fake-ingest/ingest.mjs` (body from `contracts/mocks/shared/problem.mjs`), `scripts/validate-events.mjs` (every error answer of the matrix must validate against the IF-8 schema), and the stub instance image (`contracts/mocks/stub-instance/Dockerfile` copies the registry and installs `js-yaml`). The stub sidecar's own answers on `/v1/events` (a proposal, section 3) keep their shape; they are not ingest answers.
+
+### 0.2.1 (2026-10-11, Tanmay, story L-09 preparation)
+- Editorial, no schema change: open point 4 now states the whole order of the ingest checks as section 5 has it (it had stayed at the 0.1.0 wording, without the epoch checks and the store-full answer); open points 3, 4, 13, 14, 19, 20, 22, 27 and 28 are marked confirmed on delegation by Tanmay (handoff H-82; point 28 had been left out of that handoff); the written proposals stand.
+
 ### 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42, decided on the developer's delegation; to be confirmed)
 - BREAKING: new required wire field `epoch` (integer at least 1) in `instance-events.schema.json`; event identity is now `(instance_id, epoch, seq)` instead of `(instance_id, seq)`. Every epoch restarts the sidecar counter at 1. The posted schema does not contain `epoch` (the sidecar stamps it; a poster that sends it gets 422).
 - BREAKING: the signing string of `X-VM-Signature` (label stays `v1` while the contracts are 0.x) is now `instance_id`, newline, `epoch`, newline, `seq`, newline, hex SHA-256 of the body. The three signed envelope examples are signed again.
@@ -163,6 +227,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Table owners (DB), `contracts/db/`
 
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+
 ### 0.2.0 (2026-10-12, Akshay, story P-05)
 - Additive: `table-owners.yaml` written (H-95 shape confirmed as proposed): all 42 tables of architecture 04 sections 2.1 to 2.8 plus `deks` of the `vm_keystore` database, each with its owning module. Stream P: kernel, accounts, orgs, assessments, privacy, admin, notifications, live. Stream L rows (attempts, instances, scoring, ingest, flags) are proposals marked "To confirm by Tanmay"; the catalogue tables belong to `admin` (the sync job), to confirm by Sahil and Tanmay. The 13 module folders exist now (empty packages), so every owner passes `scripts/check_table_owners.py`.
 - The schema is unchanged.
@@ -174,6 +242,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Challenge catalogue (IF-7), `contracts/catalog/` and `challenges/catalog/`
 
+### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
+
+- First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
+
 ### 0.1.0 (2026-10-09, Sahil, story T-02)
 - First draft: `contracts/catalog/challenge.schema.json` (JSON Schema 2020-12, one challenge entry) and a short `contracts/catalog/README.md`.
 - 11 stub entries `challenges/catalog/c01..c11.yaml` (`status: stub`): OWASP 2021/2025 tags, CWE and ATT&CK ids, difficulty and tier, placeholder milestone summaries and three empty hint slots, provisional flag placement/delivery, start-state, exploit-test and fixed-build paths.
@@ -184,6 +256,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ### 2026-10-12 (Sahil, Sprint 2, T-11/T-12/T-13)
 - registry change: the `app tests` CI job in `.github/workflows/ci.yml` now also runs `services/*/test/**/*.test.mjs`, so the new `services/mock-services`, `services/import-service` and `services/bot` test suites run in CI alongside `apps/*`. Workflow change only — no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract, or any rule.
+
+### 2026-10-11 (Tanmay, story L-09 preparation, ADR 0029)
+- registry change: new rule `approvals` (starts with the first tag `contracts-v*`: a pull request that changes a contract needs one approval from an owner or consumer, or from every consumer other than the author when the change is declared BREAKING (if the author is the only consumer, one approval from any other listed person), never the author's own, never one given before a later change of the contract files; the approvers are read from the base copy of `contracts/COMPAT.md`); `compat` reads only the `## Versions` table; the job `contract-rules` fetches the pull request reviews in a separate step (`pull-requests: read`) and hands the file to the checker; new file `contracts/COMPAT.md` (also guarded: an edit of it needs a `registry change:` line; CODEOWNERS lists the three owners); new script `scripts/tag-contracts.mjs` (checks the preconditions and prints the tag commands, never pushes).
 
 ### 2026-10-11 (Tanmay, story 1.15)
 - registry change: IF-7 (challenge catalogue, owner T) is registered and `contracts/catalog` is no longer reserved; the checker, its registry, the oasdiff pins and the workflow now run from the base commit (trusted checker, ADR 0026); deleting a whole contract is a breaking change; the marker is the exact line `BREAKING:`.

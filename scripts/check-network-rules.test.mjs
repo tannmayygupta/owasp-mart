@@ -112,7 +112,7 @@ test('cloud-init runs one baseline script that stops at the first failure and wr
   assert.match(b, /baseline-failed/);
   assert.match(b, /step=\$STEP/);
   const steps = [...b.matchAll(/^STEP=([a-z-]+);[ \t]+.*$/gm)].map((m) => m[1]);
-  assert.deepEqual(steps, ['lock-root', 'sshd-config-test', 'restart-ssh', 'firewall', 'docker', 'egress', 'secrets-dir', 'time-sync', 'keepalive', 'unattended-upgrades']);
+  assert.deepEqual(steps, ['lock-root', 'sshd-config-test', 'restart-ssh', 'firewall', 'docker', 'egress', 'secrets-dir', 'certs-dir', 'time-sync', 'keepalive', 'unattended-upgrades', 'lego', 'certs-timer']);
   assert.match(b, /passwd -l root/);
   assert.match(b, /install -d -m 0700 -o root -g root \/opt\/vulnmart \/opt\/vulnmart\/secrets/);
   assert.match(b, /install -d -m 0755 \/run\/sshd && sshd -t/, "sshd -t needs /run/sshd, which is missing before the first ssh start on Ubuntu 24.04");

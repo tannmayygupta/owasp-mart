@@ -162,7 +162,7 @@ sequenceDiagram
     participant X as outbox relay
     participant L as SSE hub
     participant B as Browser
-    S->>E: POST /internal/v1/events (signed with the per-instance key, instance id and seq in the signed part)
+    S->>E: POST /internal/v1/events (signed with the per-instance key, instance id, epoch and seq in the signed part)
     E->>I: forward over the private link (mTLS)
     I->>I: derive the instance key from the master and instance id, verify signature
     alt bad signature or wrong instance id

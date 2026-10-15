@@ -99,11 +99,10 @@ test('an owner reads, an outsider gets the same 404 as for a missing id, and the
   assert.equal(outsider.status, 404);
   assert.equal(missing.status, 404);
   assert.equal(outsider.json.code, missing.json.code);
-  assert.equal(outsider.json.detail, missing.json.detail);
   assert.equal(outsider.json.title, missing.json.title);
   const none = seen(await get(`/api/v1/attempts/${A_CAND}`, { user: null }));
   assert.equal(none.status, 401);
-  assert.match(none.json.code, /^auth_/);
+  assert.match(none.json.code, /^AUTH-/);
 });
 
 test('a POST needs the CSRF header and the dashboard origin', async () => {
@@ -111,7 +110,7 @@ test('a POST needs the CSRF header and the dashboard origin', async () => {
   for (const opt of [{ csrf: null }, { csrf: 'WRONG-0123456789012345' }, { origin: 'https://evil.example.invalid' }, { origin: null }]) {
     const r = seen(await post(`/api/v1/attempts/${A_LEARNER}/flags`, body, opt));
     assert.equal(r.status, 403);
-    assert.match(r.json.code, /^auth_/);
+    assert.match(r.json.code, /^AUTH-/);
   }
   assert.deepEqual(seen(await get(`/api/v1/attempts/${A_LEARNER}/timeline`)).json.items, []);
 });
@@ -132,7 +131,7 @@ test('flag results by input, no echo, rate limit per challenge', async () => {
   const limited = seen(await post(p, { challenge_key: 'C07', flag: fakeFlag('A') }));
   assert.equal(limited.status, 429);
   assert.ok(Number(limited.headers['retry-after']) >= 1);
-  assert.equal(limited.json.code, 'att_flag_rate_limited');
+  assert.equal(limited.json.code, 'ATT-FLAG-RATE-LIMITED');
   const ok = seen(await post(p, { challenge_key: 'C08', flag: fakeFlag('A') }));
   assert.deepEqual(ok.json, { challenge_key: 'C08', result: 'correct', credit: 'credited' });
   for (const part of ['score', 'timeline', 'challenges', 'report', 'integrity-flags', 'evidence']) seen(await get(`/api/v1/attempts/${A_LEARNER}/${part}`));
@@ -144,7 +143,7 @@ test('bad bodies are 422 with a field pointer; wrong media type 415; a body wher
   for (const [body, field] of [[{ challenge_key: 'C01' }, '/flag'], [{ challenge_key: 'C01', flag: 5 }, '/flag'], [{ challenge_key: 'C77', flag: 'x' }, '/challenge_key'], [{ flag: 'x', challenge_key: 'C01', more: 1 }, '/more']]) {
     const r = seen(await post(p, body));
     assert.equal(r.status, 422);
-    assert.equal(r.json.code, 'req_validation');
+    assert.equal(r.json.code, 'REQ-VALIDATION');
     assert.equal(r.json.field, field);
   }
   assert.equal(seen(await post(p, 'challenge_key=C01', { ctype: 'text/plain' })).status, 415);
@@ -154,7 +153,7 @@ test('bad bodies are 422 with a field pointer; wrong media type 415; a body wher
 test('hints off is 404, hints on unlock and repeat', async () => {
   for (const r of [await get(`/api/v1/attempts/${A_CAND}/challenges/C01/hints`, { user: 'CAM' }), await post(`/api/v1/attempts/${A_CAND}/challenges/C01/hints/1/unlock`, undefined, { user: 'CAM' })]) {
     assert.equal(seen(r).status, 404);
-    assert.equal(r.json.code, 'att_hints_disabled');
+    assert.equal(r.json.code, 'ATT-HINTS-DISABLED');
   }
   const h = `/api/v1/attempts/${A_LEARNER}/challenges/C03/hints`;
   assert.ok(seen(await get(h)).json.items.every((x) => x.text === null));
@@ -200,7 +199,7 @@ test('an instance that is not ready cannot be opened or reset (409)', async () =
   for (const [p, body] of [[`/api/v1/instances/${id}/open`, undefined], [`/api/v1/instances/${id}/reset`, { confirm: true }]]) {
     const x = await call(slow, 'POST', p, { user: 'ADA', body });
     assert.equal(x.status, 409);
-    assert.match(x.json.code, /^inst_/);
+    assert.match(x.json.code, /^INST-/);
   }
 });
 
@@ -209,7 +208,7 @@ test('start, submit and wrong states', async () => {
   assert.equal(start1.status, 200);
   assert.equal(start1.json.state, 'running');
   assert.equal(seen(await post('/api/v1/attempts/a-CCCCCCCCCCCCCCCC/start', undefined, { user: 'CAM' })).status, 409);
-  assert.equal(seen(await post('/api/v1/attempts/a-DDDDDDDDDDDDDDDD/submit', { confirm: true }, { user: 'CAM' })).json.code, 'att_invalid_state');
+  assert.equal(seen(await post('/api/v1/attempts/a-DDDDDDDDDDDDDDDD/submit', { confirm: true }, { user: 'CAM' })).json.code, 'ATT-INVALID-STATE');
   assert.equal(seen(await post(`/api/v1/attempts/${A_CAND}/submit`, { confirm: true }, { user: 'CAM' })).json.state, 'submitted');
   assert.equal(seen(await get(`/api/v1/instances/${I_CAND}`, { user: 'CAM' })).json.access, 'frozen');
 });
@@ -231,16 +230,16 @@ test('reviewer routes: evidence, integrity flags with a decision, report, timeli
   assert.equal(seen(await get(`/api/v1/attempts/${A_CAND}/timeline?limit=0`, { user: 'REX' })).status, 422);
 });
 
-test('errors are RFC 9457 problem details; the content type is checked before the lookup', async () => {
+test('errors are the closed IF-8 body; the content type is checked before the lookup', async () => {
   const missing = seen(await get('/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ'));
   assert.equal(missing.headers['content-type'].split(';')[0], 'application/problem+json');
-  for (const k of ['type', 'title', 'status', 'detail', 'instance', 'code', 'request_id']) assert.ok(k in missing.json, k);
-  assert.equal(missing.json.type, 'https://vulnmart.invalid/problems/' + missing.json.code);
+  assert.deepEqual(Object.keys(missing.json).sort(), ['code', 'request_id', 'status', 'title', 'type']);
+  assert.equal(missing.json.type, 'urn:vulnmart:error:' + missing.json.code);
   assert.equal(missing.json.status, 404);
   assert.ok(!('message' in missing.json));
   const media = seen(await post('/api/v1/attempts/a-ZZZZZZZZZZZZZZZZ/flags', 'x=1', { ctype: 'text/plain' }));
   assert.equal(media.status, 415);
-  assert.equal(media.json.code, 'req_unsupported_media_type');
+  assert.equal(media.json.code, 'REQ-UNSUPPORTED-MEDIA-TYPE');
 });
 
 test('timeline: a late event with a smaller key does not skip or repeat an item of a page (cursor by epoch and seq)', async () => {

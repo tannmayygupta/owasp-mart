@@ -1,0 +1,37 @@
+# vm-p edge for the Vercel same-origin rewrite and spike S-14 (story LE-3, ADR 0031). Runs on vm-p only. Run by hand per docs/runbooks/vercel-and-origin.md.
+# The probe stands in for the API until the real platform stack (P-07, L-12) exists; replace the probe service by the API and set UPSTREAM then.
+name: vulnmart-origin
+services:
+  caddy:
+    # Caddy 2.10.2, tag plus index digest (checked 2026-10-11). Stock image, no plugin.
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    ports:
+      - "443:443"
+    environment:
+      UPSTREAM: "probe:8080"
+    volumes:
+      - ./Caddyfile.p:/etc/caddy/Caddyfile:ro
+      - ./origin-gate.caddy:/etc/caddy/origin-gate.caddy:ro
+      # lego writes fullchain.pem and privkey.pem here (docs/runbooks/certificates.md); root-only private key, so the container runs as root (H-115)
+      - /opt/vulnmart/certs/live:/certs:ro
+      # one file per secret, created by the runbook; origin_secret_previous exists only during a rotation
+      - /opt/vulnmart/secrets/origin_secret_current:/run/secrets/origin_secret_current:ro
+      - /opt/vulnmart/secrets/origin_secret_previous:/run/secrets/origin_secret_previous:ro
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp", "/data", "/config"]
+    depends_on: [probe]
+    restart: unless-stopped
+  probe:
+    image: node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+    user: "65532:65532"
+    command: ["node", "/app/server.mjs"]
+    volumes:
+      - ./probe:/app:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    expose: ["8080"]
+    restart: unless-stopped

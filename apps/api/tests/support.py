@@ -10,6 +10,7 @@ import queue
 import shutil
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -32,6 +33,14 @@ from vulnmart.ports.instance_host import (
 ROOT = Path(__file__).resolve().parents[3]
 SERVER = ROOT / "contracts" / "mocks" / "fake-orchestrator" / "server.mjs"
 CONTRACT_DIR = ROOT / "contracts" / "orchestrator"
+# Which service the HTTP side of the suites talks to: the Node fake of the contract (default) or the Python service of story 3.2
+# (`VM_ORCH_SERVICE=python`, started with `--backend fake`). The reset and activity cases are skipped for the Python service until
+# story 3.4 (see conftest.py).
+SERVICE_KIND = os.environ.get("VM_ORCH_SERVICE", "node").strip().lower()
+PYTHON_SERVICE = SERVICE_KIND == "python"
+ORCH_SRC = ROOT / "apps" / "orchestrator" / "src"
+TEMPLATE_SCHEMA = ROOT / "contracts" / "instance" / "instance-template.schema.json"
+SHOP_TEMPLATE = ROOT / "contracts" / "instance" / "examples" / "valid" / "instance-template" / "shop-template.json"
 PLATFORM_KEY = b"FAKE-SIGNING-KEY-NOT-REAL-0000000000"
 ORCH_KEY = b"FAKE-ORCHESTRATOR-KEY-NOT-REAL-0000000"
 WRONG_KEY = b"FAKE-WRONG-KEY-NOT-REAL-0000000000000"
@@ -39,6 +48,14 @@ WRONG_KEY = b"FAKE-WRONG-KEY-NOT-REAL-0000000000000"
 START_TIMEOUT_SECONDS = 15
 
 _counter = itertools.count(1)
+
+
+def instance_memory_mb(kind: str, request_mb: int) -> int:
+    """What one instance counts against the host capacity. The Node fake and the in-memory fake count the request value
+    `limits.memory_mb`; the Python service counts what the template gives the containers (components plus the 64 MB keeper, M5)."""
+    if PYTHON_SERVICE and kind == "http":
+        return sum(c["memory_mb"] for c in json.loads(SHOP_TEMPLATE.read_text(encoding="utf-8"))["components"]) + 64
+    return request_mb
 
 
 def new_id() -> str:
@@ -206,17 +223,39 @@ class Pki:
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
+_templates_dir: Path | None = None
+
+
+def python_templates_dir() -> Path:
+    """A folder with the one example template (the Python service loads every *.json of a folder, and the examples folder holds two)."""
+    global _templates_dir
+    if _templates_dir is None or not _templates_dir.exists():
+        _templates_dir = Path(tempfile.mkdtemp(prefix="vm-templates-"))
+        shutil.copy(SHOP_TEMPLATE, _templates_dir / "shop-template.json")
+    return _templates_dir
+
+
 class ServiceProcess:
-    """The fake orchestrator as a separate Node process."""
+    """The orchestrator service as a separate process: the Node fake, or the Python service when `VM_ORCH_SERVICE=python`."""
 
     def __init__(self, *, capacity_mb: int = 8192, step_delay_ms: int = 0, report_url: str | None = None,
                  extra_args: tuple[str, ...] = (), tls: "Pki | None" = None,
                  tls_server: tuple[Path, Path] | None = None) -> None:
-        node = shutil.which("node")
-        if node is None:
-            raise RuntimeError("node is required for the fake orchestrator tests")
-        args = [node, str(SERVER), "--port", "0", "--capacity-mb", str(capacity_mb), "--step-delay-ms", str(step_delay_ms),
-                "--key", PLATFORM_KEY.decode(), "--report-key", ORCH_KEY.decode()]
+        env = None
+        if PYTHON_SERVICE:
+            # the rate limit is off: a test polls far faster than the 20 requests per second a platform client is allowed
+            # the keys go in the environment, never on the command line (M6); the fake backend needs its explicit test switch (H3)
+            args = [sys.executable, "-m", "vulnmart_orchestrator", "--backend", "fake", "--allow-fake-backend", "--port", "0",
+                    "--capacity-mb", str(capacity_mb), "--step-delay-ms", str(step_delay_ms),
+                    "--templates-dir", str(python_templates_dir()), "--template-schema", str(TEMPLATE_SCHEMA), "--rate-per-s", "0"]
+            env = {**os.environ, "PYTHONPATH": str(ORCH_SRC), "VM_ORCH_PLATFORM_KEY": PLATFORM_KEY.decode(),
+                   "VM_ORCH_REPORT_KEY": ORCH_KEY.decode()}
+        else:
+            node = shutil.which("node")
+            if node is None:
+                raise RuntimeError("node is required for the fake orchestrator tests")
+            args = [node, str(SERVER), "--port", "0", "--capacity-mb", str(capacity_mb), "--step-delay-ms", str(step_delay_ms),
+                    "--key", PLATFORM_KEY.decode(), "--report-key", ORCH_KEY.decode()]
         if report_url:
             args += ["--report-url", report_url]
         if tls is not None:
@@ -226,7 +265,7 @@ class ServiceProcess:
             args += list(extra_args)
         # stderr goes to a file, never to an undrained pipe (a full pipe would stall the service)
         self._stderr = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
-        self.proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=self._stderr, text=True)
+        self.proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=self._stderr, text=True, env=env)
         lines: queue.Queue[str] = queue.Queue()
         threading.Thread(target=lambda: lines.put(self.proc.stdout.readline()), daemon=True).start()
         try:

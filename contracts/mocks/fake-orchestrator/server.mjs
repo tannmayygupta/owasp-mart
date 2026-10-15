@@ -10,8 +10,8 @@
 //
 // Wire rules (ADR 0028, contract section 2a and 6): every integer of the contract must be an integer token in the body (no `1.0`,
 // no `1e0`, no boolean, at most 2^53 - 1), so the body is read by the small strict parser below and not by JSON.parse, which cannot tell
-// `1` from `1.0`. Every error answer is RFC 9457 problem details (`application/problem+json`: type, title, status, detail, instance, plus
-// the extension members code, request_id and field). The one non-integer number, limits.cpu_limit, is compared by value (2 equals 2.0).
+// `1` from `1.0`. Every error answer is the closed IF-8 body (`application/problem+json`, contracts/errors/problem.schema.json: type, title, status,
+// code, request_id and, for a 422, field), with the title and the status taken from the registry. The one non-integer number, limits.cpu_limit, is compared by value (2 equals 2.0).
 //
 // Not part of the contract (test aids): the template name shop-fail-v0, which ends in `failed` with the
 // placeholder code INST-HEALTH-TIMEOUT, and POST /_fake/v1/instances/{id}/activity (unsigned, loopback only).
@@ -28,22 +28,20 @@ import { readFileSync } from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MEDIA_TYPE, pointer, problemBody } from '../shared/problem.mjs';
 
 export const MAX_BODY = 64 * 1024;
 export const MAX_SKEW_MS = 60 * 1000;
 export const NONCE_TTL_MS = 5 * 60 * 1000;
 export const TEMPLATES = new Set(['shop-v0', 'shop-fail-v0']);
 const COMPONENTS = new Set(['bot-controller', 'import-service', 'injector', 'mock-services', 'shop', 'sidecar']);
-const FORBIDDEN = new Set(['image', 'command', 'cmd', 'entrypoint', 'volume', 'volumes', 'mount', 'mounts', 'port', 'ports', 'network', 'networks', 'env', 'environment']);
+// The same names as FORBIDDEN_FIELDS of apps/orchestrator/src/vulnmart_orchestrator/builder.py (a test compares the two lists).
+const FORBIDDEN = new Set([
+  'image', 'images', 'command', 'cmd', 'entrypoint', 'args', 'env', 'environment', 'volumes', 'volume', 'mounts', 'mount',
+  'ports', 'port', 'network', 'networks', 'network_mode', 'privileged', 'user', 'cap_add', 'cap_drop', 'devices', 'labels',
+  'security_opt', 'binds', 'tmpfs', 'components', 'healthcheck', 'restart', 'pid', 'ipc', 'extra_hosts', 'dns',
+]);
 const LABELS = new Set(['instance', 'epoch', 'component', 'template', 'kind']);
-const TITLES = {
-  'ORCH-BAD-SIGNATURE': 'Bad signature', 'ORCH-INSTANCE-NOT-FOUND': 'Instance not found', 'ORCH-METHOD-NOT-ALLOWED': 'Method not allowed',
-  'ORCH-REQUEST-MISMATCH': 'Same identity, different body', 'ORCH-INSTANCE-EXISTS': 'Instance exists', 'ORCH-INVALID-STATE': 'Invalid state',
-  'ORCH-STALE-EPOCH': 'Stale epoch', 'ORCH-STALE-ACCESS-EPOCH': 'Stale access epoch', 'ORCH-BODY-TOO-LARGE': 'Body too large',
-  'ORCH-UNSUPPORTED-MEDIA-TYPE': 'Unsupported media type', 'ORCH-FIELD-FORBIDDEN': 'Field forbidden', 'ORCH-TEMPLATE-UNKNOWN': 'Template unknown',
-  'ORCH-LABEL-UNKNOWN': 'Label unknown', 'ORCH-VALIDATION': 'Validation failed', 'ORCH-CURSOR-INVALID': 'Cursor invalid', 'ORCH-BUSY': 'No capacity',
-  'ORCH-RATE-LIMITED': 'Rate limited', 'ORCH-ROUTE-UNKNOWN': 'No such call', 'ORCH-INTERNAL': 'Internal error',
-};
 const RESETTABLE = new Set(['ready', 'active', 'idle']);
 const TRANSITIONAL = new Set(['requested', 'provisioning', 'starting', 'resetting', 'stopping']);
 
@@ -62,7 +60,6 @@ const RE = {
 };
 
 export const MAX_INT = Number.MAX_SAFE_INTEGER; // 2^53 - 1, the largest integer of the contract (RFC 7493 section 2.2)
-export const PROBLEM_BASE = 'https://vulnmart.invalid/problems/';
 const JSON_TYPE = /^application\/json\s*(;.*)?$/i;
 
 // A number token that is not a plain integer in the safe range: a fraction, an exponent, or too large. Never an integer.
@@ -169,10 +166,10 @@ const bad = (field, message, code = 'ORCH-VALIDATION') => ({ code, field, messag
 function checkKeys(body, allowed) {
   if (!isObj(body)) return bad('', 'the body must be a JSON object');
   for (const k of Object.keys(body)) {
-    if (FORBIDDEN.has(k.toLowerCase())) return bad(k, `the orchestrator accepts no ${k}`, 'ORCH-FIELD-FORBIDDEN');
+    if (FORBIDDEN.has(k.toLowerCase())) return bad(pointer(k.slice(0, 64)), `the orchestrator accepts no ${k}`, 'ORCH-FIELD-FORBIDDEN');
   }
   // An unknown key is echoed back, so it is cut to 64 characters first.
-  for (const k of Object.keys(body)) if (!allowed.includes(k)) return bad('/' + k.slice(0, 64), `unknown field ${k.slice(0, 64)}`);
+  for (const k of Object.keys(body)) if (!allowed.includes(k)) return bad(pointer(k.slice(0, 64)), `unknown field ${k.slice(0, 64)}`);
   for (const k of allowed) if (!(k in body)) return bad('/' + k, `${k} is required`);
   return null;
 }
@@ -269,16 +266,12 @@ export function createFakeOrchestrator(options = {}) {
   const nonces = new Map();
   let reportQueue = Promise.resolve();
 
-  // RFC 9457 problem details. type, title, status, detail and instance are the standard members; code, request_id and field are
-  // extension members. `title` is fixed per code, `detail` says what happened this time. Never a stack trace.
+  // The IF-8 error body (shared/problem.mjs): the title and the status come from the registry, there is no `detail` and no `instance`.
+  // The `detail` argument is only a note for the reader of this file; it never reaches the answer (no free text reaches a client).
   const problem = (res, status, code, detail, field, extra = {}) => {
     const requestId = 'req-' + crypto.randomBytes(6).toString('hex');
-    const body = {
-      type: PROBLEM_BASE + code.toLowerCase(), title: TITLES[code] ?? 'Error', status, detail: String(detail).slice(0, 500),
-      instance: 'urn:vulnmart:request:' + requestId, code, request_id: requestId,
-    };
-    if (field) body.field = field;
-    send(res, status, body, 'application/problem+json', { ...(status === 429 ? { 'retry-after': '5' } : {}), ...extra });
+    const body = problemBody(code, requestId, { field });
+    send(res, body.status, body, MEDIA_TYPE, { ...(body.status === 429 ? { 'retry-after': '5' } : {}), ...extra });
   };
   const send = (res, status, body, type = 'application/json', extra = {}) => {
     const text = body === undefined ? '' : JSON.stringify(body);
@@ -483,23 +476,23 @@ export function createFakeOrchestrator(options = {}) {
   function list(res, url) {
     const q = url.searchParams;
     for (const name of q.keys()) {
-      if (!LABELS.has(name) && name !== 'cursor' && name !== 'limit') return problem(res, 422, 'ORCH-LABEL-UNKNOWN', `${name.slice(0, 64)} is not a label filter`, name.slice(0, 64));
+      if (!LABELS.has(name) && name !== 'cursor' && name !== 'limit') return problem(res, 422, 'ORCH-LABEL-UNKNOWN', 'not a label filter', pointer('query', name.slice(0, 64)));
     }
     for (const name of new Set(q.keys())) {
-      if (q.getAll(name).length > 1) return problem(res, 422, 'ORCH-VALIDATION', `${name.slice(0, 64)} is given more than once`, name.slice(0, 64));
+      if (q.getAll(name).length > 1) return problem(res, 422, 'ORCH-VALIDATION', 'given more than once', pointer('query', name.slice(0, 64)));
     }
     let limit = 100;
     if (q.has('limit')) {
-      if (!/^[1-9][0-9]{0,2}$/.test(q.get('limit'))) return problem(res, 422, 'ORCH-VALIDATION', 'limit is 1 to 500', 'limit');
+      if (!/^[1-9][0-9]{0,2}$/.test(q.get('limit'))) return problem(res, 422, 'ORCH-VALIDATION', 'limit is 1 to 500', '/query/limit');
       limit = Number(q.get('limit'));
-      if (limit > 500) return problem(res, 422, 'ORCH-VALIDATION', 'limit is 1 to 500', 'limit');
+      if (limit > 500) return problem(res, 422, 'ORCH-VALIDATION', 'limit is 1 to 500', '/query/limit');
     }
-    if (q.has('epoch') && !/^[1-9]\d*$/.test(q.get('epoch'))) return problem(res, 422, 'ORCH-VALIDATION', 'epoch is a positive integer', 'epoch');
-    if (q.has('instance') && !RE.instanceId.test(q.get('instance'))) return problem(res, 422, 'ORCH-VALIDATION', 'bad instance id', 'instance');
+    if (q.has('epoch') && !/^[1-9]\d*$/.test(q.get('epoch'))) return problem(res, 422, 'ORCH-VALIDATION', 'epoch is a positive integer', '/query/epoch');
+    if (q.has('instance') && !RE.instanceId.test(q.get('instance'))) return problem(res, 422, 'ORCH-VALIDATION', 'bad instance id', '/query/instance');
     let after = null;
     if (q.has('cursor')) {
       after = decodeCursor(q.get('cursor'));
-      if (after === null) return problem(res, 422, 'ORCH-CURSOR-INVALID', 'the cursor is not one this orchestrator handed out', 'cursor');
+      if (after === null) return problem(res, 422, 'ORCH-CURSOR-INVALID', 'the cursor is not one this orchestrator handed out', '/query/cursor');
     }
     const items = [...records.keys()].sort().filter((id) => {
       const r = records.get(id);
@@ -525,7 +518,7 @@ export function createFakeOrchestrator(options = {}) {
     if (ctl) {
       const { buf } = await readBody(req);
       const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
-      if (!local || method !== 'POST') return problem(res, 403, 'ORCH-BAD-SIGNATURE', 'not available');
+      if (!local || method !== 'POST') return problem(res, 404, 'ORCH-ROUTE-UNKNOWN', 'not available');
       const r = records.get(ctl[1]);
       const [body] = parseJson(buf);
       if (!r) return problem(res, 404, 'ORCH-INSTANCE-NOT-FOUND', 'unknown instance');

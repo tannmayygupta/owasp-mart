@@ -36,5 +36,6 @@
   "error.gone.json": "Problem",
   "error.unsupported-media.json": "Problem",
   "flags.result.incorrect.json": "FlagSubmissionResult",
-  "timeline.last-page.json": "Timeline"
+  "timeline.last-page.json": "Timeline",
+  "error.validation-errors.json": "Problem"
 }

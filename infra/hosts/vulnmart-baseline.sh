@@ -13,7 +13,7 @@ case "$KEEPALIVE" in
 esac
 MARK_DIR=/var/lib/vulnmart
 mkdir -p "$MARK_DIR"
-rm -f "$MARK_DIR/baseline-ok" "$MARK_DIR/baseline-failed"
+rm -f "$MARK_DIR/baseline-ok" "$MARK_DIR/baseline-failed" "$MARK_DIR/certs-tooling-failed"
 STEP=start
 trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "step=$STEP exit=$rc" > "$MARK_DIR/baseline-failed"; fi' EXIT
 
@@ -24,9 +24,15 @@ STEP=firewall;             /usr/local/sbin/vulnmart-firewall.sh "$PRIVATE_CIDR"
 STEP=docker;               /usr/local/sbin/vulnmart-install-docker.sh
 STEP=egress;               systemctl daemon-reload && systemctl enable --now vulnmart-egress.service
 STEP=secrets-dir;          install -d -m 0700 -o root -g root /opt/vulnmart /opt/vulnmart/secrets
+STEP=certs-dir;            install -d -m 0700 -o root -g root /opt/vulnmart/certs
 STEP=time-sync;            if systemctl cat systemd-timesyncd.service >/dev/null 2>&1; then systemctl restart systemd-timesyncd; elif systemctl cat chrony.service >/dev/null 2>&1; then systemctl restart chrony; else echo "vulnmart-baseline: no time sync service (systemd-timesyncd or chrony) found" >&2; false; fi
 STEP=keepalive;            systemctl daemon-reload && if [ "$KEEPALIVE" = yes ]; then systemctl enable --now vulnmart-keepalive.service; else systemctl disable --now vulnmart-keepalive.service; fi
 STEP=unattended-upgrades;  systemctl enable --now unattended-upgrades
+
+# The certificate tooling is optional (D-49): a failure prints a warning and writes /var/lib/vulnmart/certs-tooling-failed (verify-hosts shows it as a WARN) but never stops the baseline.
+optional() { "$@" || { echo "vulnmart-baseline: warning: optional step $STEP failed" >&2; echo "step=$STEP" >> "$MARK_DIR/certs-tooling-failed"; }; }
+STEP=lego;                 optional /usr/local/sbin/vulnmart-install-lego.sh
+STEP=certs-timer;          optional sh -c 'systemctl daemon-reload && systemctl enable --now vulnmart-certs.timer'
 
 STEP=marker
 date -u +%Y-%m-%dT%H:%M:%SZ > "$MARK_DIR/baseline-ok"

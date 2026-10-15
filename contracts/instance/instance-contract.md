@@ -1,13 +1,13 @@
 # Instance contract v0 (IF-6)
 
-- **Version:** 0.1.0 (draft, 0.x until the tag `contracts-v1.0.0` in story L-09). See [../CHANGELOG.md](../CHANGELOG.md).
+- **Version:** 1.0.0 (first stable release, tag `contracts-v1.0.0` pending; the history is in [the changelog](../CHANGELOG.md))
 - **Owner:** stream L (Tanmay) with stream T (Sahil). Sahil approves as consumer before merge (CODEOWNERS `/contracts/instance/`).
 - **Source:** `docs/architecture/07-repo-and-workstreams.md` section 3.2 (the 11 topics below), `04-data-and-state.md` sections 11.1 and 11.3, `docs/design/challenge-specs.md` sections 8 and 10.
 - **Check it:** `pnpm run contracts:check` (or `node scripts/validate-contracts.mjs`).
 
 Plain terms: an **instance** is one private copy of the shop with its helper containers. This document says what every container in an instance must look like, so the orchestrator (L) and the shop and services (T) can be built separately. Words in **bold "to confirm"** are values the architecture does not fix; every one is listed in the table at the end ("Open points (to confirm)") for Sahil and Akshay.
 
-What this contract does not cover: the body and names of events (IF-4, `contracts/events/app-events.md`), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are placeholders until the registry is merged.
+What this contract does not cover: the body and names of events (IF-4, `contracts/events/app-events.md`), the orchestrator API (IF-5, L-04), the catalogue schema (IF-7, T-02) and the error registry (IF-8, P-02). Where they are needed, this document names the field or the code family only. Error code names written here as `INST-*` are the codes of the IF-8 registry.
 
 Machine-checkable parts: [injection-document.schema.json](injection-document.schema.json), [flags-file.schema.json](flags-file.schema.json), [instance-template.schema.json](instance-template.schema.json), [sidecar-start.schema.json](sidecar-start.schema.json) (JSON Schema 2020-12), with valid and invalid examples in `examples/`. Rules that compare two fields (for example "the injector and the shop share one `/run/vm` volume") are checked by `scripts/validate-contracts.mjs`.
 
@@ -110,9 +110,9 @@ Order and lifetime: the shop, import service and mock-services start only after 
 
 **Seed.** `seed` is random, at least 32 and at most 128 characters from `A-Z a-z 0-9 _ -`. It is a secret like the flags: never in an environment variable, a log line, a label or an event. It drives the per-instance seeded passwords and data.
 
-**Exit codes** (the `INST-*` names are placeholders until the error registry, story P-02, is merged):
+**Exit codes** (the `INST-*` names are the codes of the IF-8 error registry):
 
-| Exit code | Meaning | Placeholder error code |
+| Exit code | Meaning | Error code (IF-8) |
 |---|---|---|
 | 0 | Injected, marker written | none |
 | 10 | The document is missing, not JSON or fails the schema | `INST-INJECT-BAD-DOCUMENT` |
@@ -179,7 +179,7 @@ Every value below was chosen by this draft because the architecture does not fix
 | 2 | Flag length and alphabet | 24 characters from `A-Z2-7` inside `VM{ }` (architecture 04 section 11.1 calls the format a placeholder, FR-FLG-02) | Sahil, Akshay |
 | 3 | Maximum flags per document | 11 (C01 to C11) | Sahil |
 | 4 | Seed length and alphabet | 32 to 128 characters of `A-Z a-z 0-9 _ -` | Sahil |
-| 5 | Exit codes and placeholder names | 0, 10, 11, 12, 13 and `INST-INJECT-*` (section 5) | Akshay (registry P-02) |
+| 5 | Exit codes and error code names | 0, 10, 11, 12, 13 and `INST-INJECT-*` (section 5) | Akshay (registry P-02) |
 | 6 | Marker file content and mode | `/run/vm/injected`, empty, mode 0444 (the path is from the architecture) | Sahil |
 | 7 | Flags file | `/run/vm/flags.json`, mode 0400 (from the architecture), fields in the schema | Sahil |
 | 8 | Run user | `65532:65532` for every component | Sahil |
@@ -194,13 +194,13 @@ Every value below was chosen by this draft because the architecture does not fix
 | 17 | Healthcheck numbers and kinds | interval 2 s, timeout 2 s, 15 retries; kinds `http`, `tcp`, `socket`; shop checks `/readyz` | Tanmay (spike S-4) |
 | 18 | Import service transport | unix socket, no network, fresh process per job, healthcheck by socket | Sahil |
 | 19 | Decoy placement field | `decoy_placement` (optional string, content defined by T) | Sahil |
-| 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | Tanmay |
-| 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | Tanmay |
+| 20 | Network mode names | `instance` and `none`; the import service and the injector are always `none`; the others use `instance` | confirmed on delegation (Tanmay, 2026-10-11) |
+| 21 | Template and component names | template id such as `shop-v0`; component name equal to the role name | confirmed on delegation (Tanmay, 2026-10-11) |
 | 22 | Event endpoint base URL | `http://sidecar:9000` (path `/v1/events`, defined by IF-4); mock base `http://mock-services` | Tanmay, Sahil |
 | 23 | Label value shapes | tokens `{instance_id}`, `{epoch}`, `{expires}`, `{host}`, `{owner_hash}`; owner hash is 64 lowercase hex and arrives as the required `owner_hash` of the IF-5 create body, computed by the platform (proposal: HMAC-SHA256 of the user id with a platform label key; handoff H-20); `vm.schema` equals `0.1`; `vm.kind` is `inst` in templates | Akshay (owner hash), Tanmay |
 | 24 | Env value limit and reason length | value at most 512 characters; flag-in-env reason 20 to 300 characters, not blank; only the shop may use the exception | Sahil |
 | 25 | Env allowlist | the 13 names in section 2 | Sahil |
-| 26 | `issued_at` handling | optional, advisory and not enforced in v0, no age check | Tanmay |
+| 26 | `issued_at` handling | optional, advisory and not enforced in v0, no age check | confirmed on delegation (Tanmay, 2026-10-11) |
 | 27 | Sentinel and file paths of the placement kinds | file names are defined by the catalogue (IF-7); the directories `/run/placement/import` and `/run/placement/mock` are fixed here (row 16) | Sahil (T-02) |
 | 28 | Shop restart and data loss | `/data` is memory-backed and lost on restart; no restart policy in v0; a dead shop means the orchestrator resets the instance (refers to OI-23) | Tanmay, Sahil |
 | 29 | Injector network mode | Decision by Tanmay (2026-10-08): `network_mode: none` for the injector, enforced by the schema. This deviates from the architecture 02 drawing, which shows the injector on the instance network | Tanmay |

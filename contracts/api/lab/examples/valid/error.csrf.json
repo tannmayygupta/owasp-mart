@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/auth_csrf_failed",
-  "title": "The CSRF check failed.",
+  "type": "urn:vulnmart:error:AUTH-CSRF-FAILED",
+  "title": "The request could not be verified.",
   "status": 403,
-  "detail": "the CSRF header is missing or wrong",
-  "instance": "urn:vulnmart:request:req-0123456789ab",
-  "code": "auth_csrf_failed",
+  "code": "AUTH-CSRF-FAILED",
   "request_id": "req-0123456789ab"
 }

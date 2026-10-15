@@ -36,9 +36,9 @@ write_files:
     permissions: "0644"
     content: ${docker_daemon}
   - path: /usr/local/sbin/vulnmart-egress.sh
-    encoding: b64
     permissions: "0755"
-    content: ${egress_sh}
+    content: |
+      ${egress_sh}
   - path: /etc/systemd/system/vulnmart-egress.service
     encoding: b64
     permissions: "0644"
@@ -54,6 +54,26 @@ write_files:
     encoding: b64
     permissions: "0644"
     content: ${keepalive_unit}
+  - path: /usr/local/sbin/vulnmart-certs.sh
+    permissions: "0755"
+    content: |
+      ${certs_sh}
+  - path: /etc/systemd/system/vulnmart-certs.service
+    permissions: "0644"
+    content: |
+      ${certs_unit}
+  - path: /etc/systemd/system/vulnmart-certs.timer
+    permissions: "0644"
+    content: |
+      ${certs_timer}
+  - path: /etc/vulnmart/lego.pin.json
+    permissions: "0644"
+    content: |
+      ${lego_pin}
+  - path: /usr/local/sbin/vulnmart-install-lego.sh
+    permissions: "0755"
+    content: |
+      ${lego_install_sh}
   - path: /etc/apt/apt.conf.d/20auto-upgrades
     permissions: "0644"
     content: |

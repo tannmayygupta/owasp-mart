@@ -1,6 +1,6 @@
 # IF-8: error codes and error format
 
-Version **0.1.0** (story P-02). Owner: stream P (Akshay). Anyone adds a code by pull request; the owner approves.
+Version **1.0.0** (story P-02). Owner: stream P (Akshay). Anyone adds a code by pull request; the owner approves.
 Consumers: every stream. Architecture: `docs/architecture/07-repo-and-workstreams.md` section 3.6. Requirement: NFR-SEC-03.
 
 ## What is here

@@ -1,15 +1,15 @@
 openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
-  title: Orchestrator API (IF-5), contract v0.3.0 (proposal)
-  version: 0.3.0
+  title: Orchestrator API (IF-5), contract v1.0.0
+  version: 1.0.0
   description: |
     The calls between the platform worker (stream P, VM-P) and the lab orchestrator (stream L, VM-I).
     Seven calls go from the platform to the orchestrator; one signed state report goes back.
     Status: DRAFT, a proposal for Akshay to confirm in the team chat (D-37). Every value that the
     architecture does not fix is listed in the "Open points (to confirm)" table of
-    orchestrator-api.md. Error codes named ORCH-* and INST-* are placeholders until the error
-    registry (IF-8, story P-02) is merged.
+    orchestrator-api.md. Error codes named ORCH-* and INST-* are the codes of the error registry (IF-8,
+    contracts/errors/error-codes.yaml).
 
     Rules that hold for every call (the text is in orchestrator-api.md):
     * Transport is mutual TLS on the private link. mTLS is not modelled in this file.
@@ -25,7 +25,8 @@ info:
       `1e0`, no boolean, at most 9007199254740991 (2^53 - 1, I-JSON, RFC 7493). A JSON Schema validator
       accepts 1.0 for `type: integer`, so the receiver has to check the token itself (orchestrator-api.md
       section 2a). The one number that is not an integer is `limits.cpu_limit`; it is compared by value.
-    * Every error answer is RFC 9457 problem details, media type `application/problem+json`.
+    * Every error answer is the closed IF-8 body (contracts/errors/problem.schema.json, RFC 9457 style), media type
+      `application/problem+json`: type, title, status, code, request_id and, for 422, field. No detail, no instance.
     * All examples use obviously fake values.
   license:
     name: Proprietary, project internal
@@ -331,9 +332,9 @@ components:
     Invalid:
       description: |
         ORCH-FIELD-FORBIDDEN (the body names an image, command, volume, port, network or
-        environment value; `field` names it), ORCH-TEMPLATE-UNKNOWN, ORCH-LABEL-UNKNOWN or
+        environment value; `field` is its pointer), ORCH-TEMPLATE-UNKNOWN, ORCH-LABEL-UNKNOWN or
         ORCH-VALIDATION (any other malformed value, a number that is not an integer token included; `field` is a JSON
-        Pointer) or ORCH-CURSOR-INVALID (a cursor this orchestrator did not hand out; `field` is `cursor`). Nothing created.
+        Pointer) or ORCH-CURSOR-INVALID (a cursor this orchestrator did not hand out; `field` is `/query/cursor`). Nothing created.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -374,11 +375,8 @@ components:
       enum: [unknown, healthy, unhealthy]
     ErrorCode:
       description: |
-        Placeholder code until the error registry (IF-8) is merged. Codes in use: ORCH-BAD-SIGNATURE,
-        ORCH-INSTANCE-NOT-FOUND, ORCH-METHOD-NOT-ALLOWED, ORCH-REQUEST-MISMATCH, ORCH-INSTANCE-EXISTS,
-        ORCH-INVALID-STATE, ORCH-STALE-EPOCH, ORCH-STALE-ACCESS-EPOCH, ORCH-BODY-TOO-LARGE,
-        ORCH-UNSUPPORTED-MEDIA-TYPE, ORCH-CURSOR-INVALID, ORCH-FIELD-FORBIDDEN, ORCH-TEMPLATE-UNKNOWN, ORCH-LABEL-UNKNOWN, ORCH-VALIDATION, ORCH-BUSY,
-        ORCH-RATE-LIMITED and INST-* codes for failed instances.
+        Code of the error registry (IF-8, contracts/errors/error-codes.yaml): ORCH-* for an error answer of this API, INST-* for
+        the failed instance (error_code). The registry holds the names, the HTTP status and the fixed title of every code.
       type: string
       pattern: '^(ORCH|INST)-[A-Z0-9]+(-[A-Z0-9]+)*$'
     OwnerHash:
@@ -578,26 +576,44 @@ components:
         health: { $ref: '#/components/schemas/Health' }
     Problem:
       description: |
-        RFC 9457 problem details (media type application/problem+json). `type`, `title`, `status`, `detail` and `instance` are the
-        standard members; `code`, `request_id` and `field` are extension members of this API. The schema is open on purpose: a
-        client ignores members it does not know, so a member can be added later without breaking anyone. Three names are
-        refused: `message` (the old-style member, removed in 0.3.0), `stack` and `trace` (an answer never holds a stack trace,
-        NFR-SEC-03). `type` is `https://vulnmart.invalid/problems/` plus the lower-case `code`; `instance` is
-        `urn:vulnmart:request:` plus `request_id`; `title` is fixed per code, `detail` is for this occurrence.
+        The error body of IF-8 (contracts/errors/problem.schema.json), copied here so that this file is self-contained;
+        `scripts/check_orchestrator_contract.py` fails when the two differ. RFC 9457 members `type`, `title` and `status`
+        plus `code`, `request_id` and, for 422, `field` or `errors`. The schema is closed: there is no `detail`, no
+        `instance`, no `message`, and never a stack trace (NFR-SEC-03). `type` is `urn:vulnmart:error:` plus the `code`;
+        `title` is the registry's fixed text for the code; `field` is a JSON Pointer built from names of the request
+        (`/template_id`, `/limits/memory_mb`, `/query/limit`, `/path/instance_id`), never from a value. The codes of this
+        API are the ORCH-* codes of the registry; they never reach a browser.
       type: object
-      required: [type, title, status, detail, instance, code, request_id]
+      additionalProperties: false
+      required: [type, title, status, code, request_id]
       properties:
-        type: { type: string, format: uri-reference, maxLength: 200, pattern: '^https://vulnmart\.invalid/problems/[a-z0-9]+(-[a-z0-9]+)*$' }
-        title: { type: string, minLength: 1, maxLength: 200 }
+        type:
+          description: 'urn:vulnmart:error: plus the code.'
+          type: string
+          pattern: '^urn:vulnmart:error:[A-Z]{2,6}(-[A-Z]+)+$'
+          maxLength: 100
+        title:
+          description: The registry's fixed generic text for the code.
+          type: string
+          minLength: 1
+          maxLength: 200
         status: { type: integer, format: int64, minimum: 400, maximum: 599 }
-        detail: { type: string, maxLength: 500 }
-        instance: { type: string, format: uri-reference, maxLength: 200, pattern: '^urn:vulnmart:request:[A-Za-z0-9-]{8,64}$' }
-        code: { $ref: '#/components/schemas/ErrorCode' }
+        code: { type: string, pattern: '^[A-Z]{2,6}(-[A-Z]+)+$', maxLength: 60 }
         request_id: { type: string, pattern: '^[A-Za-z0-9-]{8,64}$' }
         field:
-          description: The offending field (for ORCH-FIELD-FORBIDDEN its name, for ORCH-VALIDATION a JSON Pointer, for ORCH-CURSOR-INVALID `cursor`).
+          description: One JSON Pointer to the offending field (empty string for the whole body).
           type: string
+          pattern: '^(/([^/~]|~[01])*)*$'
           maxLength: 200
-        message: { not: {}, description: Removed in 0.3.0. Use `detail`. }
-        stack: { not: {}, description: Never present (NFR-SEC-03). }
-        trace: { not: {}, description: Never present (NFR-SEC-03). }
+        errors:
+          description: 'For 422 with several problems: one entry per offending field. The detail is a fixed generic text and never repeats the submitted value.'
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [pointer, detail]
+            properties:
+              pointer: { type: string, pattern: '^(/([^/~]|~[01])*)*$', maxLength: 200 }
+              detail: { type: string, minLength: 1, maxLength: 200 }

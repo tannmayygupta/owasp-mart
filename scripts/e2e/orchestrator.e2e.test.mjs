@@ -102,20 +102,18 @@ function assertStatus(o, where = 'status') {
   assert.ok(o.error_code === null || typeof o.error_code === 'string');
   assert.ok(isTs(o.created_at) && isTs(o.updated_at));
 }
-// RFC 9457 problem details (ADR 0028): standard members type, title, status, detail, instance; extension members code, request_id, field.
+// The closed IF-8 body: type, title, status, code, request_id and, for a 422, field. No detail, no instance, no message.
 function assertProblem(r, status, code) {
   assert.equal(r.status, status, r.text);
   assert.equal(r.headers.get('content-type'), 'application/problem+json');
   const j = r.json;
   assert.equal(j.code, code, r.text);
   assert.equal(j.status, status, 'the status member equals the HTTP status');
-  assert.equal(j.type, 'https://vulnmart.invalid/problems/' + code.toLowerCase());
+  assert.equal(j.type, 'urn:vulnmart:error:' + code);
   assert.ok(typeof j.title === 'string' && j.title.length > 0);
-  assert.equal(typeof j.detail, 'string');
   assert.match(j.request_id, /^[A-Za-z0-9-]{8,64}$/);
-  assert.equal(j.instance, 'urn:vulnmart:request:' + j.request_id);
-  assert.ok(!('message' in j), 'the old-style message member is gone');
-  for (const k of Object.keys(j)) assert.ok(['type', 'title', 'status', 'detail', 'instance', 'code', 'request_id', 'field'].includes(k), `unexpected key ${k}`);
+  for (const gone of ['detail', 'instance', 'message']) assert.ok(!(gone in j), `the member ${gone} is gone`);
+  for (const k of Object.keys(j)) assert.ok(['type', 'title', 'status', 'code', 'request_id', 'field'].includes(k), `unexpected key ${k}`);
 }
 const secretMarkers = [createExample.event_key, createExample.seed, 'VM{', createExample.flag_digests[0].sha256];
 
@@ -199,7 +197,7 @@ test('a body that names an image, command, volume, port or env is refused with 4
     const id = newId();
     const r = await call(base, 'POST', '/v1/instances', { ...clone(createExample), instance_id: id, [name]: value });
     assertProblem(r, 422, 'ORCH-FIELD-FORBIDDEN');
-    assert.equal(r.json.field, name);
+    assert.equal(r.json.field, '/' + name);
     assertProblem(await call(base, 'GET', `/v1/instances/${id}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
   }
   const id = newId();
@@ -385,14 +383,14 @@ test('a cursor that this orchestrator did not hand out is 422 ORCH-CURSOR-INVALI
   for (const cursor of ['!!', 'AAAA', 'x'.repeat(200), '', 'a'.repeat(23), 'a'.repeat(25), 'AAAAAAAAAAAAAAAAAAAAAAAA', Buffer.from('not-an-instance-id').toString('base64url')]) {
     const r = await call(lbase, 'GET', `/v1/instances?cursor=${encodeURIComponent(cursor)}`);
     assertProblem(r, 422, 'ORCH-CURSOR-INVALID');
-    assert.equal(r.json.field, 'cursor');
+    assert.equal(r.json.field, '/query/cursor');
   }
   const page = await call(lbase, 'GET', '/v1/instances?limit=2');
   assert.equal(page.json.next_cursor.length, 24);
   assert.equal((await call(lbase, 'GET', `/v1/instances?limit=2&cursor=${page.json.next_cursor}`)).json.items.length, 1);
 });
 
-test('every error answer is RFC 9457 problem details and nothing in it is a stack trace', async () => {
+test('every error answer is the closed IF-8 body and nothing in it is a stack trace', async () => {
   const unknown = newId();
   assertProblem(await call(base, 'GET', `/v1/instances/${unknown}`), 404, 'ORCH-INSTANCE-NOT-FOUND');
   assertProblem(await call(base, 'DELETE', '/v1/host'), 405, 'ORCH-METHOD-NOT-ALLOWED');

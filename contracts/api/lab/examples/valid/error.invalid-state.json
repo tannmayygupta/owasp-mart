@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/att_invalid_state",
-  "title": "The attempt is in the wrong state.",
+  "type": "urn:vulnmart:error:ATT-INVALID-STATE",
+  "title": "This action is not allowed in the attempt's current state.",
   "status": 409,
-  "detail": "submit is not allowed in state submitted",
-  "instance": "urn:vulnmart:request:req-0123456789ab",
-  "code": "att_invalid_state",
+  "code": "ATT-INVALID-STATE",
   "request_id": "req-0123456789ab"
 }

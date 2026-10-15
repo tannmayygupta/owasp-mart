@@ -1,9 +1,7 @@
 {
-  "type": "https://vulnmart.invalid/problems/att_flag_rate_limited",
-  "title": "Too many incorrect submissions.",
+  "type": "urn:vulnmart:error:ATT-FLAG-RATE-LIMITED",
+  "title": "Too many attempts. Try again later.",
   "status": 429,
-  "detail": "too many incorrect submissions for this challenge",
-  "instance": "urn:vulnmart:request:req-0123456789ab",
-  "code": "att_flag_rate_limited",
+  "code": "ATT-FLAG-RATE-LIMITED",
   "request_id": "req-0123456789ab"
 }

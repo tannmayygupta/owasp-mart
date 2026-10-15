@@ -1,0 +1,130 @@
+# Real output of the story checks (filtered to result lines), 2026-10-12 after the review fixes, Windows, Docker Desktop, Node v24.11.0
+
+$ node --test scripts/e2e/caddy-origin.e2e.test.mjs scripts/check-sse-rewrite.test.mjs scripts/scan-secrets.test.mjs scripts/ci-workflow-shape.test.mjs
+ok a good rewrite passes every check; no secret value is printed; the information line is not a PASS (1079.5645ms)
+ok with --direct a good rewrite gives ten PASS lines (nine checks and the direct check) (1001.5415ms)
+ok an event split across two network chunks is counted once (frames are read per blank line) (996.6078ms)
+ok a buffered rewrite (all events at the end) fails stream-steady (994.5085ms)
+ok events delivered in batches fails stream-steady (976.5541ms)
+ok a rewrite that does not set the secret header fails echo-through-rewrite (984.8035ms)
+ok a rewrite that forwards the visitor secret (the gate in front answers 403) fails visitor-header-overwritten (965.3754ms)
+ok a content-encoding added to the stream fails stream-no-compression (983.8982ms)
+ok a rewritten cache-control on the stream fails stream-cache-control (970.0934ms)
+ok a shared cache that keeps the first answer fails no-shared-cache (984.1648ms)
+ok Set-Cookie dropped fails cookie-passthrough (981.8888ms)
+ok cookie attributes HttpOnly, Secure and SameSite removed fails cookie-passthrough (972.6142ms)
+ok the request cookie header dropped fails cookie-passthrough (983.4043ms)
+ok the query string lost fails request-body-and-query (987.6028ms)
+ok the POST body lost fails request-body-and-query (987.1253ms)
+ok a stream cut by the rewrite is reported with its time and fails the longest-stream check (336.3724ms)
+ok direct access: 403 with the body "forbidden" passes; another body, an open origin and an unreachable origin fail (3947.3806ms)
+ok a request that never answers is cut by the request timeout (no check waits forever) (2069.6622ms)
+ok an unreachable url fails every live check and exits 1 without throwing (2.0108ms)
+ok parseCli: https only, no credentials, hold range, validate alone, render needs out (0.8331ms)
+ok validator: the committed vercel.json of the probe project is valid and has the placeholder host, no brace variables (2.7362ms)
+ok validator: each broken shape is named, none crashes (5.8082ms)
+ok originHost and renderProbe: only https://<label>.duckdns.org is accepted; the output is the probe folder with the host filled in and valid (235.461ms)
+ok validator command: exit 0 for the committed file, exit 1 and the problem for a bad one, exit 2 for bad usage (254.1009ms)
+ok probe numberParam: null, empty and non-numeric give the default; the rest is cut to the range (0.1958ms)
+ok probe: an empty interval and heartbeat do not make a 10 ms flood, and a stream ends at its maximum age (1021.8047ms)
+ok probe: the cacheable endpoint is public with a random body per request; echo returns the POST body and query (5.0282ms)
+ok no workflow uses the pull_request_target trigger (2.2164ms)
+ok contract-rules: base commit is the trusted source, the head goes to head/, nothing is persisted, permissions are read-only (0.9965ms)
+ok contract-rules: no step runs code from head/ except the declared bootstrap fallback, and no secret is used (1.3547ms)
+ok contract-rules: the reviews are fetched with a read-only token in one step that runs no repository code; the checker never holds it (1.7391ms)
+ok no step of any job uses secrets, only that one step uses gh or a token, and no other job asks for more than contents: read (1.0292ms)
+ok contract-rules-untrusted: head code runs here, with no credentials and read-only permissions (0.3114ms)
+ok every action in the contract-rules jobs is pinned by a full commit SHA, the same ones as the rest of ci.yml (0.6729ms)
+ok CODEOWNERS covers the files that define the rules engine (0.7015ms)
+ok compose job runs the Caddy origin e2e test; vm-p compose pins the stock Caddy and the probe node image by digest, with no plugin build (1.2198ms)
+ok no secret: 403 and the upstream is not called (650.7851ms)
+ok wrong, empty, near-miss, short, upper-case and non-hex secrets: 403, upstream not called (577.0708ms)
+ok right secret: proxied, the upstream sees the client address header and the /api prefix, the echo never returns the secret (610.6534ms)
+ok rotation: new in current and old in previous both accepted, then the old one removed leaves only the new (1200.4345ms)
+ok a secret file with a * (wildcard in Caddy's header matcher) never opens the gate; a 64-hex secret does; a file of another length or case never matches (7177.0737ms)
+ok SSE: events reach the client spread over time, not at the end (flush_interval -1) (3217.3003ms)
+ok SSE heartbeat comments pass through while no event is due (1016.1104ms)
+ok logs: requests are logged and the secret never appears (current, previous, wrong or empty) (1483.8399ms)
+ok no secret file at start: Caddy is up and refuses every request, including an empty header (fail closed) (14.5296ms)
+ok an empty secret file also fails closed (603.7509ms)
+ok Caddyfile.p adapts: the default logger deletes the secret header, the access log does too, the admin endpoint is a unix socket, the stream is unbuffered (746.7298ms)
+ok caddy reload through the admin socket succeeds in the running container (the renewal hook of H-115) (841.9347ms)
+ok production shape: the real Caddyfile.p with the flags of compose.p.yaml serves TLS, refuses without the secret, proxies with it, reloads through the socket, logs no secret (1333.1111ms)
+ok production shape, secret file missing at start: Docker creates a directory, Caddy fails closed, and the runbook preflight (test -f) catches it (1774.9706ms)
+ok production shape, previous file missing at start (a directory) but current present: the current secret works and nothing else does (720.5807ms)
+ok the working tree has no OCID, key, fingerprint, local file or public address (482.4919ms)
+ok an OCID, a private key block and a fingerprint are caught (0.2961ms)
+ok placeholders are not flagged (0.1517ms)
+ok a public address is caught in the scoped folders and ignored elsewhere; private and documentation addresses pass (0.1917ms)
+ok isPublicIPv4 knows the private ranges (0.213ms)
+ok a tracked Vercel link file or local env file is refused (project and organisation ids, environment values) (0.3266ms)
+ok files that must stay local are caught by name (0.1934ms)
+ok Terraform variable files, plans, state backups and ssh private keys are caught by name; examples are not (0.2013ms)
+ok the matched value is never part of a hit (0.2691ms)
+ok an AWS access key id, a secret access key and an account id are caught (0.2936ms)
+ok AWS placeholders and wildcard ARNs are not flagged, and the hit never contains the value (0.1777ms)
+ok AWS credential files are caught by name (0.171ms)
+ok a png, jpg or jpeg in the root or outside docs/assets is caught; under docs/assets it is not (0.2144ms)
+ok the console URL form with an account id is caught (built at test time) (0.13ms)
+ok the SecretAccessKey JSON form, more id prefixes and a CSV row are caught (values built at test time) (0.175ms)
+info tests 66
+info pass 66
+info fail 0
+info cancelled 0
+info skipped 0
+exit code: 0
+
+$ node scripts/check-sse-rewrite.mjs --validate
+PASS  vercel.json has the expected shape
+exit code: 0
+
+$ docker compose -f infra/caddy/compose.p.yaml config -q
+exit code: 0
+
+$ node scripts/check-text-files.mjs
+PASS no control character, BOM or mojibake in the tracked text files
+exit code: 0
+
+$ node scripts/scan-secrets.mjs
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree
+exit code: 0
+
+$ node scripts/check-contract-rules.mjs
+PASS            registry: 6 contracts, 13 folders under contracts/ all registered
+PASS            base: compared with origin/main (merge base 65b49255b9); 738 file(s) differ
+PASS            changelog[IF-6]: new entries for IF-6: 0.3.1 (2026-10-11, Tanmay, story L-09 preparation); 0.3.0 (2026-10-11, Tanmay, story 1.15, instance template hardening; a minor step because it is breaking before v1.0.0); 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42); 0.1.1 (2026-10-09, Tanmay, story L-03); 0.1.2 (2026-10-09, Tanmay, story L-04 follow-up); 0.1.3 (2026-10-10, Tanmay, story L-06)
+PASS            mock[IF-6]: a mock file changed with the contract
+PASS            breaking[IF-6]: BREAKING declared in the new entry with a raised version (0.3.1):
+PASS            changelog[IF-4]: new entries for IF-4: 0.2.1 (2026-10-11, Tanmay, story L-09 preparation); 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42, decided on the developer's delegation; to be confirmed); 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft); 0.1.0 (2026-10-08, Tanmay, story L-03)
+PASS            mock[IF-4]: a mock file changed with the contract
+PASS            breaking[IF-4]: contracts/events/instance-events.schema.json: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-5]: new entries for IF-5: 0.3.0 (2026-10-11, Tanmay, story 1.15, review findings of pull request 3; decided on the developer's delegation, ADR 0028; to be confirmed); 0.2.0 (2026-10-11, Tanmay, story 1.15, decision D-42; only the `first_seq` and `event_key` lines; other IF-5 changes of this story are listed by their own entries); 0.1.0 follow-up notes (2026-10-09, Tanmay, story L-04 follow-up; still the 0.1.0 draft, nothing was confirmed yet); 0.1.0 (2026-10-09, Tanmay, story L-04)
+PASS            mock[IF-5]: a mock file changed with the contract
+PASS            breaking[IF-5]: contracts/orchestrator/orchestrator.openapi.yaml: new file, not compared (a new file is not a breaking change)
+PASS            changelog[IF-2]: new entries for IF-2: 0.2.0 (2026-10-11, Tanmay, story 1.15 part B4, which also carries story 1.12 for IF-2; to be confirmed by Akshay); 0.1.0 (2026-10-09, Tanmay, story L-05)
+PASS            mock[IF-2]: a mock file changed with the contract
+PASS            breaking[IF-2]: contracts/api/lab/lab.openapi.yaml: new file, not compared (a new file is not a breaking change)
+PASS            changelog[DB]: new entry for DB: 0.1.0 (2026-10-10, Tanmay, story L-07)
+PASS            mock[DB]: no mock by design: the table-owners list is read by CI only, nothing runs against it
+PASS            breaking[DB]: contracts/db/table-owners.schema.json: new file, not compared (a new file is not a breaking change)
+PASS            contract[IF-7]: no file of this contract changed
+PASS            compat: 6 row(s), every listed version exists; 16 approver row(s)
+NOT-APPLICABLE  approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+NOT-APPLICABLE  table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE  alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE  bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet
+SUMMARY: 19 PASS, 0 FAIL, 4 NOT-APPLICABLE
+NOT-APPLICABLE: approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+NOT-APPLICABLE: table-owners: contracts/db/table-owners.yaml does not exist yet
+NOT-APPLICABLE: alembic: apps/api/migrations/versions does not exist yet
+NOT-APPLICABLE: bundle: no bundle command (script "contracts:bundle:check") and no contracts/api/bundle/openapi.json yet
+exit code: 0
+
+$ node --test "scripts/*.test.mjs"  (full suite, run after the last change, 2026-10-12; summary lines)
+info tests 558
+info pass 557
+info fail 0
+info cancelled 0
+info skipped 1
+
+(the one skipped test is the flock test: flock is not available on Windows, Linux CI has it)

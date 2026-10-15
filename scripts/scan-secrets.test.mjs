@@ -37,6 +37,11 @@ test('isPublicIPv4 knows the private ranges', () => {
   assert.equal(isPublicIPv4(300, 1, 1, 1), false);
 });
 
+test('a tracked Vercel link file or local env file is refused (project and organisation ids, environment values)', () => {
+  const hits = scanFiles(['infra/vercel/s14-probe/.vercel/project.json', '.vercel/project.json', '.env.local', 'apps/web/.env.production.local', 'infra/vercel/s14-probe/vercel.json'], () => '', () => 0);
+  assert.deepEqual(hits.map((h) => h.file), ['infra/vercel/s14-probe/.vercel/project.json', '.vercel/project.json', '.env.local', 'apps/web/.env.production.local']);
+});
+
 test('files that must stay local are caught by name', () => {
   const hits = scanFiles(['infra/terraform/oci/terraform.tfvars', 'x/oci_api_key.pem', 'infra/terraform/oci/hosts.local.json', 'infra/terraform/oci/terraform.tfvars.example'], () => '', () => 0);
   assert.deepEqual(hits.map((h) => h.file), ['infra/terraform/oci/terraform.tfvars', 'x/oci_api_key.pem', 'infra/terraform/oci/hosts.local.json']);

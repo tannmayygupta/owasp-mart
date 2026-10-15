@@ -27,6 +27,11 @@ export const BASELINE_FILES = [
   { local: 'infra/hosts/vulnmart-egress.service', remote: '/etc/systemd/system/vulnmart-egress.service' },
   { local: 'infra/hosts/vulnmart-keepalive.py', remote: '/usr/local/sbin/vulnmart-keepalive.py' },
   { local: 'infra/hosts/vulnmart-keepalive.service', remote: '/etc/systemd/system/vulnmart-keepalive.service' },
+  { local: 'infra/hosts/vulnmart-certs.sh', remote: '/usr/local/sbin/vulnmart-certs.sh' },
+  { local: 'infra/hosts/vulnmart-certs.service', remote: '/etc/systemd/system/vulnmart-certs.service' },
+  { local: 'infra/hosts/vulnmart-certs.timer', remote: '/etc/systemd/system/vulnmart-certs.timer' },
+  { local: 'infra/hosts/lego.pin.json', remote: '/etc/vulnmart/lego.pin.json' },
+  { local: 'infra/hosts/vulnmart-install-lego.sh', remote: '/usr/local/sbin/vulnmart-install-lego.sh' },
 ];
 
 /** sha256 of each repository baseline file (line ends normalised to LF), keyed by remote path. */
@@ -96,6 +101,9 @@ export function remoteBaseline(rules, vm) {
     "echo secrets=$(sudo -n stat -c '%a:%U' /opt/vulnmart/secrets)",
     "echo docker=$(sudo -n docker --version | cut -d, -f1 | tr ' ' '_')",
     'echo keepalive=$(systemctl is-active vulnmart-keepalive || true)',
+    'echo certs=$(sudo -n /usr/local/sbin/vulnmart-certs.sh status --short 2>/dev/null || true)',
+    'if sudo -n test -f /var/lib/vulnmart/certs-tooling-failed; then echo certtooling=failed; else echo certtooling=ok; fi',
+    'echo certtimer=$(systemctl is-enabled vulnmart-certs.timer 2>/dev/null || true)',
     'echo reboot=$(if [ -f /var/run/reboot-required ]; then echo required; else echo no; fi)',
     "echo cloudinit=$(cloud-init status 2>/dev/null | head -1 | tr ' ' '_')",
     'if sudo -n test -f /var/lib/vulnmart/baseline-ok; then echo marker=ok; elif sudo -n test -f /var/lib/vulnmart/baseline-failed; then echo "marker=failed:$(sudo -n cat /var/lib/vulnmart/baseline-failed | tr \' \' _)"; else echo marker=missing; fi',
@@ -153,7 +161,21 @@ export function isolationChecks(vm, kv, add) {
   const rootImds = kv.hostnet_root_imds;
   add(`${vm} information: a ROOT host-network container ${reach(rootImds) ? 'CAN' : 'cannot'} reach instance metadata`, true, `${rootImds ?? 'no answer'}; known residual risk (ADR 0027): compose files must not use host networking or privileged mode (scripts/check-lab-compose-rules.mjs)`, reach(rootImds));
 }
-export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, keepalive = false, checkMetadata = true, checkIsolation = false, tempListener = false, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
+/** Certificate state from `vulnmart-certs.sh status --short` (none:na | ok:<days> | failed:<days|na>), the renewal timer and the tooling marker. No certificate yet, a failed tooling install, or an unreadable answer is a warning (the developer issues it by runbook certificates.md), not a failure. */
+export function certificateChecks(vm, kv, add) {
+  if (kv.certs === undefined) return; // an older answer without the field
+  if (kv.certtooling === 'failed') add(`${vm} certificate tooling installed`, true, 'WARNING: /var/lib/vulnmart/certs-tooling-failed exists: the lego install or the timer step failed at first boot (rerun vulnmart-install-lego.sh, runbook certificates.md Part B)', true);
+  const [state, days] = String(kv.certs).split(':');
+  if (!['none', 'ok', 'failed'].includes(state)) {
+    add(`${vm} certificate status readable`, true, 'WARNING: certificate script not installed or answer unreadable', true);
+    return;
+  }
+  add(`${vm} certificate renewal timer enabled`, kv.certtimer === 'enabled', kv.certtimer || 'no answer');
+  const n = Number(days);
+  if (state === 'none') add(`${vm} production certificate present`, true, 'WARNING: none issued yet (runbook certificates.md)', true);
+  else if (state === 'failed') add(`${vm} certificate renewal has not failed`, false, `failure marker present, days left ${days}: read the journal of vulnmart-certs.service`);
+  else add(`${vm} certificate has more than 14 days left`, state === 'ok' && Number.isFinite(n) && n > 14, `${days} days`);
+}export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubuntu', rules, requireListener = false, keepalive = false, checkMetadata = true, checkIsolation = false, tempListener = false, closedPorts = CLOSED_PORTS, localHashes = localBaselineHashes() }) {
   const checks = [];
   const add = (name, ok, detail = '', warn = false) => checks.push({ name, ok, detail, warn });
   const open = publicPorts(rules);
@@ -179,6 +201,7 @@ export async function verifyHosts({ hosts, tcpProbe, ssh, identity, user = 'ubun
       const ciRepaired = /error/.test(ci) && kv.marker === 'ok';
       add(`${vm} cloud-init finished`, /done/.test(ci) || ciRepaired, ciRepaired ? 'cloud-init recorded an error from an earlier run; the baseline marker is ok (repaired and rerun by hand)' : ci, ciRepaired);
       add(`${vm} baseline marker says ok`, kv.marker === 'ok', kv.marker);
+      certificateChecks(vm, kv, add);
       for (const p of [...open, ...privatePortsFor(rules, vm)]) add(`${vm} host firewall placeholder rule for port ${p} present`, kv[`fw_${p}`] === 'yes', kv[`fw_${p}`] ?? 'no answer');
       const remote = parseShas(login.stdout);
       for (const f of BASELINE_FILES) {

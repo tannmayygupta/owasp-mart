@@ -1,0 +1,20 @@
+# Test variant of Caddyfile.p: no TLS, plain port 8080, the SAME gate file. Used by scripts/e2e/caddy-origin.e2e.test.mjs.
+{
+	# The admin endpoint is a unix socket inside the tmpfs /tmp, never a TCP port: it is what `caddy reload` (the renewal hook of H-115) talks to.
+	# Reload: docker exec <caddy container> caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --address unix//tmp/caddy-admin.sock
+	admin unix//tmp/caddy-admin.sock
+	auto_https off
+	# The default logger also carries the error and warning lines of the proxy, which print the request headers (found by the e2e test, 2026-10-11):
+	# the secret header is deleted there too, not only in the access log of origin-gate.caddy.
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>headers>X-Origin-Secret delete
+		}
+	}
+}
+
+:8080 {
+	import /etc/caddy/origin-gate.caddy
+}

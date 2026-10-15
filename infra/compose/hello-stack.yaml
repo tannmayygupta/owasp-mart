@@ -1,0 +1,25 @@
+# Hello stack for the deploy script (story L-12): the image comes from HELLO_IMAGE, a digest reference taken from the CI release manifest.
+# scripts/deploy.mjs sets HELLO_IMAGE; running this file by hand needs it set (the :? below refuses an empty value).
+name: vulnmart-hello-stack
+
+services:
+  hello:
+    image: ${HELLO_IMAGE:?set HELLO_IMAGE to the digest reference from release.json}
+    container_name: vulnmart-hello-stack
+    user: "65532:65532"
+    read_only: true
+    mem_limit: 64m
+    pids_limit: 64
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:18081:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 1s
+    restart: "no"

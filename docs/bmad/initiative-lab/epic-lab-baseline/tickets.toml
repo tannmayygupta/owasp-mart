@@ -72,7 +72,7 @@ risk = "medium"
 id = 12
 type = "story"
 title = "Adopt RFC 9457 problem details in IF-5 and IF-2"
-description = "Moves the error body of the orchestrator API (IF-5) and the lab API (IF-2) to RFC 9457 problem details: standard members type, title, status, detail and instance, with code, request_id and field kept as extension members, media type application/problem+json. Updates both OpenAPI files, examples, both mocks, the checkers, the Python client and fake host, the contract texts, ADRs 0024 and 0019, the contract changelog and the handoffs for Akshay (H-81, H-91). Decided by the developer on 2026-10-09 after the ADR 0019 source research."
+description = "Moves the error body of the orchestrator API (IF-5) and the lab API (IF-2) to RFC 9457 problem details: standard members type, title, status, detail and instance, with code, request_id and field kept as extension members, media type application/problem+json. Updates both OpenAPI files, examples, both mocks, the checkers, the Python client and fake host, the contract texts, ADRs 0024 and 0019, the contract changelog and the handoffs for Akshay (H-81, H-91). Decided by the developer on 2026-10-09 after the ADR 0019 source research. Superseded by story 16 (2026-10-12): the closed IF-8 body, with no detail and no instance member."
 verify = "Both contracts validate with the new Problem schema; every error answer of both mocks and of the Python host is a valid problem details body with the right media type; no old-style body (message member) remains; all suites pass, including on Linux in Docker."
 covers = ["LB-5", "LB-9"]
 after = [4, 9, 11]
@@ -169,3 +169,25 @@ hitl = true
 risk = "high"
 references = ["docs/bmad/initiative-lab/audit-2026-10-11-sprint-1.md"]
 unknown = "Design points to settle with the developer before they are built: IF-4 sequence and epoch rule, event key derivation and distribution (H-09, H-10), the isolation design for H-103, the remote state backend, and whether story 1.12 (RFC 9457) is folded in because it also changes the IF-5 and IF-2 Problem schema."
+[[entry]]
+id = 16
+type = "story"
+title = "Move the IF-2, IF-4 and IF-5 error bodies to the IF-8 format (condition F-2 of the contracts sign-off)"
+description = "Stream P signs contracts v1.0.0 on the condition that the error bodies of IF-2, IF-4 and IF-5 use the closed IF-8 problem body (type urn:vulnmart:error:<CODE>, title, status, code, request_id, field or errors with pointer and detail; no message, detail or instance; registry codes), because changing them after the tag would be a breaking change. Change the three contracts, their examples and schemas, the Node fake orchestrator and ingest, the Python InstanceHost client and the Python orchestrator service, and every test that checks an error body."
+verify = "Every error answer of the fake orchestrator, the Python orchestrator service, the fake ingest and the mock validates against contracts/errors/problem.schema.json; the contract-rules check, the orchestrator tests, the api tests and the script tests pass."
+covers = ["LB-8", "FR-INS-07"]
+after = [15]
+hitl = false
+risk = "high"
+references = ["docs/reviews/2026-10-11-if8-change-request-for-stream-l.md", "docs/reviews/2026-10-12-p08-contract-sign-off.md"]
+
+[[entry]]
+id = 17
+type = "story"
+title = "Local end-to-end demo of sprints 1 and 2 for the guide meeting"
+description = "One command, node scripts/dev.mjs demo, shows the work of all three streams running on the developer's machine: the platform stack (API, Postgres, Valkey, Mailpit, dashboards) answering through the same-origin proxy, the real Python orchestrator service with the Docker backend, and the platform's own InstanceHost client creating an instance from the shop template (real shop image from apps/shop where it works as the shop role, the stub otherwise), reading it, opening access, listing, destroying it and checking nothing is left. Prints a clear step table, saves redacted evidence, tears everything down, and has a short runbook for the meeting."
+verify = "node scripts/dev.mjs demo runs to the end on the developer machine with every step PASS and nothing left over (docker ps, networks, volumes labelled vm.*); the runbook lists what to show and say; no secret, address or personal data is printed or saved."
+covers = ["FR-INS-01", "FR-INS-07", "PB-6"]
+after = [16]
+hitl = false
+risk = "medium"

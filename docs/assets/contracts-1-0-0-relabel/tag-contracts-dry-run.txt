@@ -1,0 +1,37 @@
+FAIL  clean-tree: the working tree is not clean (54 path(s)): M README.md; M apps/orchestrator/Dockerfile; M apps/orchestrator/src/vulnmart_orchestrator/builder.py; M apps/orchestrator/src/vulnmart_orchestrator/capacity.py; M apps/orchestrator/src/vulnmart_orchestrator/engine.py; ...
+FAIL  on-main: the current branch is sprint-2-tanmay, not main (a tag on a feature branch would tag work that is not merged)
+FAIL  up-to-date: HEAD (994aae3fa0) is not origin/main (17131ba48a); run `git fetch origin` first, then update main (git pull) so the tag lands on the merge commit that CI checked
+PASS  tag-absent: the tag contracts-v1.0.0 does not exist yet
+PASS  versions: 9 contract versions match the changelog: IF-1 1.0.0, IF-3 1.0.0, IF-8 1.0.0, IF-2 1.0.0, IF-4 1.0.0, IF-5 1.0.0, IF-6 1.0.0, IF-7 1.0.0, DB 1.0.0
+PASS  release-labels: every contract is labelled 1.0.0
+FAIL  approvals: 19 sign-off(s) still pending: IF-1 @akshaay29 (owner, stream P); IF-3 @akshaay29 (owner, stream P); IF-8 @akshaay29 (owner, stream P); IF-2 @tannmayygupta (owner, stream L); IF-2 @akshaay29 (consumer, stream P); IF-4 @tannmayygupta (owner, stream L); IF-4 @sahillroy (consumer, stream T); IF-4 @akshaay29 (consumer, stream P); IF-5 @tannmayygupta (owner, stream L); IF-5 @akshaay29 (consumer, stream P); IF-6 @tannmayygupta (owner, stream L); IF-6 @tannmayygupta (consumer, stream L); IF-6 @sahillroy (consumer, stream T); IF-7 @sahillroy (owner, stream T); IF-7 @akshaay29 (consumer, stream P); IF-7 @tannmayygupta (consumer, stream L); DB @akshaay29 (owner, stream P); DB @tannmayygupta (consumer, stream L); DB @sahillroy (consumer, stream T)
+FAIL  handoffs: 27 of 62 checklist line(s) are not ticked:
+        line 177: H-24 run user, ports, paths, mount targets (Sahil)
+        line 178: H-25 flag, seed and document limits (Sahil)
+        line 179: H-26 injector entrypoint, marker, flags file, exit codes, stdin limit (Sahil)
+        line 180: H-27 snapshot hand-over (Sahil)
+        line 181: H-28 placement volumes read by the consumers (Sahil)
+        line 182: H-29 import service socket (Sahil)
+        line 183: H-30 health endpoints and readiness rule (Sahil)
+        line 184: H-31 limits and sizes (Sahil, after S-4 and S-5)
+        line 185: H-32 env allowlist and flag-in-env exception (Sahil)
+        line 186: H-34 template and component names (Sahil)
+        line 187: H-35 event posting path, answers, caps (Sahil)
+        line 188: H-36 posted schema and allowed sources (Sahil)
+        line 189: H-37 flag-like rule and redaction marker (Sahil)
+        line 190: H-38 `session_kind` and `user_id` rules (Sahil)
+        line 191: H-39 data field shapes (Sahil)
+        line 192: H-40 `challenge_key` placement (Sahil)
+        line 193: H-41 catalogue field names (Sahil)
+        line 194: H-43 milestone definitions versus event names (Sahil, Tanmay)
+        line 195: H-44 bot controller and `bot.visit` (Sahil)
+        line 196: H-45 to H-55 event names and data fields of C01 to C11 (Sahil; H-50 also needs the import-service posting path decided)
+        line 201: H-62 injector network and architecture 02 drawing (Tanmay)
+        line 207: H-72 numbers after spikes S-4 and S-5 (Tanmay)
+        line 210: H-79 `InstancePort` Protocol author (Tanmay, Akshay)
+        line 211: H-81 placeholder names replaced after P-02 (Tanmay; waits for H-01 to H-03, answered by Akshay)
+        line 212: H-82 Tanmay's own open points confirmed (Tanmay)
+        line 214: H-42 `decoy_placement` content (Sahil, may be closed in T-30 if the field stays an optional string)
+        line 216: H-80 this checklist reviewed and the tag decision (Tanmay)
+
+NOT READY: 5 of 8 preconditions failed (clean-tree, on-main, up-to-date, approvals, handoffs). No tag was created.

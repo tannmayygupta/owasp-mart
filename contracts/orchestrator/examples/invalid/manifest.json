@@ -182,12 +182,12 @@
   "problem-bad-code.json": {
     "schema": "Problem",
     "path": "/code",
-    "rule": "code family and shape"
+    "rule": "code is upper case words joined by hyphens"
   },
   "problem-stack-trace.json": {
     "schema": "Problem",
     "path": "/stack",
-    "rule": "never a stack trace (NFR-SEC-03)"
+    "rule": "never a stack trace (NFR-SEC-03); the schema is closed"
   },
   "create-first-seq-removed.json": {
     "schema": "CreateInstanceRequest",
@@ -202,17 +202,17 @@
   "problem-message-member.json": {
     "schema": "Problem",
     "path": "/message",
-    "rule": "the old-style message member is gone; use detail"
+    "rule": "the old-style message member is gone; the schema is closed"
   },
   "problem-old-style.json": {
     "schema": "Problem",
     "path": "/type",
-    "rule": "the standard members type, title, status, detail and instance are required"
+    "rule": "the members type, title and status are required"
   },
   "problem-type-real-domain.json": {
     "schema": "Problem",
     "path": "/type",
-    "rule": "type is a URI under vulnmart.invalid (no real domain)"
+    "rule": "type is urn:vulnmart:error: plus the code"
   },
   "problem-status-string.json": {
     "schema": "Problem",
@@ -229,16 +229,6 @@
     "path": "/status",
     "rule": "status is 400 to 599"
   },
-  "problem-missing-instance.json": {
-    "schema": "Problem",
-    "path": "/instance",
-    "rule": "instance is required"
-  },
-  "problem-instance-not-urn.json": {
-    "schema": "Problem",
-    "path": "/instance",
-    "rule": "instance is urn:vulnmart:request: plus the request id"
-  },
   "problem-missing-title.json": {
     "schema": "Problem",
     "path": "/title",
@@ -247,7 +237,7 @@
   "problem-trace-member.json": {
     "schema": "Problem",
     "path": "/trace",
-    "rule": "never a stack trace (NFR-SEC-03)"
+    "rule": "never a stack trace (NFR-SEC-03); the schema is closed"
   },
   "state-report-missing-transition.json": {
     "schema": "StateReport",
@@ -343,5 +333,25 @@
     "schema": "HostStatus",
     "path": "/capacity_memory_mb",
     "rule": "an integer token, not 8192.0"
+  },
+  "problem-type-old-url.json": {
+    "schema": "Problem",
+    "path": "/type",
+    "rule": "the old https type is gone; type is urn:vulnmart:error: plus the code"
+  },
+  "problem-has-detail.json": {
+    "schema": "Problem",
+    "path": "/detail",
+    "rule": "detail is not used: no free text reaches a client"
+  },
+  "problem-has-instance.json": {
+    "schema": "Problem",
+    "path": "/instance",
+    "rule": "instance is not used"
+  },
+  "problem-extension-member.json": {
+    "schema": "Problem",
+    "path": "/retry_after_seconds",
+    "rule": "the schema is closed: no extension member"
   }
 }

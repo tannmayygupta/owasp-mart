@@ -1,4 +1,4 @@
-# uv workspace root (Python side). Members: apps/api and packages/py-models (generated contract models); stream L adds apps/orchestrator.
+# uv workspace root (Python side). Members: apps/api, apps/orchestrator (stream L engine) and packages/py-models (generated contract models).
 # The one pytest setting lives here (not in apps/api), so `pytest` runs the same from the root and through uv.
 [project]
 name = "vulnmart"
@@ -11,7 +11,7 @@ dependencies = []
 package = false
 
 [tool.uv.workspace]
-members = ["apps/api", "packages/py-models"]
+members = ["apps/api", "apps/orchestrator", "packages/py-models"]
 
 # Plain `pytest` from the repository root runs the platform API tests only (the BMAD skills tests are not ours).
 [tool.pytest.ini_options]

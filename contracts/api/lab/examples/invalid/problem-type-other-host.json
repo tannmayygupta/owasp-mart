@@ -1,9 +1,7 @@
 {
-  "type": "https://example.com/problems/att_not_found",
-  "title": "The attempt was not found.",
+  "type": "https://example.com/problems/att-not-found",
+  "title": "Attempt not found.",
   "status": 404,
-  "detail": "no such attempt",
-  "instance": "urn:vulnmart:request:req-0123456789ab",
-  "code": "att_not_found",
+  "code": "ATT-NOT-FOUND",
   "request_id": "req-0123456789ab"
 }

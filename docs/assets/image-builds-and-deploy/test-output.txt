@@ -1,0 +1,8 @@
+## node --test scripts/images-matrix.test.mjs scripts/deploy.test.mjs scripts/ci-workflow-shape.test.mjs (final, after the review fixes)
+tests 36, pass 36, fail 0, skipped 0
+## node --test "scripts/*.test.mjs" (full suite, final run after the review fixes)
+tests 585, pass 584, fail 0, skipped 1 (the flock test, not available on Windows)
+## node scripts/check-text-files.mjs: exit 0 ; node scripts/scan-secrets.mjs: exit 0
+## docker compose -f infra/compose/hello-stack.yaml config -q (dummy digest in HELLO_IMAGE): exit 0 (first run)
+## local build of infra/hello (COPY --chmod=0444, WORKDIR /www), run read-only as 65532: health=healthy, body=hello (re-run after the Dockerfile fix; the first try without WORKDIR failed: httpd could not enter /www)
+## history: the first full run had 1 failure (byte order mark in two new files), fixed before this run

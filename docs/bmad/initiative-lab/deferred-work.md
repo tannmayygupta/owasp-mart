@@ -80,3 +80,39 @@
 - source_plan: same
   summary: Free Plan limits (instance count, disk size, eligible types in Sydney, zone availability) and the 16384-byte user data limit are unverified; so are Budgets' treatment of credits, idle reclaim by AWS and the completeness of `iam-policy.json`.
   evidence: AWS pages were read only while planning (2026-10-11), not in the build; record the real answers in `docs/research/s-11-aws-hosts.md` after the first apply.
+
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: Feed one real `gh api --paginate --slurp .../pulls/N/reviews` output to `loadReviews` as a test fixture.
+  evidence: The approvals rule and the reviews step were proven only with hand-built review arrays and a workflow text test; the real JSON shape (user.login, state, commit_id, submitted_at) and the `--slurp` behaviour of the runner's gh were not run on GitHub (maybe-false, medium if wrong). It fails closed after the tag (a missing or invalid file is a FAIL), and the first real pull request that runs the job shows it; capture that output into scripts/fixtures then.
+
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: The header of contracts/instance/instance-contract.md still says "Version: 0.1.0" while the contract is at 0.3.1.
+  evidence: Found by the story 1.7 review pass; it was stale before the story and does not refer to the changes made here. A text change under contracts/instance/ needs a contracts changelog entry, so it is fixed together with the next IF-6 change or the 1.0.0 release commit.
+
+- source_plan: `docs/bmad/initiative-lab/epic-environments-and-deployment/story-duckdns-names-and-certificates-plan.md`
+  summary: Confirm the lego v5.5.2 flags `--server`, `--path` and `renew --days` with the real binary.
+  evidence: Only `--accept-tos`, the flag order before `run` and the wildcard file names (`_.<name>.crt`) were confirmed from the lego documentation; the rest are standard flags that the scripts exercise against a stub (maybe-false, medium if wrong). The developer's staging run settles it; paste its real output into the S-16 note and fix the script if lego rejects a flag.
+
+- source_plan: `docs/bmad/initiative-lab/epic-environments-and-deployment/story-vercel-project-same-origin-rewrite-and-live-stream-check-plan.md`
+  summary: Prove on the live Vercel project that the `routes` transform expands `$ORIGIN_SECRET` and overwrites a visitor value, that SSE streams unbuffered through the rewrite and for how long, which Host header reaches the origin, and whether rewrite caching is off.
+  evidence: The Vercel side is documented but unproven (maybe-false, medium if wrong): only the developer's S-14 run with `scripts/check-sse-rewrite.mjs` can settle it; the fallback (Routing Middleware) is written in the runbook.
+
+- source_plan: `docs/bmad/initiative-lab/epic-orchestrator-and-instance-lifecycle/story-state-machine-and-docker-instance-host-create-from-a-templat-plan.md`
+  summary: Replace the single engine lock by a lock per instance so one slow create does not block the others.
+  evidence: `Orchestrator.create` holds one RLock for the whole provisioning (up to the injector and health timeouts), so a second create or a destroy of another instance waits; the concurrency story (3.6, many instances at once) needs per-instance locks and a short global lock for the records dict.
+- source_plan: `docs/bmad/initiative-lab/epic-orchestrator-and-instance-lifecycle/story-state-machine-and-docker-instance-host-create-from-a-templat-plan.md`
+  summary: Akshay's test scripts/generate-api-code.test.mjs ("CRLF alone is not stale") fails deterministically on the Windows checkout of main.
+  evidence: Found while verifying story 3.1: the failure is in P-04 files that this branch does not touch (git diff against origin/main is empty for them); core.autocrlf is true on this PC. It probably passes on the Linux CI. Akshay should make the test independent of the checkout's line endings.
+
+## Contracts audit (2026-10-13)
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: Accepted risk (audit 2026-10-13): the rules-engine guard accepts a self-written `registry change:` line and CODEOWNERS needs one owner; GitHub branch protection with required code-owner review is the control; check Settings > Branches (open question to the developer, ADR 0029).
+  evidence: Audit of 2026-10-13; unverified until the developer looks at Settings, Branches. All rows must be re-confirmed at 1.0.0 (release commit 0a2a43b); the P-08 review of 2026-10-12 does not satisfy the tag.
+
+## CI fixes of the sprint 2 pull request (2026-10-13)
+- source_plan: `docs/bmad/initiative-lab/epic-lab-baseline/story-tag-contracts-v1-0-0-and-start-the-change-rules-plan.md`
+  summary: First CI run of the pull request failed in three jobs (api tests, compose and hello, contract rules); fixed in the commit that adds this note. Only the next CI run on GitHub proves it.
+  evidence: `docs/dev-log/2026-10-13-tannmayygupta-ci-fixes-sprint-2-pr.md`
+  second round (2026-10-13): caddy-origin production-shape tests made readable for a root container without DAC override; contract rules failure of the second run still to be read from the full log.
+  third round (2026-10-13): contract rules step prints a short verdict (output to a file, notice lines left out); real FAIL line of the Linux run still to be read from the next run.
+  fourth round (2026-10-13): contract rules uses --trusted (trusted mode restored); the first-round removal of --tools had switched it off.

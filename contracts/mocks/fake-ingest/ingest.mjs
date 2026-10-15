@@ -1,5 +1,5 @@
 // Fake ingest for instance events (IF-4). Verifies the signature, the size, the schema and duplicates, and stores
-// accepted events in memory. It answers exactly as contracts/events/app-events.md section 5 says. It is a stand-in for the real
+// accepted events in memory. Its error answers are the closed IF-8 body (problem.schema.json). It answers exactly as contracts/events/app-events.md section 5 says. It is a stand-in for the real
 // ingest (stream L); it never writes to disk and never prints event data. Node, Ajv and node:crypto only.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -9,6 +9,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { verifySignature } from './sign.mjs';
 import { deriveEventKey } from './event-key.mjs';
+import { problemBody } from '../shared/problem.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_SCHEMA = path.resolve(HERE, '..', '..', 'events', 'instance-events.schema.json');
@@ -65,12 +66,9 @@ export function schemaErrors(validate, data) {
   return out;
 }
 
+// Which registry code each refusal answers (title and status come from the registry, see shared/problem.mjs).
 const PROBLEM = {
-  signature: { status: 401, code: 'EVT-BAD-SIGNATURE', title: 'Signature check failed' },
-  schema: { status: 422, code: 'EVT-SCHEMA', title: 'Event does not match the schema' },
-  large: { status: 413, code: 'EVT-TOO-LARGE', title: 'Event too large' },
-  mismatch: { status: 409, code: 'EVT-DUPLICATE-MISMATCH', title: 'Same (instance_id, epoch, seq) with a different body' },
-  full: { status: 503, code: 'EVT-STORE-FULL', title: 'Fake ingest store is full' },
+  signature: 'EVT-BAD-SIGNATURE', schema: 'EVT-SCHEMA', large: 'EVT-TOO-LARGE', mismatch: 'EVT-DUPLICATE-MISMATCH', full: 'EVT-STORE-FULL',
 };
 
 // Two ways to give the ingest its keys (app-events.md section 4):
@@ -106,10 +104,12 @@ export function createIngest({ keys, master, instances, schemaFile = DEFAULT_SCH
     headers: { 'content-type': problem ? 'application/problem+json' : 'application/json' },
     body,
   });
+  // The IF-8 body. `message` is a note for the reader of this file and never reaches the answer; `errors` is a list of
+  // { path, message } from the schema check, answered as { pointer, detail } (the detail never holds the offending value).
   const problem = (kind, message, errors) => {
-    const p = PROBLEM[kind];
     requestCounter += 1;
-    return reply(p.status, { type: 'about:blank', title: p.title, status: p.status, code: p.code, message, request_id: `fake-${requestCounter}`, ...(errors ? { errors } : {}) }, true);
+    const body = problemBody(PROBLEM[kind], `fake-${String(requestCounter).padStart(8, '0')}`, { errors: errors ? errors.map((x) => ({ pointer: x.path, detail: x.message })) : undefined });
+    return reply(body.status, body, true);
   };
   const header = (headers, name) => {
     for (const k of Object.keys(headers || {})) if (k.toLowerCase() === name) return headers[k];

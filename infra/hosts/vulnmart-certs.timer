@@ -1,0 +1,12 @@
+[Unit]
+Description=VulnMart certificate renewal, twice a day (the script decides whether a renewal is due)
+
+[Timer]
+OnCalendar=*-*-* 03,15:00:00
+RandomizedDelaySec=1h
+# Runs at the next boot when a run was missed while the host was stopped.
+Persistent=true
+Unit=vulnmart-certs.service
+
+[Install]
+WantedBy=timers.target
