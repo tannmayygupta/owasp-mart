@@ -10,6 +10,7 @@ on:
       - infra/images.json
       - infra/hello/**
       - apps/**
+      - services/**
       - contracts/mocks/**
       - scripts/images-matrix.mjs
       - scripts/images-release.mjs
@@ -20,6 +21,7 @@ on:
       - infra/images.json
       - infra/hello/**
       - apps/**
+      - services/**
       - contracts/mocks/**
       - scripts/images-matrix.mjs
       - scripts/images-release.mjs

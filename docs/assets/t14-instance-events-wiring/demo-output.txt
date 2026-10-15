@@ -1,0 +1,34 @@
+VulnMart local demo output (node scripts/dev.mjs demo)
+Date: 2026-10-16
+Options: (none)
+Shop role: real shop image (apps/shop)
+Image in the shop role: vulnmart-shop:local (built from apps/shop)
+Note: the real apps/shop image works in the shop role
+
+STATUS  STEP                                DETAIL
+------  ----------------------------------  ----------------------------------------
+PASS    preflight-tools                     Node v24.8.0, uv 0.12.24, Docker 28.5.1, Compose 2.40.0, Docker engine running
+PASS    preflight-clean-machine             no vulnmart containers, no vm.instance objects, ports free
+PASS    platform-stack-up                   services of profiles platform + web healthy
+PASS    api-health                          /healthz 200, /readyz 200 {"status":"ok","checks":{"postgres":"ok","valkey":"ok"}}
+PASS    api-refuses-without-origin-secret   direct /api/v1/health without the proxy header answered 403 (expected 403)
+PASS    web-proxy-health                    /api/v1/health through the dashboards origin: HTTP 200, status ok
+PASS    origin-secret-hidden                page HTTP 200; the secret header is not in any response header (true) nor in any body (true)
+PASS    stub-image-build                    vulnmart-stub-instance:local built
+PASS    shop-image-build                    vulnmart-shop:local built from apps/shop
+PASS    shop-role                           the real apps/shop image works in the shop role
+PASS    orchestrator-start                  real Python service, Docker backend, real shop in the shop role, reduced two-component template
+PASS    client:host-status                  kind laptop, capacity 8192 MB, used 0 MB, instances 0, health ok
+PASS    client:create-and-ready             accepted new work True, first state requested, then ready, health healthy, error none
+PASS    client:get-has-no-secrets           12 fields (instance_id, template_id, epoch, state, access, access_epoch, health, error_code, host_id, hostname, created_at, updated_at); 7 secret values checked, 0 found
+PASS    client:shop-readyz-inside           node fetch exit 0, HTTP 200
+PASS    client:open-access                  access open, access_epoch 1
+PASS    client:list                         1 instance(s) listed, next_cursor none
+PASS    client:create-again-is-idempotent   changed False (200 means a repeat), state ready, epoch 1
+PASS    client:error-format-if8             code ORCH-TEMPLATE-UNKNOWN, HTTP 422, request_id present, field /template_id
+PASS    client:destroy                      accepted new work True, final state destroyed
+PASS    client:destroy-again-is-idempotent  changed False, state destroyed
+PASS    client:nothing-left-over            0 containers, 0 networks, 0 volumes labelled vm.instance
+PASS    cleanup                             project vulnmart-demo removed with its volumes, orchestrator stopped, no stray instance objects
+
+Result: every step PASS

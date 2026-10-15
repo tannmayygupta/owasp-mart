@@ -8,28 +8,38 @@ process.on('message', (m) => {
   // `__delay_ms` is a TEST-ONLY hook to exercise the timeout path; it is honored
   // only when VM_IMPORT_TEST_HOOKS=1, so a client cannot pin a worker in production.
   const delay = process.env.VM_IMPORT_TEST_HOOKS === '1' ? Math.min(Number(job.__delay_ms) || 0, 60000) : 0;
+  // Send the result, then exit only once the IPC message has flushed: exiting
+  // immediately after process.send can drop the message (the channel is async,
+  // notably on Windows), which the parent would see as a crash, not a result.
+  const done = (msg) => process.send(msg, () => process.exit(0));
   const run = () => {
     try {
       const result = preview(job);
       // Self-check that the merge did not pollute this process's Object.prototype.
       const protoCheck = ({}).polluted === undefined && ({}).x === undefined ? 'clean' : 'polluted';
-      process.send({ ok: true, preview: result, worker_pid: process.pid, proto_check: protoCheck });
+      done({ ok: true, preview: result, worker_pid: process.pid, proto_check: protoCheck });
     } catch {
-      process.send({ ok: false, error: 'preview_failed', worker_pid: process.pid });
+      done({ ok: false, error: 'preview_failed', worker_pid: process.pid });
     }
-    process.exit(0);
   };
   if (delay > 0) setTimeout(run, delay); else run();
 });
 
+// How deep safeMerge will recurse. A legitimate product patch is shallow; a
+// deeply nested patch is bounded here so it cannot overflow the stack (a cheap
+// denial of service), the value at the cap being taken as-is rather than merged.
+const MAX_MERGE_DEPTH = 8;
+
 // Merge the submitted product fields over the defaults. SAFE: keys that would
-// pollute a prototype are dropped, and arrays replace (not merge).
-function safeMerge(base, patch) {
+// pollute a prototype are dropped, arrays replace (not merge), and recursion is
+// bounded to MAX_MERGE_DEPTH.
+function safeMerge(base, patch, depth = 0) {
   const out = { ...base };
   if (patch && typeof patch === 'object' && !Array.isArray(patch)) {
     for (const [k, v] of Object.entries(patch)) {
       if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      out[k] = v && typeof v === 'object' && !Array.isArray(v) ? safeMerge(out[k] && typeof out[k] === 'object' ? out[k] : {}, v) : v;
+      const recurse = v && typeof v === 'object' && !Array.isArray(v) && depth < MAX_MERGE_DEPTH;
+      out[k] = recurse ? safeMerge(out[k] && typeof out[k] === 'object' ? out[k] : {}, v, depth + 1) : v;
     }
   }
   return out;

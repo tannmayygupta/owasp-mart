@@ -107,6 +107,39 @@ export function postEvent(eventsUrl, event, { timeoutMs = 3000 } = {}) {
   });
 }
 
+// A db handle the marketplace can be mounted on before the real db exists. In an
+// instance the snapshot db only opens after the injector marker (makeReadiness),
+// but the routes capture `db` at mount time, so this forwards each call to the
+// db resolved now. Before it is ready a call throws (the healthcheck keeps player
+// traffic off /readyz until then, so this is a guard, not a hot path). Only the
+// three methods the shop uses are exposed (prepare/exec/close).
+export function lazyDb(getDb) {
+  const resolve = () => {
+    const db = getDb();
+    if (!db) throw new Error('shop database is not ready');
+    return db;
+  };
+  return {
+    prepare: (sql) => resolve().prepare(sql),
+    exec: (sql) => resolve().exec(sql),
+    close: () => { const db = getDb(); if (db) db.close(); },
+  };
+}
+
+// An event emitter bound to the sidecar. Returns `emit(type, data, opts)` which
+// builds a posted event (shopEvent) and posts it best-effort: fire-and-forget, so
+// it never blocks or fails a player request (IF-4 section 3). With no events URL
+// (a local / non-instance run, no sidecar) it is a no-op. `post` is injectable for
+// tests. Telemetry must never break a request, so a build/post error is swallowed.
+export function makeEmitter(eventsUrl, { post = postEvent } = {}) {
+  if (!eventsUrl) return () => {};
+  return (type, data, opts = {}) => {
+    try {
+      post(eventsUrl, shopEvent(type, data, opts)).catch(() => {});
+    } catch { /* never let telemetry break a player request */ }
+  };
+}
+
 // A readiness gate for the instance: ready only when the marker exists and the
 // snapshot has been copied to /data and opened. The open is lazy and cached, and
 // retried on each call until it works, so the shop can start before the injector

@@ -7,7 +7,7 @@
 import { createApp } from './app.mjs';
 import { openDb } from './db/index.mjs';
 import { migrate } from './db/migrate.mjs';
-import { makeReadiness } from './instance/instance.mjs';
+import { makeReadiness, lazyDb, makeEmitter } from './instance/instance.mjs';
 // `seedAll` is imported dynamically in the local-run branch only: the seed data
 // lives outside src/ and is NOT shipped in the instance image (the instance gets
 // a pre-seeded snapshot from the injector), so the instance path must not load it.
@@ -47,10 +47,13 @@ function instanceReadiness(env) {
 // Reconcile the T-14 marketplace (needs an open db) with the T-04 instance
 // readiness (db appears from the injected snapshot only after the marker). For a
 // local / non-instance run we open, migrate and seed a fresh db and mount the
-// full shop, always-ready. In an instance the db comes from the snapshot once
-// ready; mounting the marketplace on that db is completed in T-09.
+// full shop, always-ready, with no event emission (no sidecar). In an instance
+// the db comes from the injected snapshot once ready, so the marketplace mounts
+// on a lazy handle (the routes resolve the db per request, after /readyz is 200)
+// and app events are posted to the sidecar (T-09, IF-4).
 const readiness = instanceReadiness(process.env);
 let db;
+let emit;
 if (!readiness) {
   db = openDb(process.env.VM_DB_PATH ?? ':memory:');
   migrate(db);
@@ -58,9 +61,13 @@ if (!readiness) {
     const { seedAll } = await import('../seed/registry.mjs');
     await seedAll(db);
   }
+  emit = () => {};
+} else {
+  db = lazyDb(readiness.getDb);
+  emit = makeEmitter(process.env.VM_SIDECAR_EVENTS_URL);
 }
 
-const app = createApp({ db, isReady: readiness?.ready });
+const app = createApp({ db, isReady: readiness?.ready, emit });
 const server = app.listen(PORT, HOST, () => {
   console.log(`vulnmart-shop listening on http://${HOST}:${PORT}`);
 });

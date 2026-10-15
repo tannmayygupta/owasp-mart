@@ -1,19 +1,19 @@
 VulnMart local demo output (node scripts/dev.mjs demo)
-Date: 2026-10-15
-Options: --no-web
+Date: 2026-10-13
+Options: (none)
 Shop role: real shop image (apps/shop)
 Image in the shop role: vulnmart-shop:local (built from apps/shop)
 Note: the real apps/shop image works in the shop role
 
 STATUS  STEP                                DETAIL
 ------  ----------------------------------  ----------------------------------------
-PASS    preflight-tools                     Node v24.8.0, uv 0.12.24, Docker 28.5.1, Compose 2.40.0, Docker engine running
+PASS    preflight-tools                     Node v24.11.0, uv 0.12.23, Docker 29.6.2, Compose 5.3.1, Docker engine running
 PASS    preflight-clean-machine             no vulnmart containers, no vm.instance objects, ports free
-PASS    platform-stack-up                   services of profiles platform healthy
+PASS    platform-stack-up                   services of profiles platform + web healthy
 PASS    api-health                          /healthz 200, /readyz 200 {"status":"ok","checks":{"postgres":"ok","valkey":"ok"}}
 PASS    api-refuses-without-origin-secret   direct /api/v1/health without the proxy header answered 403 (expected 403)
-SKIP    web-proxy-health                    --no-web
-SKIP    origin-secret-hidden                --no-web
+PASS    web-proxy-health                    /api/v1/health through the dashboards origin: HTTP 200, status ok
+PASS    origin-secret-hidden                page HTTP 200; the secret header is not in any response header (true) nor in any body (true)
 PASS    stub-image-build                    vulnmart-stub-instance:local built
 PASS    shop-image-build                    vulnmart-shop:local built from apps/shop
 PASS    shop-role                           the real apps/shop image works in the shop role
@@ -31,4 +31,4 @@ PASS    client:destroy-again-is-idempotent  changed False, state destroyed
 PASS    client:nothing-left-over            0 containers, 0 networks, 0 volumes labelled vm.instance
 PASS    cleanup                             project vulnmart-demo removed with its volumes, orchestrator stopped, no stray instance objects
 
-Result: no step FAIL; some steps SKIP (see the table)
+Result: every step PASS

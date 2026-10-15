@@ -1,0 +1,13 @@
+(node:28572) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS live-process-up
+PASS live-not-ready-before-marker
+PASS live-ready-after-marker
+PASS live-runtime-nonroot
+PASS live-runtime-readonly-root
+PASS live-runtime-cap-drop-all
+PASS live-runtime-no-new-privileges
+PASS live-no-egress
+PASS live-no-flag-in-health
+
+shop-instance: PASS (9 checks)

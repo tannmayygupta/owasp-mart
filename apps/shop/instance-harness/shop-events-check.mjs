@@ -1,19 +1,26 @@
-// Shop boundaries + signed app events (T-10, FR-SHP-14). Proves, end to end in
-// Docker with the REAL shop and the REAL sidecar + fake ingest:
-//   - the shop posts an unsigned event to the sidecar; the sidecar stamps
+// Shop boundaries + signed app events (T-10 / T-09, FR-SHP-14). Proves, end to
+// end in Docker with the REAL shop and the REAL sidecar + fake ingest:
+//   - a REAL player action (a correct customer login against the injected
+//     marketplace) posts an unsigned app event to the sidecar; the sidecar stamps
 //     (instance_id, epoch, seq) and signs; the FAKE INGEST accepts and stores it;
 //   - the shop's only reachable peer is the sidecar: it has no route to a
 //     "platform" service on another network, and no egress to the internet.
 //
-// The shop posts through its own code (src/instance/instance.mjs postEvent), run
-// in-container, so this exercises the real emit path. Secrets (the event key and
-// the fake flags) reach the sidecar/ingest on standard input only, never a
-// command line, env or `docker inspect`. Needs Docker.
+// The shop is injected (snapshot + flags + marker) so it becomes ready and mounts
+// the marketplace, then a login over loopback drives the route's own fire-and-
+// forget emit path (not a test-only call); a directly-posted event also exercises
+// the contract post path. Secrets (the event key and the fake flags) reach the
+// sidecar/ingest on standard input only, never a command line, env or
+// `docker inspect`. Needs Docker.
 // Run: node apps/shop/instance-harness/shop-events-check.mjs
 import { spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freshValues, sidecarStartDocument } from '../../../contracts/mocks/stub-instance/fixtures.mjs';
+import { buildSnapshot } from '../seed/build-snapshot.mjs';
+import { SEED_PASSWORD } from '../seed/contributions/000-baseline.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..', '..');
@@ -36,6 +43,7 @@ const add = (rule, ok, detail = '') => results.push({ rule, ok, detail: ok ? '' 
 const skipped = [];
 const skip = (rule, reason) => { skipped.push(rule); console.log(`SKIP ${rule} -- ${scrub(reason)}`); };
 const children = [];
+let dir; // host temp dir (snapshot + flags) injected into the shop; removed on exit
 
 function docker(args, opts = {}) {
   const r = spawnSync('docker', args, { encoding: 'utf8', timeout: 120000, ...opts });
@@ -104,6 +112,33 @@ function cleanup() {
   for (const c of children) { try { c.kill(); } catch { /* gone */ } }
   for (const n of [SHOP, SIDE, INGEST, DECOY, PROBER]) docker(['rm', '-f', n]);
   for (const n of [INST, PLAT]) docker(['network', 'rm', n]);
+  if (dir) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ } }
+}
+
+// Inject a file into the shop container as the shop user (65532): a cap-dropped
+// root cannot chown, so the bytes are written over `docker exec -i` stdin by node
+// running as 65532 (the T-09 pattern), owned correctly with the injector's mode.
+function injectFile(dstPath, mode, input) {
+  return spawnSync('docker',
+    ['exec', '-i', SHOP, '/nodejs/bin/node', '-e',
+      `const fs=require('fs');fs.writeFileSync(${JSON.stringify(dstPath)}, fs.readFileSync(0));fs.chmodSync(${JSON.stringify(dstPath)}, ${mode});`],
+    { input, timeout: 120000 });
+}
+// Drive a real, correct customer login over loopback inside the shop container
+// (fetch /login for the CSRF token + session cookie, then POST credentials). The
+// seeded customer comes from the injected snapshot. Returns the POST status.
+function loginInShop() {
+  const code = `
+    const base='http://127.0.0.1:3000';
+    (async()=>{
+      const r1=await fetch(base+'/login');
+      const cookie=(r1.headers.getSetCookie?.()||[]).map(c=>c.split(';')[0]).join('; ');
+      const m=(await r1.text()).match(/name="csrf" value="([^"]+)"/);
+      const body=new URLSearchParams({email:'customer.demo@vulnmart.test',password:${JSON.stringify(SEED_PASSWORD)},csrf:m?m[1]:''}).toString();
+      const r2=await fetch(base+'/login',{method:'POST',headers:{cookie,'content-type':'application/x-www-form-urlencoded'},body,redirect:'manual'});
+      console.log(r2.status);
+    })().catch(e=>console.log('ERR '+e.message));`;
+  return execNode(SHOP, code).stdout.trim();
 }
 
 async function main() {
@@ -113,6 +148,14 @@ async function main() {
   cleanup();
 
   const start = sidecarStartDocument(values); // instance_id, epoch, event_key, flag_digests
+
+  // A real seeded snapshot + flags file on the host, to inject into the shop so it
+  // becomes ready and serves the marketplace (the injector does this in production).
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-t10-'));
+  const snapshotFile = path.join(dir, 'snapshot.db');
+  const flagsDoc = { schema_version: '0.1', instance_id: values.instance_id, epoch: values.epoch, flags: values.flags };
+  await buildSnapshot(snapshotFile);
+
   try {
     if (docker(['network', 'create', '--internal', INST]).status !== 0) throw new Error('could not create the internal network');
     if (docker(['network', 'create', PLAT]).status !== 0) throw new Error('could not create the platform network');
@@ -153,21 +196,41 @@ async function main() {
     const ingestUp = await waitFor(() => execStub(INGEST, "fetch('http://127.0.0.1:8081/_fake/events').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))").status === 0, { tries: 120 });
     add('live-ingest-up', ingestUp, 'the fake ingest did not answer /_fake/events in time');
 
+    // Inject the snapshot + flags + marker (snapshot and flags first, marker LAST),
+    // as the shop user 65532, so the shop becomes ready and mounts the marketplace.
+    if (injectFile('/run/vm/snapshot.db', 0o444, fs.readFileSync(snapshotFile)).status !== 0) throw new Error('could not inject the snapshot');
+    if (injectFile('/run/vm/flags.json', 0o400, Buffer.from(JSON.stringify(flagsDoc))).status !== 0) throw new Error('could not inject the flags file');
+    if (docker(['exec', SHOP, '/nodejs/bin/node', '-e', "const fs=require('fs');fs.writeFileSync('/run/vm/injected','');fs.chmodSync('/run/vm/injected',0o444);"]).status !== 0) throw new Error('could not write the marker');
+    const ready = await waitFor(() => execNode(SHOP, "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))").status === 0, { tries: 120 });
+    add('live-ready-after-injection', ready, 'the shop did not become ready after the snapshot was injected');
+
     // Post ONE event through the shop's own code; expect the sidecar to accept (202).
     const emit = execNode(SHOP, "import('/app/src/instance/instance.mjs').then(m=>m.postEvent(process.env.VM_SIDECAR_EVENTS_URL, m.shopEvent('shop.catalog_query_error',{route:'/api/products/search',error_class:'sql_syntax'},{user_id:'u-1001'}))).then(s=>console.log(s))");
     const sidecarStatus = Number(emit.stdout.trim());
     add('live-sidecar-accepts-event', sidecarStatus === 202, `the sidecar answered ${sidecarStatus || emit.stderr.trim()} (want 202)`);
 
-    // The fake ingest must receive and store the shop's event, signed, with identity.
+    // Drive a REAL player action: a correct customer login. The route emits
+    // auth.attempt through the same fire-and-forget emit path (not a test-only call).
+    const loginStatus = loginInShop();
+    add('live-real-login-succeeds', loginStatus === '302', `the login over loopback answered ${loginStatus || '<none>'} (want 302)`);
+
+    // The fake ingest must receive and store the shop's events, signed, with identity:
+    // both the directly-posted catalog event AND the auth.attempt from the real login.
     let stored = [];
-    const reached = await waitFor(() => {
+    const haveBoth = await waitFor(() => {
       const r = execStub(INGEST, "fetch('http://127.0.0.1:8081/_fake/events').then(r=>r.text()).then(t=>console.log(t)).catch(()=>console.log('[]'))");
       try { stored = JSON.parse(r.stdout.trim()); } catch { stored = []; }
-      return stored.length > 0;
+      return stored.some((e) => e.type === 'shop.catalog_query_error') && stored.some((e) => e.type === 'auth.attempt');
     }, { tries: 120, delayMs: 500 });
-    const ok = reached && stored.length === 1 && stored[0].instance_id === values.instance_id
-      && stored[0].epoch === values.epoch && stored[0].seq === 1 && stored[0].type === 'shop.catalog_query_error';
-    add('live-fake-ingest-accepts-shop-event', ok, `ingest holds ${JSON.stringify(stored)}`);
+    // The ingest read-out carries only identity + type (never source or data, so
+    // no flag or body can leak through it); the posted body's fields are proven
+    // schema-valid by the unit test (apps/shop/test/instance/instance-events-wiring).
+    const mine = (e) => e && e.instance_id === values.instance_id && e.epoch === values.epoch && e.seq >= 1;
+    const cat = stored.find((e) => e.type === 'shop.catalog_query_error');
+    add('live-fake-ingest-accepts-shop-event', haveBoth && mine(cat), `ingest holds ${JSON.stringify(stored)}`);
+    // The real route's event: a stamped, signed auth.attempt from the login flow.
+    const auth = stored.find((e) => e.type === 'auth.attempt');
+    add('live-real-action-reaches-ingest', mine(auth), `no stamped auth.attempt from the real login: ${JSON.stringify(auth)}`);
 
     // Negative control: the ingest MUST reject an event with no valid signature, so
     // a STORED event proves the sidecar really signed it (not that the ingest takes

@@ -1,0 +1,8 @@
+NOTE bot memory per instance (S-5 baseline, controller only): 17.58MiB
+PASS live-bot-up
+PASS live-visits-allowed-page
+PASS live-refuses-disallowed-path
+PASS live-refuses-other-instance
+PASS live-memory-measured
+
+bot: PASS (5 checks)

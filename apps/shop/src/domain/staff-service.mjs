@@ -60,6 +60,11 @@ export function assignTicket(db, actor, ticketId, assigneeId) {
   requireCan(actor, 'manage_tickets');
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(parseId(ticketId));
   if (!ticket) throw new NotFoundError('ticket not found');
+  // A resolved or closed ticket is not reopened by an assignment (that silently
+  // undid a resolution); it must be reopened deliberately first.
+  if (ticket.status === 'resolved' || ticket.status === 'closed') {
+    throw new ValidationError('a resolved or closed ticket cannot be assigned');
+  }
   const assignee = db.prepare('SELECT id, role FROM users WHERE id = ?').get(parseId(assigneeId));
   if (!assignee) throw new ValidationError('unknown assignee');
   // A ticket may only be assigned to someone who can work it (support or admin),
@@ -74,6 +79,11 @@ export function resolveTicket(db, actor, ticketId) {
   requireCan(actor, 'manage_tickets');
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(parseId(ticketId));
   if (!ticket) throw new NotFoundError('ticket not found');
+  // Only an active ticket is resolved; re-resolving a resolved/closed one is a
+  // no-op that still wrote an audit line and bumped updated_at.
+  if (ticket.status !== 'open' && ticket.status !== 'pending') {
+    throw new ValidationError('only an open or pending ticket can be resolved');
+  }
   db.prepare("UPDATE tickets SET status = 'resolved', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(ticket.id);
   audit(db, actor.id, 'ticket.resolve', `ticket:${ticket.id}`);
 }
@@ -164,6 +174,15 @@ export function setUserStatus(db, actor, userId, status) {
   if (status !== 'active' && status !== 'suspended') throw new ValidationError('status must be active or suspended');
   const u = db.prepare('SELECT * FROM users WHERE id = ?').get(parseId(userId));
   if (!u) throw new NotFoundError('user not found');
+  if (status === 'suspended') {
+    // An admin cannot lock themselves out, and the platform must keep at least
+    // one active admin (suspending the last one would leave no one who can undo it).
+    if (u.id === actor.id) throw new ValidationError('you cannot suspend your own account');
+    if (u.role === 'admin') {
+      const otherActiveAdmins = db.prepare("SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND status = 'active' AND id != ?").get(u.id).c;
+      if (otherActiveAdmins === 0) throw new ValidationError('cannot suspend the last active admin');
+    }
+  }
   db.prepare('UPDATE users SET status = ? WHERE id = ?').run(status, u.id);
   audit(db, actor.id, `user.${status}`, `user:${u.id}`);
 }

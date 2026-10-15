@@ -51,7 +51,13 @@ function readCookie(req, name) {
   if (!header) return undefined;
   for (const part of header.split(';')) {
     const [k, ...v] = part.trim().split('=');
-    if (k === name) return decodeURIComponent(v.join('='));
+    if (k === name) {
+      const raw = v.join('=');
+      // A malformed percent-escape (e.g. "vm_sess=%") makes decodeURIComponent
+      // throw; fall back to the raw value (parse() rejects a bad cookie anyway)
+      // rather than let a crafted cookie 500 every request.
+      try { return decodeURIComponent(raw); } catch { return raw; }
+    }
   }
   return undefined;
 }

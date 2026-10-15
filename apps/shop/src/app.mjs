@@ -29,8 +29,10 @@ const ALWAYS_READY = () => true;
 // Build the app. Pass { db } to mount the customer-facing shop (T-14); without
 // a db only the health endpoints are served (the T-01 skeleton / health tests).
 // Pass { isReady } (T-04) to gate /readyz behind the instance marker + snapshot;
-// without it the shop is always-ready (tests / local runs).
-export function createApp({ db, isReady = ALWAYS_READY } = {}) {
+// without it the shop is always-ready (tests / local runs). Pass { emit } to post
+// app events to the sidecar on built flows (T-09, IF-4); without it emission is a
+// no-op (local runs and tests that do not assert on events).
+export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -62,7 +64,7 @@ export function createApp({ db, isReady = ALWAYS_READY } = {}) {
     app.use(express.urlencoded({ extended: false }));
     app.use(loadUser(db));
     app.use(checkCsrf);
-    registerRoutes(app, db);
+    registerRoutes(app, db, emit);
     registerStaffRoutes(app, db);
   }
 
@@ -73,10 +75,12 @@ export function createApp({ db, isReady = ALWAYS_READY } = {}) {
   });
 
   // Error handler (4-arg): a thrown route error returns the same JSON shape
-  // rather than Express's default non-JSON body, and never a stack trace
-  // (NFR-SEC-03). Kept minimal here; routes that throw arrive in later stories.
+  // rather than Express's default non-JSON body, and never a stack trace to the
+  // client (NFR-SEC-03). The error IS logged server-side so an unexpected 500 is
+  // diagnosable (the instance log is not player-visible; it carries no flags).
   // eslint-disable-next-line no-unused-vars
-  app.use((_err, _req, res, _next) => {
+  app.use((err, _req, res, _next) => {
+    console.error('shop 500:', err?.stack ?? err?.message ?? err);
     res.status(500).json({ code: 'SHOP-INTERNAL', message: 'Internal error' });
   });
 

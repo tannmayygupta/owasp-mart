@@ -8,9 +8,11 @@
 // Tanmay's lab harness (scripts/dev.mjs harness) drives the STUB with its own
 // /_stub routes and a JSON snapshot; this harness drives the real shop with a
 // real seeded SQLite snapshot (built on the host by T-08's buildSnapshot and
-// injected with `docker cp`, since the shop image carries no seed/migrations).
-// The sidecar/event chain is T-10; the marketplace-on-snapshot wiring is tracked
-// as a follow-up. Needs Docker. Run: node apps/shop/instance-harness/shop-instance-check.mjs
+// injected over `docker exec`, since the shop image carries no seed/migrations).
+// The sidecar/event chain and the marketplace-on-snapshot wiring (the shop
+// mounts the marketplace on the injected db and emits real app events) are proven
+// by the T-10 harness (shop-events-check). Needs Docker.
+// Run: node apps/shop/instance-harness/shop-instance-check.mjs
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

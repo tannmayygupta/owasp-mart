@@ -16,8 +16,13 @@ export const DEFAULT_TIMEOUT_MS = 5000;
 const MAX_JOB_BYTES = 1 << 20; // 1 MiB
 const CONN_IDLE_MS = 10000; // a connection that never sends/finishes is dropped
 // Cap concurrent workers so a burst cannot exhaust the container's pid budget
-// (instance contract: pids_limit 64); excess jobs are refused, not queued.
-const MAX_INFLIGHT = Number(process.env.VM_IMPORT_MAX_INFLIGHT) || 8;
+// (instance contract: pids_limit 64); excess jobs are refused, not queued. Kept
+// small (the shop sends one preview at a time); raise with the env var if needed.
+const MAX_INFLIGHT = Number(process.env.VM_IMPORT_MAX_INFLIGHT) || 3;
+// Also cap concurrent connections, so a flood cannot each buffer up to
+// MAX_JOB_BYTES before the per-job check runs. Headroom above MAX_INFLIGHT leaves
+// room for liveness probes and the odd in-flight reply.
+const MAX_CONNS = Number(process.env.VM_IMPORT_MAX_CONNS) || MAX_INFLIGHT * 4;
 
 // Run one job in a fresh child process, with a timeout. Always resolves (an error
 // is a result, never a rejection); the child is killed when done or on timeout.
@@ -39,6 +44,7 @@ export function runJob(job, { timeoutMs = DEFAULT_TIMEOUT_MS, worker = WORKER } 
 // A unix-socket server: read one JSON job per connection, run it in a fresh
 // process, write the result, close. One job per connection keeps framing trivial.
 let inflight = 0;
+let openConns = 0;
 
 export function createImportServer({ socketPath, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   try { fs.rmSync(socketPath, { force: true }); } catch { /* no stale socket */ }
@@ -46,13 +52,26 @@ export function createImportServer({ socketPath, timeoutMs = DEFAULT_TIMEOUT_MS 
   // our write side open to reply AFTER the async worker finishes. Without this,
   // the server auto-ends on the client's FIN and the reply is never sent.
   const server = net.createServer({ allowHalfOpen: true }, (conn) => {
+    openConns += 1;
+    conn.on('close', () => { openConns -= 1; });
+    // Too many open connections: drop this one before buffering anything.
+    if (openConns > MAX_CONNS) { conn.destroy(); return; }
     conn.setTimeout(CONN_IDLE_MS, () => conn.destroy());
     const chunks = [];
     let size = 0;
+    let rejected = false;
     const reply = (obj) => { if (!conn.destroyed) conn.end(JSON.stringify(obj)); };
-    conn.on('data', (c) => { size += c.length; if (size > MAX_JOB_BYTES) conn.destroy(); else chunks.push(c); });
+    conn.on('data', (c) => {
+      if (rejected || conn.destroyed) return;
+      // A job carries data (a liveness probe sends none, so it is never refused
+      // here); if every worker slot is taken, refuse it now rather than buffer the
+      // whole body first.
+      if (inflight >= MAX_INFLIGHT) { rejected = true; return reply({ ok: false, error: 'busy' }); }
+      size += c.length;
+      if (size > MAX_JOB_BYTES) conn.destroy(); else chunks.push(c);
+    });
     conn.on('end', async () => {
-      if (conn.destroyed) return;
+      if (conn.destroyed || rejected) return;
       const raw = Buffer.concat(chunks).toString('utf8');
       // A liveness probe connects and sends nothing: answer without forking a worker.
       if (raw.trim() === '') return reply({ ok: true, health: true });

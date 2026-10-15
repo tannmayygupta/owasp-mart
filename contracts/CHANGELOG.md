@@ -254,6 +254,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
+### 2026-10-15 (Sahil, Sprint 2 to main — images.yml path filters, PR #14 review A1)
+- registry change: `.github/workflows/images.yml` adds `services/**` to the `push` and `pull_request` path filters, so a change to the new `services/mock-services`, `services/import-service` or `services/bot` images triggers the image build. Workflow change only — no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract, or any rule. (The same change also adds an optional per-image `healthcheck` argv to `infra/images.json` and emits it from `scripts/images-release.mjs`; those files are not guarded contract paths.)
+
 ### 2026-10-15 (Sahil, T-03 contracts v1.0.0 sign-off)
 - registry change: in `contracts/COMPAT.md` the four stream-T Approvals rows (IF-4 consumer, IF-6 consumer, IF-7 owner, DB consumer) are set to `approved` at version 1.0.0 — Sahil's sign-off. No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
 

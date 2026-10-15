@@ -71,15 +71,21 @@ function getOrCreateCart(db, userId) {
   return cart;
 }
 
+export const MAX_CART_QTY = 99;
+
 export function addToCart(db, user, productId, qty = 1) {
   if (!can('customer', 'cart_checkout', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
   const n = Number(qty);
-  if (!Number.isInteger(n) || n < 1) throw new ValidationError('quantity must be a positive integer');
+  // A safe-integer upper bound stops a huge quantity overflowing the money maths.
+  if (!Number.isSafeInteger(n) || n < 1 || n > MAX_CART_QTY) {
+    throw new ValidationError(`quantity must be an integer from 1 to ${MAX_CART_QTY}`);
+  }
   const product = getPublishedProduct(db, productId); // 404 if not published
   const cart = getOrCreateCart(db, user.id);
   const existing = db.prepare('SELECT * FROM cart_items WHERE cart_id = ? AND product_id = ?').get(cart.id, product.id);
   if (existing) {
-    db.prepare('UPDATE cart_items SET qty = qty + ? WHERE id = ?').run(n, existing.id);
+    // Merge but keep the line capped so repeated adds cannot exceed the cap.
+    db.prepare('UPDATE cart_items SET qty = MIN(qty + ?, ?) WHERE id = ?').run(n, MAX_CART_QTY, existing.id);
   } else {
     db.prepare('INSERT INTO cart_items (cart_id, product_id, qty) VALUES (?, ?, ?)').run(cart.id, product.id, n);
   }
@@ -223,10 +229,13 @@ export function addReview(db, user, productId, rating, body) {
 export function requestRefund(db, user, orderItemId, reason) {
   if (!can('customer', 'request_refund', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
   const item = ownOrderItem(db, user, orderItemId);
-  const active = db
-    .prepare("SELECT 1 FROM refunds WHERE order_item_id = ? AND status IN ('requested','approved') LIMIT 1")
+  if (item.status === 'cancelled') throw new ValidationError('a cancelled item cannot be refunded');
+  // Any refund that is not rejected blocks a new one — including a `processed`
+  // refund, so an item cannot be paid out twice (correct flow; C04 is a later path).
+  const existing = db
+    .prepare("SELECT 1 FROM refunds WHERE order_item_id = ? AND status != 'rejected' LIMIT 1")
     .get(item.id);
-  if (active) throw new ValidationError('a refund is already in progress for this item');
+  if (existing) throw new ValidationError('a refund already exists for this item');
   const info = db
     .prepare("INSERT INTO refunds (order_item_id, amount_cents, reason, status, requested_by) VALUES (?, ?, ?, 'requested', ?)")
     .run(item.id, item.unit_price_cents * item.qty, reason ?? null, user.id);
@@ -236,10 +245,17 @@ export function requestRefund(db, user, orderItemId, reason) {
 export function openDispute(db, user, orderItemId, reason) {
   if (!can('customer', 'open_dispute', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
   const item = ownOrderItem(db, user, orderItemId);
+  if (item.status === 'cancelled') throw new ValidationError('a cancelled item cannot be disputed');
   const open = db
     .prepare("SELECT 1 FROM disputes WHERE order_item_id = ? AND status IN ('open','under_review','escalated') LIMIT 1")
     .get(item.id);
   if (open) throw new ValidationError('a dispute is already open for this item');
+  // The same double-compensation rule: an item already refunded (approved or paid)
+  // cannot also be disputed for a second payout.
+  const settledRefund = db
+    .prepare("SELECT 1 FROM refunds WHERE order_item_id = ? AND status IN ('approved','processed') LIMIT 1")
+    .get(item.id);
+  if (settledRefund) throw new ValidationError('this item already has a refund and cannot also be disputed');
   const info = db
     .prepare("INSERT INTO disputes (order_item_id, opened_by, reason, status) VALUES (?, ?, ?, 'open')")
     .run(item.id, user.id, reason ?? null);

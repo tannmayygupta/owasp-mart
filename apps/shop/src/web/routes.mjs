@@ -22,7 +22,7 @@ const h = (fn) => async (req, res, next) => {
   }
 };
 
-export function registerRoutes(app, db) {
+export function registerRoutes(app, db, emit = () => {}) {
   app.get('/', (_req, res) => res.redirect('/shop'));
 
   // Catalogue
@@ -42,7 +42,16 @@ export function registerRoutes(app, db) {
     // Any role may log in; route guards (requireCustomer / requireRole) enforce
     // what each role may reach. A suspended account cannot sign in.
     const user = authenticate(db, req.body.email, req.body.password);
-    if (!user || user.status !== 'active') {
+    const active = !!user && user.status === 'active';
+    // IF-4 auth.attempt: every login attempt. `result` keeps an unknown
+    // credential ('unknown') from a found-but-refused account ('rejected') so the
+    // event is not a user-enumeration oracle; no password or email is ever sent.
+    emit(
+      'auth.attempt',
+      { route: 'web', account_id: user ? String(user.id) : 'unknown', result: active ? 'success' : user ? 'rejected' : 'unknown' },
+      { user_id: user ? String(user.id) : null },
+    );
+    if (!active) {
       return res.status(401).render('login', { error: 'Wrong email or password.' });
     }
     setSession(res, { uid: user.id, csrf: req.session.csrf });
@@ -63,6 +72,8 @@ export function registerRoutes(app, db) {
       ship: { line1: req.body.line1, city: req.body.city, country: req.body.country },
       card: req.body.card,
     });
+    // IF-4 order.paid: an order became paid on the correct checkout path.
+    emit('order.paid', { order_id: String(order.id), verified: true, via: 'card' }, { user_id: String(req.user.id) });
     res.redirect(`/orders/${order.id}`);
   }));
 

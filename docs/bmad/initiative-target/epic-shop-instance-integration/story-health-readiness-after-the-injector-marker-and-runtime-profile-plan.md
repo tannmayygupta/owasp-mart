@@ -66,9 +66,13 @@ context:
 
 ## Implementation Notes
 
-The snapshot is built on the host (the image carries no seed/migrations) and injected by piping it to `node` over `docker exec -i` as uid 65532, because a cap-dropped root cannot `chown`; the marker is written last. The instance shop currently serves only the health surface — mounting the marketplace routes on the injected snapshot once ready is tracked as a follow-up (it needs lazy db wiring and is exercised with the flows/boundaries work).
+The snapshot is built on the host (the image carries no seed/migrations) and injected by piping it to `node` over `docker exec -i` as uid 65532, because a cap-dropped root cannot `chown`; the marker is written last. Once ready, the instance shop mounts the full marketplace on the injected snapshot through a lazy db handle (`lazyDb`) and emits real app events to the sidecar (done 2026-10-16, PR #14 review A2a; proven by the T-10 harness and the `instance-events-wiring` unit test).
 
 ## Plan Change Log
+
+### 2026-10-16 — instance-mode marketplace + app events wired (PR #14 review A2a)
+
+The follow-up noted in the Implementation Notes is done. In instance mode the shop now mounts the marketplace on `lazyDb(readiness.getDb)` (routes resolve the snapshot db per request, after `/readyz` is 200) and posts real IF-4 events on the built flows — `auth.attempt` on login, `order.paid` on a paid checkout — via `makeEmitter(VM_SIDECAR_EVENTS_URL)`, best-effort. New unit test `apps/shop/test/instance/instance-events-wiring.test.mjs`; the T-10 Docker harness (`shop-events-check`) now injects a snapshot, drives a real login over loopback and asserts a stamped `auth.attempt` reaches the fake ingest (12/12). See `docs/dev-log/2026-10-16-sahillroy-pr14-review-response.md`.
 
 ## Review Triage Log
 
