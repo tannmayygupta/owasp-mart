@@ -7,6 +7,34 @@
       "dockerfile": "infra/hello/Dockerfile",
       "platforms": ["linux/amd64"],
       "public": true
+    },
+    {
+      "name": "shop",
+      "context": "apps/shop",
+      "dockerfile": "apps/shop/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true
+    },
+    {
+      "name": "mock-services",
+      "context": "services/mock-services",
+      "dockerfile": "services/mock-services/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true
+    },
+    {
+      "name": "import-service",
+      "context": "services/import-service",
+      "dockerfile": "services/import-service/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true
+    },
+    {
+      "name": "bot-controller",
+      "context": "services/bot",
+      "dockerfile": "services/bot/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true
     }
   ]
 }

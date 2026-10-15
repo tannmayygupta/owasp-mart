@@ -57,6 +57,10 @@ context:
 
 ## Plan Change Log
 
+### 2026-10-15 — contracts v1.0.0 re-sign-off (H-121)
+
+The earlier IF-4/IF-6 consumer sign-off (2026-10-09) was marked stale (H-108) after the contracts changed. Re-read the current IF-4 (app-events §3/4/7, changelog 0.2.1/0.3.0/1.0.0), IF-6 (0.3.1/0.3.2/1.0.0), IF-7 and DB against the built shop and catalogue. Findings: the IF-4 1.0.0 move of the **ingest's** error answers to the closed IF-8 body does not reach the shop (the posted schema and the sidecar `/v1/events` answers are unchanged); IF-6 changes are editorial; the 11 IF-7 catalogue stubs validate; DB table-owners cover the shop's tables. Set the four stream-T Approvals rows in `contracts/COMPAT.md` to `approved` at 1.0.0 (2026-10-15), answered H-121, and ticked the checklist rows the built shop answers (H-24/27/29/30/35/36/41). `check-contract-rules` 0 FAIL; `tag-contracts --dry-run` no longer lists `@sahillroy`. See `docs/dev-log/2026-10-15-sahillroy-t03-contracts-v1-signoff.md`.
+
 ## Design Notes
 
 This is a review/sign-off chore, not code, so the cycle's build/code-review/e2e steps collapse into writing and self-checking the review document. Change requests are filed as review comments for the contract owner; the one substantive request (the `/version` env-var names vs the IF-6 env allowlist) is carried from the T-01 review's deferred item.

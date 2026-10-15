@@ -36,19 +36,19 @@ IF-8 | P | @akshaay29 | owner | 1.0.0 | - | pending
 IF-2 | L | @tannmayygupta | owner | 1.0.0 | - | pending
 IF-2 | P | @akshaay29 | consumer | 1.0.0 | - | pending
 IF-4 | L | @tannmayygupta | owner | 1.0.0 | - | pending
-IF-4 | T | @sahillroy | consumer | 1.0.0 | - | pending
+IF-4 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
 IF-4 | P | @akshaay29 | consumer | 1.0.0 | - | pending
 IF-5 | L | @tannmayygupta | owner | 1.0.0 | - | pending
 IF-5 | P | @akshaay29 | consumer | 1.0.0 | - | pending
 IF-6 | L | @tannmayygupta | owner | 1.0.0 | - | pending
 IF-6 | L | @tannmayygupta | consumer | 1.0.0 | - | pending
-IF-6 | T | @sahillroy | consumer | 1.0.0 | - | pending
-IF-7 | T | @sahillroy | owner | 1.0.0 | - | pending
+IF-6 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
+IF-7 | T | @sahillroy | owner | 1.0.0 | 2026-10-15 | approved
 IF-7 | P | @akshaay29 | consumer | 1.0.0 | - | pending
 IF-7 | L | @tannmayygupta | consumer | 1.0.0 | - | pending
 DB | P | @akshaay29 | owner | 1.0.0 | - | pending
 DB | L | @tannmayygupta | consumer | 1.0.0 | - | pending
-DB | T | @sahillroy | consumer | 1.0.0 | - | pending
+DB | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
 
 Stream P recorded its review in story P-08 (`docs/reviews/2026-10-12-p08-contract-sign-off.md`) against IF-4 0.2.0, IF-6 0.2.0 and DB 0.2.0, which are older than the versions above, and with a condition (F-2: the IF-2, IF-4 and IF-5 error bodies move to IF-8 before the tag). Stream L met F-2 on 2026-10-12 (IF-2 0.3.0, IF-4 0.3.0, IF-5 0.4.0, IF-6 0.3.2 editorial, IF-8 0.4.0 with three added codes). The Akshay rows stay `pending` until he confirms the current versions.
 
