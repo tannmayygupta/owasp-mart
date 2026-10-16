@@ -12,8 +12,9 @@ same way. Each instance has its own lock for the slow work, a short global lock 
 that arrives while the instance is still being built cancels the build at its next step.
 
 State is in memory plus Docker labels. Truth is Docker: destroy works from the `vm.instance` label even for an instance this
-process never heard of. There is no database here (the reconciler is story 3.5). Every transition goes to `on_transition` (the state
-report queue of the service).
+process never heard of. There is no database here: the reconciler (story 3.5, `reconcile.py`) rebuilds the records from the Docker
+labels after a restart, and destroyed ids are kept as tombstones. Every transition goes to `on_transition` (the state report queue of
+the service).
 """
 from __future__ import annotations
 
@@ -33,6 +34,7 @@ from .builder import (
 from .capacity import Capacity
 from .images import ImageAllowlist
 from .lifecycle import FakeSettingsPort, SettingsPort
+from .reconcile import AllWantedDesiredState, DesiredStatePort, ReconcileResult, Reconciler, TombstoneStore
 from .states import (
     Busy, ErrorCode, InstanceExists, InstanceNotFound, InstanceState, InvalidState, RequestMismatch, StaleAccessEpoch, StaleEpoch,
     TemplateUnknown, Transition, check_transition, injector_error_code,
@@ -41,6 +43,9 @@ from .states import (
 S = InstanceState
 _ENDING = (S.STOPPING, S.DESTROYED)
 MAX_REASON = 200  # the length the StateReport schema allows
+ADOPTED_TRANSITION_BASE = 1_000_000  # transitions of an adopted instance count from here plus the seconds since ADOPTION_EPOCH, so the
+ADOPTION_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)  # platform never drops them as repeats, also after a second restart
+MEMORY_ADOPTION_SLACK_MB = 64  # the volume keeper container (64 MB) that every instance holds besides its template components
 
 
 @dataclass
@@ -66,6 +71,10 @@ class InstanceRecord:
     last_activity: datetime | None = None
     reset_prints: dict[int, str] = dc_field(default_factory=dict, repr=False)  # new epoch -> fingerprint of its reset body
     destroying: bool = False  # a destroy worker is running
+    # set only for an instance the reconciler found after a restart (adoption): there is no create request to read them from
+    expires_dt: datetime | None = None  # the `vm.expires` label: the total limit
+    idle_minutes: int | None = None  # the idle limit (the settings default)
+    transition_offset: int = 0  # added to the count of transitions to number the next one
     lock: threading.RLock = dc_field(default_factory=threading.RLock, repr=False, compare=False)  # the slow work of this instance
 
 
@@ -109,6 +118,9 @@ class Orchestrator:
         step_delay_s: float = 0.0,
         on_transition: Callable[[Transition], None] | None = None,
         settings: SettingsPort | None = None,
+        tombstones: TombstoneStore | None = None,
+        desired: DesiredStatePort | None = None,
+        reconcile_gate: bool = False,
     ) -> None:
         self.backend, self.templates, self.images = backend, templates, images
         self.settings: SettingsPort = settings or FakeSettingsPort()
@@ -119,6 +131,12 @@ class Orchestrator:
         self.on_transition = on_transition
         self.records: dict[str, InstanceRecord] = {}
         self._lock = threading.RLock()  # the table and every state change; never held across a Docker call
+        self.tombstones = tombstones or TombstoneStore()
+        self.reconciler = Reconciler(self, desired or AllWantedDesiredState())
+        # With the gate, creates and resets are refused (ORCH-BUSY) until a pass has worked: the first pass at start has finished and
+        # the desired state could be read (no safe mode). Without it (the engine tests) the engine is open from the start.
+        self._reconciled = not reconcile_gate
+        self._safe_mode = False
 
     # ------------------------------------------------------------ state
 
@@ -128,10 +146,11 @@ class Orchestrator:
     def get(self, instance_id: str) -> InstanceRecord | None:
         return self.records.get(instance_id)
 
-    def _move(self, rec: InstanceRecord, to: InstanceState, reason: str, error_code: str | None = None) -> None:
+    def _move(self, rec: InstanceRecord, to: InstanceState, reason: str, error_code: str | None = None, *, force: bool = False) -> None:
         with self._lock:
-            check_transition(rec.state, to)
-            number = len(rec.transitions) + 1  # per instance and epoch: a new epoch is a new record and starts at 1
+            if not force:  # `force` is the reconciler recording what it found, which has no earlier state
+                check_transition(rec.state, to)
+            number = rec.transition_offset + len(rec.transitions) + 1  # per instance and epoch: a new epoch starts at 1 (adopted: high)
             at = self._stamp()
             if to is S.READY:
                 rec.health = "healthy"
@@ -143,6 +162,11 @@ class Orchestrator:
             t = Transition(rec.instance_id, rec.epoch, number, rec.state, to, at, (reason or "state change")[:MAX_REASON], error_code, rec.health)
             rec.transitions.append(t)
             rec.state, rec.error_code, rec.updated_at = to, error_code, at
+            if to is S.DESTROYED:
+                try:
+                    self.tombstones.add(rec.instance_id, rec.epoch, at)
+                except Exception as e:  # the id stays refused in memory; the file could not be written
+                    print(f"tombstone write failed: {type(e).__name__}", file=sys.stderr, flush=True)
             if self.on_transition is not None:
                 try:
                     self.on_transition(t)
@@ -201,6 +225,8 @@ class Orchestrator:
             if template is None:
                 raise TemplateUnknown("the template is not on the allow-list", field="/template_id")
             known = self.records.get(spec.instance_id)
+            if known is None and self.tombstones.has(spec.instance_id):
+                raise InstanceExists("the instance id was used and destroyed")  # a restart does not free it (H-65)
             if known is not None:
                 if known.state is S.DESTROYED:
                     raise InstanceExists("the instance id was used and destroyed")
@@ -211,6 +237,7 @@ class Orchestrator:
                 if known.fingerprint != spec.fingerprint():
                     raise RequestMismatch("same instance and epoch with another body")
                 return Accepted(known, False, self._view(known), None)  # a repeat: no new work, same result
+            self._check_open()  # after the repeat lookup: a repeat of an accepted request is answered even in safe mode
             created = self._now()
             plan = build_plan(template, self._capped(spec), self.images, now=created)  # refuses before any object exists
             # Capacity counts what the containers really get (the template memory of every component plus the keeper), not the request
@@ -227,6 +254,64 @@ class Orchestrator:
             self.records[spec.instance_id] = rec
             self._move(rec, S.REQUESTED, "create accepted")
             return Accepted(rec, True, self._view(rec), lambda: self._run_create(rec, plan, spec))
+
+    def _check_open(self) -> None:
+        if not self._reconciled or self._safe_mode:
+            raise Busy("the orchestrator is comparing Docker with its records; try again shortly")
+
+    # ------------------------------------------------------------ reconciler (story 3.5, FR-INS-05)
+
+    def reconcile(self, execute: Callable[[Callable[[], None]], None] | None = None) -> ReconcileResult:
+        """One pass of the reconciler (see `reconcile.py`). A backend error while listing Docker is raised."""
+        return self.reconciler.run_once(execute)
+
+    def _set_reconciled(self, *, safe: bool, ok: bool = True) -> None:
+        """The end of a pass. `ok` is False when the pass had an error for an instance: the gate stays (or becomes) closed."""
+        with self._lock:
+            self._reconciled, self._safe_mode = ok, safe
+
+    @property
+    def gate_closed(self) -> bool:
+        return not self._reconciled or self._safe_mode
+
+    def register_found(
+        self, instance_id: str, epoch: int, template_id: str, hostname: str, *, expires: datetime | None, ready: bool,
+    ) -> InstanceRecord | None:
+        """Record an instance found in Docker that this process does not know. `ready`: all components were found running, so it is
+        adopted as `ready` (access closed, access epoch 0; the platform opens it with its next `access` call). Otherwise it is
+        recorded as `failed` (INST-START-FAILED) and the caller removes its objects. Returns None when a record exists already.
+        Numbers start at 1,000,000 plus the seconds since 2026-01-01 (they grow across restarts), so the platform never drops a report
+        as a repeat."""
+        with self._lock:
+            if instance_id in self.records:
+                return None
+            template = self.templates[template_id]  # the reconciler checked it
+            now = self._now()
+            cfg = self.settings.get()
+            stamp = self._stamp()
+            rec = InstanceRecord(
+                instance_id, epoch, template_id, "", hostname=hostname,
+                memory_mb=sum(int(c["memory_mb"]) for c in template["components"]) + MEMORY_ADOPTION_SLACK_MB if ready else 0,
+                components=frozenset(c["name"] for c in template["components"]), created_at=stamp, updated_at=stamp,
+                # never later than the ceiling from now; a missing or unreadable label ends the instance at the next reaper pass
+                expires_dt=min(expires, now + timedelta(minutes=cfg.max_minutes_ceiling)) if expires is not None else now,
+                idle_minutes=cfg.default_idle_minutes,
+                transition_offset=ADOPTED_TRANSITION_BASE + int((now - ADOPTION_EPOCH).total_seconds()),
+            )
+            self.records[instance_id] = rec
+            if ready:
+                self._move(rec, S.READY, "adopted after a restart: every component was found running", force=True)
+            else:
+                self._move(rec, S.FAILED, "found incomplete after a restart; its objects are removed", ErrorCode.START_FAILED, force=True)
+            return rec
+
+    def mark_incomplete(self, rec: InstanceRecord) -> bool:
+        """A live instance found with only some of its objects: record `failed` (INST-START-FAILED), one report. The caller sweeps."""
+        with self._lock:
+            if rec.state not in (S.READY, S.ACTIVE, S.IDLE) or rec.destroying:
+                return False
+            self._move(rec, S.FAILED, "found incomplete: a component is not running; its objects are removed", ErrorCode.START_FAILED, force=True)
+            return True
 
     def abandon_create(self, rec: InstanceRecord) -> None:
         """The worker thread of an accepted create could not be started (M10): fail the instance with INST-START-FAILED instead of
@@ -355,12 +440,15 @@ class Orchestrator:
                 if known != fingerprint:
                     raise RequestMismatch("same new epoch with another body")
                 return Accepted(rec, False, self._view(rec), None)  # a repeat: no new work, same result
+            self._check_open()
             if rec.state not in (S.READY, S.ACTIVE, S.IDLE):
                 raise InvalidState(f"reset is not allowed in state {rec.state.value}")
             if spec.epoch != rec.epoch + 1:
                 raise StaleEpoch("the new epoch must be the current epoch plus one")
+            if rec.base is None:  # found after a restart: the create request (without secrets) was never kept
+                raise InvalidState("an adopted instance cannot be reset; destroy and create it again")
             template = self.templates.get(rec.template_id)
-            if template is None or rec.base is None:
+            if template is None:
                 raise TemplateUnknown("the template is not on the allow-list", field="/template_id")
             full = spec.apply_to(rec.base)
             # the expiry label keeps the time of the first create: a reset does not extend the total limit
@@ -427,7 +515,7 @@ class Orchestrator:
         failure: Exception | None = None
         for rec in records:
             with self._lock:
-                if rec.state is S.DESTROYED or rec.base is None or rec.created_dt is None:
+                if rec.state is S.DESTROYED or (rec.expires_dt is None and (rec.base is None or rec.created_dt is None)):
                     continue
                 if rec.state is S.STOPPING:
                     if rec.destroying:
@@ -465,12 +553,16 @@ class Orchestrator:
         return spec if spec.max_minutes <= ceiling else replace(spec, max_minutes=ceiling)
 
     def _expiry_reason(self, rec: InstanceRecord, now: datetime, ceiling: int) -> str | None:
-        assert rec.base is not None and rec.created_dt is not None
-        if now >= rec.created_dt + timedelta(minutes=min(rec.base.max_minutes, ceiling)):
+        if rec.expires_dt is not None:  # an adopted instance: the deadline comes from the `vm.expires` label
+            over, idle = now >= rec.expires_dt, rec.idle_minutes if rec.idle_minutes is not None else self.settings.get().default_idle_minutes
+        else:
+            assert rec.base is not None and rec.created_dt is not None
+            over, idle = now >= rec.created_dt + timedelta(minutes=min(rec.base.max_minutes, ceiling)), rec.base.idle_minutes
+        if over:
             return "total limit reached"
         if rec.state in (S.READY, S.ACTIVE, S.IDLE):
             since = rec.last_activity or rec.ready_at
-            if since is not None and now >= since + timedelta(minutes=rec.base.idle_minutes):
+            if since is not None and now >= since + timedelta(minutes=idle):
                 return "no activity for the idle limit"
         return None
 

@@ -1,0 +1,24 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-16 from the task L-15 of docs/dev/dev1-tanmay.md and the brief of the isolation requirements; approved on the developer's delegation (run through on recorded decisions).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Isolation probe from inside a real instance network, live checks and the VM-I runbook (S-3, S-15)"
+description = "A probe that runs inside a network built by the orchestrator's own network and container profile and tries the internet, the LAN, the metadata address, other instances, the platform, the gateway address and host services, with a positive control. Tested locally on Docker Desktop. The live conformance checks also assert no seccomp unconfined, no socket and no host path. A runbook gives the developer the VM-I steps: rule on versus off (INPUT or DOCKER-USER), a Docker restart and a reboot, and the S-15 attach test."
+verify = "Locally every blocked target reports blocked and the control reaches; the probe fails when a target is open (tested with a stub); the runbook lists the VM-I commands and the evidence to save."
+covers = ["NFR-ISO-01", "NFR-ISO-02", "NFR-ISO-03", "NFR-ISO-04", "NFR-SEC-04"]
+after = []
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Docker socket behind a proxy for the orchestrator"
+description = "A socket proxy service (allowed API sections only) that the orchestrator uses through --docker-host instead of the socket, with compose wiring, rules that reject the socket anywhere else, a local test that allowed calls pass and others are refused, and ADR 0010 updated."
+verify = "With the proxy in front, the orchestrator creates and destroys an instance; a call to a section that is not allowed (exec, images, volumes prune, system) is refused; no other service mounts the socket."
+covers = ["NFR-SEC-02", "NFR-SEC-04", "NFR-ISO-04"]
+after = [1]
+hitl = false
+risk = "high"

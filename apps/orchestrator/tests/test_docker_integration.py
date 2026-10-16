@@ -12,8 +12,10 @@ import pytest
 from support import EVENT_KEY, FLAG_A, ROOT, SEED, body, is_ci, template
 
 from vulnmart_orchestrator.backend import SdkBackend
+from vulnmart_orchestrator.builder import build_plan, parse_create
 from vulnmart_orchestrator.engine import Orchestrator
 from vulnmart_orchestrator.images import ImageAllowlist
+from vulnmart_orchestrator.reconcile import FakeDesiredState
 from vulnmart_orchestrator.states import ErrorCode, InstanceState
 
 S = InstanceState
@@ -204,3 +206,68 @@ def test_a_shop_that_is_never_healthy_times_out_and_leaves_nothing(docker_client
     assert rec.state is S.FAILED and rec.error_code == ErrorCode.HEALTH_TIMEOUT
     assert time.monotonic() - start < 60
     assert leftovers(docker_client, IID) == ([], [], [])
+
+
+def test_a_process_killed_during_a_real_create_leaves_nothing_after_the_first_pass_of_a_new_engine(docker_client, stub_image_id, clean, tmp_path):
+    """FR-INS-05, S-13: a child process creates an instance and stalls at its first start, is killed with its objects in Docker, and a new engine's
+    first pass removes every object and records the id as failed."""
+    import sys
+
+    script = tmp_path / "child_create.py"  # outside the package and the tests: only this file is in its own directory
+    script.write_text(
+        "import sys\n"
+        "from support import body\n"
+        "import test_docker_integration as t\n"
+        "import docker\n"
+        "from vulnmart_orchestrator.backend import SdkBackend\n"
+        "from vulnmart_orchestrator.engine import Orchestrator\n"
+        "image = sys.argv[1]\n"
+        "import time\n"
+        "class Slow(SdkBackend):\n"
+        "    def start(self, name):\n"
+        "        time.sleep(300)  # the objects exist and nothing has started: the parent kills this process here\n"
+        "orch = Orchestrator(Slow(docker.from_env()), {'shop-v0': t.reduced_template()}, t.stub_allowlist(image))\n"
+        f"orch.create(body(iid={IID!r}))\n",
+        encoding="utf-8",
+    )
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([tests_dir, str(ROOT / "apps" / "orchestrator" / "src")])}
+    plan = build_plan(reduced_template(), parse_create(body(iid=IID)), stub_allowlist(stub_image_id))
+    want = (len(plan.containers), 1, len(plan.volumes))
+    child = subprocess.Popen([sys.executable, str(script), stub_image_id], env=env, cwd=tmp_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        end = time.monotonic() + 90
+        while True:
+            cs, ns, vs = leftovers(docker_client, IID)
+            if (len(cs), len(ns), len(vs)) == want:  # everything of the plan is created, the worker now sits at its first start
+                break
+            assert child.poll() is None, "the child ended before it created its objects"
+            assert time.monotonic() < end, "the child never created its objects"
+            time.sleep(0.2)
+    finally:
+        child.kill()
+        child.wait(30)
+    assert leftovers(docker_client, IID) != ([], [], [])  # the kill left the objects behind
+
+    seen = []
+    new = Orchestrator(SdkBackend(docker_client), {"shop-v0": reduced_template()}, stub_allowlist(stub_image_id), on_transition=seen.append,
+                       reconcile_gate=True)
+    result = new.reconcile()
+    assert not result.errors and result.failed == [IID], result
+    assert leftovers(docker_client, IID) == ([], [], [])
+    rec = new.get(IID)
+    assert rec.state is S.FAILED and rec.error_code == ErrorCode.START_FAILED and len(seen) == 1
+
+
+def test_a_complete_running_instance_is_adopted_ready_by_a_second_engine_and_its_objects_stay(docker_client, stub_image_id, clean):
+    first, _ = make(docker_client, stub_image_id)
+    assert first.create(body(iid=IID)).state is S.READY
+    before = [sorted(x) for x in leftovers(docker_client, IID)]
+    seen = []
+    second = Orchestrator(SdkBackend(docker_client), {"shop-v0": reduced_template()}, stub_allowlist(stub_image_id), on_transition=seen.append,
+                          desired=FakeDesiredState({IID}), reconcile_gate=True)
+    result = second.reconcile()
+    rec = second.get(IID)
+    assert result.adopted == [IID] and not result.errors and rec.state is S.READY and (rec.access, rec.access_epoch) == ("closed", 0), result
+    assert [sorted(x) for x in leftovers(docker_client, IID)] == before and len(seen) == 1
+    assert second.destroy(IID).state is S.DESTROYED and leftovers(docker_client, IID) == ([], [], [])

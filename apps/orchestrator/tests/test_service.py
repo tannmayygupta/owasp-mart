@@ -429,3 +429,43 @@ def test_the_image_default_is_tls_required_and_never_carries_the_test_switches()
     assert "--insecure-no-tls" not in joined and "--allow-fake-backend" not in joined and "--backend" not in joined
     assert "0.0.0.0" in joined  # so the refusal of a non-loopback address without TLS (tested above) is what protects the image
     assert "--key " not in joined and "--report-key " not in joined
+
+
+# ---- reconciler (story 3.5) ----
+def test_create_and_reset_are_busy_until_the_first_pass_has_worked_and_a_pass_opens_the_service():
+    from support import allowlist, template
+
+    from vulnmart_orchestrator.auth import Verifier
+    from vulnmart_orchestrator.backend import FakeBackend
+    from vulnmart_orchestrator.engine import Orchestrator
+    from vulnmart_orchestrator.ratelimit import RateLimiter
+    from vulnmart_orchestrator.service import ReconcileLoop, Service, _problem_of
+    from vulnmart_orchestrator.states import Busy
+
+    engine = Orchestrator(FakeBackend(), {"shop-v0": template()}, allowlist(), poll_s=0.001, reconcile_gate=True)
+    service = Service(engine, Verifier(KEY.encode()), RateLimiter(0, 1))
+    with pytest.raises(Busy) as busy:
+        service._create(create_body())
+    problem = _problem_of(busy.value)  # what the endpoint answers: 429 ORCH-BUSY with Retry-After
+    assert problem.code == "ORCH-BUSY" and problem.headers.get("Retry-After")
+    assert ReconcileLoop(engine).first_pass() is True
+    assert service._create(create_body())[0] == 202
+
+
+def test_a_destroyed_id_stays_refused_after_the_service_restarts_with_the_same_state_dir(templates, tmp_path):
+    iid = "i-ABCDEFGHIJKLMNOP"
+    first = Svc(templates, "--rate-per-s", "0", "--state-dir", str(tmp_path))
+    try:
+        first.call("POST", "/v1/instances", create_body(iid))
+        wait_state(first, iid, "ready")
+        first.call("POST", f"/v1/instances/{iid}/destroy")
+        wait_state(first, iid, "destroyed")
+    finally:
+        first.stop()
+    second = Svc(templates, "--rate-per-s", "0", "--state-dir", str(tmp_path))
+    try:
+        status, problem, _ = second.call("POST", "/v1/instances", create_body(iid))
+        assert status == 409 and problem["code"] == "ORCH-INSTANCE-EXISTS"
+        assert second.call("POST", "/v1/instances", create_body("i-ZZZZZZZZZZZZZZZZ"))[0] == 202  # another id is fine
+    finally:
+        second.stop()

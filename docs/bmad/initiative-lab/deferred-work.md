@@ -132,3 +132,15 @@
 - source_plan: same
   summary: Smaller leftovers: `Settings.default_idle_minutes` and `default_max_minutes` are numbers for the platform and are not read by the engine; a reaper pass racing a reset and a reaper destroy on real Docker have no test; the fake activity route trusts the loopback address of the caller (only with `--backend fake`).
   evidence: review of story 3.4 (blind, edge-case and verification-gap lenses), all low.
+- source_plan: story-reconciler-repair-differences-between-recorded-and-real-stat-plan.md
+  summary: The service uses a desired-state port that wants every instance until the platform has a source (H-123), so an orphan is never destroyed in production; only incomplete leftovers are removed and unknown complete instances are adopted.
+  evidence: story 3.5 design (ADR 0036); the fake port covers the orphan and safe-mode rows in tests.
+- source_plan: same
+  summary: An adopted instance cannot be reset (no create request is kept, the reset answers the template error) and starts with access closed; a reconciler-failed or adopted instance reports to a platform that may not know it (a 404 would be retried for ever by the pusher, H-119). Tombstone retention is not set (H-65) and the file is not backed up. Not run on vm-i.
+  evidence: story 3.5 implementation; H-123 asks the platform side.
+- source_plan: same
+  summary: Reaper `destroy` after adoption uses the `vm.expires` label only (the settings ceiling is not applied to adopted instances); reconcile of a `stopping` record whose worker gave up is left to the reaper; an unknown template label is left alone and logged.
+  evidence: story 3.5 implementation notes.
+- source_plan: story-reconciler-repair-differences-between-recorded-and-real-stat-plan.md
+  summary: Review round of story 3.5 deferrals: the tombstone append happens inside the engine lock (move it after the lock); the idle limit of an adopted instance is fixed at adoption; `AllWantedDesiredState` is a stand-in until H-123; a record in a state `Reconciler._known` does not handle is only logged.
+  evidence: coordinator review of story 3.5, 2026-10-16.

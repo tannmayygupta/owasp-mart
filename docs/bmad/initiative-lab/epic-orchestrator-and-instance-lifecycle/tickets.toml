@@ -67,3 +67,14 @@ covers = ["FR-INS-06", "FR-INS-08", "FR-INS-09"]
 after = [5]
 hitl = true
 risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Release manifest loader: the orchestrator accepts the image release file with per-role healthchecks"
+description = "Adds ImageAllowlist.from_release that reads the release.json of the image pipeline (images by name, healthchecks by role): ignores commit and repo, skips images that are not orchestrator roles (hello), turns a healthcheck argv into a Docker Test list with CMD, and refuses anything unsafe. Found in the review of PR 14: without it the shop, mock, import and bot images never become healthy under the orchestrator."
+verify = "A real release.json produced by scripts/images-release.mjs loads; the healthchecks of the four roles reach the container health test as CMD lists; unknown roles, unknown digests and shell argv are refused."
+covers = ["FR-INS-07"]
+after = [2]
+hitl = false
+risk = "medium"

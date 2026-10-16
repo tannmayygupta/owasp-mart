@@ -1,0 +1,33 @@
+Story 3.5 reconciler, test output (Docker Desktop, 2026-10-16). Commands: uv run --locked --package vulnmart-orchestrator pytest -v <files>
+
+============================= test session starts =============================
+platform win32 -- Python 3.14.8, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\tanma\major-project\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\tanma\major-project
+configfile: pyproject.toml
+plugins: anyio-4.15.1, platformdirs-4.13.0, typeguard-4.6.0
+collecting ... collected 21 items
+
+apps/orchestrator/tests/test_reconcile.py::test_killed_mid_provision_every_object_is_removed_and_the_id_is_failed_with_one_report PASSED [  4%]
+apps/orchestrator/tests/test_reconcile.py::test_a_complete_unknown_instance_is_adopted_ready_with_closed_access_and_high_numbers_and_the_reaper_ends_it_at_its_expiry PASSED [  9%]
+apps/orchestrator/tests/test_reconcile.py::test_an_adopted_instance_is_ended_after_the_idle_limit_from_the_settings PASSED [ 14%]
+apps/orchestrator/tests/test_reconcile.py::test_an_orphan_the_platform_does_not_list_is_destroyed_through_the_normal_destroy_path PASSED [ 19%]
+apps/orchestrator/tests/test_reconcile.py::test_a_known_instance_the_platform_stopped_listing_is_destroyed_too PASSED [ 23%]
+apps/orchestrator/tests/test_reconcile.py::test_safe_mode_destroys_nothing_for_being_unwanted_and_refuses_creates_and_resets[port0] PASSED [ 28%]
+apps/orchestrator/tests/test_reconcile.py::test_safe_mode_destroys_nothing_for_being_unwanted_and_refuses_creates_and_resets[port1] PASSED [ 33%]
+apps/orchestrator/tests/test_reconcile.py::test_safe_mode_still_removes_incomplete_leftovers PASSED [ 38%]
+apps/orchestrator/tests/test_reconcile.py::test_objects_of_an_old_epoch_of_a_live_record_are_removed PASSED [ 42%]
+apps/orchestrator/tests/test_reconcile.py::test_a_live_record_with_no_object_in_docker_ends_destroyed_with_a_report PASSED [ 47%]
+apps/orchestrator/tests/test_reconcile.py::test_an_empty_network_or_volume_with_no_record_is_removed PASSED [ 52%]
+apps/orchestrator/tests/test_reconcile.py::test_a_destroyed_id_stays_refused_after_a_restart_and_the_file_holds_nothing_secret PASSED [ 57%]
+apps/orchestrator/tests/test_reconcile.py::test_the_tombstone_file_survives_a_torn_line PASSED [ 61%]
+apps/orchestrator/tests/test_reconcile.py::test_an_instance_whose_build_is_running_is_not_touched PASSED [ 66%]
+apps/orchestrator/tests/test_reconcile.py::test_one_instance_that_cannot_be_repaired_does_not_stop_the_others PASSED [ 71%]
+apps/orchestrator/tests/test_reconcile.py::test_creates_and_resets_are_busy_until_the_first_pass_has_worked PASSED [ 76%]
+apps/orchestrator/tests/test_reconcile.py::test_a_pass_that_cannot_read_docker_raises_and_leaves_the_engine_busy PASSED [ 80%]
+apps/orchestrator/tests/test_reconcile.py::test_an_incomplete_unknown_instance_is_not_adopted_when_a_component_is_not_running PASSED [ 85%]
+apps/orchestrator/tests/test_reconcile.py::test_an_unknown_template_label_is_left_alone PASSED [ 90%]
+apps/orchestrator/tests/test_reconcile.py::test_the_fake_backend_scan_lists_only_instance_objects PASSED [ 95%]
+apps/orchestrator/tests/test_reconcile.py::test_a_pass_over_a_healthy_host_changes_nothing PASSED [100%]
+
+============================= 21 passed in 0.18s ==============================

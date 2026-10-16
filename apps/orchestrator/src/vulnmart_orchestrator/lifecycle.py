@@ -19,11 +19,14 @@ class Settings:
     max_minutes_ceiling: int = 1440  # no instance lives longer than this, whatever its `limits.max_minutes` says
     active_window_minutes: int = 5  # no activity for this long moves `active` to `idle`
     reaper_interval_s: float = 30.0  # how often the reaper looks at the instances
+    reconcile_interval_s: float = 60.0  # how often the reconciler compares Docker with the records (story 3.5)
 
     def __post_init__(self) -> None:
         # a zero interval would busy-loop the reaper and a zero ceiling or window would end every instance at once
         if not (isinstance(self.reaper_interval_s, (int, float)) and 0 < self.reaper_interval_s <= 3600):
             raise ValueError("reaper_interval_s must be above 0 and at most 3600")
+        if not (isinstance(self.reconcile_interval_s, (int, float)) and 0 < self.reconcile_interval_s <= 3600):
+            raise ValueError("reconcile_interval_s must be above 0 and at most 3600")
         if not (isinstance(self.active_window_minutes, int) and self.active_window_minutes >= 1):
             raise ValueError("active_window_minutes must be an integer of at least 1")
         if not (isinstance(self.max_minutes_ceiling, int) and self.max_minutes_ceiling >= 1):

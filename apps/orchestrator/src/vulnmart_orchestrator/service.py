@@ -13,7 +13,8 @@ or an unknown path must be answered only after the signature, a body over 64 KiB
 
 `create` and `destroy` answer at once (202) and a worker thread does the Docker work; the state reports of the engine go to the
 platform through `ReportPusher`. `reset` answers at once too (202, or 200 for the same body) and a worker runs the create path again for
-the new epoch (story 3.4). A reaper thread (`Reaper`) ends instances at their total limit or after inactivity through the normal destroy
+the new epoch (story 3.4). Before it serves, the service runs one reconciler pass (story 3.5: Docker against the records) and then repeats it
+about every minute; until a pass has worked, create and reset answer 429 ORCH-BUSY. A reaper thread (`Reaper`) ends instances at their total limit or after inactivity through the normal destroy
 path. With `--backend fake` only, an unsigned loopback call `POST /_fake/v1/instances/{id}/activity` moves an instance between ready,
 active and idle for the test suites. No answer and no log line holds a secret, an exception message or a stack trace.
 """
@@ -51,6 +52,7 @@ from .problems import (
     INTERNAL, MEDIA_TYPE, RETRY_AFTER_BUSY, ROUTE_UNKNOWN, ProblemError, new_request_id, pointer, problem_body,
 )
 from .ratelimit import BURST, RATE_PER_SECOND, RateLimiter
+from .reconcile import TombstoneStore
 from .reports import ReportPusher, check_report_url
 from .states import Busy, CursorInvalid, EngineError, FieldForbidden, LabelUnknown, ValidationFailed
 from .templates import load_templates
@@ -142,6 +144,64 @@ class Reaper:
                     log_line(event="reaped", count=len(ids))
             except Exception as e:
                 log_line(event="reaper-failed", error=type(e).__name__)
+
+
+class ReconcileLoop:
+    """The first pass of the reconciler runs before the service answers (`first_pass`); this thread then repeats it every
+    `reconcile_interval_s` (from the settings port). A failed pass is logged by class name and tried again at the next wake-up."""
+
+    RETRY_S = 5.0  # while the engine is closed to creates (no pass has worked yet) the next pass is tried after this long
+
+    def __init__(self, engine: Orchestrator, *, spawn_work: Callable[[Callable[[], None], str], None] = spawn, retry_s: float | None = None) -> None:
+        self.engine, self._spawn = engine, spawn_work
+        self.retry_s = self.RETRY_S if retry_s is None else retry_s
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, name="reconciler", daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=5)
+
+    def run_once(self):
+        return self.engine.reconcile(execute=lambda work: self._spawn(destroy_worker(work), "reconcile-destroy"))
+
+    def first_pass(self) -> bool:
+        """The pass before serving. True when it worked; otherwise the service still starts and stays busy until a later pass works."""
+        try:
+            result = self.run_once()
+            self._report(result)
+            return not (result.safe_mode or result.errors)
+        except Exception as e:
+            log_line(event="reconcile-failed", error=type(e).__name__)
+            return False
+
+    @staticmethod
+    def _report(r) -> None:
+        if r.safe_mode:
+            log_line(event="reconcile-safe-mode", detail="the desired state cannot be read: nothing is destroyed for being unwanted, creates are refused")
+        if r.adopted or r.failed or r.destroyed or r.swept or r.errors:
+            log_line(event="reconciled", adopted=len(r.adopted), failed=len(r.failed), destroyed=len(r.destroyed), swept=len(r.swept),
+                     errors=len(r.errors))
+
+    def _interval(self) -> float:
+        if self.engine.gate_closed:
+            return self.retry_s
+        try:
+            return self.engine.settings.get().reconcile_interval_s
+        except Exception as e:
+            log_line(event="reconcile-settings-failed", error=type(e).__name__)
+            return 60.0
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self._interval()):
+            try:
+                self._report(self.run_once())
+            except Exception as e:
+                log_line(event="reconcile-failed", error=type(e).__name__)
 
 
 def _encode_cursor(instance_id: str) -> str:
@@ -402,6 +462,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--report-timeout-ms", type=int, default=5000)
     p.add_argument("--capacity-mb", type=int, default=DEFAULT_CAPACITY_MB)
     p.add_argument("--step-delay-ms", type=int, default=0, help="test aid: pause before each step of a create and of a destroy")
+    p.add_argument("--state-dir", help="directory for the tombstone file of destroyed instance ids (kept in memory only when not given)")
     p.add_argument("--host-id", default="orch-host-1")
     p.add_argument("--host-kind", choices=("vm", "laptop", "fake"), default=None)
     p.add_argument("--backend", choices=("docker", "fake"), default="docker")
@@ -462,6 +523,7 @@ def build_engine(args: argparse.Namespace, on_transition: Callable | None) -> Or
         raise ValueError(f"no template (*.json) found in {args.templates_dir}")
     common = dict(
         capacity_mb=args.capacity_mb, host_id=args.host_id, step_delay_s=args.step_delay_ms / 1000, on_transition=on_transition,
+        tombstones=TombstoneStore(args.state_dir), reconcile_gate=True,
     )
     if args.backend == "fake":
         if "shop-v0" in templates and FAIL_TEMPLATE not in templates:
@@ -472,6 +534,8 @@ def build_engine(args: argparse.Namespace, on_transition: Callable | None) -> Or
         )
     if not args.images_manifest:
         raise ValueError("--images-manifest is required with --backend docker")
+    if not args.state_dir:
+        log_line(event="no-state-dir", detail="destroyed instance ids are only kept in memory and are forgotten when the service restarts")
     from .backend import SdkBackend
 
     return Orchestrator(
@@ -525,8 +589,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     service = Service(engine, Verifier(platform_key), RateLimiter(args.rate_per_s, args.rate_burst), fake_controls=args.backend == "fake")
     reaper = Reaper(engine)
+    reconciler = ReconcileLoop(engine)
     if pusher:
         pusher.start()
+    reconciler.first_pass()  # before the service answers; a failure leaves create and reset busy until a later pass works
+    reconciler.start()
     reaper.start()
     try:
         asyncio.run(serve(service.app, args.host, args.port, ctx))
@@ -534,6 +601,7 @@ def main(argv: list[str] | None = None) -> int:
         pass
     finally:
         reaper.stop()
+        reconciler.stop()
         if pusher:
             pusher.stop()
     return 0
