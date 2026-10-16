@@ -15,7 +15,7 @@ const NAME = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const REGISTRY = /^[a-z0-9.-]+$/;
 // A healthcheck must be a direct exec of a binary, never a shell: distroless
 // images have no shell and the orchestrator runs the argv as-is (no wrapping).
-const SHELLISH = /(^|\/)(sh|bash|dash|ash|zsh|wget|curl)$/;
+const SHELLISH = /(^|\/)(sh|bash|dash|ash|zsh|wget|curl|nc|ncat|netcat)$/;
 
 const badPath = (p) => typeof p !== 'string' || p === '' || path.isAbsolute(p) || /^[a-zA-Z]:/.test(p) || p.includes('\\') || p.split('/').some((s) => s === '..' || s === '');
 

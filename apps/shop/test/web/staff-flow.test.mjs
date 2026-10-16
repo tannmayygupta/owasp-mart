@@ -23,7 +23,7 @@ function session() {
     csrf: null,
     async get(path) { const r = await fetch(`${base}${path}`, { headers: { cookie: cookie() }, redirect: 'manual' }); store(r); return r; },
     async post(path, form) { const r = await fetch(`${base}${path}`, { method: 'POST', headers: { cookie: cookie(), 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ ...form, csrf: self.csrf }).toString(), redirect: 'manual' }); store(r); return r; },
-    async login(email) { const page = await self.get('/login'); self.csrf = (await page.text()).match(/name="csrf" value="([^"]+)"/)[1]; const r = await self.post('/login', { email, password: PW }); assert.equal(r.status, 302, `login ${email}`); return self; },
+    async login(email) { const page = await self.get('/login'); self.csrf = (await page.text()).match(/name="csrf" value="([^"]+)"/)[1]; const r = await self.post('/login', { email, password: PW }); assert.equal(r.status, 302, `login ${email}`); self.csrf = (await (await self.get('/login')).text()).match(/name="csrf" value="([^"]+)"/)[1]; return self; },
   };
   return self;
 }

@@ -107,6 +107,8 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 Goal: The shop runs inside an instance (health, events, mock services, import service, bot) and the customer, support, finance and admin flows work.
 
+> Tick vs plan status (CLAUDE.md task-cycle step 4): a `[x]` here means the task's "Done when" criteria are met and verified (tests/harness/demo with recorded output). The matching BMAD story plan under `docs/bmad/initiative-target/` stays `status: built` — in review on PR #14 — and advances to `done` (via `bmad-ticket`) only when the developer (Sahil) confirms, per step 4. So `[x]` here with `built` in the plan is expected while the sprint PR is open, not a mismatch to "fix".
+
 - [x] **T-09. Health, readiness after the injector marker and runtime profile**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")

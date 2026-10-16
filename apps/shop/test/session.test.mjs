@@ -19,3 +19,11 @@ test('a validly signed session cookie still round-trips', () => {
   // And through the request reader, URL-encoded as a cookie value would be.
   assert.deepEqual(getSession({ headers: { cookie: `vm_sess=${encodeURIComponent(value)}` } }), { uid: 3, csrf: 'abc' });
 });
+
+test('an expired session is rejected; a future expiry is accepted', () => {
+  const expired = serialize({ uid: 3, csrf: 'x', exp: Date.now() - 1000 });
+  assert.equal(parse(expired), null, 'a past exp is treated as no session');
+  assert.equal(getSession({ headers: { cookie: `vm_sess=${encodeURIComponent(expired)}` } }), null);
+  const live = serialize({ uid: 3, csrf: 'x', exp: Date.now() + 60_000 });
+  assert.equal(parse(live).uid, 3, 'a future exp is still valid');
+});

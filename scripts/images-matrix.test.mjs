@@ -72,6 +72,8 @@ test('healthcheck is optional; a valid exec argv passes, bad shapes and shells f
   bad(['/bin/sh', '-c', 'curl localhost'], /must exec a binary directly, not a shell/);
   bad(['wget', '-q', 'http://x'], /not a shell/);
   bad(['/usr/bin/bash', '-c', 'x'], /not a shell/);
+  bad(['nc', '-z', '127.0.0.1', '80'], /not a shell/);
+  bad(['/usr/bin/ncat', 'x'], /not a shell/);
 });
 
 const SHA = 'a'.repeat(40);

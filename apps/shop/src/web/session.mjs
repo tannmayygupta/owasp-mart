@@ -14,6 +14,9 @@ if (!process.env.VM_SESSION_SECRET && process.env.VM_INSTANCE_ID) {
 }
 // Secure cookie by default; local HTTP dev can opt out with VM_INSECURE_COOKIES=1.
 const SECURE = process.env.VM_INSECURE_COOKIES !== '1';
+// Sessions expire (no challenge depends on a non-expiring cookie — C07 is reset +
+// brute force, and its own fix ends sessions after a reset). Default 12 hours.
+const SESSION_TTL_MS = Number(process.env.VM_SESSION_TTL_MS) || 12 * 60 * 60 * 1000;
 
 function b64url(buf) {
   return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -31,7 +34,8 @@ export function serialize(obj) {
   return `${payload}.${sign(payload)}`;
 }
 
-// Verify and parse a cookie value; returns the object or null (never throws).
+// Verify and parse a cookie value; returns the object or null (never throws). An
+// expired session (exp in the past) is treated as no session.
 export function parse(value) {
   if (typeof value !== 'string' || !value.includes('.')) return null;
   const [payload, sig] = value.split('.', 2);
@@ -39,11 +43,14 @@ export function parse(value) {
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  let obj;
   try {
-    return JSON.parse(unb64url(payload).toString('utf8'));
+    obj = JSON.parse(unb64url(payload).toString('utf8'));
   } catch {
     return null;
   }
+  if (obj && typeof obj.exp === 'number' && Date.now() > obj.exp) return null;
+  return obj;
 }
 
 function readCookie(req, name) {
@@ -67,9 +74,12 @@ export function getSession(req) {
   return parse(readCookie(req, COOKIE));
 }
 
-// Write the session object as a signed HttpOnly cookie.
+// Write the session object as a signed HttpOnly cookie, stamping issued-at and
+// expiry so a stolen or stale cookie does not live forever.
 export function setSession(res, obj) {
-  res.cookie(COOKIE, serialize(obj), { httpOnly: true, sameSite: 'lax', secure: SECURE, path: '/' });
+  const now = Date.now();
+  const stamped = { ...obj, iat: now, exp: now + SESSION_TTL_MS };
+  res.cookie(COOKIE, serialize(stamped), { httpOnly: true, sameSite: 'lax', secure: SECURE, path: '/', maxAge: SESSION_TTL_MS });
 }
 
 export function clearSession(res) {

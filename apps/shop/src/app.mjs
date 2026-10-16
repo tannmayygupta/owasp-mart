@@ -62,6 +62,14 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) 
   if (db) {
     configureViews(app);
     app.use(express.urlencoded({ extended: false }));
+    // In instance mode the snapshot db opens only after the injector marker; until
+    // then answer marketplace routes with a clean 503 (the health endpoints above
+    // are already served) rather than letting a db access throw a logged 500. In
+    // tests / local runs `isReady` is always-ready, so this is a no-op there.
+    app.use((_req, res, next) => {
+      if (!isReady()) return res.status(503).json({ code: 'SHOP-NOT-READY', message: 'Not ready' });
+      next();
+    });
     app.use(loadUser(db));
     app.use(checkCsrf);
     registerRoutes(app, db, emit);

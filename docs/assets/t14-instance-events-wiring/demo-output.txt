@@ -1,5 +1,5 @@
 VulnMart local demo output (node scripts/dev.mjs demo)
-Date: 2026-10-16
+Date: 2026-10-17
 Options: (none)
 Shop role: real shop image (apps/shop)
 Image in the shop role: vulnmart-shop:local (built from apps/shop)

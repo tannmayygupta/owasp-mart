@@ -69,6 +69,10 @@ test('a seeded customer can log in', async () => {
   const res = await post('/login', { email: 'customer.demo@vulnmart.test', password: SEED_PASSWORD }, csrf);
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), '/shop');
+  // Login rotates the CSRF token (anti-fixation), so re-read the fresh one a real
+  // client would get from the next rendered page before using it on later posts.
+  csrf = csrfFrom(await (await get('/login')).text());
+  assert.ok(csrf);
 });
 
 test('wrong password is rejected (no redirect)', async () => {

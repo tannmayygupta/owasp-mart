@@ -30,8 +30,8 @@ In an instance the shop now actually **serves the marketplace** (it mounts on th
 
 ### A1 — image healthchecks in the build pipeline
 - `infra/images.json`: an optional per-image `healthcheck` argv (the exact node-exec HEALTHCHECK each distroless Dockerfile already uses: shop `/readyz`, mock-services `:9101/healthz`, bot-controller `:9200/healthz`, import-service socket connect).
-- `scripts/images-matrix.mjs`: `healthcheck` is an optional key, validated as a non-empty list of non-empty strings whose argv[0] is not a shell/`wget`/`curl` (distroless has no shell; the orchestrator runs the argv as-is).
-- `scripts/images-release.mjs`: emits a `healthchecks` map (role → argv) in `release.json`, matching the orchestrator allowlist's `healthchecks` field; omitted when no image declares one.
+- `scripts/images-matrix.mjs`: `healthcheck` is an optional key, validated as a non-empty list of non-empty strings whose argv[0] is an absolute binary path, never a shell/`wget`/`curl`/`nc` (distroless has no shell).
+- `scripts/images-release.mjs`: emits a `healthchecks` map (role → argv) in `release.json`, matching the orchestrator allowlist's `healthchecks` field; omitted when no image declares one. The orchestrator's loader (Tanmay, H-124) adds the Docker `CMD` wrapper itself, so the shop emits the bare argv (`/nodejs/bin/node ...`) and never adds `CMD`. The end-to-end proof is the first real CI release plus the demo (not provable from the shop repo alone).
 - `.github/workflows/images.yml`: `services/**` added to both the `push` and `pull_request` path filters (the `registry change:` line is in `contracts/CHANGELOG.md`).
 
 ### B — safe subset (correct-flow robustness only)
@@ -56,6 +56,19 @@ In an instance the shop now actually **serves the marketplace** (it mounts on th
 ## Security notes (vulnerable parts only)
 No intended weakness was added or removed. A2(a) events carry ids/classes/counts only (no flag-like value; the posted schema enforces it) and are best-effort (never block a player request). The safe-B items are correct-flow robustness, not challenge surface; the ambiguous items are deferred, not changed, so no intended vulnerability is affected.
 
+## Second review follow-ups (same day, head 49f0c34)
+
+Tanmay's second review found the shop-side blockers fixed and asked for these:
+- **B1 refund-after-dispute (must):** `requestRefund` now also refuses when a dispute on the item is open/under_review/escalated/resolved_customer (the reverse of the dispute-side guard); only a seller-resolved dispute leaves the refund path open. Test added (reverse order).
+- **B2 import slowloris (must):** added an absolute per-connection deadline (`CONN_DEADLINE_MS`, default 15 s, injectable) so a client trickling one byte cannot hold a slot past the idle timeout; test added (off-Windows).
+- **A healthcheck wording:** the orchestrator's loader adds the Docker `CMD` wrapper (H-124), so the shop emits the bare argv and never adds `CMD`; validator also rejects `nc`/`ncat`/`netcat`; dev-log corrected; end-to-end proof is the first real CI release plus the demo.
+- **C 503-until-ready:** marketplace routes answer a clean 503 before the snapshot opens (was a logged 500 from the lazy db).
+- **C emitter cap:** `makeEmitter` caps in-flight posts at 32 and drops beyond that (a login flood against a slow sidecar cannot open unbounded sockets).
+- **C safeMerge:** at the depth cap a nested object is now dropped, not assigned raw (the raw assign skipped the dangerous-key filter).
+- **C session:** C07's spec has no session-expiry/fixation challenge (its only session item is "end sessions after reset"), so the never-expiring cookie is a baseline gap, now fixed: sessions carry `iat`/`exp` (12 h default), `parse` rejects an expired one, and the CSRF token rotates at login (logout already drops the session). Tests added; the cookie-jar e2e tests re-read the rotated token as a real client would.
+- **C cart cap:** `addToCart` is the only cart write path and is already capped (1..99 with the `MIN()` merge cap), tested; no update-quantity route exists.
+- **B3 docs:** traceability FR-SHP-14/15 → `Partial` (events are only `auth.attempt`/`order.paid`; FR-SHP-15 still Partial until the healthcheck runs through the orchestrator loader), the duplicate LB-3 row removed; HANDOFFS H-28/29/31/36/37/38/40/44/47/52/54 given dated statuses; dev3-sahil carries a note on tick-vs-plan-status; deferred-work gets the accepted-deferred items and marks the T-09 marketplace follow-up and the admin-guard item resolved.
+
 ## Limitations and follow-ups
-- A per-image field named `healthcheck` (argv) maps to the orchestrator's `healthchecks` map (role → argv); flagged to Tanmay in case he wants a different name.
-- The deferred B items are listed above for the challenge-epic stories, where the intended-vs-accidental call is made per challenge.
+- A per-image field named `healthcheck` (argv) maps to the orchestrator's `healthchecks` map (role → argv); the orchestrator loader adds `CMD` (H-124).
+- The deferred items are tracked in `docs/bmad/initiative-target/deferred-work.md` (PR #14 second-review section) for later target stories.

@@ -1,7 +1,7 @@
 // Customer-flow routes for the shop (T-14, FR-SHP-05). Server-rendered pages
 // over the shop service. Correct flow only; weaknesses are later challenge work.
 import { authenticate } from '../identity/accounts.mjs';
-import { setSession, clearSession } from './session.mjs';
+import { setSession, clearSession, newCsrfToken } from './session.mjs';
 import { requireCustomer } from './middleware.mjs';
 import * as shop from '../domain/shop-service.mjs';
 
@@ -54,7 +54,9 @@ export function registerRoutes(app, db, emit = () => {}) {
     if (!active) {
       return res.status(401).render('login', { error: 'Wrong email or password.' });
     }
-    setSession(res, { uid: user.id, csrf: req.session.csrf });
+    // Rotate the CSRF token on login so a pre-auth token cannot be fixed and
+    // reused against the authenticated session.
+    setSession(res, { uid: user.id, csrf: newCsrfToken() });
     res.redirect('/shop');
   }));
   app.post('/logout', (req, res) => { clearSession(res); res.redirect('/shop'); });

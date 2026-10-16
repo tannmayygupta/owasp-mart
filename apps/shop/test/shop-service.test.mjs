@@ -64,3 +64,16 @@ test('A3: an item already refunded cannot also be disputed (double compensation)
   db.prepare("UPDATE refunds SET status = 'approved' WHERE id = ?").run(refundId);
   assert.throws(() => openDispute(db, CUSTOMER, itemId, 'also dispute'), /already has a refund and cannot also be disputed/);
 });
+
+test('A3 (reverse order): an item under dispute cannot also be refunded', () => {
+  const itemId = paidItem();
+  openDispute(db, CUSTOMER, itemId, 'dispute first');
+  // An open dispute blocks a refund...
+  assert.throws(() => requestRefund(db, CUSTOMER, itemId, 'then refund'), /has a dispute and cannot also be refunded/);
+  // ...as does one resolved in the customer's favour (already compensated).
+  db.prepare("UPDATE disputes SET status = 'resolved_customer' WHERE order_item_id = ?").run(itemId);
+  assert.throws(() => requestRefund(db, CUSTOMER, itemId, 'again'), /has a dispute/);
+  // A dispute resolved for the seller (no compensation) leaves the refund path open.
+  db.prepare("UPDATE disputes SET status = 'resolved_seller' WHERE order_item_id = ?").run(itemId);
+  assert.doesNotThrow(() => requestRefund(db, CUSTOMER, itemId, 'legit refund'));
+});

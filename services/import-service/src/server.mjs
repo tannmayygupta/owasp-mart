@@ -15,6 +15,11 @@ const WORKER = path.join(HERE, 'worker.mjs');
 export const DEFAULT_TIMEOUT_MS = 5000;
 const MAX_JOB_BYTES = 1 << 20; // 1 MiB
 const CONN_IDLE_MS = 10000; // a connection that never sends/finishes is dropped
+// An ABSOLUTE per-connection deadline. The idle timeout above resets on every
+// byte, so a client trickling one byte at a time (slowloris) would hold a
+// connection slot forever and, at MAX_CONNS of them, starve real jobs; this fires
+// regardless of activity. Must exceed a legitimate job (timeoutMs, default 5 s).
+const CONN_DEADLINE_MS = Number(process.env.VM_IMPORT_CONN_DEADLINE_MS) || 15000;
 // Cap concurrent workers so a burst cannot exhaust the container's pid budget
 // (instance contract: pids_limit 64); excess jobs are refused, not queued. Kept
 // small (the shop sends one preview at a time); raise with the env var if needed.
@@ -46,17 +51,21 @@ export function runJob(job, { timeoutMs = DEFAULT_TIMEOUT_MS, worker = WORKER } 
 let inflight = 0;
 let openConns = 0;
 
-export function createImportServer({ socketPath, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+export function createImportServer({ socketPath, timeoutMs = DEFAULT_TIMEOUT_MS, connDeadlineMs = CONN_DEADLINE_MS } = {}) {
   try { fs.rmSync(socketPath, { force: true }); } catch { /* no stale socket */ }
   // allowHalfOpen: the client sends the job then half-closes (FIN); we must keep
   // our write side open to reply AFTER the async worker finishes. Without this,
   // the server auto-ends on the client's FIN and the reply is never sent.
   const server = net.createServer({ allowHalfOpen: true }, (conn) => {
     openConns += 1;
-    conn.on('close', () => { openConns -= 1; });
+    let deadline = null;
+    conn.on('close', () => { openConns -= 1; if (deadline) clearTimeout(deadline); });
     // Too many open connections: drop this one before buffering anything.
     if (openConns > MAX_CONNS) { conn.destroy(); return; }
     conn.setTimeout(CONN_IDLE_MS, () => conn.destroy());
+    // Absolute deadline (slowloris defence); unref'd so it never keeps the process up.
+    deadline = setTimeout(() => conn.destroy(), connDeadlineMs);
+    deadline.unref();
     const chunks = [];
     let size = 0;
     let rejected = false;

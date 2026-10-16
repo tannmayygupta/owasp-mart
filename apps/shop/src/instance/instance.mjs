@@ -131,11 +131,19 @@ export function lazyDb(getDb) {
 // it never blocks or fails a player request (IF-4 section 3). With no events URL
 // (a local / non-instance run, no sidecar) it is a no-op. `post` is injectable for
 // tests. Telemetry must never break a request, so a build/post error is swallowed.
-export function makeEmitter(eventsUrl, { post = postEvent } = {}) {
+// At most `maxInFlight` posts are outstanding at once: a burst against a slow or
+// stuck sidecar drops events rather than opening unbounded sockets (events are
+// best-effort and the sidecar/ingest are the source of truth, not the shop).
+export function makeEmitter(eventsUrl, { post = postEvent, maxInFlight = 32 } = {}) {
   if (!eventsUrl) return () => {};
+  let inFlight = 0;
   return (type, data, opts = {}) => {
+    if (inFlight >= maxInFlight) return;
     try {
-      post(eventsUrl, shopEvent(type, data, opts)).catch(() => {});
+      const event = shopEvent(type, data, opts);
+      inFlight += 1;
+      const settle = () => { inFlight -= 1; };
+      post(eventsUrl, event).then(settle, settle);
     } catch { /* never let telemetry break a player request */ }
   };
 }

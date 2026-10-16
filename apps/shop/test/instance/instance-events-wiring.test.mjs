@@ -153,8 +153,10 @@ test('a failed login posts auth.attempt with result "unknown" and no account id'
 
 test('a real checkout posts a schema-valid order.paid', async () => {
   // Log in, add to cart, check out — the full player flow over the snapshot db.
+  const loginCsrf = csrfFrom(await (await get('/login')).text());
+  await post('/login', { email: 'customer.demo@vulnmart.test', password: SEED_PASSWORD }, loginCsrf);
+  // Login rotates the CSRF token; re-read the fresh one for the authenticated posts.
   const csrf = csrfFrom(await (await get('/login')).text());
-  await post('/login', { email: 'customer.demo@vulnmart.test', password: SEED_PASSWORD }, csrf);
   assert.equal((await post('/cart/add', { product_id: '1', qty: '1' }, csrf)).status, 302);
   const done = await post('/checkout', { line1: '1 Test St', city: 'Testville', country: 'Testland', card: '4111111111111111' }, csrf);
   assert.equal(done.status, 302, 'checkout succeeded');

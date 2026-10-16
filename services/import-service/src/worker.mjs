@@ -38,8 +38,15 @@ function safeMerge(base, patch, depth = 0) {
   if (patch && typeof patch === 'object' && !Array.isArray(patch)) {
     for (const [k, v] of Object.entries(patch)) {
       if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-      const recurse = v && typeof v === 'object' && !Array.isArray(v) && depth < MAX_MERGE_DEPTH;
-      out[k] = recurse ? safeMerge(out[k] && typeof out[k] === 'object' ? out[k] : {}, v, depth + 1) : v;
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        // A nested object at the depth cap is DROPPED, not assigned raw: assigning
+        // it would copy its keys without the dangerous-key filter the recursion
+        // applies at every shallower level. A legitimate product patch is shallow.
+        if (depth >= MAX_MERGE_DEPTH) continue;
+        out[k] = safeMerge(out[k] && typeof out[k] === 'object' ? out[k] : {}, v, depth + 1);
+      } else {
+        out[k] = v; // primitive or array: replace
+      }
     }
   }
   return out;

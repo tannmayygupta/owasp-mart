@@ -89,3 +89,23 @@ test('a job round-trips over the unix socket', { skip: process.platform === 'win
     await new Promise((r) => server.close(r));
   }
 });
+
+// A slowloris: send one byte and never finish. The idle timeout resets on each
+// byte, so only the absolute per-connection deadline drops it and frees the slot.
+test('the absolute deadline drops a connection that never finishes', { skip: process.platform === 'win32' ? 'unix-socket behaviour differs on Windows named pipes' : false }, async () => {
+  const socketPath = path.join(os.tmpdir(), `vm-import-slow-${process.pid}-${Date.now()}.sock`);
+  const { server, listen } = createImportServer({ socketPath, connDeadlineMs: 200 });
+  await listen();
+  try {
+    const ms = await new Promise((resolve, reject) => {
+      const conn = net.connect(socketPath, () => conn.write('{')); // one byte, no FIN
+      const t0 = Date.now();
+      const guard = setTimeout(() => reject(new Error('the connection was not dropped by the deadline')), 3000);
+      conn.on('close', () => { clearTimeout(guard); resolve(Date.now() - t0); });
+      conn.on('error', () => {}); // a reset when the server destroys the socket is expected
+    });
+    assert.ok(ms < 2000, `dropped in ${ms}ms, well under the 3 s guard`);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});

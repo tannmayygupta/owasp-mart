@@ -236,6 +236,14 @@ export function requestRefund(db, user, orderItemId, reason) {
     .prepare("SELECT 1 FROM refunds WHERE order_item_id = ? AND status != 'rejected' LIMIT 1")
     .get(item.id);
   if (existing) throw new ValidationError('a refund already exists for this item');
+  // The reverse order of the dispute-side guard: an active dispute may still end
+  // in compensation, and one resolved in the customer's favour already compensated
+  // them — either way a refund on top would be a second payout. Only a dispute
+  // resolved for the seller (no compensation) leaves the refund path open.
+  const dispute = db
+    .prepare("SELECT 1 FROM disputes WHERE order_item_id = ? AND status IN ('open','under_review','escalated','resolved_customer') LIMIT 1")
+    .get(item.id);
+  if (dispute) throw new ValidationError('this item has a dispute and cannot also be refunded');
   const info = db
     .prepare("INSERT INTO refunds (order_item_id, amount_cents, reason, status, requested_by) VALUES (?, ?, ?, 'requested', ?)")
     .run(item.id, item.unit_price_cents * item.qty, reason ?? null, user.id);
