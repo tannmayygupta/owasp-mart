@@ -153,3 +153,6 @@
 - source_plan: story-concurrency-quotas-through-the-fake-quotaport-start-failures-plan.md
   summary: Builds that wait for a slot have no FIFO order (they poll every 50 ms and are woken together with notify_all), so under sustained load one build can starve while later ones run. A retry keeps its build slot for up to (1 + start_retries) health timeouts, so a failing template can hold slots for a long time.
   evidence: story 3.6 review, 2026-10-16.
+- source_plan: `docs/bmad/initiative-lab/epic-isolation-and-hardening/story-isolation-probe-from-inside-a-real-instance-network-live-che-plan.md`
+  summary: CI round 1 of the sprint 2 part 2 pull request failed on the Linux runner in two tests written on Windows (the probe test expected the gateway closed; an e2e test expected the lab profile empty). Fixed; run host-dependent tests on Linux before the push, or expect one CI round.
+  evidence: `docs/dev-log/2026-10-16-tannmayygupta-ci-fixes-sprint-2-part-2.md`

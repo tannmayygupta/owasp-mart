@@ -140,7 +140,14 @@ test('conformance live rules: seccomp unconfined and a mounted socket fail and n
 const hasDaemon = spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).status === 0;
 test('real Docker: the probe passes on a real internal network and leaves nothing behind', { skip: !hasDaemon && 'no Docker daemon', timeout: 240000 }, () => {
   const { exitCode, report } = runProbe({ docker: cliDocker, nonce: `ut${process.pid}` });
-  assert.equal(exitCode, 0, JSON.stringify(report));
+  if (process.platform === 'linux') {
+    // A Linux host without the host rule of infra/hosts/vulnmart-egress.sh (a CI runner) answers on the bridge gateway, for example its
+    // own sshd: that is the gap spike S-3 measures on VM-I, and the probe is right to report it. Everything else must still be blocked.
+    assert.ok(exitCode === 0 || report.problems.every((p) => /^open: network-gateway:/.test(p)), JSON.stringify(report));
+  } else {
+    assert.equal(exitCode, 0, JSON.stringify(report)); // Docker Desktop: the gateway belongs to its VM, which refuses
+  }
+  assert.equal(report.control, 'open', JSON.stringify(report)); // the control must connect, or the probe proves nothing
   assert.equal(report.leftovers, 0);
   const left = cliDocker(['ps', '-aq', '--filter', `label=${PROBE_LABEL}`]).stdout.trim() + cliDocker(['network', 'ls', '-q', '--filter', `label=${PROBE_LABEL}`]).stdout.trim();
   assert.equal(left, '');
