@@ -24,6 +24,7 @@ from .quota import QuotaPort
 from .reports import CHALLENGE_KEYS, ChallengeResult, EvidenceItem, IntegrityFlag, Milestone, Score
 
 _GONE = frozenset({InstanceState.STOPPING, InstanceState.DESTROYED, InstanceState.FAILED})
+_NOT_COUNTED = frozenset({InstanceState.DESTROYED, InstanceState.FAILED})  # states that no longer hold a quota place
 TICKET_SECONDS = 60  # a one-time ticket is short-lived (architecture 03)
 
 
@@ -182,6 +183,7 @@ class FakeInstancePort:
         self._lock = threading.Lock()
         self._items: dict[str, InstanceView] = {}
         self._owner: dict[str, str] = {}
+        self._org: dict[str, str] = {}
         self.forced_by: dict[str, str] = {}
 
     def _get(self, instance_id: str) -> InstanceView:
@@ -195,17 +197,29 @@ class FakeInstancePort:
     def request(self, attempt_id: str, *, user_id: str, org_id: str | None = None) -> InstanceView:
         self._attempts.get(attempt_id)
         with self._lock:
-            for v in self._running():
-                if v.attempt_id == attempt_id:
+            # a repeat is answered from every instance of the attempt that is not destroyed (also stopping and failed), before any
+            # quota check: a repeat of an accepted request is never refused by quota
+            for v in self._items.values():
+                if v.attempt_id == attempt_id and v.state is not InstanceState.DESTROYED:
                     return v
-            mine = [v for v in self._running() if self._owner[v.instance_id] == user_id]
-            if len(mine) >= self._quota.max_instances(user_id, org_id):
+            # Quotas (story 3.6, FR-INS-06): per user, per company and for the platform; any one reached refuses the request before
+            # anything is created. Only live instances count: `destroyed` and `failed` free their place.
+            live = [v for v in self._items.values() if v.state not in _NOT_COUNTED]
+            limits = self._quota.limits(user_id, org_id)
+            mine = [v for v in live if self._owner[v.instance_id] == user_id]
+            if len(mine) >= limits.user:
                 raise InstanceQuotaReached(f"{user_id} already runs {len(mine)} instance(s)")
+            if limits.company is not None and sum(1 for v in live if org_id is not None and self._org.get(v.instance_id) == org_id) >= limits.company:
+                raise InstanceQuotaReached(f"the company {org_id} is at its limit of {limits.company} instance(s)")
+            if len(live) >= limits.total:
+                raise InstanceQuotaReached(f"the platform is at its limit of {limits.total} instance(s)")
             state = InstanceState.READY if self._auto_ready else InstanceState.REQUESTED
             v = InstanceView(new_id("i-"), attempt_id, state, Access.OPEN if self._auto_ready else Access.CLOSED,
                              Health.HEALTHY if self._auto_ready else Health.UNKNOWN, 1)
             self._items[v.instance_id] = v
             self._owner[v.instance_id] = user_id
+            if org_id is not None:
+                self._org[v.instance_id] = org_id
             return v
 
     def advance(self, instance_id: str, state: InstanceState, *, access: Access | None = None, error_code: str | None = None) -> InstanceView:

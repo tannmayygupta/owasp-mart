@@ -144,3 +144,12 @@
 - source_plan: story-reconciler-repair-differences-between-recorded-and-real-stat-plan.md
   summary: Review round of story 3.5 deferrals: the tombstone append happens inside the engine lock (move it after the lock); the idle limit of an adopted instance is fixed at adoption; `AllWantedDesiredState` is a stand-in until H-123; a record in a state `Reconciler._known` does not handle is only logged.
   evidence: coordinator review of story 3.5, 2026-10-16.
+- source_plan: story-isolation-probe-from-inside-a-real-instance-network-live-che-plan.md
+  summary: A larger Docker daemon address pool (infra/hosts/docker-daemon.json) is a proposal in the runbook docs/runbooks/isolation-vm-i.md; it changes infra/hosts and needs its own story. The live S-3 and S-15 results on vm-i are the developer's run.
+  evidence: story 4.1 plan, Never section.
+- source_plan: story-isolation-probe-from-inside-a-real-instance-network-live-che-plan.md
+  summary: The probe tries TCP over IPv4 only. UDP targets and IPv6 targets are not probed; the exact tmpfs option string of the probe containers is not compared with builder.py.
+  evidence: story 4.1 review round, 2026-10-16.
+- source_plan: story-concurrency-quotas-through-the-fake-quotaport-start-failures-plan.md
+  summary: Builds that wait for a slot have no FIFO order (they poll every 50 ms and are woken together with notify_all), so under sustained load one build can starve while later ones run. A retry keeps its build slot for up to (1 + start_retries) health timeouts, so a failing template can hold slots for a long time.
+  evidence: story 3.6 review, 2026-10-16.

@@ -20,8 +20,14 @@ class Settings:
     active_window_minutes: int = 5  # no activity for this long moves `active` to `idle`
     reaper_interval_s: float = 30.0  # how often the reaper looks at the instances
     reconcile_interval_s: float = 60.0  # how often the reconciler compares Docker with the records (story 3.5)
+    max_parallel_builds: int = 4  # builds that run at the same time; more wait in `requested` (story 3.6, FR-INS-07)
+    start_retries: int = 1  # how often a failed start (INST-START-FAILED, INST-HEALTH-TIMEOUT) is tried again, 0 to 2 (FR-INS-08)
 
     def __post_init__(self) -> None:
+        if not (type(self.max_parallel_builds) is int and 1 <= self.max_parallel_builds <= 64):
+            raise ValueError("max_parallel_builds must be an integer from 1 to 64")
+        if not (type(self.start_retries) is int and 0 <= self.start_retries <= 2):
+            raise ValueError("start_retries must be an integer from 0 to 2")
         # a zero interval would busy-loop the reaper and a zero ceiling or window would end every instance at once
         if not (isinstance(self.reaper_interval_s, (int, float)) and 0 < self.reaper_interval_s <= 3600):
             raise ValueError("reaper_interval_s must be above 0 and at most 3600")

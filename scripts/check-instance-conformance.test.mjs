@@ -121,6 +121,8 @@ test('live inspect: a conforming container set passes; each drift names its rule
     'live-no-bind-mounts': (c) => { c.Mounts.push({ Type: 'bind' }); },
     'live-ports-loopback-only': (c) => { c.HostConfig.PortBindings['8080/tcp'][0].HostIp = '0.0.0.0'; },
     'live-no-secret-in-env': (c) => { c.Config.Env.push('VM_EVENT_KEY=x'); },
+    'seccomp-not-unconfined': (c) => { c.HostConfig.SecurityOpt.push('seccomp=unconfined'); },
+    'no-docker-socket': (c) => { c.Mounts.push({ Type: 'bind', Source: '/var/run/docker.sock', Destination: '/var/run/docker.sock' }); },
   };
   for (const [rule, fn] of Object.entries(cases)) {
     const c = container('vulnmart-harness-shop');

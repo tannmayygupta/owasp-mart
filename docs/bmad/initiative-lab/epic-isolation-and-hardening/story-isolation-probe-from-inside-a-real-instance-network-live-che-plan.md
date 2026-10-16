@@ -3,8 +3,8 @@ title: 'Isolation probe from inside a real instance network, live checks and the
 type: 'feature'
 ticket: '1'
 created: '2026-10-16'
-status: 'draft'
-baseline_revision: ''
+status: 'built'
+baseline_revision: '1ee5c019bb1ede4ec4d587476f05023ed514ad17'
 route: 'full'
 route_source: 'pinned'
 risk: 'high'
@@ -27,7 +27,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 
 **Always:** The probe uses only the Docker CLI, creates only objects labelled `vm.kind=isolation-probe` and removes them in every case (also on error and on a second run). Targets: the network gateway address, `host.docker.internal`, the host's docker0 address, a container on another internal network (by address), `169.254.169.254`, a public address on 443 and 53, three RFC1918 addresses (LAN), a platform-like name; control: the sidecar alias on its own network, which must be reachable (otherwise the run fails, because a probe that reaches nothing proves nothing). A target counts as open only on a completed TCP connect; timeout, refusal, unreachable and name-not-found are blocked. The probe exits non-zero when any target is open or the control is not reached. Output contains no secret and no public address of the machine. The runbook lists exact commands for the developer on VM-I: the probe with the host rule on and off (S-3: shows whether INPUT or DOCKER-USER blocks the gateway), after a Docker restart and after a reboot, a port scan note, and the S-15 attach and restart timing with the number of attached networks; and what evidence to save under `docs/assets/`.
 
-**Never:** Running anything on AWS, VM-I or over SSH; changing `infra/hosts/**`, terraform or the daemon address pool (a proposal for a larger pool goes into the runbook and `deferred-work.md`); `.github/workflows/**`; `contracts/**`; privileged containers, host networking or the Docker socket inside the probe; pushes and commits.
+**Never:** Running anything on AWS, VM-I or over SSH; changing `infra/hosts/**`, terraform or the daemon address pool (a proposal for a larger pool goes into the runbook and `deferred-work.md`); `.github/workflows/**`; `contracts/**`; privileged containers, host networking or the Docker socket inside the probe; pushes and commits (the developer's session commits). Write the dev-log last but do write it, keep every file without a byte order mark.
 
 ## I/O & Edge-Case Matrix
 
@@ -55,11 +55,11 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `scripts/isolation-probe.mjs` -- probe and report (injectable `docker` runner for tests)
-- [ ] `scripts/isolation-probe.test.mjs` -- every matrix row (stub runner) and one real Docker run when a daemon exists
-- [ ] `scripts/check-instance-conformance.mjs` + fixtures + tests -- two new live rules
-- [ ] `docs/runbooks/isolation-vm-i.md` -- numbered developer steps with expected output and evidence list
-- [ ] docs -- ADR, D-57, CHANGELOG, traceability, dev-log, evidence (a real local run), story `built`
+- [x] `scripts/isolation-probe.mjs` -- probe and report (injectable `docker` runner for tests)
+- [x] `scripts/isolation-probe.test.mjs` -- every matrix row (stub runner) and one real Docker run when a daemon exists
+- [x] `scripts/check-instance-conformance.mjs` + fixtures + tests -- two new live rules
+- [x] `docs/runbooks/isolation-vm-i.md` -- numbered developer steps with expected output and evidence list
+- [x] docs -- ADR, D-57, CHANGELOG, traceability, dev-log, evidence (a real local run), story `built`
 
 **Acceptance Criteria:**
 - Given Docker Desktop, when `node scripts/isolation-probe.mjs` runs, then it exits 0 with every forbidden target blocked and the control reached, and `docker ps -a`, `docker network ls` show nothing labelled `isolation-probe` afterwards.
@@ -68,9 +68,26 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 
 ## Implementation Notes
 
+Built 2026-10-16. The two live rules went into checkInspect (no fixtures file change was needed). Local Docker Desktop run: PASS, 16 forbidden targets blocked, control reached, nothing left over; 86 tests passed. Not run: vm-i (the developer's runbook). The whole-suite run has one failure that exists without this change (generate-api-code.test.mjs, line endings). Handoffs H-62 and H-71 got answer text; the plan names D-57 and ADR 0037, both Proposed.
+
+Review round (2026-10-16): the verdict now fails on a target with no answer or an error state (only timeout, refused, unreachable and name-not-found count as blocked), on a non-zero exit code or an incomplete answer list from the in-container program (which now writes with a callback before exiting); SIGINT and SIGTERM run the labelled cleanup and exit 130; the report holds the probe and peer subnets, the peer must be on another network and subnet, and the probe container gets `--add-host host.docker.internal:host-gateway`; `--image` and `--timeout-ms` are validated (exit 2). Conformance: new rule `security-profiles-not-disabled` (apparmor, label, systempaths), the socket rule covers any `.sock`, named pipes and binds of parent directories. Runbook: one run at a time and manual cleanup, subnet check against `LABS_DOCKER_SUBNETS`, safety-net timer, empty-vm-i warning, evidence list. Deferred: UDP and IPv6 targets, exact tmpfs comparison with builder.py.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (2026-10-16, one focused review lens for false passes, the main risk of a probe).
+
+| Verdict | Route | Finding and evidence |
+|---|---|---|
+| high | patch | A target with no answer or an `error:*` state counted as not open, so a garbled output that still held the control passed: every target needs an answer in {timeout, refused, unreachable, name-not-found}. Tests: truncated array, error state, missing target. |
+| high | patch | The in-container exit code was ignored and parse errors swallowed; output could be cut by `process.exit`: exit code, JSON and length are required, output written with a callback. Test. |
+| medium | patch | No SIGINT/SIGTERM handling left objects behind (sleep container 5 min): handlers, cleanup always, exit 130; one run at a time and a manual cleanup line in the runbook. Test. |
+| high | patch | S-3 on VM-I could be vacuous (probe subnet outside `LABS_DOCKER_SUBNETS`; `host.docker.internal` unresolvable on Linux): subnets in the report, runbook step 3b compares them, `--add-host host.docker.internal:host-gateway`, peer must sit on another network and subnet. Tests. |
+| medium | patch | Conformance rules missed `apparmor=unconfined`, `label=disable`, `systempaths=unconfined`, non-docker `.sock` files and parent-directory binds: new rule and wider socket rule with tests, including a benign container. |
+| low | patch | `--image` and `--timeout-ms` not validated; runbook step numbers and states disagree, restart steps need "only on an empty vm-i", no restore timer for the host rule: all fixed in the runbook and script. |
+| low | defer | UDP and IPv6 targets; exact tmpfs option comparison with `builder.py`: in `deferred-work.md`. |
+| none | reviewer | No shell use, no socket or host mount, cleanup filters only on the exact label: confirmed. |
 
 ## Design Notes
 

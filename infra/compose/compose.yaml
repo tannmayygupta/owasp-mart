@@ -242,6 +242,59 @@ services:
       start_period: 30s
     restart: "no"
 
+  # ---- Lab profile (story 4.2, ADR 0010 and 0038, D-58): the Docker socket proxy -----------------------------
+  # The ONLY service that mounts the Docker socket (read-only), and the only one scripts/check-lab-compose-rules.mjs lets do so.
+  # Image: tecnativa/docker-socket-proxy v0.5.0 (Apache-2.0; HAProxy inside), multi-arch index digest checked with
+  # `docker buildx imagetools inspect` on 2026-10-16. The stock image allows whole sections, and its CONTAINERS section
+  # includes /containers/{id}/exec, which cannot be switched off with the EXEC variable (found in the story 4.2 test).
+  # So the proxy runs its own HAProxy file (file docker-proxy/rules.cfg, loaded as the config `docker-proxy-rules`): a deny-by-default list of the exact method and
+  # path pairs SdkBackend uses (read from backend.py): _ping and version, container list/inspect/create/start/attach/remove,
+  # network list/inspect/create/remove, volume list/inspect/create/remove. Start, attach and every remove work only for objects named vm-*, and a container create only with name=vm-*. exec, images, build, commit, info, swarm, secrets, services, plugins,
+  # system, events, auth, stop, restart, kill and the archive calls answer 403. The request body is not filtered, so the
+  # orchestrator's template-id-only rule and the host rule stay the second line (ADR 0010).
+  # The process runs as root inside the container because the socket file is root-owned; everything else is dropped.
+  # The orchestrator uses it with: --docker-host tcp://127.0.0.1:2375
+  docker-proxy:
+    profiles: ["lab"]
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    container_name: vulnmart-docker-proxy
+    read_only: true
+    command: ["haproxy", "-f", "/usr/local/etc/haproxy/docker-proxy-rules.cfg"]
+    configs:
+      - source: docker-proxy-rules
+        target: /usr/local/etc/haproxy/docker-proxy-rules.cfg
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 64m
+    pids_limit: 64
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=4m
+      - /run:rw,noexec,nosuid,size=1m
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - labs-core
+    ports:
+      - "127.0.0.1:2375:2375"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2375/_ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 1s
+    restart: "no"
+
+networks:
+  # Only the orchestrator joins this network; no instance network is ever attached to it.
+  labs-core:
+    name: vulnmart-labs-core
+
+configs:
+  docker-proxy-rules:
+    file: ./docker-proxy/rules.cfg
+
 volumes:
   pg-data:
   web-node-modules:

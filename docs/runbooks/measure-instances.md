@@ -2,7 +2,7 @@
 
 Goal: real numbers for (1) how long an instance takes from `create` to `ready`, and (2) how much memory one instance uses, on the labs host `vm-i`. Stories 3.4 and 3.6 use them (idle/start timeouts, how many instances fit). The tool is `apps/orchestrator/src/vulnmart_orchestrator/measure.py`. It uses the real engine and the real Docker backend, with random fake flags, a random seed and event key. Nothing real is read or printed.
 
-**Cost warning:** `vm-i` is stopped to save credits. Start it only for this run and stop it again after (step 8). Never create or replace a host while `vm_i_running=false` (rule from story 1.15).
+**Cost warning:** `vm-i` is stopped to save credits. Start it only for this run and stop it again after (step 9). Never create or replace a host while `vm_i_running=false` (rule from story 1.15).
 
 All steps are yours. I (Claude) do not call AWS or SSH to hosts. Paste the redacted output back to me.
 
@@ -23,8 +23,11 @@ All steps are yours. I (Claude) do not call AWS or SSH to hosts. Paste the redac
    - `--count 10`: ten instances running together; the tool then reads the memory of every container and the drop of the host `MemAvailable`.
    - Exit code 0 means no failed instance and nothing left behind. Exit 1 means a failure or leftovers (the JSON says which).
    Optional, to see the limit: repeat with `--count 20`.
-7. **Paste back** the JSON printed at the end plus the `free -m` of step 5. It holds only numbers and the host class (kernel, CPU count, total memory): no address, no name. Also run `docker ps -a | wc -l` and `docker volume ls | wc -l` and tell me the counts (both should be unchanged from before).
-8. **Stop vm-i** again: set `vm_i_running = false` in `terraform.tfvars`, run `terraform apply`, and confirm it shows stopped. Never create or replace a host while `vm_i_running = false`.
+7. **Concurrent starts** (story 3.6; about 1-3 minutes). It starts N instances at the same moment and shows how the cap on parallel builds (`max_parallel_builds`, default 4) behaves:
+   `uv run --package vulnmart-orchestrator python -m vulnmart_orchestrator.measure --stub-image vulnmart-stub-instance:local --rounds 1 --count 1 --settle 1 --concurrent 10 --out /tmp/s4-concurrent`
+   Repeat with `--concurrent 20`, and once with `--manifest <release.json>` when the real images exist. The JSON has a block `concurrent_start`: `ready`, `failures`, `busy` (creates the host refused for capacity), `wall_clock_s`, `most_builds_together` (it must not be above the cap) and `ready_after_s` (min, median, p95, max). Exit code 0 means every instance became ready and nothing was left behind. Save the JSON as evidence (`docs/assets/story-3-6-concurrency-quotas/vm-i-concurrent-N.json`, numbers only). The warm-pool triggers of ADR 0039 are read from it: `ready_after_s.p95` above 30 s, or `busy` above 0. A local Docker Desktop run exists (3 started together, stub image) and is labelled local only; it is not a vm-i result.
+8. **Paste back** the JSON printed at the end plus the `free -m` of step 5. It holds only numbers and the host class (kernel, CPU count, total memory): no address, no name. Also run `docker ps -a | wc -l` and `docker volume ls | wc -l` and tell me the counts (both should be unchanged from before).
+9. **Stop vm-i** again: set `vm_i_running = false` in `terraform.tfvars`, run `terraform apply`, and confirm it shows stopped. Never create or replace a host while `vm_i_running = false`.
 
 ## What I do with the result
 

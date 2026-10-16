@@ -3,8 +3,8 @@ title: 'Release manifest loader: the orchestrator accepts the image release file
 type: 'feature'
 ticket: '7'
 created: '2026-10-16'
-status: 'draft'
-baseline_revision: ''
+status: 'built'
+baseline_revision: '1ee5c019bb1ede4ec4d587476f05023ed514ad17'
 route: 'full'
 route_source: 'pinned'
 risk: 'medium'
@@ -27,7 +27,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 
 **Always:** Digests keep their rule (`name@sha256:<64 hex>`; local ids only with the existing `allow_local_ids` flag). A healthcheck is an exec-form argv of non-empty strings, `argv[0]` is an absolute path, never a shell (`sh`, `bash`, `ash`, `dash`), `wget`, `curl` or `nc`, at most 16 items of at most 512 characters. A role in `healthchecks` must also be in `images`. Unknown top-level keys other than `commit` and `repo` are refused. The loader never reads files itself apart from the one it is given. The orchestrator's `--images` option accepts either file form (a key `images` with `commit` or `repo`, or `healthchecks`, selects the release form). Error text names the field, never a value that could be a secret.
 
-**Never:** Changing `scripts/images-release.mjs`, `infra/images.json`, `scripts/images-matrix.mjs` or the Dockerfiles (stream T and the image pipeline own them; a handoff row tells Sahil that the pipeline output is accepted as is and that `CMD` is added here). Touching `contracts/**`, `.github/workflows/**`, the Excel tracker, pushes, commits.
+**Never:** Changing `scripts/images-release.mjs`, `infra/images.json`, `scripts/images-matrix.mjs` or the Dockerfiles (stream T and the image pipeline own them; a handoff row tells Sahil that the pipeline output is accepted as is and that `CMD` is added here). Touching `contracts/**`, `.github/workflows/**`, the Excel tracker, pushes, commits (the developer's session commits). Write the dev-log last but do write it, keep every file without a byte order mark.
 
 ## I/O & Edge-Case Matrix
 
@@ -56,10 +56,10 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `images.py` -- `from_release` and the argv rules
-- [ ] `service.py`/`__main__.py` -- `--images` picks the loader
-- [ ] `test_states_images.py` -- every matrix row
-- [ ] docs -- as in the Code Map, story state `built`
+- [x] `images.py` -- `from_release` and the argv rules
+- [x] `service.py`/`__main__.py` -- `--images` picks the loader
+- [x] `test_states_images.py` -- every matrix row
+- [x] docs -- as in the Code Map, story state `built`
 
 **Acceptance Criteria:**
 - Given the real output of the release script, when the orchestrator loads it, then the shop role has a health test starting with `CMD` and `/nodejs/bin/node`, and the build of a plan for the shop template uses it (test through `build_plan`).
@@ -70,6 +70,13 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 ## Plan Change Log
 
 ## Review Triage Log
+
+Quick review (2026-10-16, the developer's session read the full diff of `images.py`; small, one module).
+
+| Verdict | Route | Finding and evidence |
+|---|---|---|
+| none | accepted | `from_manifest` unchanged and strict; `from_release` reads only `images` and `healthchecks`, ignores `commit` and `repo`, refuses any other key, skips non-role images, requires an image for every healthcheck role, prefixes `CMD` once, and refuses shell, wget, curl and nc programs, relative paths and oversized argv. Tests cover every matrix row including a `build_plan` check. |
+| low | note | The real-script test builds the release with the real `buildRelease` and adds `healthchecks` itself, because the stream T branch that emits it is not in this branch yet; the first real CI release is the live proof (runbook step of L-12). |
 
 ## Verification
 

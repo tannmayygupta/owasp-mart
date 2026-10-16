@@ -3,8 +3,8 @@ title: 'Docker socket behind a proxy for the orchestrator'
 type: 'feature'
 ticket: '2'
 created: '2026-10-16'
-status: 'draft'
-baseline_revision: ''
+status: 'built'
+baseline_revision: '1ee5c019bb1ede4ec4d587476f05023ed514ad17'
 route: 'full'
 route_source: 'pinned'
 risk: 'high'
@@ -68,9 +68,24 @@ context: ['{project-root}/docs/adr/0010-docker-socket-proxy.md']
 
 ## Implementation Notes
 
+- Built 2026-10-16. The stock proxy image forwards container exec when containers and POST are on, so the service loads its own deny-by-default HAProxy file (`infra/compose/docker-proxy/rules.cfg`); start, attach and remove are limited to names starting with `vm-`.
+- The compose lint parses the YAML (js-yaml) for the socket exception; the line scan stays for the privileged and host-network rules.
+- Tests: compose rules 8 of 8, real-Docker file 11 of 11, no-Docker kwargs test 1 of 1 (outputs in `docs/assets/story-4-2-socket-proxy/`). The vm-i run is the developer's (deploy runbook Part E, H-125).
+- Files written without control characters or a byte order mark (checked with `node scripts/check-text-files.mjs`).
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (2026-10-16, one focused security review lens; static reading, the integration tests were run by the implementer and again in the final verification).
+
+| Verdict | Route | Finding and evidence |
+|---|---|---|
+| high | patch | The compose rule was line based: a service named `"evil":`, `evil: &a` or `evil: {...}` stayed attributed to `docker-proxy`, flow-style volumes and ports passed, long-form ports without `host_ip`, `volumes_from`, `extends`, `include`, `devices` and binds of `/`, `/var`, `/var/run`, `/run` were not checked, and `docker-proxy`'s image and command were not pinned. Rewritten on a real YAML parse (anchors and merge keys resolved), 8 tests, one per shape and both sides of the exception. |
+| high | patch | The proxy filtered by method and path only, so the orchestrator could remove or drive the platform's own containers, volumes and networks: start, attach and DELETE now work only for `vm-*` names, create needs `?name=vm-`; inspect and list stay open; network and volume create cannot be restricted by name (the name is in the body). Foreign-object tests (403, object still there). |
+| medium | patch | Docs understated the attacker's reach: ADR 0010, ADR 0038, the dev-log, deploy.md Part E and `06-security.md` now state that create is root-equivalent, inspect reads any container's environment and the loopback port has no login. |
+| medium | patch | No test that the create payload never carries privileged, host binds or host namespaces: `test_backend_sdk_kwargs.py` over every component of the shop plan. |
+| low | patch | Dot-only id segments, `/v../` version prefix, HEAD allowed, case-insensitive paths: tightened; bypass shapes (`//`, `..`, `%2e%2e`, lowercase method) tested with 403. |
+| low | defer | Two `PytestUnraisableExceptionWarning` lines about an unclosed HTTP response (not traced); rootless Docker (S-8, L-29). |
 
 ## Design Notes
 

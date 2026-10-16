@@ -202,7 +202,7 @@ class Reconciler:
         e = self.engine
         with e._lock:
             rec = e.records.get(iid)
-            if rec is not None and (rec.state in BUSY_STATES or rec.destroying):
+            if rec is not None and (rec.state in BUSY_STATES or rec.destroying or rec.retrying):
                 result.skipped.append(iid)  # its build or destroy is running in this process
                 return
         if rec is None:
@@ -219,7 +219,7 @@ class Reconciler:
 
     def _idle(self, rec: InstanceRecord) -> bool:
         with self.engine._lock:
-            return rec.state not in BUSY_STATES and not rec.destroying
+            return rec.state not in BUSY_STATES and not rec.destroying and not rec.retrying
 
     def _sweep(self, iid: str, epoch: int | None, result: ReconcileResult, guard: Callable[[], bool]) -> bool:
         """Remove the objects, unless `guard` (checked right before, under the engine lock) says a create or reset has begun since the

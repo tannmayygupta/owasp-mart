@@ -271,3 +271,154 @@ def test_a_complete_running_instance_is_adopted_ready_by_a_second_engine_and_its
     assert result.adopted == [IID] and not result.errors and rec.state is S.READY and (rec.access, rec.access_epoch) == ("closed", 0), result
     assert [sorted(x) for x in leftovers(docker_client, IID)] == before and len(seen) == 1
     assert second.destroy(IID).state is S.DESTROYED and leftovers(docker_client, IID) == ([], [], [])
+
+# ---------------------------------------------------------------- through the Docker socket proxy (story 4.2, ADR 0010, D-58)
+
+PROXY_URL = "tcp://127.0.0.1:2375"
+COMPOSE_FILE = ROOT / "infra" / "compose" / "compose.yaml"
+
+
+def _compose(*args, timeout=300):
+    return subprocess.run(["docker", "compose", "-f", str(COMPOSE_FILE), "--profile", "lab", *args], cwd=ROOT, capture_output=True, text=True,
+                          timeout=timeout)
+
+
+@pytest.fixture(scope="module")
+def socket_proxy(docker_client):
+    """Starts the `docker-proxy` service of the lab profile and waits until it is healthy; stops it afterwards if this fixture started it."""
+    was_running = bool(_compose("ps", "--status", "running", "-q", "docker-proxy").stdout.strip())
+    up = _compose("up", "-d", "--wait", "docker-proxy")
+    if up.returncode != 0:
+        message = "the docker-proxy service did not start: " + up.stderr[-400:]
+        if is_ci():
+            pytest.fail(message)
+        pytest.skip(message)
+    yield PROXY_URL
+    if not was_running:
+        _compose("down")
+
+
+def _status(method, path):
+    import http.client
+
+    conn = http.client.HTTPConnection("127.0.0.1", 2375, timeout=10)
+    try:
+        conn.request(method, path)
+        resp = conn.getresponse()
+        resp.read()
+        resp.close()
+        return resp.status
+    finally:
+        conn.close()
+
+
+def test_the_proxy_answers_403_for_every_section_the_orchestrator_does_not_use(socket_proxy):
+    for method, path in [
+        ("POST", "/containers/anything/exec"), ("POST", "/v1.43/containers/anything/exec"), ("POST", "/exec/anything/start"), ("GET", "/images/json"),
+        ("POST", "/build"), ("POST", "/commit"), ("GET", "/info"), ("GET", "/system/df"), ("POST", "/swarm/init"), ("GET", "/secrets"),
+        ("GET", "/services"), ("GET", "/plugins"), ("POST", "/auth"), ("GET", "/events"), ("POST", "/containers/anything/stop"),
+        ("POST", "/containers/anything/kill"), ("GET", "/containers/anything/archive?path=/"), ("PUT", "/containers/anything/archive?path=/"),
+    ]:
+        assert _status(method, path) == 403, (method, path)
+    for method, path in [("GET", "/_ping"), ("GET", "/version"), ("GET", "/containers/json"), ("GET", "/networks"), ("GET", "/volumes")]:
+        assert _status(method, path) == 200, (method, path)
+
+
+def test_create_reset_and_destroy_work_through_the_proxy_and_leave_nothing(docker_client, stub_image_id, socket_proxy, clean):
+    be = _recording_via(socket_proxy)  # the same real backend class, pointed at the proxy
+    orch = Orchestrator(be, {"shop-v0": reduced_template()}, stub_allowlist(stub_image_id), health_timeout_s=60, injector_timeout_s=60)
+    rec = orch.create(body(iid=IID))
+    assert rec.state is S.READY, [(t.to_state.value, t.reason, t.error_code) for t in rec.transitions]
+    cs, ns, vs = leftovers(docker_client, IID)
+    assert len(cs) == 2 and len(ns) == 1 and len(vs) == 4
+
+    reset = {k: body()[k] for k in ("flags", "decoys", "flag_digests", "event_key", "seed")}
+    reset["epoch"] = 2
+    rec = orch.reset(IID, reset)
+    assert rec.state is S.READY and rec.epoch == 2, [(t.to_state.value, t.reason, t.error_code) for t in rec.transitions]
+    cs, ns, vs = leftovers(docker_client, IID)
+    assert len(cs) == 2 and len(ns) == 1 and len(vs) == 4 and all("-e2" in n for n in cs + ns + vs)
+
+    assert orch.destroy(IID).state is S.DESTROYED
+    assert leftovers(docker_client, IID) == ([], [], [])
+
+
+def _recording_via(url):
+    import docker
+
+    return Recording(docker.DockerClient(base_url=url))
+
+
+def test_a_proxy_that_is_down_gives_failed_with_a_start_error_and_leaves_nothing(docker_client, stub_image_id, socket_proxy, clean):
+    be = _recording_via(socket_proxy)  # connected while the proxy is up, so the client is built
+    orch = Orchestrator(be, {"shop-v0": reduced_template()}, stub_allowlist(stub_image_id), health_timeout_s=60, injector_timeout_s=60)
+    assert _compose("stop", "docker-proxy").returncode == 0
+    try:
+        rec = orch.create(body(iid=IID))
+    finally:
+        assert _compose("up", "-d", "--wait", "docker-proxy").returncode == 0
+    assert rec.state is S.FAILED and rec.error_code == ErrorCode.START_FAILED, [(t.to_state.value, t.reason, t.error_code) for t in rec.transitions]
+    assert leftovers(docker_client, IID) == ([], [], [])
+
+
+def _raw(method, path):
+    """Sends the request line exactly as written (no normalising) and returns the status."""
+    import socket
+
+    with socket.create_connection(("127.0.0.1", 2375), timeout=10) as s:
+        s.sendall(f"{method} {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n".encode())
+        s.settimeout(10)
+        data = b""
+        while b"\r\n" not in data:
+            chunk = s.recv(256)
+            if not chunk:
+                break
+            data += chunk
+    return int(data.split(b" ", 2)[1])
+
+
+def test_odd_paths_and_methods_are_refused_by_the_proxy(socket_proxy):
+    for method, path in [
+        ("GET", "//containers/json"), ("GET", "/containers/x/../exec"), ("POST", "/containers/x/../exec"), ("POST", "/containers/x/%2e%2e/exec"),
+        ("POST", "/containers/x/%2E%2E/exec"), ("GET", "/containers/../info"), ("GET", "/containers/%2e%2e/info"), ("GET", "/containers/../containers/json"),
+        ("get", "/containers/json"), ("Get", "/_ping"), ("HEAD", "/_ping"), ("DELETE", "/containers/.."), ("DELETE", "/containers/vm-x/.."),
+        ("DELETE", "/containers/%2e%2e"), ("GET", "/v1/_ping"), ("GET", "/v1.43.1/_ping"), ("GET", "/containers/./json"),
+    ]:
+        assert _raw(method, path) == 403, (method, path)
+    assert _raw("GET", "/v1.43/_ping") == 200 and _raw("GET", "/_ping") == 200
+
+
+def test_the_proxy_only_drives_objects_named_vm_and_a_foreign_object_stays(docker_client, stub_image_id, socket_proxy):
+    import uuid
+
+    import docker
+
+    name = "foreign-probe-" + uuid.uuid4().hex[:10]
+    container = volume = network = None
+    try:
+        volume = docker_client.volumes.create(name=name)
+        network = docker_client.networks.create(name, driver="bridge")
+        container = docker_client.containers.create(stub_image_id, name=name, command=["shop"])
+        for method, path in [
+            ("DELETE", f"/containers/{name}"), ("DELETE", f"/containers/{name}?force=1&v=1"), ("POST", f"/containers/{name}/start"),
+            ("POST", f"/containers/{name}/attach?stdin=1&stream=1"), ("DELETE", f"/volumes/{name}"), ("DELETE", f"/volumes/{name}?force=1"),
+            ("DELETE", f"/networks/{name}"), ("POST", f"/containers/{container.id}/start"), ("DELETE", f"/containers/{container.id}"),
+            ("DELETE", f"/networks/{network.id}"), ("POST", f"/containers/create?name={name}-2"), ("POST", "/containers/create"),
+        ]:
+            assert _status(method, path) == 403, (method, path)
+        # through the real backend client the refusal is a backend error, not a silent success
+        be = _recording_via(socket_proxy)
+        with pytest.raises(docker.errors.APIError):
+            be.api.remove_container(name, force=True)
+        # the foreign objects are all still there, and the container never started
+        assert docker_client.containers.get(name).status == "created"
+        docker_client.volumes.get(name)
+        docker_client.networks.get(name)
+        assert not [c for c in docker_client.containers.list(all=True) if c.name == f"{name}-2" or c.name == f"{name}-3"]
+    finally:
+        for obj in (container, network, volume):
+            if obj is not None:
+                try:
+                    obj.remove(force=True) if obj is container else obj.remove()
+                except docker.errors.DockerException:
+                    pass

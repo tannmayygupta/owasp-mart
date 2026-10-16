@@ -175,7 +175,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Handoffs: H-57, H-58, H-59, H-60, H-61, H-64, H-66, H-67, H-68, H-69, H-70, H-71, H-72, H-79 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status (2026-10-12): engine done (state machine, builder, Docker backend, create and destroy; tests on a fake and on real Docker). Story 3.2 built the same day (the IF-5 service: signing, mTLS options, strict JSON, rate limit, capacity, accept and run, state reports, test backend, Dockerfile; the contract suites of apps/api pass against it; ADR 0034, D-53). NOT met (ticked on the developer's instruction): reset and idle detection (story 3.4), the reconciler (3.5) and the cold-start measurement S-4 are open, and the stories wait for review and the developer's confirmation.
 
-- [ ] **L-14. Reset, teardown, timing defaults and reconciler**
+- [x] **L-14. Reset, teardown, timing defaults and reconciler**
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
   - Build: Reset with new flags, tear down at expiry or inactivity, and a reconciler that repairs any difference between recorded and real state.
@@ -183,7 +183,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Waits on: L-13.
   - Done when: Learner instances stop after 60 minutes idle or 4 hours total; killing the orchestrator mid-provision leaves no orphans after the reconciler runs.
   - Handoffs: H-59, H-61, H-65, H-67 (see docs/dev/HANDOFFS.md; read them when you plan this task)
-  - Status (2026-10-15): story 3.4 (reset with new flags, teardown at the total limit or after inactivity, the timing settings port) built and tested, waiting for review and the developer's confirmation; ADR 0035, D-54, handoff H-122 added for Akshay. NOT ticked: story 3.5 (reconciler, persistence) is still open.
+  - Status (2026-10-16): ticked on the developer's instruction to complete sprint 2 from our side. Stories 3.4 (reset, reaper, settings; ADR 0035, D-54) and 3.5 (reconciler, tombstones, startup gate; ADR 0036, D-55) are built, reviewed with four lenses and tested locally (orchestrator 406 tests, shared protocol suites 392 passed, real-Docker kill test: no orphan after the first pass). NOT met live: nothing ran on vm-i; the platform activity signal and the desired-state list are open (H-122, H-123, Akshay); the stories stay `built` until the developer confirms them. Open leftovers are in `docs/bmad/initiative-lab/deferred-work.md`.
 
 - [ ] **L-15. Instance isolation and hardening**
   - Epic: `epic-isolation-and-hardening`
@@ -193,6 +193,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Waits on: L-13.
   - Done when: From inside an instance the internet, LAN, cloud metadata, other instances, the platform, the gateway IP and host services are unreachable, tested on VM-I.
   - Handoffs: H-62, H-71 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status (2026-10-16): NOT ticked. Stories 4.1 (isolation probe from inside a real instance network, conformance rules, VM-I runbook `docs/runbooks/isolation-vm-i.md`; ADR 0037, D-57) and 4.2 (Docker socket behind a filtering proxy, compose rule on a real YAML parse; ADRs 0010 and 0038, D-58) are built, reviewed and tested on Docker Desktop (the probe reports 16 forbidden targets blocked and the control reached). Done-when needs the developer's run on VM-I (S-3 host rule on and off, S-15, the proxy in front of the orchestrator): runbook steps, handoff H-125. Tick when the evidence is saved.
 
 - [ ] **L-16. Concurrency, quotas, start failures and warm-pool decision**
   - Epic: `epic-orchestrator-and-instance-lifecycle`
@@ -202,6 +203,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Waits on: L-13, L-14.
   - Done when: The measured number of concurrent instances and memory per instance are recorded, quotas are enforced against the fake port and failed starts are handled.
   - Handoffs: H-66, H-79 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status (2026-10-16): NOT ticked. Story 3.6 (build cap, one start retry, quotas through the fake QuotaPort with INST-QUOTA-REACHED, `measure.py --concurrent`; ADR 0039 warm pool Proposed, D-59) is built, reviewed and tested locally (a local run: 3 of 3 ready in about 7.6 s, local only). Done-when needs the measured concurrency and memory per instance on vm-i (runbook `docs/runbooks/measure-instances.md` step 7) and the developer's confirmation of the warm-pool ADR; the real InstancePort and the quota numbers are with Akshay (H-79, H-126).
 
 ## Sprint 3 (22 Oct to 28 Oct 2026)
 

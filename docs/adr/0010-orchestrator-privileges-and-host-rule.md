@@ -1,24 +1,32 @@
 # 0010. Orchestrator privileges and the host-side drop rule
 
-- **Status:** Proposed
-- **Date:** 2026-10-08
-- **Deciders:** (pending the user)
-- **Requirements:** D-23, NFR-SEC-02, NFR-SEC-04, NFR-ISO-02, NFR-ISO-05
+- **Status:** Accepted with conditions for the socket proxy part (D-58, decided on the developer's delegation in story 4.2, 2026-10-16; to be confirmed by the developer). The host rule part stays Proposed until spike S-3 is run on vm-i.
+- **Date:** 2026-10-08 (updated 2026-10-16)
+- **Deciders:** (pending the user); the socket proxy part by Tanmay through delegation to Claude Code (story 4.2)
+- **Requirements:** D-23, D-58, NFR-SEC-02, NFR-SEC-04, NFR-ISO-02, NFR-ISO-04, NFR-ISO-05
 
 ## Context
 Docker socket access is root on the host. Docker says an internal network still allows the gateway IP and host services. The PRD names DOCKER-USER for the drop rule.
 
 ## Options considered
 1. Separate orchestrator on the instance host behind a socket proxy, building containers from templates only.
-2. Rootless Docker: lowers daemon-escape damage, changes networking and the rule.
+2. Rootless Docker: lowers daemon-escape damage, changes networking and the rule (kept open as spike S-8, see ADR 0038).
 3. Remote daemon over SSH: more moving parts.
 Rule placement: (a) DOCKER-USER; (b) INPUT chain.
 
-## Decision (proposed)
+## Decision
 Option 1; rootless as optional hardening after spike S-8. Rule in the INPUT chain (container-to-host traffic is local delivery), DOCKER-USER kept for defence in depth. The orchestrator accepts instance ids and allowlisted template names only, listens on a private address with mTLS and signed requests, holds no master keys and audits every action. ASVS level 3.
 
+### Socket proxy, as built in story 4.2 (D-58)
+- The proxy is the service `docker-proxy` of the `lab` Compose profile (`infra/compose/compose.yaml`), image `tecnativa/docker-socket-proxy` v0.5.0 (Apache-2.0, HAProxy inside), pinned by the multi-arch index digest `sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459`. Source of the digest: `docker buildx imagetools inspect tecnativa/docker-socket-proxy:v0.5.0` on 2026-10-16 (public registry data, no secret). The tag also resolved to the same index as `latest` that day.
+- It is the only service that mounts the socket, as `/var/run/docker.sock:/var/run/docker.sock:ro`. The read-only flag protects the socket file, not the API: Docker API calls over a socket still change the daemon. The control is the filter in front of it. `scripts/check-lab-compose-rules.mjs` refuses the socket in every other service and refuses a second bind or a published port outside `127.0.0.1` in `docker-proxy`.
+- Hardening: read-only root, tmpfs for `/tmp` and `/run`, `cap_drop: ALL`, `no-new-privileges`, memory and pid limits, a health check, one network (`labs-core`) that no instance network joins, port only on `127.0.0.1:2375`. The process stays root inside the container because the socket file is root-owned on the host; a root process with no capabilities and a read-only root is the most that works with this image.
+- **The stock image could not do the job on its own.** With `CONTAINERS=1` and `POST=1` the image forwards `POST /containers/{id}/exec` (the `EXEC=0` variable only guards the old `/exec` path) and `stop`, `kill` and the archive calls too. This was measured in the story 4.2 test (exec answered 400 from the daemon, not 403 from the proxy). So the service loads its own HAProxy file `infra/compose/docker-proxy/rules.cfg`: deny by default, then exactly the method and path pairs the `SdkBackend` calls (read from `apps/orchestrator/src/vulnmart_orchestrator/backend.py`): `GET /_ping` and `/version`; `GET /containers/json`, `GET /containers/{id}/json`, `POST /containers/create`, `POST /containers/{id}/start` and `/attach`, `DELETE /containers/{id}`; `GET /networks`, `GET /networks/{id}`, `POST /networks/create`, `DELETE /networks/{name}`; the same four for volumes. **Second line by name:** start, attach and every DELETE are allowed only for names that start with `vm-` (the names the builder gives: containers `vm-<id>-e<epoch>-<component>`, networks `...-net`, volumes `vm-run-<id>-e<epoch>` and the other `vm-*` volumes) and a container create only with a `?name=vm-...`; list and inspect (by name or id: the SDK inspects a new network and volume by id) stay open. Path segments must not be only dots, the API version must look like `v1.43`, there is no HEAD and the method is case sensitive. Everything else answers 403.
+- **What the proxy does not do.** It filters by method and path, not by body. A caller that may create containers can still ask for a bad container (a privileged one, a bind mount of `/`). The second line is the orchestrator: it accepts a template id only, builds every container from the fixed profile (IF-6 section 7), and the host rule drops instance-to-host traffic. A compromised orchestrator process is therefore still close to root on the host (it can create a privileged container through the proxy). The proxy reduces what a bug in the orchestrator or a leak of the proxy port can do (no exec into existing containers, no image pulls or builds, no daemon info, no swarm); it does not make a hostile orchestrator harmless. Rootless Docker (S-8) would; see ADR 0038.
+
+- **What an attacker who controls the orchestrator can still do through the proxy (plain words).** (1) Create is root-equivalent: the request body is not filtered, so a container that is privileged or binds `/` can be created (its name must start with `vm-`) and started. (2) List and inspect are open, so the environment of any container on the host can be read. (3) After the name rule, start, attach and remove of containers, and remove of networks and volumes, work only on objects named `vm-...`, so the platform's own objects cannot be removed or driven through the proxy. (4) Creating a network or a volume cannot be restricted by name (the name is in the body). (5) The loopback port `127.0.0.1:2375` has no login: any local process on vm-i controls Docker as far as the proxy allows. The proxy therefore limits a bug or a leak; it does not make a hostile orchestrator harmless.
 ## Consequences
-The INPUT claim is an inference and must be proved in S-3. Docker Desktop cannot take the rule, so the laptop is lower assurance. A socket proxy filters by API section, not request body, so orchestrator code is the control.
+The INPUT claim is an inference and must be proved in S-3. Docker Desktop cannot take the rule, so the laptop is lower assurance. A socket proxy filters by API method and path, not request body, so orchestrator code is the control. The proxy file must be re-read when `SdkBackend` calls a new Docker endpoint: the test `test_the_proxy_answers_403_for_every_section_the_orchestrator_does_not_use` and the through-the-proxy lifecycle test fail loudly if a needed call is denied. The orchestrator itself is not in Compose (its deployment unit is L-12/L-13), so on vm-i the proxy runs in Compose and the orchestrator runs on the host with `--docker-host tcp://127.0.0.1:2375` (runbook `docs/runbooks/deploy.md`, Part E, a live step for the developer).
 
 ## Evidence
-https://docs.docker.com/reference/cli/docker/network/create/ (VERIFIED); https://docs.docker.com/engine/network/firewall-iptables/ (VERIFIED: FORWARD and DOCKER-USER; INPUT UNVERIFIED); socket proxy behaviour UNVERIFIED. See docs/architecture/06-security.md section 4.
+https://docs.docker.com/reference/cli/docker/network/create/ (VERIFIED); https://docs.docker.com/engine/network/firewall-iptables/ (VERIFIED: FORWARD and DOCKER-USER; INPUT UNVERIFIED); https://github.com/Tecnativa/docker-socket-proxy (the image labels name Apache-2.0 and v0.5.0; VERIFIED by `docker image inspect`, the plan said MIT, the image says Apache-2.0). Proxy behaviour VERIFIED locally in story 4.2: 18 denied requests answered 403, the lifecycle of a stub instance (create, reset, destroy) passed through the proxy, evidence in `docs/assets/story-4-2-socket-proxy/`. See docs/architecture/06-security.md section 4.

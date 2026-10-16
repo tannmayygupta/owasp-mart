@@ -3,8 +3,8 @@ title: 'Concurrency, quotas through the fake QuotaPort, start failures, warm-poo
 type: 'feature'
 ticket: '6'
 created: '2026-10-16'
-status: 'draft'
-baseline_revision: ''
+status: 'built'
+baseline_revision: '1ee5c019bb1ede4ec4d587476f05023ed514ad17'
 route: 'full'
 route_source: 'pinned'
 risk: 'medium'
@@ -27,7 +27,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 
 **Always:** Retry only the codes `INST-START-FAILED` and `INST-HEALTH-TIMEOUT`, at most `start_retries` times (setting, default 1, 0 to 2); never retry `INST-INJECT-FAILED` (a bad document does not get better) and never after a destroy. The retry reuses the same plan and the same secrets in memory; nothing is logged or stored. A destroy during a retry cancels it. Concurrency cap: builds beyond the cap wait in the worker (state `requested` stays until a slot frees), never fail because of the cap. Quotas: defaults in the fake are per user 1, per company 5, global 20 (all settings of the fake, changeable by tests and later by the platform); counting excludes `destroyed` and `failed`; a repeat of an accepted request is never refused by quota. Capacity (memory) checks stay as they are. The fake `QuotaPort` and the settings are the only places with these numbers. The measurement run must not leave anything behind and prints no secret. ADR 0039 states what is measured locally and what is not measured yet.
 
-**Never:** Changing IF-5 or any contract file (quotas live above `InstanceHost`; no new error code); touching Akshay's non-port code in `apps/api` (read it, write only ports and tests); running AWS or vm-i; `.github/workflows/**`; the Excel tracker; pushes and commits; deciding the warm pool as final (the developer confirms the ADR after the vm-i numbers).
+**Never:** Changing IF-5 or any contract file (quotas live above `InstanceHost`; no new error code); touching Akshay's non-port code in `apps/api` (read it, write only ports and tests); running AWS or vm-i; `.github/workflows/**`; the Excel tracker; pushes, commits and any git checkout, stash or reset (other files of the working tree belong to other work; write the dev-log last, keep files free of a byte order mark); deciding the warm pool as final (the developer confirms the ADR after the vm-i numbers).
 
 ## I/O & Edge-Case Matrix
 
@@ -72,9 +72,28 @@ context: ['{project-root}/docs/dev/HANDOFFS.md']
 
 ## Implementation Notes
 
+- `QuotaPort` already existed in `apps/api/src/vulnmart/ports/quota.py` (user, organisation, default); it gained `limits()` returning user, company and total, and `FakeQuotaPort` the new settings `company_max` (5), `total_max` (20) and `companies`. The old `global_max` still means the per-user default (kept so the kernel and existing tests do not change).
+- The build cap is a condition counter that reads `max_parallel_builds` at each wait, so a setting change applies at once; a build that waits is cancelled by a destroy within 50 ms.
+- The retry sits in `Orchestrator._build`; `_fail` now returns whether the sweep was clean (an unclean sweep is never retried). A failed try is reported `failed`, then `provisioning`; health goes back to `unknown` on the retry.
+- `measure.py --concurrent N` (0 to 40) uses one thread per instance and adds a `concurrent_start` block to the result; failures make the exit code non-zero.
+- Review round (2026-10-16): the record has a flag `retrying`, set before the `failed` report of a failed try and cleared after the move to `provisioning` or on any exit; the reconciler (`_one`, `_idle`) treats it as busy, so it never sweeps the objects of a retry. The repeat lookup of `FakeInstancePort.request` covers every instance of the attempt that is not destroyed (also `stopping` and `failed`). `FakeQuotaPort.user_max` is the per-user default (`global_max` is an alias); without an organisation the company check is skipped by design. The warm-pool trigger now reads `ready_after_s.p95` above 30 s or `busy` above 0 (new field in `concurrent_start`). The lock order of `_enter_build` is commented; the missing FIFO order and the slot held by a retry are in `deferred-work.md`.
+- The task file `dev1-tanmay.md` (L-16) is not ticked: the story waits for the developer's confirmation.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (2026-10-16, one focused lens on the retry, the build cap and the quota code).
+
+| Verdict | Route | Finding and evidence |
+|---|---|---|
+| medium | patch | During a retry the record is `failed` for a moment and the reconciler could sweep the retry's new objects: a `retrying` flag on the record, treated as busy by the reconciler; tests. |
+| medium | patch | A repeat of an accepted request whose instance was `stopping` or `failed` was looked up only among running ones and could be refused by quota: repeat lookup over every instance of the attempt; tests. |
+| medium | patch (docs) | `failed` frees a quota place but a retry moves `failed` back to `provisioning`, so a user can briefly hold one more instance: written in ADR 0039, D-59 and handoff H-126 for Akshay (the real port counts a `failed` instance with a pending retry). |
+| low | patch | `global_max` means the per-user default: `user_max` added, `global_max` kept as an alias; no `org_id` skips the company check (commented, tested); `limits()` was added to the QuotaPort Protocol (told in H-126). |
+| low | patch | The warm-pool trigger could not be read from the measurement JSON: reworded to `ready_after_s.p95` above 30 s or `busy` above 0, with `busy` counted in `concurrent_start`; the "about 7 s" label is create to ready. |
+| low | defer | No FIFO order for waiting builds (poll with `notify_all`); a retry holds its slot for up to (1 + `start_retries`) health timeouts; waiting builds do not survive a restart (the reconciler cleans up). In `deferred-work.md`. |
+| none | reviewer | No slot leak on any exit path, no deadlock (cv never held with `rec.lock` or the engine lock), destroy of a waiting build works within about 50 ms, only START_FAILED and HEALTH_TIMEOUT retried, sweep before the retry is clean, quota check and insert are under one lock. |
 
 ## Verification
 

@@ -45,7 +45,8 @@ _ENDING = (S.STOPPING, S.DESTROYED)
 MAX_REASON = 200  # the length the StateReport schema allows
 ADOPTED_TRANSITION_BASE = 1_000_000  # transitions of an adopted instance count from here plus the seconds since ADOPTION_EPOCH, so the
 ADOPTION_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)  # platform never drops them as repeats, also after a second restart
-MEMORY_ADOPTION_SLACK_MB = 64  # the volume keeper container (64 MB) that every instance holds besides its template components
+RETRYABLE = (ErrorCode.START_FAILED, ErrorCode.HEALTH_TIMEOUT)  # the only failures a start retry is for (never INST-INJECT-FAILED)
+MEMORY_ADOPTION_SLACK_MB = 64 # the volume keeper container (64 MB) that every instance holds besides its template components
 
 
 @dataclass
@@ -71,6 +72,7 @@ class InstanceRecord:
     last_activity: datetime | None = None
     reset_prints: dict[int, str] = dc_field(default_factory=dict, repr=False)  # new epoch -> fingerprint of its reset body
     destroying: bool = False  # a destroy worker is running
+    retrying: bool = False  # the build worker is between a failed try and the next one: `failed` for a moment, the reconciler must not touch it
     # set only for an instance the reconciler found after a restart (adoption): there is no create request to read them from
     expires_dt: datetime | None = None  # the `vm.expires` label: the total limit
     idle_minutes: int | None = None  # the idle limit (the settings default)
@@ -137,6 +139,9 @@ class Orchestrator:
         # the desired state could be read (no safe mode). Without it (the engine tests) the engine is open from the start.
         self._reconciled = not reconcile_gate
         self._safe_mode = False
+        self._build_cv = threading.Condition()  # the parallel-build cap (story 3.6)
+        self._builds_running = 0
+        self.max_builds_seen = 0  # the most builds that ran together (read by the concurrency test and the measure tool)
 
     # ------------------------------------------------------------ state
 
@@ -157,7 +162,7 @@ class Orchestrator:
                 rec.ready_at = self._now()
             elif to is S.FAILED:
                 rec.health = "unhealthy" if error_code == ErrorCode.HEALTH_TIMEOUT else "unknown"
-            elif to is S.RESETTING:
+            elif to is S.RESETTING or (to is S.PROVISIONING and rec.state is S.FAILED):  # a reset, or the retry of a failed start
                 rec.health = "unknown"
             t = Transition(rec.instance_id, rec.epoch, number, rec.state, to, at, (reason or "state change")[:MAX_REASON], error_code, rec.health)
             rec.transitions.append(t)
@@ -329,23 +334,80 @@ class Orchestrator:
 
     def _run_create(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec, clear_epoch: int | None = None) -> None:
         """The slow work of a create, or of a reset (`clear_epoch` is then the old epoch whose objects go first)."""
-        with rec.lock:
+        if not self._enter_build(rec):
+            return  # a destroy took the instance while it waited for a build slot; the destroy sweeps and finishes
+        try:
+            with rec.lock:
+                self._build(rec, plan, spec, clear_epoch)
+        finally:
+            self._leave_build()
+
+    def _enter_build(self, rec: InstanceRecord) -> bool:
+        """Wait for one of `max_parallel_builds` slots (story 3.6, FR-INS-07). The instance stays `requested` (or `resetting`) while it
+        waits; the cap never fails a create. Returns False when a destroy took the instance meanwhile."""
+        # Lock order: `_build_cv` may take the settings lock (`settings.get()`); the settings port never takes `_build_cv`.
+        with self._build_cv:
+            while True:
+                if rec.state in _ENDING:
+                    return False
+                if self._builds_running < self.settings.get().max_parallel_builds:
+                    self._builds_running += 1
+                    self.max_builds_seen = max(self.max_builds_seen, self._builds_running)
+                    return True
+                self._build_cv.wait(0.05)
+
+    def _leave_build(self) -> None:
+        with self._build_cv:
+            self._builds_running -= 1
+            self._build_cv.notify_all()
+
+    def _build(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec, clear_epoch: int | None) -> None:
+        """The build with the start retry (FR-INS-08): a start or health failure is tried again `start_retries` times with the same plan
+        and the same secrets (they stay in this worker's memory only). Every failed try is swept and reported as `failed`, then the
+        instance goes to `provisioning` again. An injection failure, a cancel by a destroy and an unclean sweep are never retried."""
+        try:
+            self._build_tries(rec, plan, spec, clear_epoch)
+        finally:
+            rec.retrying = False  # on any exit
+
+    def _build_tries(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec, clear_epoch: int | None) -> None:
+        retries_left = self.settings.get().start_retries
+        resume = False
+        while True:
             try:
-                self._run(rec, plan, spec, clear_epoch)
+                self._run(rec, plan, spec, clear_epoch, resume=resume)
+                return
             except _Cancelled:
                 return  # the destroy that cancelled the build sweeps and finishes
             except _Failure as f:
-                self._fail(rec, f)
+                failure = f
             except BackendError:
-                self._fail(rec, _Failure(ErrorCode.START_FAILED, "the container host refused a step"))
+                failure = _Failure(ErrorCode.START_FAILED, "the container host refused a step")
             except Exception as e:  # any other error: never leave the record in `provisioning` with objects behind
                 # only the class name: the message may carry a document, flag, seed or key
                 self._fail(rec, _Failure(ErrorCode.START_FAILED, f"unexpected error: {type(e).__name__}"))
+                return
+            if failure.code not in RETRYABLE or retries_left <= 0 or rec.state in _ENDING:
+                self._fail(rec, failure)
+                return
+            retries_left -= 1
+            rec.retrying = True  # set before the `failed` report: the reconciler never sees a failed record whose retry is coming
+            if not self._fail(rec, failure) or rec.state is not S.FAILED:
+                return  # cleanup incomplete, or a destroy took the instance
+            try:
+                self._advance(rec, S.PROVISIONING, "start failed once; trying again")
+            except _Cancelled:
+                return
+            rec.retrying = False
+            resume, clear_epoch = True, None  # the sweep of the failed try removed every object, also those of an old epoch
 
-    def _run(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec, clear_epoch: int | None = None) -> None:
+    def _run(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec, clear_epoch: int | None = None, *, resume: bool = False) -> None:
         b = self.backend
-        self._pause(rec)
-        self._advance(rec, S.PROVISIONING, "orchestrator starts work")
+        if not resume:  # a retry is already `provisioning`
+            self._pause(rec)
+            self._advance(rec, S.PROVISIONING, "orchestrator starts work")
+        else:
+            self._check_cancel(rec)
         if clear_epoch is not None:
             # a reset: the old epoch's containers, networks and volumes (found by the `vm.epoch` label) are gone before any object of
             # the new epoch exists, so no old file survives (H-61). The new epoch has other names, so the two never meet.
@@ -405,16 +467,19 @@ class Orchestrator:
                 raise _Failure(ErrorCode.HEALTH_TIMEOUT, "a component did not become healthy in time")
             self._sleep(self.poll_s)
 
-    def _fail(self, rec: InstanceRecord, f: _Failure) -> None:
-        reason = f.reason
+    def _fail(self, rec: InstanceRecord, f: _Failure) -> bool:
+        """Sweep, then record `failed`. Returns True when the sweep was clean."""
+        reason, clean = f.reason, True
         try:
             self._sweep(rec.instance_id)
         except BackendError:
             reason += "; cleanup incomplete, the reconciler or a destroy must finish it"
+            clean = False
         try:
             self._advance(rec, S.FAILED, reason, f.code)
         except _Cancelled:
             pass  # a destroy took the instance while it failed: the destroy finishes
+        return clean
 
     # ------------------------------------------------------------ reset (story 3.4, FR-INS-03)
 
