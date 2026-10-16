@@ -183,6 +183,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Waits on: L-13.
   - Done when: Learner instances stop after 60 minutes idle or 4 hours total; killing the orchestrator mid-provision leaves no orphans after the reconciler runs.
   - Handoffs: H-59, H-61, H-65, H-67 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status (2026-10-15): story 3.4 (reset with new flags, teardown at the total limit or after inactivity, the timing settings port) built and tested, waiting for review and the developer's confirmation; ADR 0035, D-54, handoff H-122 added for Akshay. NOT ticked: story 3.5 (reconciler, persistence) is still open.
 
 - [ ] **L-15. Instance isolation and hardening**
   - Epic: `epic-isolation-and-hardening`

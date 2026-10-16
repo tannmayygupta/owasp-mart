@@ -41,7 +41,9 @@ TRANSITIONS: frozenset[tuple[InstanceState | None, InstanceState]] = frozenset({
     (S.STARTING, S.FAILED),
     (S.FAILED, S.PROVISIONING),
     (S.FAILED, S.DESTROYED),
-    *((frm, S.STOPPING) for frm in (S.READY, S.ACTIVE, S.IDLE, S.PROVISIONING, S.STARTING, S.REQUESTED, S.FAILED)),
+    # `resetting` is here too: IF-5 says destroy is accepted from any state but destroyed and stopping, and a destroy during a reset
+    # cancels it (story 3.4). The contract table lists the other seven; this one follows from the rule text.
+    *((frm, S.STOPPING) for frm in (S.READY, S.ACTIVE, S.IDLE, S.RESETTING, S.PROVISIONING, S.STARTING, S.REQUESTED, S.FAILED)),
     (S.STOPPING, S.DESTROYED),
 })
 

@@ -7,6 +7,7 @@ Nothing here talks to Docker.
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import math
@@ -85,6 +86,11 @@ class CreateSpec:
             separators=(",", ":"),
         )
         return hashlib.sha256(body.encode()).hexdigest()
+
+    def without_secrets(self) -> "CreateSpec":
+        """The same request with no flag, decoy, digest, event key or seed: what the record keeps after its work ran. A reset
+        fills the secrets of its own body into a copy of this (`dataclasses.replace`)."""
+        return dataclasses.replace(self, flags=(), decoys=(), flag_digests=(), event_key="", seed="")
 
 
 MAX_INT = 2**53 - 1  # I-JSON: the largest integer every language reads back exactly (IF-5 section 2a)
@@ -205,7 +211,7 @@ def parse_create(body: object) -> CreateSpec:
 
 @dataclass(frozen=True, slots=True)
 class ResetSpec:
-    """A validated reset body (story 3.4 will use it; the service validates it today and answers a placeholder)."""
+    """A validated reset body: the new epoch and the new secrets. Template, owner, host name and limits come from the record."""
 
     epoch: int
     flags: tuple[tuple[str, str], ...] = dc_field(repr=False)
@@ -213,6 +219,18 @@ class ResetSpec:
     flag_digests: tuple[tuple[str, str], ...] = dc_field(repr=False)
     event_key: str = dc_field(repr=False)
     seed: str = dc_field(repr=False)
+
+    def fingerprint(self) -> str:
+        """Hash of every field, so an identical repeat is recognised and nothing secret is kept in clear."""
+        body = json.dumps([self.epoch, self.flags, self.decoys, self.flag_digests, self.event_key, self.seed], separators=(",", ":"))
+        return hashlib.sha256(body.encode()).hexdigest()
+
+    def apply_to(self, base: CreateSpec) -> CreateSpec:
+        """The create spec of the new epoch: the record's own request with this body's epoch and secrets."""
+        return dataclasses.replace(
+            base, epoch=self.epoch, flags=self.flags, decoys=self.decoys, flag_digests=self.flag_digests,
+            event_key=self.event_key, seed=self.seed,
+        )
 
 
 def parse_reset(body: object) -> ResetSpec:

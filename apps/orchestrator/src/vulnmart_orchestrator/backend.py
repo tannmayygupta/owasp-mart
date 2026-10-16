@@ -49,7 +49,8 @@ class Backend(Protocol):
     def state(self, name: str) -> ContainerState: ...
     def wait_exit(self, name: str, timeout_s: float) -> int | None:
         """The exit code, or None if the container is still running after `timeout_s`."""
-    def find(self, instance_id: str) -> Found: ...
+    def find(self, instance_id: str, epoch: int | None = None) -> Found:
+        """Every object with the `vm.instance` label; with `epoch` only those that also carry that `vm.epoch` label."""
     def remove_container(self, name: str) -> None: ...
     def remove_network(self, name: str) -> None: ...
     def remove_volume(self, name: str) -> None: ...
@@ -131,9 +132,9 @@ class FakeBackend:
         st = self.state(name)
         return st.exit_code if st.status == "exited" else None
 
-    def find(self, instance_id: str) -> Found:
+    def find(self, instance_id: str, epoch: int | None = None) -> Found:
         def mine(labels: dict[str, str]) -> bool:
-            return labels.get("vm.instance") == instance_id
+            return labels.get("vm.instance") == instance_id and (epoch is None or labels.get("vm.epoch") == str(epoch))
 
         return Found(
             tuple(n for n, s in self.containers.items() if mine(s.labels)),
@@ -286,8 +287,9 @@ class SdkBackend:
                 return None
             time.sleep(0.2)
 
-    def find(self, instance_id: str) -> Found:
-        flt = {"label": f"vm.instance={instance_id}"}
+    def find(self, instance_id: str, epoch: int | None = None) -> Found:
+        labels = [f"vm.instance={instance_id}"] + ([f"vm.epoch={epoch}"] if epoch is not None else [])  # several label filters are ANDed
+        flt = {"label": labels}
         return Found(
             tuple(c.name for c in self._wrap(self.client.containers.list, all=True, filters=flt)),
             tuple(n.name for n in self._wrap(self.client.networks.list, filters=flt)),

@@ -12,8 +12,10 @@ or an unknown path must be answered only after the signature, a body over 64 KiB
     422 template allow-list, 404 existence, 409 state and epoch, 429 capacity   (the engine)
 
 `create` and `destroy` answer at once (202) and a worker thread does the Docker work; the state reports of the engine go to the
-platform through `ReportPusher`. The reset call is a marked placeholder until story 3.4: it validates and answers 501. No answer
-and no log line holds a secret, an exception message or a stack trace.
+platform through `ReportPusher`. `reset` answers at once too (202, or 200 for the same body) and a worker runs the create path again for
+the new epoch (story 3.4). A reaper thread (`Reaper`) ends instances at their total limit or after inactivity through the normal destroy
+path. With `--backend fake` only, an unsigned loopback call `POST /_fake/v1/instances/{id}/activity` moves an instance between ready,
+active and idle for the test suites. No answer and no log line holds a secret, an exception message or a stack trace.
 """
 from __future__ import annotations
 
@@ -46,13 +48,11 @@ from .engine import Orchestrator
 from .images import ImageAllowlist, ImageNotAllowed, fake_allowlist
 from .jsonstrict import JsonStrictError, loads_strict
 from .problems import (
-    INTERNAL, MEDIA_TYPE, NOT_IMPLEMENTED, RETRY_AFTER_BUSY, ROUTE_UNKNOWN, ProblemError, new_request_id, pointer, problem_body,
+    INTERNAL, MEDIA_TYPE, RETRY_AFTER_BUSY, ROUTE_UNKNOWN, ProblemError, new_request_id, pointer, problem_body,
 )
 from .ratelimit import BURST, RATE_PER_SECOND, RateLimiter
 from .reports import ReportPusher, check_report_url
-from .states import (
-    Busy, CursorInvalid, EngineError, FieldForbidden, InvalidState, LabelUnknown, StaleEpoch, ValidationFailed,
-)
+from .states import Busy, CursorInvalid, EngineError, FieldForbidden, LabelUnknown, ValidationFailed
 from .templates import load_templates
 
 MAX_BODY = 64 * 1024
@@ -63,7 +63,8 @@ LABELS = ("instance", "epoch", "component", "template", "kind")
 CURSOR = re.compile(r"[A-Za-z0-9_-]{24}")  # base64url, no padding, of an 18-character instance id
 LIMIT = re.compile(r"[1-9][0-9]{0,2}")
 EPOCH = re.compile(r"[1-9][0-9]*")
-PLACEHOLDER_RESET = "reset is not built yet (story 3.4); nothing was changed"
+FAKE_ACTIVITY = re.compile(r"/_fake/v1/instances/([^/]+)/activity")
+LOOPBACK = ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
 # (path pattern, methods in the order the Allow header lists them, route name)
 ROUTES: list[tuple[re.Pattern[str], tuple[str, ...], str]] = [
@@ -104,6 +105,44 @@ def destroy_worker(work: Callable[[], None], attempts: int = 5, pause_s: float =
                 time.sleep(pause_s * (n + 1))
 
     return run
+
+class Reaper:
+    """The background pass that ends instances at the total limit or after inactivity (FR-INS-04). It wakes every
+    `reaper_interval_s` (from the settings port), asks the engine for one pass and runs each destroy on a worker thread. A failed pass is
+    logged by class name and tried again at the next wake-up. `stop` ends the thread at shutdown."""
+
+    def __init__(self, engine: Orchestrator, *, spawn_work: Callable[[Callable[[], None], str], None] = spawn) -> None:
+        self.engine, self._spawn = engine, spawn_work
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, name="reaper", daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=5)
+
+    def run_once(self) -> list[str]:
+        return self.engine.reap_due(execute=lambda work: self._spawn(destroy_worker(work), "reap-destroy"))
+
+    def _interval(self) -> float:
+        try:
+            return self.engine.settings.get().reaper_interval_s
+        except Exception as e:  # a failing settings port must not end the thread
+            log_line(event="reaper-settings-failed", error=type(e).__name__)
+            return 30.0
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self._interval()):
+            try:
+                ids = self.run_once()
+                if ids:
+                    log_line(event="reaped", count=len(ids))
+            except Exception as e:
+                log_line(event="reaper-failed", error=type(e).__name__)
+
 
 def _encode_cursor(instance_id: str) -> str:
     return base64.urlsafe_b64encode(instance_id.encode()).decode().rstrip("=")
@@ -162,8 +201,10 @@ class Service:
 
     def __init__(
         self, engine: Orchestrator, verifier: Verifier, limiter: RateLimiter, *, spawn_work: Callable[[Callable[[], None], str], None] = spawn,
+        fake_controls: bool = False,
     ) -> None:
         self.engine, self.verifier, self.limiter, self._spawn = engine, verifier, limiter, spawn_work
+        self.fake_controls = fake_controls  # the unsigned activity control: only with `--backend fake`
         self.app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)  # no unauthenticated page about the API
         # An object with `__call__`, not a function: Starlette gives a function route only the GET method, an ASGI object all methods.
         # So an odd method is refused in the contract's order (after the signature) and as a problem body, not by the router.
@@ -209,6 +250,11 @@ class Service:
 
         # 2. signature (the request target as sent: path plus query string)
         raw_path = request.scope.get("raw_path") or request.scope["path"].encode()
+        if self.fake_controls:  # test control of the fake backend: before the signature, unsigned by design (loopback only)
+            ctl = FAKE_ACTIVITY.fullmatch(raw_path.decode("latin-1"))
+            if ctl:
+                status, answer = self._activity(request, ctl.group(1), buf)
+                return status, json.dumps(answer, separators=(",", ":")).encode(), {"Content-Type": "application/json"}, "fake-activity"
         target = raw_path.decode("latin-1")
         query = request.scope.get("query_string", b"")
         if query:
@@ -279,14 +325,28 @@ class Service:
         return (202 if accepted.changed else 200), accepted.view
 
     def _reset(self, instance_id: str, buf: bytes) -> tuple[int, dict]:
-        # PLACEHOLDER (story 3.4): the body is checked like the real call, then nothing happens.
-        spec = parse_reset(_loads(buf))
-        current = self.engine.view(instance_id)  # 404 for an unknown instance
-        if current["state"] not in ("ready", "active", "idle"):
-            raise InvalidState(f"reset is not allowed in state {current['state']}")
-        if spec.epoch != current["epoch"] + 1:
-            raise StaleEpoch("the new epoch must be the current epoch plus one")
-        raise ProblemError(NOT_IMPLEMENTED, PLACEHOLDER_RESET)
+        accepted = self.engine.accept_reset(instance_id, parse_reset(_loads(buf)))
+        if accepted.work is not None:
+            try:
+                self._spawn(accepted.work, "reset")
+            except Exception as e:  # no thread could be started: the instance fails with a code, it does not stay `resetting`
+                log_line(event="spawn-failed", what="reset", error=type(e).__name__)
+                self.engine.abandon_create(accepted.record)
+                raise ProblemError(INTERNAL, "the worker could not be started") from None
+        return (202 if accepted.changed else 200), accepted.view
+
+    def _activity(self, request: Request, instance_id: str, buf: bytes) -> tuple[int, dict]:
+        """Test control of `--backend fake` only, not part of IF-5: unsigned and loopback only, like the Node fake."""
+        if request.method != "POST" or not request.client or request.client.host not in LOOPBACK:
+            raise ProblemError(ROUTE_UNKNOWN, "not available")
+        try:
+            data = _loads(buf)
+        except ValidationFailed:
+            data = None
+        state = data.get("state") if isinstance(data, dict) else None
+        if not isinstance(state, str):
+            raise ValidationFailed("state is ready, active or idle", field="/state")
+        return 200, self.engine.force_activity(_id(instance_id), state)
 
     def _list(self, query: bytes) -> tuple[int, dict]:
         pairs = urllib.parse.parse_qsl(query.decode("latin-1"), keep_blank_values=True)
@@ -463,14 +523,17 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as e:  # the text of our own checks; no key is ever in these messages
         print(f"vulnmart_orchestrator: {e}", file=sys.stderr)
         return 2
-    service = Service(engine, Verifier(platform_key), RateLimiter(args.rate_per_s, args.rate_burst))
+    service = Service(engine, Verifier(platform_key), RateLimiter(args.rate_per_s, args.rate_burst), fake_controls=args.backend == "fake")
+    reaper = Reaper(engine)
     if pusher:
         pusher.start()
+    reaper.start()
     try:
         asyncio.run(serve(service.app, args.host, args.port, ctx))
     except KeyboardInterrupt:
         pass
     finally:
+        reaper.stop()
         if pusher:
             pusher.stop()
     return 0

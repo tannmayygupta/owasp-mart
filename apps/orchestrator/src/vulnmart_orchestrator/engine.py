@@ -23,12 +23,16 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from dataclasses import field as dc_field
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 
 from .backend import Backend, BackendError
-from .builder import ContainerSpec, CreateSpec, InstancePlan, build_plan, injection_document, parse_create, sidecar_document
+from .builder import (
+    ContainerSpec, CreateSpec, InstancePlan, ResetSpec, build_plan, injection_document, parse_create, parse_reset, sidecar_document,
+)
 from .capacity import Capacity
 from .images import ImageAllowlist
+from .lifecycle import FakeSettingsPort, SettingsPort
 from .states import (
     Busy, ErrorCode, InstanceExists, InstanceNotFound, InstanceState, InvalidState, RequestMismatch, StaleAccessEpoch, StaleEpoch,
     TemplateUnknown, Transition, check_transition, injector_error_code,
@@ -56,6 +60,11 @@ class InstanceRecord:
     created_at: str = ""
     updated_at: str = ""
     transitions: list[Transition] = dc_field(default_factory=list)
+    base: CreateSpec | None = dc_field(default=None, repr=False)  # the create request without its secrets: a reset builds on it
+    created_dt: datetime | None = None  # the first create: the total limit counts from here and a reset does not move it
+    ready_at: datetime | None = None  # when the instance last became ready (the inactivity clock starts here)
+    last_activity: datetime | None = None
+    reset_prints: dict[int, str] = dc_field(default_factory=dict, repr=False)  # new epoch -> fingerprint of its reset body
     destroying: bool = False  # a destroy worker is running
     lock: threading.RLock = dc_field(default_factory=threading.RLock, repr=False, compare=False)  # the slow work of this instance
 
@@ -99,8 +108,10 @@ class Orchestrator:
         host_kind: str = "vm",
         step_delay_s: float = 0.0,
         on_transition: Callable[[Transition], None] | None = None,
+        settings: SettingsPort | None = None,
     ) -> None:
         self.backend, self.templates, self.images = backend, templates, images
+        self.settings: SettingsPort = settings or FakeSettingsPort()
         self.health_timeout_s, self.injector_timeout_s, self.poll_s = health_timeout_s, injector_timeout_s, poll_s
         self._clock, self._sleep, self._now = clock, sleep, now
         self.capacity = Capacity(capacity_mb)
@@ -124,6 +135,7 @@ class Orchestrator:
             at = self._stamp()
             if to is S.READY:
                 rec.health = "healthy"
+                rec.ready_at = self._now()
             elif to is S.FAILED:
                 rec.health = "unhealthy" if error_code == ErrorCode.HEALTH_TIMEOUT else "unknown"
             elif to is S.RESETTING:
@@ -195,11 +207,12 @@ class Orchestrator:
                 if spec.epoch < known.epoch:
                     raise StaleEpoch("the epoch is below the current epoch")
                 if spec.epoch > known.epoch:
-                    raise InstanceExists("the instance exists; a new epoch is a reset (not in this engine yet)")
+                    raise InstanceExists("the instance exists; a new epoch is a reset")
                 if known.fingerprint != spec.fingerprint():
                     raise RequestMismatch("same instance and epoch with another body")
                 return Accepted(known, False, self._view(known), None)  # a repeat: no new work, same result
-            plan = build_plan(template, spec, self.images, now=self._now())  # refuses before any object exists
+            created = self._now()
+            plan = build_plan(template, self._capped(spec), self.images, now=created)  # refuses before any object exists
             # Capacity counts what the containers really get (the template memory of every component plus the keeper), not the request
             # limit `limits.memory_mb`, which is validated but is not what Docker is given (M5 of the audit).
             used = self.capacity.used(r.memory_mb for r in self.records.values() if r.state is not S.DESTROYED)
@@ -209,6 +222,7 @@ class Orchestrator:
             rec = InstanceRecord(
                 spec.instance_id, spec.epoch, spec.template_id, spec.fingerprint(), hostname=spec.hostname, memory_mb=plan.memory_mb,
                 components=frozenset(c["name"] for c in template["components"]), created_at=now, updated_at=now,
+                base=spec.without_secrets(), created_dt=created,
             )
             self.records[spec.instance_id] = rec
             self._move(rec, S.REQUESTED, "create accepted")
@@ -218,7 +232,7 @@ class Orchestrator:
         """The worker thread of an accepted create could not be started (M10): fail the instance with INST-START-FAILED instead of
         leaving it in `requested` for ever, holding capacity. It can be destroyed like any failed instance."""
         with self._lock:
-            if rec.state is S.REQUESTED:
+            if rec.state in (S.REQUESTED, S.RESETTING):  # a create, or a reset whose worker could not be started
                 self._move(rec, S.PROVISIONING, "the worker could not be started")
         if rec.state is S.PROVISIONING:
             self._fail(rec, _Failure(ErrorCode.START_FAILED, "the orchestrator could not start the worker for this create"))
@@ -228,10 +242,11 @@ class Orchestrator:
         with self._lock:
             rec.destroying = False
 
-    def _run_create(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec) -> None:
+    def _run_create(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec, clear_epoch: int | None = None) -> None:
+        """The slow work of a create, or of a reset (`clear_epoch` is then the old epoch whose objects go first)."""
         with rec.lock:
             try:
-                self._run(rec, plan, spec)
+                self._run(rec, plan, spec, clear_epoch)
             except _Cancelled:
                 return  # the destroy that cancelled the build sweeps and finishes
             except _Failure as f:
@@ -242,10 +257,15 @@ class Orchestrator:
                 # only the class name: the message may carry a document, flag, seed or key
                 self._fail(rec, _Failure(ErrorCode.START_FAILED, f"unexpected error: {type(e).__name__}"))
 
-    def _run(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec) -> None:
+    def _run(self, rec: InstanceRecord, plan: InstancePlan, spec: CreateSpec, clear_epoch: int | None = None) -> None:
         b = self.backend
         self._pause(rec)
         self._advance(rec, S.PROVISIONING, "orchestrator starts work")
+        if clear_epoch is not None:
+            # a reset: the old epoch's containers, networks and volumes (found by the `vm.epoch` label) are gone before any object of
+            # the new epoch exists, so no old file survives (H-61). The new epoch has other names, so the two never meet.
+            self._sweep(rec.instance_id, clear_epoch)
+            self._check_cancel(rec)
         b.create_network(plan.network)
         for v in plan.volumes:
             b.create_volume(v)
@@ -311,6 +331,149 @@ class Orchestrator:
         except _Cancelled:
             pass  # a destroy took the instance while it failed: the destroy finishes
 
+    # ------------------------------------------------------------ reset (story 3.4, FR-INS-03)
+
+    def reset(self, instance_id: str, request: dict | ResetSpec) -> InstanceRecord:
+        """Accept and run a reset in the calling thread (the engine tests use it)."""
+        accepted = self.accept_reset(instance_id, request)
+        if accepted.work is not None:
+            accepted.work()
+        return accepted.record
+
+    def accept_reset(self, instance_id: str, request: dict | ResetSpec) -> Accepted:
+        """IF-5 `reset`: the new epoch (current plus one) and the new secrets. It runs the create path again for the new epoch after
+        the old epoch's objects are removed. Template, owner, host name and limits come from the record. No capacity check: the
+        instance keeps the memory it holds (H-57). An identical repeat is a repeat (200), another body for the same epoch a mismatch."""
+        spec = request if isinstance(request, ResetSpec) else parse_reset(request)
+        with self._lock:
+            rec = self.records.get(instance_id)
+            if rec is None:
+                raise InstanceNotFound("unknown instance")
+            fingerprint = spec.fingerprint()
+            known = rec.reset_prints.get(spec.epoch)
+            if known is not None and spec.epoch <= rec.epoch:
+                if known != fingerprint:
+                    raise RequestMismatch("same new epoch with another body")
+                return Accepted(rec, False, self._view(rec), None)  # a repeat: no new work, same result
+            if rec.state not in (S.READY, S.ACTIVE, S.IDLE):
+                raise InvalidState(f"reset is not allowed in state {rec.state.value}")
+            if spec.epoch != rec.epoch + 1:
+                raise StaleEpoch("the new epoch must be the current epoch plus one")
+            template = self.templates.get(rec.template_id)
+            if template is None or rec.base is None:
+                raise TemplateUnknown("the template is not on the allow-list", field="/template_id")
+            full = spec.apply_to(rec.base)
+            # the expiry label keeps the time of the first create: a reset does not extend the total limit
+            plan = build_plan(template, self._capped(full), self.images, now=rec.created_dt)  # refuses before anything changes
+            old_epoch = rec.epoch
+            rec.epoch = spec.epoch
+            rec.transitions = []  # numbering restarts at 1 in the new epoch
+            rec.reset_prints[spec.epoch] = fingerprint
+            rec.last_activity = rec.ready_at = None
+            self._move(rec, S.RESETTING, "reset accepted")
+            return Accepted(rec, True, self._view(rec), lambda: self._run_create(rec, plan, full, old_epoch))
+
+    # ------------------------------------------------------------ activity and teardown (story 3.4, FR-INS-04)
+
+    def record_activity(self, instance_id: str, at: datetime | None = None) -> dict:
+        """A player did something at `at` (now by default). `ready` or `idle` becomes `active` (one report); an `active` instance only
+        gets a later last-activity time. The platform will call this once it forwards the signal (open points P-4 and P-19)."""
+        with self._lock:
+            rec = self.records.get(instance_id)
+            if rec is None:
+                raise InstanceNotFound("unknown instance")
+            if rec.state not in (S.READY, S.ACTIVE, S.IDLE):
+                raise InvalidState(f"activity is not allowed in state {rec.state.value}")
+            now = self._now()
+            if at is not None and at.tzinfo is None:
+                raise ValueError("the activity time must carry a time zone")
+            at = min(at or now, now)  # never in the future
+            rec.last_activity = max(rec.last_activity, at) if rec.last_activity is not None else at  # never backwards
+            if rec.state is not S.ACTIVE:
+                self._move(rec, S.ACTIVE, "player activity")
+            return self._view(rec)
+
+    def force_activity(self, instance_id: str, state: str) -> dict:
+        """Test control of the fake backend (`POST /_fake/v1/instances/{id}/activity`): move between ready, active and idle by hand.
+        The same transitions as the real ones; the same state again changes nothing and makes no report."""
+        with self._lock:
+            rec = self.records.get(instance_id)
+            if rec is None:
+                raise InstanceNotFound("unknown instance")
+            if state not in ("ready", "active", "idle") or rec.state not in (S.READY, S.ACTIVE, S.IDLE):
+                raise InvalidState("activity only moves between ready, active and idle")
+            target = InstanceState(state)
+            if target is not rec.state:
+                try:
+                    check_transition(rec.state, target)
+                except ValueError:
+                    raise InvalidState(f"{rec.state.value} cannot become {state}") from None
+                if target in (S.ACTIVE, S.IDLE):
+                    rec.last_activity = self._now()
+                self._move(rec, target, "player activity (fake control)")
+            return self._view(rec)
+
+    def reap_due(self, now: datetime | None = None, execute: Callable[[Callable[[], None]], None] | None = None) -> list[str]:
+        """One pass of the reaper. `now` is the clock under test (the engine's clock by default). Moves `active` to `idle` after the
+        quiet window, and destroys, through the normal destroy path, an instance that is past its total limit
+        (`min(max_minutes, ceiling)` from the first create, any live state) or has had no activity for its `idle_minutes` (counted from
+        ready or the last activity). `execute` runs the destroy work (a worker thread in the service); by default it runs here.
+        Returns the ids it started a destroy for."""
+        now = now or self._now()
+        cfg = self.settings.get()
+        started: list[str] = []
+        with self._lock:
+            records = list(self.records.values())
+        failure: Exception | None = None
+        for rec in records:
+            with self._lock:
+                if rec.state is S.DESTROYED or rec.base is None or rec.created_dt is None:
+                    continue
+                if rec.state is S.STOPPING:
+                    if rec.destroying:
+                        continue  # a worker is removing it
+                    reason = "a destroy did not finish"  # its worker gave up: try the removal again
+                else:
+                    if rec.state is S.ACTIVE:
+                        since = rec.last_activity or rec.ready_at
+                        if since is not None and now - since >= timedelta(minutes=cfg.active_window_minutes):
+                            self._move(rec, S.IDLE, "no activity for the active window")
+                    reason = self._expiry_reason(rec, now, cfg.max_minutes_ceiling)
+                    if reason is None:
+                        continue
+                try:
+                    accepted = self.accept_destroy(rec.instance_id, f"destroy by the reaper: {reason}")
+                except InvalidState:
+                    continue
+            started.append(rec.instance_id)
+            if accepted.work is not None:
+                if execute is None:
+                    accepted.work()
+                else:
+                    try:
+                        execute(accepted.work)
+                    except Exception as e:  # one instance never stops the pass: its flag is cleared and the next pass tries again
+                        self.release_destroy(rec)
+                        failure = failure or e
+        if failure is not None:
+            raise failure
+        return started
+
+    def _capped(self, spec: CreateSpec) -> CreateSpec:
+        """The spec the plan is built from: `max_minutes` is cut to the settings ceiling, so the `vm.expires` label is the real deadline."""
+        ceiling = self.settings.get().max_minutes_ceiling
+        return spec if spec.max_minutes <= ceiling else replace(spec, max_minutes=ceiling)
+
+    def _expiry_reason(self, rec: InstanceRecord, now: datetime, ceiling: int) -> str | None:
+        assert rec.base is not None and rec.created_dt is not None
+        if now >= rec.created_dt + timedelta(minutes=min(rec.base.max_minutes, ceiling)):
+            return "total limit reached"
+        if rec.state in (S.READY, S.ACTIVE, S.IDLE):
+            since = rec.last_activity or rec.ready_at
+            if since is not None and now >= since + timedelta(minutes=rec.base.idle_minutes):
+                return "no activity for the idle limit"
+        return None
+
     # ------------------------------------------------------------ access
 
     def set_access(self, instance_id: str, access: str, access_epoch: int) -> dict:
@@ -345,7 +508,7 @@ class Orchestrator:
             accepted.work()  # on failure the instance stays `stopping` and a repeat retries
         return rec
 
-    def accept_destroy(self, instance_id: str) -> Accepted:
+    def accept_destroy(self, instance_id: str, reason: str = "destroy accepted") -> Accepted:
         with self._lock:
             rec = self.records.get(instance_id)
             if rec is None:
@@ -358,7 +521,7 @@ class Orchestrator:
                     check_transition(rec.state, S.STOPPING)
                 except ValueError:
                     raise InvalidState(f"destroy is not allowed in state {rec.state.value}") from None
-                self._move(rec, S.STOPPING, "destroy accepted")
+                self._move(rec, S.STOPPING, reason)
                 changed = True
             work = None
             if not rec.destroying:  # a repeat while nothing is working retries the removal
@@ -378,9 +541,10 @@ class Orchestrator:
             with self._lock:
                 rec.destroying = False
 
-    def _sweep(self, instance_id: str) -> None:
+    def _sweep(self, instance_id: str, epoch: int | None = None) -> None:
+        """Remove every object of the instance; with `epoch` only the objects of that epoch (a reset clears the old one)."""
         b = self.backend
-        found = b.find(instance_id)
+        found = b.find(instance_id, epoch)
         errors = 0
         for step, names in ((b.remove_container, found.containers), (b.remove_network, found.networks), (b.remove_volume, found.volumes)):
             for n in names:
@@ -390,7 +554,7 @@ class Orchestrator:
                     errors += 1
         if errors:
             raise BackendError(f"{errors} object(s) could not be removed")
-        if not b.find(instance_id).empty:
+        if not b.find(instance_id, epoch).empty:
             raise BackendError("objects with the instance label remain")
 
     # ------------------------------------------------------------ list and host

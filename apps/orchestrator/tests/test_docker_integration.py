@@ -62,6 +62,7 @@ class Recording(SdkBackend):
     def __init__(self, client):
         super().__init__(client)
         self.log: list[tuple[str, str]] = []
+        self.documents: dict[str, bytes] = {}  # what each container got on standard input
 
     def start(self, name):
         self.log.append(("start", name))
@@ -69,6 +70,7 @@ class Recording(SdkBackend):
 
     def start_with_stdin(self, name, data):
         self.log.append(("start_with_stdin", name))
+        self.documents[name] = data
         return super().start_with_stdin(name, data)
 
     def wait_exit(self, name, timeout_s):
@@ -153,6 +155,33 @@ def test_create_reaches_ready_only_after_the_injector_exit_and_destroy_leaves_no
     assert done.state is S.DESTROYED
     assert leftovers(docker_client, IID) == ([], [], [])
     assert orch.destroy(IID).state is S.DESTROYED  # a second destroy succeeds
+
+
+def test_reset_gives_a_new_epoch_removes_the_old_objects_and_the_new_flags_only_reach_the_injector(docker_client, stub_image_id, clean):
+    new_flag, new_seed, new_key = "VM{" + "D" * 24 + "}", "RESET-SEED-NOT-REAL-" + "D" * 24, "RESET-EVENT-KEY-NOT-REAL-" + "D" * 24
+    orch, be = make(docker_client, stub_image_id)
+    assert orch.create(body(iid=IID)).state is S.READY
+    used = orch.host_status()["used_memory_mb"]
+    old_names = set(leftovers(docker_client, IID)[0] + leftovers(docker_client, IID)[1] + leftovers(docker_client, IID)[2])
+    assert old_names and all("-e1" in n for n in old_names)
+
+    reset = {k: body()[k] for k in ("flags", "decoys", "flag_digests", "event_key", "seed")}
+    reset["flags"] = [{"challenge_key": "C01", "flag": new_flag}, reset["flags"][1]]
+    reset.update(epoch=2, event_key=new_key, seed=new_seed)
+    rec = orch.reset(IID, reset)
+    assert rec.state is S.READY and rec.epoch == 2, [(t.to_state.value, t.reason, t.error_code) for t in rec.transitions]
+
+    cs, ns, vs = leftovers(docker_client, IID)
+    assert not (old_names & set(cs + ns + vs))  # every object of epoch 1 is gone, the volumes included (H-61)
+    assert len(cs) == 2 and len(ns) == 1 and len(vs) == 4 and all("-e2" in n for n in cs + ns + vs)
+    assert orch.host_status()["used_memory_mb"] == used  # the memory of the instance is unchanged
+    doc = json.loads(next(d for n, d in be.documents.items() if "-e2-" in n and n.endswith("-injector")))
+    assert doc["epoch"] == 2 and doc["seed"] == new_seed and doc["flags"][0]["flag"] == new_flag  # the new flags reached the injector
+    for c in cs:  # and nowhere else: no container setting or label holds them
+        raw = json.dumps(docker_client.api.inspect_container(c))
+        assert new_flag not in raw and new_seed not in raw and new_key not in raw and FLAG_A not in raw
+    assert new_flag not in json.dumps(orch.view(IID))
+    assert orch.destroy(IID).state is S.DESTROYED and leftovers(docker_client, IID) == ([], [], [])
 
 
 def test_a_failing_injector_gives_failed_and_leaves_nothing(docker_client, stub_image_id, clean):

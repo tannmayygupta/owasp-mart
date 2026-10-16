@@ -1,0 +1,18 @@
+# Story 3.4 verification, run on 2026-10-16 after the review patches (real output, trimmed to the summary lines)
+
+## orchestrator unit and real-Docker tests: uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
+........................................................................ [ 73%]
+........................................................................ [ 97%]
+.......                                                                  [100%]
+295 passed in 119.53s (0:01:59)
+
+## shared apps/api suites against the Python service: VM_ORCH_SERVICE=python ... --backend fake (as in ci.yml)
+.................................                                        [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_http_service.py:692: tests the Node fake, not the Python service
+392 passed, 1 skipped in 437.09s (0:07:17)
+
+## api suite on the fake host: uv run --locked --package vulnmart-api pytest -q
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:150: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:160: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+963 passed, 7 skipped in 56136.75s (15:35:36)

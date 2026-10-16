@@ -275,7 +275,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Covers: FR-ADM-01, 02, 04, 05, 06
   - Waits on: P-18 and Tanmay's L-16 (InstancePort, capacity).
   - Done when: An admin approves a company, force-stops an instance and changes a quota that the lab then enforces.
-  - Handoffs: H-15 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-15, H-122 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-29. Data exports**
   - Epic: `epic-dashboards-and-exports`

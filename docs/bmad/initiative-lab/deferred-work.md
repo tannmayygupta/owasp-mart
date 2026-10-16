@@ -116,3 +116,19 @@
   second round (2026-10-13): caddy-origin production-shape tests made readable for a root container without DAC override; contract rules failure of the second run still to be read from the full log.
   third round (2026-10-13): contract rules step prints a short verdict (output to a file, notice lines left out); real FAIL line of the Linux run still to be read from the next run.
   fourth round (2026-10-13): contract rules uses --trusted (trusted mode restored); the first-round removal of --tools had switched it off.
+
+- source_plan: `docs/bmad/initiative-lab/epic-orchestrator-and-instance-lifecycle/story-reset-with-new-flags-teardown-at-expiry-or-inactivity-timing-plan.md`
+  summary: A failed reset has no way back except a destroy: a repeated identical reset body answers 200 with the failed state, and the failed-start retry (OI-24, H-23, H-65) is story 3.6.
+  evidence: review of story 3.4 (edge-case and blind lenses): the platform that repeats the same body learns nothing new; the recovery today is destroy and a new create.
+- source_plan: same
+  summary: The edge `resetting` to `stopping` is in `states.py` only. The IF-5 transition table does not list it (a destroy during a reset). Add it at the next contract change; the Node fake already allows destroy in any live state.
+  evidence: story 3.4 implementation notes; no contract file may change outside a contract release.
+- source_plan: same
+  summary: `.github/workflows/ci.yml` line 51 still says "reset cases skipped until story 3.4". Change the comment together with the next workflow change (a ci.yml edit needs a `registry change:` line in contracts/CHANGELOG.md).
+  evidence: review of story 3.4 (verification-gap lens); the comment is stale, the command is correct.
+- source_plan: same
+  summary: Until H-122 is answered the orchestrator ends an instance `idle_minutes` after ready even while a player is busy (no activity signal). The platform must send a large `idle_minutes` meanwhile; the orchestrator must not face real players before the answer.
+  evidence: review of story 3.4 (blind lens, medium); the frozen matrix row says the clock runs from ready; H-122 carries the warning.
+- source_plan: same
+  summary: Smaller leftovers: `Settings.default_idle_minutes` and `default_max_minutes` are numbers for the platform and are not read by the engine; a reaper pass racing a reset and a reaper destroy on real Docker have no test; the fake activity route trusts the loopback address of the caller (only with `--backend fake`).
+  evidence: review of story 3.4 (blind, edge-case and verification-gap lenses), all low.
