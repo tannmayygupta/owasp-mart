@@ -6,6 +6,7 @@ the browser routes of IF-1. Today that is the public `GET /api/v1/health` of `co
 """
 from __future__ import annotations
 
+import secrets
 import time
 from collections.abc import Mapping
 
@@ -14,6 +15,8 @@ from fastapi.responses import JSONResponse
 
 from vulnmart.accounts.api import router as accounts_router
 from vulnmart.accounts.service import AccountService
+from vulnmart.accounts.session_api import router as session_router
+from vulnmart.accounts.sessions import SessionService
 from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRateLimiter
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
@@ -30,6 +33,19 @@ def _accounts_from(settings: Settings, ports) -> AccountService | None:
         # a verification link sent over plain http would hand its token to anyone on the path
         raise RuntimeError(f"VULNMART_ENV={settings.env} needs VULNMART_PUBLIC_ORIGIN to be an https:// address")
     return AccountService(ports.sessions, ports.settings, public_origin=settings.public_origin)
+
+
+def _sessions_from(settings: Settings, ports) -> SessionService | None:
+    """The session service over the database, or None without a database address. The CSRF key comes from the environment or a file;
+    staging and production do not start without one, dev and test make a random key for this process (their CSRF tokens end with it)."""
+    key = settings.csrf_key()
+    if key is None:
+        if settings.env in ("staging", "production"):
+            raise RuntimeError(f"VULNMART_ENV={settings.env} needs a CSRF key (VULNMART_CSRF_SECRET or VULNMART_CSRF_SECRET_FILE)")
+        key = secrets.token_bytes(32)
+    if ports.sessions is None:
+        return None
+    return SessionService(ports.sessions, ports.settings, key)
 
 
 def _limiter_from(settings: Settings) -> RateLimiter:
@@ -51,6 +67,7 @@ def create_app(
     configure_logs: bool = False,
     accounts: AccountService | None = None,
     rate_limiter: RateLimiter | None = None,
+    sessions: SessionService | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits)."""
@@ -60,7 +77,9 @@ def create_app(
     app.state.ports = build_ports(settings)
     app.state.accounts = accounts or _accounts_from(settings, app.state.ports)
     app.state.rate_limiter = rate_limiter or _limiter_from(settings)
+    app.state.session_service = sessions or _sessions_from(settings, app.state.ports)
     app.include_router(accounts_router)
+    app.include_router(session_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs
     # one round of checks, not one per call (the answer itself is never cached by anyone else: no-store).

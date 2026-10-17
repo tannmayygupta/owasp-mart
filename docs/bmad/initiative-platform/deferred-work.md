@@ -42,6 +42,17 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-login-sessions-timeouts-and-csrf-plan (2026-10-17)
+
+- The routes for a user's own session list, revoking one session and "log out everywhere" (FR-ACC-04): story 3.6; the service functions are built and tested.
+- The login form and the "who am I" page (dashboards); `getMe` and `updateMe` are P-14.
+- Expired and revoked rows stay in `sessions` until a purge job exists (the retention scheduler, P-24).
+- The architecture's Valkey cache of active sessions is not built; every authenticated request is one Postgres read (plus a write at most once a minute). Measure before adding it.
+- The login limits (60 attempts an hour per visitor address; 10 wrong passwords in 15 minutes per email address) are placeholders; the per-email wait also stops the right password for that window.
+- A strict deployment accepts one dashboard origin only; `localhost` and `127.0.0.1` are different origins to the check.
+- The Argon2id hash upgrade at login (`needs_rehash`) is tested with a weak hash but no production hash is older than the current profile yet.
+- The session and CSRF behaviour was checked against the contract and a local browser-less client; not in a real browser, and not on the deployed Vercel path (handoff H-131).
+
 ## Deferred from: story-learner-signup-email-verification-and-signup-abuse-protection-plan (2026-10-17)
 
 - The signup form and the verify-email page (the link in the mail points at `${public_origin}/verify-email?token=...`, a dashboards page that does not exist yet); until then a learner can only be created and verified through the API. No task before P-26 builds them: decide which dashboards story owns them.

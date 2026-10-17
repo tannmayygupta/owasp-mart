@@ -226,8 +226,16 @@ describe('platform and web profiles on a real Docker engine', () => {
     }
     return null;
   }
-  const postJson = (path, body) =>
-    fetch(`http://127.0.0.1:3000${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
+  // Every state-changing call must carry the dashboard origin (story P-12, the Origin check of the contract).
+  const ORIGIN = 'http://127.0.0.1:3000';
+  const call = (method, path, { body, headers = {} } = {}) =>
+    fetch(`${ORIGIN}${path}`, {
+      method,
+      headers: { origin: ORIGIN, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    });
+  const postJson = (path, body, headers) => call('POST', path, { body, headers });
 
   test('accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited', async () => {
     const email = `e2e-learner-${Date.now()}@example.com`;
@@ -270,6 +278,76 @@ describe('platform and web profiles on a real Docker engine', () => {
     const bad = await postJson('/api/v1/accounts', { ...body, email: 'x@example.com', age_declaration: false });
     assert.equal(bad.status, 422);
     assert.doesNotMatch(await bad.text(), /correct horse/);
+  }, { timeout: 180000 });
+
+  // Story P-12: login, the session cookie through the real proxy, CSRF, the Origin check, logout, and a stolen cookie.
+  test('sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good', async () => {
+    const email = `e2e-login-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Login', age_declaration: true })).status, 202);
+    // right password, address not verified yet: 403, and no cookie; a wrong password is 401
+    const early = await postJson('/api/v1/session', { email, password });
+    assert.equal(early.status, 403);
+    assert.equal((await early.json()).code, 'AUTH-EMAIL-NOT-VERIFIED');
+    assert.equal(early.headers.getSetCookie().length, 0);
+    const wrong = await postJson('/api/v1/session', { email, password: 'not the password at all' });
+    assert.equal(wrong.status, 401);
+    assert.equal((await wrong.json()).code, 'AUTH-INVALID-CREDENTIALS');
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    const token = /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1];
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token })).status, 200);
+
+    // another site cannot log a visitor in
+    const forged = await postJson('/api/v1/session', { email, password }, { origin: 'https://evil.example' });
+    assert.equal(forged.status, 403);
+    assert.equal((await forged.json()).code, 'AUTH-ORIGIN-FORBIDDEN');
+
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 200);
+    assert.equal(login.headers.get('cache-control'), 'private, no-store');
+    const cookies = login.headers.getSetCookie();
+    assert.equal(cookies.length, 1, 'one cookie came back through the proxy');
+    assert.match(cookies[0], /^__Host-vm_session=[A-Za-z0-9_-]{43};/);
+    for (const part of ['Path=/', 'Secure', 'HttpOnly']) assert.ok(cookies[0].includes(part), `${part} in ${cookies[0]}`);
+    assert.match(cookies[0], /SameSite=lax/i);
+    assert.doesNotMatch(cookies[0], /Domain=|Max-Age=|Expires=/i);
+    const session = await login.json();
+    const value = /__Host-vm_session=([^;]+)/.exec(cookies[0])[1];
+    assert.equal(session.status, 'authenticated');
+    assert.equal(session.user.email, email);
+    assert.equal(session.user.account_type, 'participant');
+    assert.equal(session.user.email_verified, true);
+    assert.ok(!JSON.stringify(session).includes(value), 'the cookie value is not in the body');
+    assert.equal(psql(`SELECT count(*) FROM sessions WHERE id_hash = '${value}'`), '0', 'the cookie value itself is not stored');
+    assert.equal(psql(`SELECT count(*) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), '1');
+    const cookie = `__Host-vm_session=${value}`;
+
+    // the session, with the same csrf token
+    const current = await call('GET', '/api/v1/session', { headers: { cookie } });
+    assert.equal(current.status, 200);
+    assert.equal((await current.json()).csrf_token, session.csrf_token);
+    const nobody = await call('GET', '/api/v1/session');
+    assert.equal(nobody.status, 401);
+    assert.equal((await nobody.json()).code, 'AUTH-SESSION-REQUIRED');
+
+    // logout needs the right origin and this session's csrf token; refused calls leave the session alone
+    const noToken = await call('DELETE', '/api/v1/session', { headers: { cookie } });
+    assert.equal(noToken.status, 403);
+    assert.equal((await noToken.json()).code, 'AUTH-CSRF-FAILED');
+    const otherSite = await call('DELETE', '/api/v1/session', { headers: { cookie, 'x-csrf-token': session.csrf_token, origin: 'https://evil.example' } });
+    assert.equal(otherSite.status, 403);
+    assert.equal((await otherSite.json()).code, 'AUTH-ORIGIN-FORBIDDEN');
+    assert.equal((await call('GET', '/api/v1/session', { headers: { cookie } })).status, 200);
+    const out = await call('DELETE', '/api/v1/session', { headers: { cookie, 'x-csrf-token': session.csrf_token } });
+    assert.equal(out.status, 204);
+    assert.match(out.headers.getSetCookie()[0], /^__Host-vm_session=("")?;|Max-Age=0/i);
+    // a copy of the old cookie no longer works
+    const replay = await call('GET', '/api/v1/session', { headers: { cookie } });
+    assert.equal(replay.status, 401);
+    assert.equal((await replay.json()).code, 'AUTH-SESSION-REQUIRED');
+    assert.equal(psql(`SELECT (revoked_at IS NOT NULL) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), 't');
   }, { timeout: 180000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {

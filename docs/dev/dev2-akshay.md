@@ -133,13 +133,14 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: A learner can sign up and verify by email on the local stack, and the abuse limits trigger in a test.
   - Handoffs: H-127 (answered in P-11), H-129 (to Tanmay, L-11) (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-12. Login, sessions, timeouts and CSRF**
+- [x] **P-12. Login, sessions, timeouts and CSRF**  (the user's own session list and "log out everywhere" exist as tested service functions; their routes need a contract change and moved to story 3.6)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: not planned yet; created when you incept `epic-accounts-and-sessions` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `3.2` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done; the routes of FR-ACC-04's session list are story `3.6`
   - Build: Session cookies, idle and absolute timeouts, logout, CSRF protection and the cookie rules of NFR-SEC-03.
   - Covers: FR-ACC-03, 04
   - Waits on: P-11.
   - Done when: Login, logout and both timeouts work and a request without a CSRF token is refused.
+  - Handoffs: H-131 (to Tanmay, L-11) (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-13. Account types, candidate role and admin creation**
   - Epic: `epic-accounts-and-sessions`
@@ -148,6 +149,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-ACC-05, 06, 11
   - Waits on: P-12.
   - Done when: Roles are enforced in tests and an admin can only be created as FR-ACC-11 says.
+  - Handoffs: H-130 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-14. Password reset, password quality and account self-service**
   - Epic: `epic-accounts-and-sessions`
@@ -156,7 +158,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-ACC-08, 09
   - Waits on: P-10, P-12.
   - Done when: A reset link works once and expires, weak passwords are refused and a user can change their details.
-  - Handoffs: H-127 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-127, H-130 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-15. Multi-factor login**
   - Epic: `epic-accounts-and-sessions`
@@ -165,6 +167,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-ACC-07
   - Waits on: P-12.
   - Done when: MFA enrolment and login work in tests, and recovery is covered.
+  - Handoffs: H-130 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-16. Consent screen, consent record, minimum data and 18-and-over**
   - Epic: `epic-privacy-audit-and-keys`

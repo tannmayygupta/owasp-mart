@@ -59,6 +59,19 @@ class Settings(BaseSettings):
     # How many proxies we run in front of the API and append to x-forwarded-for; the entry this many from the right is the visitor.
     # Counted only when an origin secret protects the API (architecture 03 rule 4). Behind caddy-p it will be 2 (see handoff H-129).
     trusted_proxy_hops: int = Field(default=1, ge=0, le=5)
+    # The key of the CSRF token (HMAC of the session value, ADR 0019 M2; story P-12). Production reads a file (architecture 06 s3) and the
+    # file wins; staging and production do not start without one. dev and test make a random key per process (tokens then end with it).
+    csrf_secret: str | None = Field(default=None, repr=False)
+    csrf_secret_file: str | None = None
+
+    def csrf_key(self) -> bytes | None:
+        """The configured CSRF key as bytes, or None when none is set."""
+        if self.csrf_secret_file:
+            with open(self.csrf_secret_file, encoding="utf-8") as f:
+                value = f.read().strip()
+        else:
+            value = self.csrf_secret
+        return value.encode("utf-8") if value else None
 
     def origin_secrets_value(self) -> str | None:
         """The configured origin secret(s): the file's content when a file is named, else the environment value."""

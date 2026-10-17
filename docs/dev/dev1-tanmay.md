@@ -150,7 +150,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Waits on: L-10 and Akshay's dashboards skeleton (P-07).
   - Handoffs: H-116, H-117 (see docs/dev/HANDOFFS.md; added by the preparation story, 2026-10-11)
   - Done when: The Vercel site reaches the API through `/api/*`, direct access to the VM without the secret is refused, and the S-14 result is recorded.
-  - Handoffs: H-113, H-129 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-113, H-129, H-131 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status 2026-10-12 (story 2.3): the Caddy origin-secret gate, the stock Caddy edge for vm-p, the Vercel probe project with the `routes` header transform, the S-14 check script, ADR 0031, decision D-50 (Proposed) and the runbook `docs/runbooks/vercel-and-origin.md` are built and tested with real Caddy in Docker (including TLS) and stand-in proxies. NOT met (ticked on the developer's instruction): the live steps are the developer's (Vercel login and project, sensitive environment variable, secret files on vm-p, port 443, the S-14 run) and the real wiring waits for Akshay's P-07 and the live certificates of L-10.
 
 - [x] **L-12. Image builds for amd64 and arm64 and deploy pipelines**

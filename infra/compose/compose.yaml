@@ -180,6 +180,10 @@ services:
       # Story P-07: the API refuses /api/* without the origin secret the web proxy adds (a development value, the same
       # default as the web service below; production keeps it in the Vercel project and on VM-P, architecture 06 s3).
       VULNMART_ORIGIN_SECRET: ${VULNMART_DEV_ORIGIN_SECRET:-vulnmart-dev-origin-secret-not-a-secret}
+      # Story P-12: the key of the CSRF tokens (a development value; production reads a secret file, architecture 06 s3) and the one
+      # origin the browser may call from (the Origin check): the dashboards of the web service below.
+      VULNMART_CSRF_SECRET: ${VULNMART_DEV_CSRF_SECRET:-vulnmart-dev-csrf-secret-not-a-secret}
+      VULNMART_PUBLIC_ORIGIN: http://127.0.0.1:3000
     cap_drop:
       - ALL
     security_opt:

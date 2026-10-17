@@ -57,3 +57,17 @@ covers = ["FR-ACC-07"]
 after = [2]
 hitl = false
 risk = "high"
+
+# Added 2026-10-17 during story 3.2 (P-12): FR-ACC-04 also says a user can list and revoke their own sessions and log out everywhere. The
+# service functions exist and are tested (SessionService.list_sessions, revoke, revoke_all), but IF-1 has no route for them, and a route
+# is a contract change (bundle, generated clients, COMPAT.md, the contract owner's look), so it is a story of its own.
+[[entry]]
+id = 6
+type = "story"
+title = "Session list, revoke and log out everywhere routes"
+description = "Adds the routes of IF-1 for a user's own session list, revoking one session and logging out everywhere, over the existing SessionService, with the contract change, regenerated bundle and clients and COMPAT entry."
+verify = "A user lists their sessions, revokes another one and logs out everywhere in a test, and the contract rules and generated clients are current."
+covers = ["FR-ACC-04"]
+after = [2]
+hitl = false
+risk = "low"

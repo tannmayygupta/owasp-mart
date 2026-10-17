@@ -53,6 +53,28 @@ def test_concurrent_hits_never_allow_more_than_the_limit():
     assert sum(allowed) == 5
 
 
+def test_peek_does_not_count_and_denies_only_at_the_limit():
+    clock = Clock()
+    limiter = InMemoryRateLimiter(now=clock)
+    assert limiter.peek("f", 2).allowed, "nothing counted yet"
+    limiter.hit("f", 2, 60)
+    assert limiter.peek("f", 2).allowed and limiter.peek("f", 2).allowed, "peeking again changes nothing"
+    limiter.hit("f", 2, 60)
+    denied = limiter.peek("f", 2)
+    assert not denied.allowed and denied.retry_after == 60
+    clock.t += 61
+    assert limiter.peek("f", 2).allowed, "the window ended"
+
+
+def test_reset_forgets_the_count():
+    limiter = InMemoryRateLimiter(now=Clock())
+    limiter.hit("f", 1, 60), limiter.hit("f", 1, 60)
+    assert not limiter.peek("f", 1).allowed
+    limiter.reset("f")
+    assert limiter.peek("f", 1).allowed and limiter.hit("f", 1, 60).allowed
+    limiter.reset("never-used")  # no error
+
+
 def test_an_address_is_never_part_of_a_key():
     key = email_key("ada@example.com")
     assert "ada" not in key and "@" not in key and len(key) == 32 and key == email_key("ada@example.com") != email_key("bob@example.com")
@@ -95,3 +117,34 @@ def test_valkey_counts_expires_and_is_atomic_under_threads():
     [t.start() for t in threads]
     [t.join() for t in threads]
     assert sum(allowed) == 5
+
+
+def test_a_failing_store_raises_unavailable_for_peek_and_reset():
+    class Broken:
+        def register_script(self, script):
+            return lambda **kw: None
+
+        def pipeline(self):
+            raise ConnectionError("down")
+
+        def delete(self, key):
+            raise ConnectionError("down")
+
+    limiter = ValkeyRateLimiter(Broken())
+    with pytest.raises(RateLimiterUnavailable):
+        limiter.peek("k", 1)
+    with pytest.raises(RateLimiterUnavailable):
+        limiter.reset("k")
+
+
+@pytest.mark.skipif(not VALKEY, reason="needs VULNMART_TEST_VALKEY_URL")
+def test_valkey_peek_and_reset():
+    import valkey
+
+    limiter = ValkeyRateLimiter(valkey.Valkey.from_url(VALKEY), prefix=f"test:{uuid.uuid4().hex}:")
+    assert limiter.peek("f", 2).allowed
+    limiter.hit("f", 2, 60), limiter.hit("f", 2, 60)
+    denied = limiter.peek("f", 2)
+    assert not denied.allowed and 1 <= denied.retry_after <= 60
+    limiter.reset("f")
+    assert limiter.peek("f", 2).allowed

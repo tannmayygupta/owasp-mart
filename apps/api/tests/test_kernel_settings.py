@@ -87,8 +87,8 @@ def test_an_unknown_name_or_a_wrongly_typed_row_is_refused(port):
 
 def test_the_history_has_one_root_and_one_head():
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0003"]
-    assert [r.revision for r in script.walk_revisions()] == ["0003", "0002", "0001"]
+    assert script.get_heads() == ["0004"]
+    assert [r.revision for r in script.walk_revisions()] == ["0004", "0003", "0002", "0001"]
 
 
 def test_stream_l_single_head_check_passes():
@@ -133,4 +133,4 @@ def test_every_table_of_the_metadata_is_in_the_table_owners_file():
     import vulnmart.notifications.models  # noqa: F401 - registers email_outbox whichever test ran first
 
     assert json.dumps(sorted(Base.metadata.tables)) == json.dumps(
-        ["email_outbox", "email_tokens", "job_runs", "org_members", "organizations", "quotas", "settings", "user_roles", "users"])
+        ["email_outbox", "email_tokens", "job_runs", "org_members", "organizations", "quotas", "sessions", "settings", "user_roles", "users"])
