@@ -21,9 +21,10 @@ import vulnmart.accounts.models  # noqa: F401
 import vulnmart.notifications.models  # noqa: F401
 from support import ROOT
 from test_kernel_postgres import with_db
-from vulnmart.accounts.models import EmailToken, User, UserRole
+from vulnmart.accounts.models import EmailToken, User, UserRole, UserSession
 from vulnmart.accounts.security import hash_password, token_hash
 from vulnmart.accounts.service import AccountService, TokenInvalid
+from vulnmart.accounts.sessions import SessionService
 from vulnmart.kernel.settings import sqlalchemy_url
 from vulnmart.notifications.models import EmailOutbox
 from vulnmart.ports.fakes import FakeSettingsPort
@@ -147,3 +148,80 @@ def test_one_link_used_at_once_works_for_exactly_one_request(sessions):
     assert sorted(results) == ["invalid"] * 7 + ["ok"]
     with sessions() as s:
         assert s.scalar(select(User.email_verified_at)) is not None
+
+
+# ---- story P-12: sessions ---------------------------------------------------------------------------------------------
+
+def session_service(sessions):
+    return SessionService(sessions, FakeSettingsPort(), b"k" * 32)
+
+
+def verified_user(sessions, uid="u-AAAAAAAAAAAAAAAA", email="a@example.com"):
+    with sessions.begin() as s:
+        add_user(s, uid, email)
+        s.get(User, uid).email_verified_at = datetime.now(UTC)
+        s.add(UserRole(user_id=uid, role="learner", account_type="participant"))
+
+
+def test_a_session_lives_on_postgres_and_goes_with_its_user(sessions):
+    verified_user(sessions)
+    service = session_service(sessions)
+    result = service.login(email="a@example.com", password=GOOD, ip_trunc="203.0.113.0/24", ua_class="browser")
+    assert service.resolve(result.token) is not None
+    with sessions() as s:
+        stored = s.scalar(select(UserSession))
+        assert stored.id_hash == token_hash(result.token) and result.token not in (stored.id_hash, stored.ip_trunc)
+    service.logout(result.token)
+    assert service.resolve(result.token) is None
+    with sessions.begin() as s:
+        s.execute(text("DELETE FROM users"))
+    with sessions() as s:
+        assert s.scalars(select(UserSession)).all() == [], "sessions are removed with their user"
+
+
+def test_many_logins_at_once_make_that_many_distinct_sessions(sessions):
+    verified_user(sessions)
+    service = session_service(sessions)
+    barrier, tokens, errors = threading.Barrier(8), [], []
+
+    def work():
+        barrier.wait()
+        try:
+            tokens.append(service.login(email="a@example.com", password=GOOD).token)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=work) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert errors == [] and len(set(tokens)) == 8
+    with sessions() as s:
+        assert len(s.scalars(select(UserSession)).all()) == 8
+
+
+def test_one_session_ended_at_once_ends_once_and_resolving_never_fails(sessions):
+    verified_user(sessions)
+    service = session_service(sessions)
+    token = service.login(email="a@example.com", password=GOOD).token
+    barrier, results = threading.Barrier(8), []
+
+    def work():
+        barrier.wait()
+        results.append(service.logout(token))
+
+    threads = [threading.Thread(target=work) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert sorted(results) == [False] * 7 + [True], "exactly one of eight simultaneous logouts ended it"
+    assert service.resolve(token) is None
+    other = service.login(email="a@example.com", password=GOOD).token
+    resolved, barrier = [], threading.Barrier(8)
+
+    def read():
+        barrier.wait()
+        resolved.append(service.resolve(other) is not None)
+
+    threads = [threading.Thread(target=read) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert resolved == [True] * 8

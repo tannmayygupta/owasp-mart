@@ -36,6 +36,14 @@ class RateLimiter(Protocol):
         """Count one request under `key`. Allowed while the count in the current window is at most `limit`."""
         ...
 
+    def peek(self, key: str, limit: int) -> RateDecision:
+        """Without counting: denied when the current window already holds `limit` or more under `key` (used for failed-login counters)."""
+        ...
+
+    def reset(self, key: str) -> None:
+        """Forget the count under `key` (a successful login clears the failures of that address)."""
+        ...
+
 
 def email_key(normalized_email: str) -> str:
     """A key part for an address: a hash, so no address is ever a Valkey key."""
@@ -61,6 +69,18 @@ class InMemoryRateLimiter:
             if count <= limit:
                 return RateDecision(True, 0)
             return RateDecision(False, max(1, int(end - now + 0.999)))
+
+    def peek(self, key: str, limit: int) -> RateDecision:
+        now = self._now()
+        with self._lock:
+            count, end = self._windows.get(key, (0, 0.0))
+            if now >= end or count < limit:
+                return RateDecision(True, 0)
+            return RateDecision(False, max(1, int(end - now + 0.999)))
+
+    def reset(self, key: str) -> None:
+        with self._lock:
+            self._windows.pop(key, None)
 
 
 class ValkeyRateLimiter:
@@ -88,3 +108,22 @@ class ValkeyRateLimiter:
         if int(count) <= limit:
             return RateDecision(True, 0)
         return RateDecision(False, max(1, int(ttl)))
+
+    def peek(self, key: str, limit: int) -> RateDecision:
+        try:
+            pipe = self._client.pipeline()
+            pipe.get(self._prefix + key)
+            pipe.ttl(self._prefix + key)
+            raw, ttl = pipe.execute()
+        except Exception as exc:  # noqa: BLE001
+            raise RateLimiterUnavailable(type(exc).__name__) from exc
+        count = int(raw) if raw is not None else 0
+        if count < limit:
+            return RateDecision(True, 0)
+        return RateDecision(False, max(1, int(ttl)))
+
+    def reset(self, key: str) -> None:
+        try:
+            self._client.delete(self._prefix + key)
+        except Exception as exc:  # noqa: BLE001
+            raise RateLimiterUnavailable(type(exc).__name__) from exc

@@ -61,6 +61,28 @@ class UserRole(Timestamps, Base):
     account_type: Mapped[str] = mapped_column(String(12), nullable=False, server_default="participant")
 
 
+class UserSession(Base):
+    """A server-side session (architecture 04 section 2.1, FR-ACC-03). The cookie holds an opaque random value; only its SHA-256
+    hash is stored, so a copy of this table cannot be used to sign in. `last_seen_at` drives the idle timeout, `absolute_expires_at`
+    the absolute one, `revoked_at` logout and "log out everywhere". `ip_trunc` and `ua_class` are coarse (a network prefix and a
+    device class), kept for the user's own session list, not for tracking."""
+
+    __tablename__ = "sessions"
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE", name="fk_sessions_user_id_users"),
+        Index("ix_sessions_user_id", "user_id"),
+    )
+
+    id_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    absolute_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ip_trunc: Mapped[str | None] = mapped_column(String(64))
+    ua_class: Mapped[str | None] = mapped_column(String(16))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class EmailToken(Timestamps, Base):
     __tablename__ = "email_tokens"
     __table_args__ = (

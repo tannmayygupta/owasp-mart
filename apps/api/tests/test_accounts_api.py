@@ -28,6 +28,7 @@ from vulnmart.ports.fakes import FakeSettingsPort
 GOOD = "correct horse battery staple"
 SIGNUP = {"email": "ada@example.com", "password": GOOD, "display_name": "Ada", "age_declaration": True}
 SECRET = "dev-origin-secret-0123456789"
+ORIGIN = "http://127.0.0.1:3000"  # the dashboard origin (Settings.public_origin by default): every state-changing call must come from it
 T = datetime(2026, 10, 17, 10, 0, tzinfo=UTC)
 
 
@@ -43,7 +44,7 @@ def make_client(sessions, *, settings=None, limiter=None, overrides=None, servic
     svc = AccountService(sessions, FakeSettingsPort(), public_origin="https://vulnmart.example", now=lambda: T) if service else None
     app = create_app({}, settings=settings, accounts=svc, rate_limiter=limiter or InMemoryRateLimiter())
     app.state.ports.settings = FakeSettingsPort(overrides or {})
-    return TestClient(app, headers=headers, raise_server_exceptions=False)
+    return TestClient(app, headers={"origin": ORIGIN, **headers}, base_url="https://testserver", raise_server_exceptions=False)
 
 
 def mails(sessions):
@@ -133,6 +134,28 @@ def test_the_password_is_never_logged(sessions, caplog):
         c.post("/api/v1/accounts", json=SIGNUP)
         c.post("/api/v1/accounts", json={**SIGNUP, "password": "wrong shape", "display_name": ""})
     assert GOOD not in caplog.text and "wrong shape" not in caplog.text
+
+
+@pytest.mark.parametrize("path,body", [
+    ("/api/v1/accounts", SIGNUP), ("/api/v1/accounts/verify-email", {"token": "A" * 43}),
+    ("/api/v1/accounts/verify-email/resend", {"email": "a@example.com"}),
+])
+@pytest.mark.parametrize("headers", [
+    {"origin": None}, {"origin": "https://evil.example"}, {"origin": "http://127.0.0.1:3001"}, {"origin": "null"},
+    {"sec-fetch-site": "cross-site"}, {"sec-fetch-site": "same-site"},
+])
+def test_a_public_post_from_another_origin_is_forbidden(sessions, path, body, headers):
+    with make_client(sessions) as c:
+        sent = {k: v for k, v in headers.items() if v is not None}
+        r = c.post(path, json=body, headers=sent) if "origin" not in headers or headers["origin"] else c.post(path, json=body, headers={"origin": ""})
+    assert (r.status_code, r.json()["code"]) == (403, "AUTH-ORIGIN-FORBIDDEN")
+    assert users(sessions) == [] and mails(sessions) == []
+
+
+def test_the_dashboard_origin_with_a_trailing_slash_or_same_origin_fetch_metadata_is_fine(sessions):
+    with make_client(sessions) as c:
+        r = c.post("/api/v1/accounts", json=SIGNUP, headers={"origin": ORIGIN + "/", "sec-fetch-site": "same-origin"})
+    assert r.status_code == 202
 
 
 # ---- verifyEmail and resend ------------------------------------------------------------------------------------------
@@ -242,12 +265,12 @@ def test_client_address_rules():
 @pytest.mark.parametrize("env", ["staging", "production"])
 def test_a_strict_environment_will_not_start_without_valkey_for_the_rate_limits(env):
     with pytest.raises(RuntimeError, match="VULNMART_VALKEY_URL"):
-        create_app({}, settings=Settings(env=env, origin_secret=SECRET))
+        create_app({}, settings=Settings(env=env, origin_secret=SECRET, csrf_secret="k" * 32))
 
 
 @pytest.mark.parametrize("env", ["staging", "production"])
 def test_a_strict_environment_will_not_send_links_over_plain_http(env):
-    settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0",
+    settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0", csrf_secret="k" * 32,
                         postgres_dsn="postgresql://app@db.invalid/vulnmart", public_origin="http://vulnmart.example")
     with pytest.raises(RuntimeError, match="https://"):
         create_app({}, settings=settings)
@@ -264,6 +287,12 @@ def test_without_a_configured_service_the_routes_answer_an_internal_error(sessio
 def test_when_the_limiter_store_is_down_the_request_is_refused_not_let_through(sessions):
     class Down:
         def hit(self, key, limit, window_seconds):
+            raise RateLimiterUnavailable("ConnectionError")
+
+        def peek(self, key, limit):
+            raise RateLimiterUnavailable("ConnectionError")
+
+        def reset(self, key):
             raise RateLimiterUnavailable("ConnectionError")
 
     with make_client(sessions, limiter=Down()) as c:

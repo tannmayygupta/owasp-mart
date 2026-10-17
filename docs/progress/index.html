@@ -59,7 +59,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <h2>The three streams</h2>
 <div class="cards">
 <div class="card"><h3><a href="#lab">Lab: Tanmay</a></h3><p>Builds the part that starts a private copy of the shop for each person, keeps it isolated, detects the attacks, and scores the attempt.</p><p class="summary">14 done, 2 being implemented, 15 next, of 31 tasks.</p></div>
-<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">10 done, 6 being implemented, 16 next, of 32 tasks.</p></div>
+<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">11 done, 5 being implemented, 16 next, of 32 tasks.</p></div>
 <div class="card"><h3><a href="#target">Target: Sahil</a></h3><p>Builds the online shop that is deliberately vulnerable, with its 11 challenges, hints and the tests that prove each one can be solved.</p><p class="summary">16 done, 0 being implemented, 16 next, of 32 tasks.</p></div>
 </div>
 <h2>Contracts between the streams</h2>
@@ -181,7 +181,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <section id="platform">
 <h2>Platform stream: Akshay</h2>
 <p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p>
-<p class="summary"><strong>10 done, 6 being implemented, 16 next, 32 tasks in total.</strong></p>
+<p class="summary"><strong>11 done, 5 being implemented, 16 next, 32 tasks in total.</strong></p>
 <p class="source">source: docs/dev/dev2-akshay.md (working tree)</p>
 <h3>Sprint 1 <span class="dates">(2026-10-08 to 2026-10-14)</span></h3>
 <ul class="tasks">
@@ -199,7 +199,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <li class="task done"><div class="head"><span class="tid">P-09</span> <span class="ttitle">Outbox, queue worker and email provider</span> <span class="status">Done</span></div><p class="build">Transactional outbox, Dramatiq worker with retries, and the email provider adapter.</p><p class="waits">Waits on: P-06. Open: which provider, Resend or Brevo (OI-32).</p></li>
 <li class="task done"><div class="head"><span class="tid">P-10</span> <span class="ttitle">Email templates and in-app warnings</span> <span class="status">Done</span></div><p class="build">Templates for every email type and in-app warnings.</p><p class="waits">Waits on: P-09.</p></li>
 <li class="task done"><div class="head"><span class="tid">P-11</span> <span class="ttitle">Learner signup, email verification and signup abuse protection</span> <span class="status">Done</span></div><p class="build">Learner signup with Argon2id passwords, email verification and rate limits against abuse.</p><p class="waits">Waits on: P-10. Open: CAPTCHA choice.</p></li>
-<li class="task now"><div class="head"><span class="tid">P-12</span> <span class="ttitle">Login, sessions, timeouts and CSRF</span> <span class="status">Being implemented</span></div><p class="build">Session cookies, idle and absolute timeouts, logout, CSRF protection and the cookie rules of NFR-SEC-03.</p><p class="waits">Waits on: P-11.</p></li>
+<li class="task done"><div class="head"><span class="tid">P-12</span> <span class="ttitle">Login, sessions, timeouts and CSRF</span> <span class="status">Done</span></div><p class="build">Session cookies, idle and absolute timeouts, logout, CSRF protection and the cookie rules of NFR-SEC-03.</p><p class="waits">Waits on: P-11.</p></li>
 <li class="task now"><div class="head"><span class="tid">P-13</span> <span class="ttitle">Account types, candidate role and admin creation</span> <span class="status">Being implemented</span></div><p class="build">Separate account types, the candidate role on the same login, and admin account creation.</p><p class="waits">Waits on: P-12.</p></li>
 <li class="task now"><div class="head"><span class="tid">P-14</span> <span class="ttitle">Password reset, password quality and account self-service</span> <span class="status">Being implemented</span></div><p class="build">Password reset by email, password quality rules, and self-service account management.</p><p class="waits">Waits on: P-10, P-12.</p></li>
 <li class="task now"><div class="head"><span class="tid">P-15</span> <span class="ttitle">Multi-factor login</span> <span class="status">Being implemented</span></div><p class="build">Multi-factor login as the requirement specifies.</p><p class="waits">Waits on: P-12.</p></li>
