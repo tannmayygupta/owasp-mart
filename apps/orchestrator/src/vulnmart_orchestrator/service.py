@@ -46,6 +46,7 @@ from .backend import FAIL_TEMPLATE, BackendError, ServiceFakeBackend
 from .builder import INSTANCE_ID, TemplateInvalid, parse_access, parse_create, parse_reset
 from .capacity import DEFAULT_CAPACITY_MB
 from .engine import Orchestrator
+from .gate import GatePort, NullGate
 from .images import ImageAllowlist, ImageNotAllowed, fake_allowlist
 from .jsonstrict import JsonStrictError, loads_strict
 from .problems import (
@@ -475,6 +476,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--injector-timeout-s", type=float, default=None)
     p.add_argument("--rate-per-s", type=float, default=RATE_PER_SECOND, help="requests per second per client; 0 switches the limit off")
     p.add_argument("--rate-burst", type=float, default=BURST)
+    p.add_argument("--edge-container", help="name of the edge container that is connected to every instance network (off when not given)")
+    p.add_argument("--gate-url", help="base URL of the gate admin API (https, or http for a loopback host or a network alias); needs --gate-admin-key-file")
+    p.add_argument("--gate-admin-key-file", help="file with the gate admin secret (same file rule as the other key files); needs --gate-url")
     p.add_argument("--tls-cert")
     p.add_argument("--tls-key")
     p.add_argument("--tls-ca")
@@ -523,7 +527,8 @@ def build_engine(args: argparse.Namespace, on_transition: Callable | None) -> Or
         raise ValueError(f"no template (*.json) found in {args.templates_dir}")
     common = dict(
         capacity_mb=args.capacity_mb, host_id=args.host_id, step_delay_s=args.step_delay_ms / 1000, on_transition=on_transition,
-        tombstones=TombstoneStore(args.state_dir), reconcile_gate=True,
+        tombstones=TombstoneStore(args.state_dir), reconcile_gate=True, edge_container=args.edge_container,
+        gate=GatePort(args.gate_url, args.gate_admin_key_file) if args.gate_url else NullGate(),
     )
     if args.backend == "fake":
         if "shop-v0" in templates and FAIL_TEMPLATE not in templates:
@@ -571,6 +576,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--backend fake is a test backend: it needs --allow-fake-backend")
         if args.report_url:
             check_report_url(args.report_url)
+        if bool(args.gate_url) != bool(args.gate_admin_key_file):
+            raise ValueError("--gate-url and --gate-admin-key-file must be given together")
         platform_key = _key(args.key_file, "VM_ORCH_PLATFORM_KEY", "key (platform signing key)")
         pusher = None
         if args.report_url:

@@ -1,0 +1,3 @@
+-P INPUT DROP
+-A INPUT -i lo -j ACCEPT
+-A INPUT -s 172.30.0.0/16 -m conntrack --ctstate NEW -j DROP

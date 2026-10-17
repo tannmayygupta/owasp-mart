@@ -1,0 +1,10 @@
+STATUS  STEP                   DETAIL
+------  ---------------------  ----------------------------------------
+PASS    docker-seccomp         security options: seccomp,profile=builtin, cgroupns; rootless no; userns no (checked, not extended); storage overlayfs
+FAIL    daemon-pools           no default-address-pools set: Docker's built-in pool is used; 50 instance networks are not guaranteed
+FAIL    daemon-live-restore    live-restore is not true; no-new-privileges default off (set per container, see container-hardening)
+SKIP    host-rule-docker-user  Docker Desktop host has no iptables here (run on the VM)
+SKIP    host-rule-input        Docker Desktop host has no iptables here (run on the VM)
+PASS    container-hardening    1 container(s): none privileged, no host network, socket only read-only in docker-proxy, no unlisted writable binds, instances drop ALL and set no-new-privileges
+SKIP    listening-ports        ss is not available here (run on the VM)
+SKIP    imds-v2-required       AWS metadata check is a VM step

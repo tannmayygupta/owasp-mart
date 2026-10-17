@@ -1,0 +1,27 @@
+$ node scripts/check-submission-pack.mjs
+STATUS  STEP                                            DETAIL
+------  ----------------------------------------------  ----------------------------------------
+PASS    source of truth (decision log, open questions)  initial.md (117634 characters)
+PASS    project rules                                   CLAUDE.md (6842 characters)
+PASS    PRD                                             docs/prd/PRD.md (123458 characters)
+PASS    architecture overview                           docs/architecture/01-overview-and-components.md (14267 characters)
+PASS    architecture deployment                         docs/architecture/02-deployment-and-network.md (28699 characters)
+PASS    architecture origins and access                 docs/architecture/03-origins-and-access.md (25864 characters)
+PASS    architecture data and state                     docs/architecture/04-data-and-state.md (25484 characters)
+PASS    architecture key flows                          docs/architecture/05-key-flows.md (14523 characters)
+PASS    architecture security                           docs/architecture/06-security.md (17397 characters)
+PASS    decision records (ADRs)                         43 file(s) in docs/adr
+PASS    dev-log entries                                 84 file(s) in docs/dev-log
+PASS    traceability matrix                             docs/traceability.md (59298 characters)
+PASS    changelog                                       CHANGELOG.md (60180 characters)
+PASS    evidence folders (docs/assets)                  167 file(s) in docs/assets
+PASS    runbook: local demo                             docs/runbooks/local-demo.md (5746 characters)
+PASS    runbook: backup and restore                     docs/runbooks/backup-restore.md (6119 characters)
+PASS    runbook: laptop fallback                        docs/runbooks/laptop-fallback.md (3904 characters)
+PASS    runbook: VM-I hardening audit                   docs/runbooks/vmi-hardening.md (7871 characters)
+PASS    runbook: demo 19 Oct                            docs/runbooks/demo-19-oct.md (8172 characters)
+PASS    runbook: submission pack                        docs/runbooks/submission-pack.md (3316 characters)
+PASS    handoffs register                               docs/dev/HANDOFFS.md (132043 characters)
+PASS    no secret-looking content                       328 files scanned, no hit
+
+submission pack: PASS

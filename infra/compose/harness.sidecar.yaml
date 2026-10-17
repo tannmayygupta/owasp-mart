@@ -1,0 +1,16 @@
+# Override of infra/compose/harness.yaml that runs the PRODUCT sidecar image (services/sidecar, story 6.2) in place of the stub sidecar.
+# Build the image first:   docker build -f services/sidecar/Dockerfile -t vulnmart-sidecar:local services/sidecar
+# Resolve it (check only): docker compose -f infra/compose/harness.yaml -f infra/compose/harness.sidecar.yaml -p vulnmart-harness config
+# scripts/harness.mjs starts the stack from harness.yaml only; to run it with this override, point its compose file list at both files.
+# The start document still arrives on standard input; the flags are those of the stub sidecar (the entry point is /app/src/main.mjs, the
+# distroless image has no shell). Runtime profile (user, read-only root, cap_drop, tmpfs /tmp) is inherited from harness.yaml.
+services:
+  sidecar:
+    image: vulnmart-sidecar:local
+    command: ["/app/src/main.mjs", "--relay", "http://edge:8081/internal/v1/events", "--upstream", "http://shop:3000"]
+    healthcheck:
+      test: ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:9000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 1s

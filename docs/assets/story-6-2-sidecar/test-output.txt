@@ -1,0 +1,198 @@
+=== sidecar tests (incl. real Docker)
+> node --test "services/sidecar/test/*.test.mjs"
+✔ image: builds, starts under the runtime profile, is healthy, passes a gzip flag response through and delivers signed events (12643.6441ms)
+ℹ image size (local, Docker Desktop, amd64): 53073687 bytes = 50.6 MiB
+ℹ idle memory after the requests above (local, docker stats): 45.41MiB / 256MiB
+✔ schemas: the copies in services/sidecar/schemas equal the contract files byte for byte (2.4413ms)
+✔ every event type the sidecar can emit passes the wire schema (14.0925ms)
+✔ flag_seen: challenge key in envelope and data for real and decoy, in neither for foreign; proxy events say source sidecar, player, no user (D-76) (0.3472ms)
+✔ capture: secret fields are blanked in JSON and form bodies and in the query; flags in any plain, percent or full-width form become the marker (0.9653ms)
+✔ capture: the body is cut at 8 KiB of UTF-8 without breaking a character; headers are cut at 512; only allow-listed headers (1.3771ms)
+✔ capture: a flag hidden in a form the redaction does not read is never sent: the whole body is replaced (0.7319ms)
+✔ route templates: digits, UUIDs, order numbers and flag-like segments become {id}; the query is dropped; 200 characters at most; methods are the enum or other (0.808ms)
+✔ bad start document: exit 2, the fixed message, no listener is started, nothing of the document is printed (85.1177ms)
+✔ a good start document starts both ports; the word "sidecar" in front of the flags is accepted; the log line holds no key or digest (304.93ms)
+✔ S-9: every channel row is seen or not seen as the table says (16.5156ms)
+✔ classes: real and decoy come from the digest set with their challenge key; a flag-shaped string in no digest is foreign without a key (1.2895ms)
+✔ a candidate is reported once per response however often and however encoded it appears (0.4748ms)
+✔ near misses are not candidates: short, long, lowercase letters, characters outside Base32 (0.5647ms)
+✔ a bad digest set cannot be built into a matcher (the sidecar then runs as a plain pass-through) (0.4466ms)
+✔ decoders: content-encoding lists, expansion bound, bad data, unsupported (66.7613ms)
+✔ text layers: JSON escapes, entities, percent; unknown entities and non-ASCII bytes are left alone (0.4721ms)
+✔ the scan cap constant is 1 MiB (0.1785ms)
+✔ start document: a valid one is read once; a bad one is refused (77.0244ms)
+✔ an app event is accepted 202, gets instance_id, the epoch and seq 1, 2, is signed, and the fake ingest stores and verifies it (438.63ms)
+✔ IF-4 answers: 405 GET, 415 wrong type, 413 over 4 KiB, 400 not JSON, 422 for a forbidden source, an extra field and an unknown type; nothing forwarded (472.7531ms)
+✔ ingest down: the event is kept and retried until it is delivered (295.5347ms)
+✔ drop rules: 401, 409, 413 and 422 drop the event with an alarm that holds only seq and status (614.92ms)
+✔ keep rules: 500 and 503 are retried until 202; 200 (duplicate) counts as delivered (341.6818ms)
+✔ bounded buffer: when full the oldest event is dropped first, with an alarm (112.317ms)
+✔ player traffic on the player port is passed to the shop unchanged (109.7615ms)
+✔ D-42: a sidecar restart inside one epoch continues from the saved counter, with no collision at the ingest (338.9875ms)
+✔ D-42: write-ahead: the counter is saved before the event is queued, so a crash can leave a gap but never a reused seq (238.0825ms)
+✔ D-42: a new epoch restarts the counter at 1; a state file of a later epoch, another instance or garbage is refused (4.7802ms)
+✔ D-42: events of a reset carry the new epoch with seq 1 and the old epoch stays history at the ingest (309.9948ms)
+✔ D-42: the sidecar lane ends at 2^40-1: the next event is refused with 503 and nothing is queued (122.578ms)
+✔ D-42: killed for real: a sidecar process killed with SIGKILL and started again continues without a collision (1391.9944ms)
+✔ real flag, plain: identical bytes to the player; proxy.flag_seen real C05, then evidence.capture C05 with the same request_ref; signed; no flag value in any event (208.1187ms)
+✔ S-9 end to end: every channel row, bytes identical to the player, events only for the rows the table calls seen (597.2534ms)
+✔ decoy and foreign: kind decoy with its challenge key, kind foreign with none; no evidence.capture for either (355.2435ms)
+✔ reload: the same candidate on the same route within 60 s is one event and a counter; another route, or after the window, is a new event (237.9167ms)
+✔ too big: a 2 MiB response is not scanned (scan_skipped counted), the player gets identical bytes, no event (231.5163ms)
+✔ proxy.request: one aggregated event per (method, route template, status) with a count, ids and classes only (284.3409ms)
+✔ spoof: a player-sent x-vm-* header is removed before the shop and none goes back out; the events still say player (210.1333ms)
+✔ the upstream status, a 502 when the shop is down, and the inspectRequest hook that does nothing (248.644ms)
+✔ never blocks: a bad digest set (the matcher cannot be built): bytes identical, one alarm line with a fixed word (177.2787ms)
+✔ never blocks: the decoder or matcher throws (sync and async): bytes identical, scan_errors counted, alarm has a word and a counter only (232.4303ms)
+✔ never blocks: the ingest is down: bytes identical, flag and evidence events stay buffered, nothing is lost (154.5927ms)
+✔ never blocks: the relay accepts and never answers (timeout): bytes identical for many requests (322.7885ms)
+✔ never blocks: an event cannot get a seq (lane full): bytes identical, emit_errors counted, alarm has a word and a counter (120.6747ms)
+✔ never blocks: the state file cannot be written (write-ahead fails): bytes identical, nothing thrown to the player (151.6143ms)
+✔ never blocks: a gzip response with a broken body is passed on as received; the scan skips it (134.2333ms)
+✔ bounded buffer: the oldest proxy.request summary goes first; a flag or evidence event is never dropped for a summary (187.2113ms)
+✔ bounded buffer (outbox): when it holds only flag or state events a summary is the one dropped, and it takes no seq (1.073ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13139.5234
+
+exit: 0
+
+=== S-9 table
+> node services/sidecar/scripts/s9-table.mjs
+wrote docs\assets\story-6-2-sidecar\s9-matcher-channels.md; 27 rows, 0 mismatches
+
+exit: 0
+
+=== images matrix (sidecar entry present)
+> node scripts/images-matrix.mjs
+{"include":[{"name":"hello","context":"infra/hello","dockerfile":"infra/hello/Dockerfile","platform":"linux/amd64","arch":"amd64","runner":"ubuntu-24.04","public":true},{"name":"shop","context":"apps/shop","dockerfile":"apps/shop/Dockerfile","platform":"linux/amd64","arch":"amd64","runner":"ubuntu-24.04","public":true},{"name":"mock-services","context":"services/mock-services","dockerfile":"services/mock-services/Dockerfile","platform":"linux/amd64","arch":"amd64","runner":"ubuntu-24.04","public":true},{"name":"import-service","context":"services/import-service","dockerfile":"services/import-service/Dockerfile","platform":"linux/amd64","arch":"amd64","runner":"ubuntu-24.04","public":true},{"name":"bot-controller","context":"services/bot","dockerfile":"services/bot/Dockerfile","platform":"linux/amd64","arch":"amd64","runner":"ubuntu-24.04","public":true},{"name":"sidecar","context":"services/sidecar","dockerfile":"services/sidecar/Dockerfile","platform":"linux/amd64","arch":"amd64","runner":"ubuntu-24.04","public":true}]}
+
+exit: 0
+
+=== images matrix tests
+> node --test scripts/images-matrix.test.mjs
+✔ the repository file is valid and its files exist (8.32ms)
+✔ matrix: amd64 only by default, arm64 rows only with the switch (0.8624ms)
+✔ main prints the matrix as one JSON line, honours BUILD_ARM64, and exits 0 (4.5837ms)
+✔ validation refuses each invalid entry (exit 1 path) (1.0793ms)
+✔ healthcheck is optional; a valid exec argv passes, bad shapes and shells fail (0.4432ms)
+✔ release manifest: healthchecks map is emitted per role, and omitted when none declare one (0.4171ms)
+✔ release manifest: a digest reference per image and the commit; lower-cases the repository (0.2117ms)
+✔ release manifest: a missing or malformed digest fails (0.6555ms)
+✔ release script: missing flags print the usage and exit 2 (no TypeError) (0.4765ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 326.1585
+
+exit: 0
+
+=== stub instance tests unchanged
+> node --test "contracts/mocks/stub-instance/**/*.test.mjs"
+✔ readDocument: a complete document ends the read even when the input is never closed (Compose containers have no stdin-once flag) (4.6034ms)
+✔ readDocument: input closed after a document, split over chunks, is read whole (2.7967ms)
+✔ readDocument: fixed reasons, never part of the input (3.4934ms)
+✔ readDocument: data after the first complete object is a bad document (same chunk, later chunk, garbage) (32.2157ms)
+✔ readDocument: input that never completes is a bad document after the deadline (130.4299ms)
+✔ readDocument: a top-level value that is not an object is rejected at once, without waiting (1.4784ms)
+✔ passThrough: an upstream that breaks off after the headers destroys the client connection; before the headers it answers 502 (81.0801ms)
+✔ listen: resolves with the port and leaves no error listener behind; a busy port rejects (4.1129ms)
+✔ gate always allows: method, path, headers and body bytes reach the sidecar and the answer comes back unchanged (57.7866ms)
+✔ edge: the player port passes everything to the gate; an unreachable gate answers 502 (24.6724ms)
+✔ edge relay: only /internal/v1/events is forwarded, byte for byte; other ingest routes are not reachable (14.858ms)
+Unknown command "bogus". Commands: shop, inject, sidecar, edge, gate, ingest
+Unknown command "". Commands: shop, inject, sidecar, edge, gate, ingest
+bad argument: --oops
+✔ ingest wrapper: takes the key and instance from standard input only; a bad document starts nothing (228.5927ms)
+✔ main: unknown command exits 2 and names the commands; the five commands and the harness-only ingest exist (1.9095ms)
+✔ main sidecar: a bad start document exits 2, starts no sidecar and prints nothing from the document (4.4796ms)
+✔ main ingest: a bad start document exits 2 and starts no server; nothing from the document printed (3.3073ms)
+sidecar: listening on 1 and 2, epoch 1, next seq 1
+✔ main inject: a bad document exits 10 through main, prints one fixed line, writes nothing (28.6404ms)
+✔ main sidecar: a good start document starts the sidecar (the control case) (1.8211ms)
+✔ success: exit 0, snapshot, placements, flags file valid against its schema, marker written last (127.8122ms)
+✔ exit 10 for every kind of bad document, nothing printed from it, no marker and no file written (27.0612ms)
+✔ exit 10 when the document is larger than the limit (2.9779ms)
+✔ exit 11 when the snapshot cannot be written; no marker, no flags file, nothing from the document printed (3.7456ms)
+✔ exit 12 when a placement file cannot be written; marker absent (5.1304ms)
+✔ exit 13 when the flags file cannot be written; marker absent (7.13ms)
+✔ exit 13 when the marker cannot be written; the marker is the last step (8.5311ms)
+✔ a second run in the same place fails (the document is written once) (9.7052ms)
+✔ exit 10 for the decoy rules of the contract: repeated value, repeated (challenge_key, index), decoy for an unknown challenge (9.1261ms)
+✔ exit 10 for trailing data after the document and for input that never completes (3.128ms)
+✔ the validator uses the very same semantic functions as the stub (1.4734ms)
+✔ injector: the stub agrees with the contract on every injection-document example (84.7923ms)
+✔ sidecar: the stub agrees with the contract on every sidecar-start example (every semantic case included) (39.4904ms)
+✔ the semantic cases are rejected through the real readers too, not only the pure functions (6.0655ms)
+✔ before the marker: healthz 200, readyz 503, planted flag refused (53.9978ms)
+✔ after the marker with an open database: readyz 200; the snapshot was copied to /data (17.8386ms)
+✔ marker present but the database cannot be opened: readyz stays 503; it recovers when the snapshot appears (17.733ms)
+✔ database open but no marker: readyz 503 (9.105ms)
+✔ version has the build id and no secret (11.5228ms)
+✔ planted flag: served by the test route, equals the flags file, never in the log (34.8446ms)
+✔ emit: the shop relays each kind to the sidecar and returns its status; unknown kind 422; bad body 400 (21.2943ms)
+✔ emit when the sidecar is unreachable answers status 0, not a crash (11.8466ms)
+✔ a request target that cannot be parsed answers 400 and the process keeps serving (9.1986ms)
+✔ a partial read-only copy of a bad snapshot does not block the retry (the snapshot is 0444) (14.021ms)
+✔ start document: a valid one is read once; a bad one is refused (74.5194ms)
+✔ an app event is accepted 202, gets instance_id, the epoch and seq 1, 2, is signed, and the fake ingest stores and verifies it (315.4564ms)
+✔ IF-4 answers: 405 GET, 415 wrong type, 413 over 4 KiB, 400 not JSON, 422 for a forbidden source, an extra field and an unknown type; nothing forwarded (320.9918ms)
+✔ ingest down: the event is kept and retried until it is delivered (211.9218ms)
+✔ drop rules: 401, 409, 413 and 422 drop the event with an alarm that holds only seq and status (506.8618ms)
+✔ keep rules: 500 and 503 are retried until 202; 200 (duplicate) counts as delivered (287.6492ms)
+✔ bounded buffer: when full the oldest event is dropped first, with an alarm (106.9878ms)
+✔ player traffic on the player port is passed to the shop unchanged (97.5782ms)
+✔ D-42: a sidecar restart inside one epoch continues from the saved counter, with no collision at the ingest (311.6942ms)
+✔ D-42: write-ahead: the counter is saved before the event is queued, so a crash can leave a gap but never a reused seq (211.3985ms)
+✔ D-42: a new epoch restarts the counter at 1; a state file of a later epoch, another instance or garbage is refused (4.1453ms)
+✔ D-42: events of a reset carry the new epoch with seq 1 and the old epoch stays history at the ingest (326.2595ms)
+✔ D-42: the sidecar lane ends at 2^40-1: the next event is refused with 503 and nothing is queued (105.6367ms)
+✔ D-42: killed for real: a sidecar process killed with SIGKILL and started again continues without a collision (1226.4522ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 55
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4918.4097
+
+exit: 0
+
+=== check-text-files
+> node scripts/check-text-files.mjs
+PASS no control character, BOM or mojibake in the tracked text files
+
+exit: 0
+
+=== scan-secrets
+> node scripts/scan-secrets.mjs
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree
+
+exit: 0
+
+=== leak scan of the image layers (story 6.1 scanner)
+> node scripts/scan-flags.mjs --image vulnmart-sidecar:local
+scan-flags: 1 source(s) scanned
+  scanned: image vulnmart-sidecar:local
+scan-flags: CLEAN, no flag pattern found
+
+exit: 0
+
+=== leak scan of the S-9 table file
+> node scripts/scan-flags.mjs --file docs/assets/story-6-2-sidecar/s9-matcher-channels.md
+scan-flags: 1 source(s) scanned
+  scanned: file s9-matcher-channels.md
+scan-flags: CLEAN, no flag pattern found
+
+exit: 0
+

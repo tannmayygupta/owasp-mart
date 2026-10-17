@@ -422,3 +422,112 @@ def test_the_proxy_only_drives_objects_named_vm_and_a_foreign_object_stays(docke
                     obj.remove(force=True) if obj is container else obj.remove()
                 except docker.errors.DockerException:
                     pass
+
+# ---------------------------------------------------------------- connect and disconnect through the proxy (story edge-3, D-66)
+
+EDGE_TEST_LABEL = {"vulnmart.test": "edge-attach"}
+
+
+def throwaway_edge(client, image_id):
+    """A context manager: a labelled container that stays up, standing in for the edge. It is removed (forced) when the block ends."""
+    import contextlib
+    import uuid
+
+    @contextlib.contextmanager
+    def run():
+        name = "vulnmart-test-edge-" + uuid.uuid4().hex[:10]
+        container = client.containers.run(image_id, name=name, entrypoint=["node", "-e", "setInterval(()=>{},1<<30)"], detach=True,
+                                          labels=EDGE_TEST_LABEL)
+        try:
+            yield container
+        finally:
+            container.remove(force=True)
+
+    return run()
+
+
+def _attached(client, network: str, container) -> bool:
+    net = client.networks.get(network)
+    net.reload()
+    return container.id in (net.attrs.get("Containers") or {})
+
+
+def test_the_proxy_allows_connect_and_disconnect_for_vm_networks_only_and_nothing_else_around_them(docker_client, stub_image_id, socket_proxy):
+    import uuid
+
+    import docker
+
+    from vulnmart_orchestrator.backend import BackendError
+
+    tag = uuid.uuid4().hex[:10]
+    vm_net, foreign = f"vm-edge-probe-{tag}", f"foreign-edge-probe-{tag}"
+    made = []
+    try:
+        with throwaway_edge(docker_client, stub_image_id) as edge:
+            made.append(docker_client.networks.create(vm_net, driver="bridge", internal=True, labels=EDGE_TEST_LABEL))
+            fnet = docker_client.networks.create(foreign, driver="bridge", labels=EDGE_TEST_LABEL)
+            made.append(fnet)
+            # a network that is not named vm-*: 403 for connect and disconnect, by name, by id, with a version prefix, and nothing changes
+            for target in (foreign, fnet.id, "platform-core", "bridge", "host"):
+                for verb in ("connect", "disconnect"):
+                    for prefix in ("", "/v1.43"):
+                        assert _status("POST", f"{prefix}/networks/{target}/{verb}") == 403, (target, verb, prefix)
+            assert not _attached(docker_client, foreign, edge)
+            # only the two calls: another method, another verb, a longer path, another case, a traversal
+            for method, path in [
+                ("GET", f"/networks/{vm_net}/connect"), ("DELETE", f"/networks/{vm_net}/connect"), ("PUT", f"/networks/{vm_net}/disconnect"),
+                ("POST", f"/networks/{vm_net}/prune"), ("POST", "/networks/prune"), ("POST", f"/networks/{vm_net}/connect/x"),
+                ("POST", f"/networks/{vm_net}/Connect"), ("POST", f"/networks/{vm_net}/"), ("POST", f"/networks/{vm_net}"),
+                ("GET", f"/networks/{vm_net}/disconnect"),
+            ]:
+                assert _status(method, path) == 403, (method, path)
+            for path in [
+                f"/networks/{vm_net}/../{foreign}/connect", f"/networks/{vm_net}/%2e%2e/{foreign}/connect", f"/networks/{vm_net}%2f..%2f{foreign}/connect",
+                f"/networks/vm-x/../{foreign}/disconnect", f"//networks/{vm_net}/connect",
+            ]:
+                assert _raw("POST", path) == 403, path
+            # a vm-* network that does not exist: the proxy lets the call through and Docker answers (not 403)
+            assert _status("POST", f"/networks/vm-no-such-network-{tag}/connect") in (400, 404)
+
+            # through the real backend class, pointed at the proxy
+            be = _recording_via(socket_proxy)
+            be.edge_container = edge.name
+            be.connect_edge(vm_net)
+            assert _attached(docker_client, vm_net, edge)
+            ep = docker_client.networks.get(vm_net).attrs["Containers"][edge.id]
+            assert ep["Name"] == edge.name
+            be.disconnect_edge(vm_net)
+            assert not _attached(docker_client, vm_net, edge)
+            be.disconnect_edge(vm_net)  # not attached: a no-op, no error
+            # a foreign network: the backend gets a refusal, a backend error, and the edge stays where it is
+            with pytest.raises(BackendError):
+                be.connect_edge(foreign)
+            assert not _attached(docker_client, foreign, edge)
+            fnet.connect(edge.name)  # attached by hand, directly on the daemon
+            with pytest.raises(BackendError):
+                be.disconnect_edge(foreign)
+            assert _attached(docker_client, foreign, edge)
+    finally:
+        for net in made:
+            try:
+                net.remove()
+            except docker.errors.DockerException:
+                pass
+
+
+def test_create_reset_and_destroy_with_the_edge_work_through_the_proxy_and_leave_nothing(docker_client, stub_image_id, socket_proxy, clean):
+    be = _recording_via(socket_proxy)
+    with throwaway_edge(docker_client, stub_image_id) as edge:
+        orch = Orchestrator(be, {"shop-v0": reduced_template()}, stub_allowlist(stub_image_id), health_timeout_s=60, injector_timeout_s=60,
+                            edge_container=edge.name)
+        rec = orch.create(body(iid=IID))
+        assert rec.state is S.READY, [(t.to_state.value, t.reason, t.error_code) for t in rec.transitions]
+        net = f"vm-{IID.lower()}-e1-net"
+        assert _attached(docker_client, net, edge)
+        reset = {k: body()[k] for k in ("flags", "decoys", "flag_digests", "event_key", "seed")}
+        reset["epoch"] = 2
+        assert orch.reset(IID, reset).state is S.READY
+        assert _attached(docker_client, f"vm-{IID.lower()}-e2-net", edge) and not [n for n in docker_client.networks.list() if n.name == net]
+        assert orch.destroy(IID).state is S.DESTROYED
+        assert leftovers(docker_client, IID) == ([], [], [])
+        assert not [n.name for n in docker_client.networks.list() if n.name.startswith("vm-") and _attached(docker_client, n.name, edge)]

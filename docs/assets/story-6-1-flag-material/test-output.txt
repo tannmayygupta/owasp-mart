@@ -1,0 +1,63 @@
+$ uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_flags_material.py apps/api/tests/test_flags_checker.py
+.......................................                                  [100%]
+39 passed in 0.17s
+
+$ uv run --locked --package vulnmart-api pytest -q
+........................................................................ [  7%]
+........................................................................ [ 14%]
+........................................................................ [ 21%]
+........................................................................ [ 28%]
+..................sssssss............................................... [ 35%]
+........................................................................ [ 42%]
+........................................................................ [ 49%]
+........................................................................ [ 56%]
+........................................................................ [ 63%]
+........................................................................ [ 70%]
+........................................................................ [ 77%]
+........................................................................ [ 84%]
+........................................................................ [ 91%]
+........................................................................ [ 98%]
+...........                                                              [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:77: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:83: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:95: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:115: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:135: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:150: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:160: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+1012 passed, 7 skipped in 303.51s (0:05:03)
+
+$ node --test scripts/scan-flags.test.mjs
+▶ countFlagPatterns
+  ✔ finds a real-pattern flag and counts each one (1.1657ms)
+  ✔ ignores the documented fake pattern (0.169ms)
+  ✔ finds the refused forms: percent-encoded brace, full-width brace, lower case (0.2132ms)
+  ✔ a clean text, a short body and a non-Base32 body are not matches (0.1495ms)
+  ✔ a match across a chunk boundary is found once (8.5508ms)
+✔ countFlagPatterns (11.3801ms)
+▶ scanBuffer
+  ✔ finds a planted pattern in a fake image layer (nested gzip tar) and names where, not the value (4.2078ms)
+  ✔ a clean layer passes and the fake pattern in a layer passes (1.1489ms)
+  ✔ a planted pattern in a log text and in docker inspect JSON is found (0.2717ms)
+✔ scanBuffer (5.9003ms)
+▶ command line
+  ✔ exit 1 and no value printed for a planted file, exit 0 for a clean one, exit 2 for a bad argument (289.9019ms)
+  ✔ a tar file with a planted layer fails (143.1347ms)
+✔ command line (433.2869ms)
+▶ real Docker
+  ✔ a clean instance container passes (layers, logs, inspect) and a planted env value and a planted log line fail (17348.5079ms)
+✔ real Docker (17695.8763ms)
+ℹ tests 11
+ℹ suites 4
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18468.2988
+
+$ node scripts/check-text-files.mjs
+PASS no control character, BOM or mojibake in the tracked text files
+$ node scripts/scan-secrets.mjs
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree

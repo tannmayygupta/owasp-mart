@@ -6,6 +6,7 @@ requires-python = "==3.14.*"
 members = [
     "vulnmart",
     "vulnmart-api",
+    "vulnmart-attempts",
     "vulnmart-models",
     "vulnmart-orchestrator",
 ]
@@ -1000,11 +1001,13 @@ source = { editable = "apps/api" }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "jsonschema" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
     { name = "uvicorn" },
     { name = "valkey" },
+    { name = "vulnmart-attempts" },
     { name = "vulnmart-models" },
 ]
 
@@ -1021,11 +1024,13 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = "==1.20.0" },
     { name = "fastapi", specifier = "==0.143.0" },
+    { name = "jsonschema", specifier = "==4.26.0" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.6" },
     { name = "pydantic-settings", specifier = "==2.15.0" },
     { name = "sqlalchemy", specifier = "==2.0.54" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "valkey", specifier = "==6.1.1" },
+    { name = "vulnmart-attempts", editable = "packages/py-attempts" },
     { name = "vulnmart-models", editable = "packages/py-models" },
 ]
 
@@ -1037,6 +1042,21 @@ dev = [
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pyyaml", specifier = "==6.0.3" },
 ]
+
+[[package]]
+name = "vulnmart-attempts"
+version = "0.0.0"
+source = { editable = "packages/py-attempts" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = "==9.1.1" }]
 
 [[package]]
 name = "vulnmart-models"

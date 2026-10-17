@@ -319,7 +319,7 @@ class Reconciler:
         expires = _parse_time(raw)
         if expires is None:
             _log(event="reconcile-expiry-label", instance=iid, problem="missing" if not raw else "unparseable")
-        rec = e.register_found(iid, current, template_id, label("vm.host"), expires=expires, ready=verdict == "complete")
+        rec = e.register_found(iid, current, template_id, label("vm.host"), expires=expires, ready=verdict == "complete", owner=label("vm.owner"))
         if rec is None:  # a create was accepted since the records were read: its worker owns the objects
             result.skipped.append(iid)
             return

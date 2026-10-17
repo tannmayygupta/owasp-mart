@@ -1,0 +1,39 @@
+$ uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_ingest_verify.py apps/api/tests/test_ingest_conformance.py
+................................................................         [100%]
+64 passed in 16.02s
+
+$ uv run --locked --package vulnmart-api pytest -q apps/api/tests
+........................................................................ [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 18%]
+........................................................................ [ 24%]
+........................................................................ [ 30%]
+........................................................................ [ 36%]
+............................sssssss..................................... [ 42%]
+........................................................................ [ 49%]
+........................................................................ [ 55%]
+........................................................................ [ 61%]
+........................................................................ [ 67%]
+........................................................................ [ 73%]
+........................................................................ [ 79%]
+........................................................................ [ 85%]
+........................................................................ [ 92%]
+........................................................................ [ 98%]
+.....................                                                    [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:77: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:83: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:95: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:115: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:135: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:150: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:160: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+1166 passed, 7 skipped in 373.81s (0:06:13)
+
+$ node scripts/check-text-files.mjs
+PASS no control character, BOM or mojibake in the tracked text files
+exit 0
+
+$ node scripts/scan-secrets.mjs
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree
+exit 0

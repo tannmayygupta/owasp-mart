@@ -1,0 +1,21 @@
+=== RUN   TestSQLiIsReportedWithTag
+--- PASS: TestSQLiIsReportedWithTag (0.57s)
+=== RUN   TestBenignIsQuiet
+--- PASS: TestBenignIsQuiet (0.43s)
+=== RUN   TestDetectOnlyNeverInterrupts
+--- PASS: TestDetectOnlyNeverInterrupts (0.42s)
+=== RUN   TestBigBodyOnlyFirst8KiBInspected
+--- PASS: TestBigBodyOnlyFirst8KiBInspected (0.59s)
+=== RUN   TestJSONBodyIsInspected
+--- PASS: TestJSONBodyIsInspected (0.46s)
+=== RUN   TestHandlerAndCounters
+--- PASS: TestHandlerAndCounters (0.47s)
+=== RUN   TestLoopbackOnly
+--- PASS: TestLoopbackOnly (0.00s)
+=== RUN   TestParanoiaRange
+--- PASS: TestParanoiaRange (0.00s)
+=== RUN   TestNoEngineOnAnywhere
+--- PASS: TestNoEngineOnAnywhere (0.02s)
+PASS
+ok  	vulnmart/crs-detect	2.965s
+done

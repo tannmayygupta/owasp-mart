@@ -1,0 +1,16 @@
+Real results of 2026-10-17, branch sprint-3-tanmay (local, loopback, no network, no Docker needed).
+
+node --test apps/edge/test/session-epoch.test.mjs
+  ok second open: ticket at epoch n+1 gives cookie B, cookie A is refused at once and B works
+  ok login bump with no new open: A and B are refused until a new ticket of the new epoch
+  ok the same ticket twice: the replay is refused and the first cookie still works
+  ok freeze then thaw: a cookie from before the freeze does not survive the thaw, a new ticket is needed
+  ok closed: nothing works, not even a fresh ticket of the right epoch
+  ok rotation: a ticket signed with the previous key is accepted while configured, not after it is removed
+  ok a stale state push cannot lower the epoch: the earlier tab cannot be brought back
+  tests 7, pass 7, fail 0
+
+node --test apps/edge/test/*.test.mjs
+  tests 103, pass 103, fail 0
+
+Nothing of this ran on vm-i, with a real certificate or in a real browser: see docs/runbooks/edge-vm-i.md.

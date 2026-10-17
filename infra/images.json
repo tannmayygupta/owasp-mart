@@ -39,6 +39,14 @@
       "platforms": ["linux/amd64"],
       "public": true,
       "healthcheck": ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||9200)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    },
+    {
+      "name": "sidecar",
+      "context": "services/sidecar",
+      "dockerfile": "services/sidecar/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true,
+      "healthcheck": ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:9000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
     }
   ]
 }

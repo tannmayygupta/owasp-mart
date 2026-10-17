@@ -4,6 +4,7 @@
 // (story 4.2, ADR 0010, D-58): the service `docker-proxy` may mount the Docker socket, only as /var/run/docker.sock:/var/run/docker.sock:ro, with no other
 // volume or bind and ports on 127.0.0.1 only. Any other exception needs a change to this script with a decision record. A root or privileged container can bypass host firewall rules (ADR 0027);
 // the VPC security groups and network ACLs are the real boundary, so these rights are refused up front.
+// Ports of the lab profile (story edge-2): in a service with profile `lab` only `edge-caddy` may publish, only 443:443, and 8080, 8081 and 9090 are never published.
 // Two passes: a line scan for the old rules (comments are stripped first, so a comment that says "no privileged" does not fail), and a real YAML parse (js-yaml,\n// anchors and merge keys resolved) for the Docker socket, binds, ports and the pinned docker-proxy service.
 // Usage: node scripts/check-lab-compose-rules.mjs [file or folder ...]   (default: every compose or harness file in the repository)
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -53,6 +54,39 @@ function publishesOnLoopbackOnly(port) {
   return false; // a bare number publishes on every interface
 }
 
+// Published ports of the lab profile (story edge-2, D-62, D-28): the edge is the only way in, so only the service `edge-caddy` may publish a port, only 443
+// (host side 443 too); the gate ports 8080, 8081 and 9090 are never published by any lab service. docker-proxy keeps its own loopback rule below.
+export const EDGE_PUBLISHER = 'edge-caddy';
+export const EDGE_PORT = 443;
+export const NEVER_PUBLISHED = [8080, 8081, 9090];
+
+/** { host, container } of one ports entry (short or long form); a number or null when it cannot be read (a range, a variable, a missing value). */
+export function portNumbers(port) {
+  const num = (v) => (/^\d{1,5}$/.test(String(v ?? '').trim()) ? Number(v) : null);
+  if (port && typeof port === 'object') return { host: num(port.published), container: num(port.target) };
+  if (typeof port === 'number') return { host: null, container: port };
+  const parts = String(port).trim().replace(/\/(tcp|udp|sctp)$/i, '').split(':');
+  if (parts.length === 1) return { host: null, container: num(parts[0]) };
+  return { host: num(parts[parts.length - 2]), container: num(parts[parts.length - 1]) };
+}
+
+function checkLabPorts(svc, def, name) {
+  const profiles = asList(def.profiles).map(String);
+  const ports = asList(def.ports);
+  if (!profiles.includes('lab') || !ports.length) return [];
+  const out = [];
+  const fail = (msg) => out.push(`${name}: service ${svc}: ${msg}`);
+  for (const p of ports) {
+    const { host, container } = portNumbers(p);
+    if (container === null) { fail(`the ports entry ${JSON.stringify(p)} cannot be read (a range or a variable is not allowed for a lab service)`); continue; }
+    if (NEVER_PUBLISHED.includes(container) || (host !== null && NEVER_PUBLISHED.includes(host))) fail(`port ${NEVER_PUBLISHED.includes(container) ? container : host} (8080, 8081 and 9090) must never be published`);
+    if (svc === SOCKET_PROXY_SERVICE) continue; // its own rule: loopback only
+    if (svc !== EDGE_PUBLISHER) fail(`a lab service must not publish a port (only ${EDGE_PUBLISHER} publishes, and only ${EDGE_PORT})`);
+    else if (container !== EDGE_PORT || host !== EDGE_PORT) fail(`${EDGE_PUBLISHER} may publish only ${EDGE_PORT}:${EDGE_PORT} (got ${JSON.stringify(p)})`);
+  }
+  return out;
+}
+
 /** Checks on the parsed document: the one Docker socket exception (service docker-proxy) and the shapes a line scan cannot see. */
 function checkParsed(text, name, lineProblems) {
   const problems = [];
@@ -81,6 +115,7 @@ function checkParsed(text, name, lineProblems) {
       const src = typeof d === 'string' ? d.split(':')[0] : String(d?.source ?? '');
       if (exposesSocket(src) || /docker/.test(src)) fail(`${where}: a device entry that exposes the Docker socket is not allowed`);
     }
+    problems.push(...checkLabPorts(svc, def, name));
     const vols = asList(def.volumes).map(volumeInfo);
     if (svc !== SOCKET_PROXY_SERVICE) {
       for (const v of vols) {

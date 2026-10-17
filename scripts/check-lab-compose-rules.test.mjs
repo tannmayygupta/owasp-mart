@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import yaml from 'js-yaml';
 import { checkComposeText, checkFiles, SOCKET_PROXY_IMAGE, SOCKET_PROXY_COMMAND } from './check-lab-compose-rules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -102,4 +103,49 @@ test('privileged and host network stay refused in any service, in block or flow 
   assert.match(bad('services:\n  a: { network_mode: host }\n')[0], /network_mode: host/);
   assert.match(bad('services:\n  a: { pid: host }\n')[0], /pid: host/);
   assert.deepEqual(bad(`# ${SOCK} is mounted only by docker-proxy\nservices:\n  a:\n    image: x\n`), []);
+});
+
+// ---- published ports of the lab profile (story edge-2, D-62, D-28)
+const lab = (name, ports, profiles = '["lab"]') => `services:\n  ${name}:\n    profiles: ${profiles}\n    ports: ${ports}\n`;
+
+test('lab ports: edge-caddy may publish 443:443 only, in every spelling of that', () => {
+  for (const p of ['["443:443"]', '["0.0.0.0:443:443"]', '["127.0.0.1:443:443"]', '["443:443/tcp"]', '\n      - { target: 443, published: 443 }', '\n      - { target: 443, published: "443", host_ip: 0.0.0.0 }']) {
+    assert.deepEqual(bad(lab('edge-caddy', p)), [], p);
+  }
+});
+
+test('lab ports: a lab service that publishes 8080, 8081 or 9090 fails (host side or container side, loopback or not, short or long form)', () => {
+  for (const p of ['["8080:8080"]', '["127.0.0.1:8080:8080"]', '["8081:8081"]', '["9090:9090"]', '["18080:8080"]', '["8080:80"]', '["9090"]', '\n      - { target: 8080, published: 8080 }', '\n      - { target: 9090, published: 19090, host_ip: 127.0.0.1 }', '["8080:8080/tcp"]']) {
+    for (const svc of ['edge-gate', 'edge-caddy', 'orchestrator']) {
+      const out = bad(lab(svc, p));
+      assert.ok(out.length >= 1, `${svc} ${p}`);
+      assert.match(out.join('\n'), /never be published/, `${svc} ${p}`);
+    }
+  }
+});
+
+test('lab ports: edge-caddy publishing 80, 8443, or 443 on another host port fails; any other lab service publishing anything fails', () => {
+  for (const p of ['["80:80"]', '["80:443"]', '["8443:443"]', '["443:8443"]', '["443:443", "80:80"]', '["443-444:443-444"]', '["${PORT}:443"]']) {
+    assert.match(bad(lab('edge-caddy', p)).join('\n'), /may publish only 443:443|cannot be read/, p);
+  }
+  assert.match(bad(lab('edge-gate', '["443:443"]'))[0], /service edge-gate: a lab service must not publish a port/);
+  assert.match(bad(lab('orchestrator', '["127.0.0.1:8000:8000"]'))[0], /must not publish a port/);
+});
+
+test('lab ports: services outside the lab profile and the docker-proxy loopback port are not touched by this rule', () => {
+  assert.deepEqual(bad(lab('hello', '["127.0.0.1:18080:8080"]', '["hello"]')), []);
+  assert.deepEqual(bad(lab('api', '["127.0.0.1:8000:8000"]', '["platform"]')), []);
+  assert.deepEqual(bad('services:\n  web:\n    ports: ["8080:8080"]\n'), []);
+  assert.deepEqual(bad(proxy()), []);
+});
+
+test('lab ports: the committed compose file has edge-caddy as its only lab service with a ports entry, and it is 443:443', () => {
+  const doc = yaml.load(readFileSync(path.join(ROOT, 'infra', 'compose', 'compose.yaml'), 'utf8'));
+  const labServices = Object.entries(doc.services).filter(([, d]) => (d.profiles ?? []).includes('lab'));
+  assert.ok(labServices.some(([n]) => n === 'edge-caddy') && labServices.some(([n]) => n === 'edge-gate'));
+  const publishing = labServices.filter(([, d]) => (d.ports ?? []).length).map(([n]) => n).sort();
+  assert.deepEqual(publishing, ['docker-proxy', 'edge-caddy']);
+  assert.deepEqual(doc.services['edge-caddy'].ports, ['443:443']);
+  assert.equal(doc.services['edge-gate'].ports, undefined);
+  assert.deepEqual(checkFiles([path.join(ROOT, 'infra', 'compose', 'compose.yaml')]), []);
 });

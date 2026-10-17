@@ -32,9 +32,11 @@ from .builder import (
     ContainerSpec, CreateSpec, InstancePlan, ResetSpec, build_plan, injection_document, parse_create, parse_reset, sidecar_document,
 )
 from .capacity import Capacity
+from .gate import OWNER as OWNER_RE
+from .gate import GateLike, NullGate
 from .images import ImageAllowlist
 from .lifecycle import FakeSettingsPort, SettingsPort
-from .reconcile import AllWantedDesiredState, DesiredStatePort, ReconcileResult, Reconciler, TombstoneStore
+from .reconcile import LIVE_STATES, AllWantedDesiredState, DesiredStatePort, ReconcileResult, Reconciler, TombstoneStore
 from .states import (
     Busy, ErrorCode, InstanceExists, InstanceNotFound, InstanceState, InvalidState, RequestMismatch, StaleAccessEpoch, StaleEpoch,
     TemplateUnknown, Transition, check_transition, injector_error_code,
@@ -77,6 +79,8 @@ class InstanceRecord:
     expires_dt: datetime | None = None  # the `vm.expires` label: the total limit
     idle_minutes: int | None = None  # the idle limit (the settings default)
     transition_offset: int = 0  # added to the count of transitions to number the next one
+    owner: str = ""  # the owner hash (the `vm.owner` label): the gate admits only this owner; empty when an adopted instance has no label
+    in_gate: bool = False  # the gate holds a record of this instance (pushed by this process); a destroy deletes it
     lock: threading.RLock = dc_field(default_factory=threading.RLock, repr=False, compare=False)  # the slow work of this instance
 
 
@@ -123,6 +127,8 @@ class Orchestrator:
         tombstones: TombstoneStore | None = None,
         desired: DesiredStatePort | None = None,
         reconcile_gate: bool = False,
+        edge_container: str | None = None,
+        gate: GateLike | None = None,
     ) -> None:
         self.backend, self.templates, self.images = backend, templates, images
         self.settings: SettingsPort = settings or FakeSettingsPort()
@@ -137,6 +143,15 @@ class Orchestrator:
         self.reconciler = Reconciler(self, desired or AllWantedDesiredState())
         # With the gate, creates and resets are refused (ORCH-BUSY) until a pass has worked: the first pass at start has finished and
         # the desired state could be read (no safe mode). Without it (the engine tests) the engine is open from the start.
+        # The edge (story edge-3): off by default. `edge_container` is the one container that is connected to every instance network;
+        # `gate` receives the access state (a `NullGate` pushes nothing). The backend gets the same name, so there is one source.
+        self.edge_container = edge_container or None
+        self.gate: GateLike = gate or NullGate()
+        self._gate_on = bool(getattr(self.gate, "enabled", False))
+        self._gate_lock = threading.RLock()  # every write to the gate; never held together with `_lock` across a gate call
+        self._gate_dirty = self._gate_on  # a full sync is due (at start, and after a failed one)
+        if self.edge_container:
+            backend.edge_container = self.edge_container  # type: ignore[attr-defined]
         self._reconciled = not reconcile_gate
         self._safe_mode = False
         self._build_cv = threading.Condition()  # the parallel-build cap (story 3.6)
@@ -254,7 +269,7 @@ class Orchestrator:
             rec = InstanceRecord(
                 spec.instance_id, spec.epoch, spec.template_id, spec.fingerprint(), hostname=spec.hostname, memory_mb=plan.memory_mb,
                 components=frozenset(c["name"] for c in template["components"]), created_at=now, updated_at=now,
-                base=spec.without_secrets(), created_dt=created,
+                base=spec.without_secrets(), created_dt=created, owner=spec.owner_hash,
             )
             self.records[spec.instance_id] = rec
             self._move(rec, S.REQUESTED, "create accepted")
@@ -268,7 +283,9 @@ class Orchestrator:
 
     def reconcile(self, execute: Callable[[Callable[[], None]], None] | None = None) -> ReconcileResult:
         """One pass of the reconciler (see `reconcile.py`). A backend error while listing Docker is raised."""
-        return self.reconciler.run_once(execute)
+        result = self.reconciler.run_once(execute)
+        self._gate_after_pass(result)
+        return result
 
     def _set_reconciled(self, *, safe: bool, ok: bool = True) -> None:
         """The end of a pass. `ok` is False when the pass had an error for an instance: the gate stays (or becomes) closed."""
@@ -280,7 +297,7 @@ class Orchestrator:
         return not self._reconciled or self._safe_mode
 
     def register_found(
-        self, instance_id: str, epoch: int, template_id: str, hostname: str, *, expires: datetime | None, ready: bool,
+        self, instance_id: str, epoch: int, template_id: str, hostname: str, *, expires: datetime | None, ready: bool, owner: str = "",
     ) -> InstanceRecord | None:
         """Record an instance found in Docker that this process does not know. `ready`: all components were found running, so it is
         adopted as `ready` (access closed, access epoch 0; the platform opens it with its next `access` call). Otherwise it is
@@ -301,7 +318,7 @@ class Orchestrator:
                 # never later than the ceiling from now; a missing or unreadable label ends the instance at the next reaper pass
                 expires_dt=min(expires, now + timedelta(minutes=cfg.max_minutes_ceiling)) if expires is not None else now,
                 idle_minutes=cfg.default_idle_minutes,
-                transition_offset=ADOPTED_TRANSITION_BASE + int((now - ADOPTION_EPOCH).total_seconds()),
+                transition_offset=ADOPTED_TRANSITION_BASE + int((now - ADOPTION_EPOCH).total_seconds()), owner=owner,
             )
             self.records[instance_id] = rec
             if ready:
@@ -440,6 +457,12 @@ class Orchestrator:
             else:
                 b.start(c.name)
         self._wait_healthy(rec, [c for c in plan.others if c.healthcheck is not None])
+        if self.edge_container:  # after the sidecar is healthy, before ready; a failure is a start failure (retried), the sweep disconnects
+            self._check_cancel(rec)
+            b.connect_edge(plan.network.name)
+        if self._gate_on:  # the gate knows the instance (access as recorded, closed for a new one) before the platform hears `ready`
+            self._check_cancel(rec)
+            self._gate_put(rec)
         self._pause(rec)
         self._advance(rec, S.READY, "health ok and flags injected")
 
@@ -475,6 +498,12 @@ class Orchestrator:
         except BackendError:
             reason += "; cleanup incomplete, the reconciler or a destroy must finish it"
             clean = False
+        if self._gate_on and rec.in_gate:  # an instance that failed after the gate had its record: the record goes with the objects
+            try:
+                self._gate_delete(rec)
+            except BackendError:
+                clean = False
+                reason += "; the gate record is still there"
         try:
             self._advance(rec, S.FAILED, reason, f.code)
         except _Cancelled:
@@ -634,7 +663,11 @@ class Orchestrator:
     # ------------------------------------------------------------ access
 
     def set_access(self, instance_id: str, access: str, access_epoch: int) -> dict:
-        """IF-5 `access`: any state but destroyed; the access epoch only grows (an equal epoch with another value is stale)."""
+        """IF-5 `access`: any state but destroyed; the access epoch only grows (an equal epoch with another value is stale).
+        With a gate (D-63) the gate gets the new state first and the record changes only after the gate took it: a push that fails
+        fails this call and changes nothing, so the platform never believes an instance is open while the gate is not."""
+        if self._gate_on:
+            return self._set_access_gated(instance_id, access, access_epoch)
         with self._lock:
             rec = self.records.get(instance_id)
             if rec is None:
@@ -646,6 +679,91 @@ class Orchestrator:
             if access_epoch > rec.access_epoch or access != rec.access:
                 rec.access, rec.access_epoch, rec.updated_at = access, access_epoch, self._stamp()
             return self._view(rec)
+
+    def _set_access_gated(self, instance_id: str, access: str, access_epoch: int) -> dict:
+        with self._gate_lock:  # one access change at a time: the record cannot move between the check and the apply
+            with self._lock:
+                rec = self.records.get(instance_id)
+                if rec is None:
+                    raise InstanceNotFound("unknown instance")
+                if rec.state is S.DESTROYED:
+                    raise InvalidState("the instance is destroyed")
+                if access_epoch < rec.access_epoch or (access_epoch == rec.access_epoch and access != rec.access):
+                    raise StaleAccessEpoch("the access epoch is older, or equal with another value")
+                changed = access_epoch > rec.access_epoch or access != rec.access
+            if changed:
+                self._gate_put(rec, access, access_epoch)  # a failure raises here, before the record changes
+                with self._lock:
+                    rec.access, rec.access_epoch, rec.updated_at = access, access_epoch, self._stamp()
+            with self._lock:
+                return self._view(rec)
+
+    # ------------------------------------------------------------ the gate (story edge-3)
+
+    def _gate_record(self, rec: InstanceRecord, access: str | None = None, access_epoch: int | None = None) -> dict | None:
+        """The story-1 body for one instance, or None when the instance has no valid owner hash (an adopted one without its label)."""
+        with self._lock:
+            if not OWNER_RE.fullmatch(rec.owner or ""):
+                return None
+            return {
+                "hostname": rec.hostname, "instance_id": rec.instance_id, "epoch": rec.epoch, "owner": rec.owner,
+                "access": rec.access if access is None else access,
+                "access_epoch": rec.access_epoch if access_epoch is None else access_epoch,
+            }
+
+    def _gate_put(self, rec: InstanceRecord, access: str | None = None, access_epoch: int | None = None) -> None:
+        body = self._gate_record(rec, access, access_epoch)
+        if body is None:
+            raise BackendError("the instance has no valid owner hash: the gate cannot be told about it")
+        with self._gate_lock:
+            self.gate.put(body)  # raises on any failure
+            rec.in_gate = True
+
+    def _gate_delete(self, rec: InstanceRecord) -> None:
+        with self._gate_lock:
+            self.gate.delete(rec.instance_id)
+            rec.in_gate = False
+
+    def _gate_close(self, rec: InstanceRecord) -> None:
+        """The instance is being removed: the gate refuses it before any object goes. Written to the gate only (access epoch one above
+        the record, so the gate accepts it and every cookie of the old epoch stops working); best effort, the delete after the sweep
+        is the one that must succeed."""
+        with self._lock:
+            if not rec.in_gate or rec.access == "closed":
+                return
+            epoch = rec.access_epoch + 1
+        try:
+            self._gate_put(rec, "closed", epoch)
+        except BackendError as e:
+            print(f"gate close failed: {type(e).__name__}", file=sys.stderr, flush=True)
+
+    def gate_sync(self) -> None:
+        """Push every live instance to the gate in one call (the gate removes what is not in the list). Raises on failure."""
+        with self._gate_lock:
+            with self._lock:
+                recs = [r for r in self.records.values() if r.state in LIVE_STATES or (r.in_gate and r.state in (S.PROVISIONING, S.STARTING, S.RESETTING))]
+                items = [(r, self._gate_record(r)) for r in recs]
+                skipped = [r.instance_id for r, b in items if b is None]
+            if skipped:
+                print(f"gate sync skips {len(skipped)} instance(s) without a valid owner", file=sys.stderr, flush=True)
+            sent = {id(r) for r, b in items if b is not None}
+            self.gate.sync([b for _, b in items if b is not None])
+            with self._lock:
+                for r in self.records.values():
+                    r.in_gate = id(r) in sent
+            self._gate_dirty = False
+
+    def _gate_after_pass(self, result: ReconcileResult) -> None:
+        """Once at start and again after a pass that repaired something (or after a failed sync): the full sync. Never raises."""
+        if not self._gate_on:
+            return
+        if not (self._gate_dirty or result.adopted or result.failed or result.destroyed or result.swept):
+            return
+        try:
+            self.gate_sync()
+        except Exception as e:  # the gate is down: logged by class name, tried again on the next pass
+            self._gate_dirty = True
+            print(f"gate sync failed: {type(e).__name__}", file=sys.stderr, flush=True)
 
     # ------------------------------------------------------------ destroy
 
@@ -689,7 +807,11 @@ class Orchestrator:
     def _run_destroy(self, rec: InstanceRecord) -> None:
         try:
             with rec.lock:  # waits for a build that a destroy cancelled
+                if self._gate_on:
+                    self._gate_close(rec)
                 self._sweep(rec.instance_id)
+                if self._gate_on and rec.in_gate:
+                    self._gate_delete(rec)  # a failure keeps the instance `stopping` and a repeat tries again
                 self._pause(rec, cancellable=False)
                 with self._lock:
                     if rec.state is not S.DESTROYED:
@@ -703,9 +825,12 @@ class Orchestrator:
         b = self.backend
         found = b.find(instance_id, epoch)
         errors = 0
+        edge = bool(self.edge_container)
         for step, names in ((b.remove_container, found.containers), (b.remove_network, found.networks), (b.remove_volume, found.volumes)):
             for n in names:
                 try:
+                    if edge and step == b.remove_network:
+                        b.disconnect_edge(n)  # a network with an endpoint cannot be removed: the edge leaves first
                     step(n)
                 except BackendError:
                     errors += 1

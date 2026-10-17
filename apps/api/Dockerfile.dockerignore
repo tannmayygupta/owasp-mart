@@ -10,5 +10,8 @@
 !apps/api/migrations/**
 !packages/py-models/pyproject.toml
 !packages/py-models/src/**
+!packages/py-attempts/pyproject.toml
+!packages/py-attempts/src/**
+!contracts/events/instance-events.schema.json
 **/__pycache__
 **/*.pyc

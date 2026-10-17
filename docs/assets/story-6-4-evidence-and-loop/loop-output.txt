@@ -1,0 +1,18 @@
+detect_loop: LOCAL run on Docker Desktop (stub shop and injector, real sidecar image, fake ingest as edge); not a live result
+PASS images-built - stub instance image and product sidecar image built (local tags)
+PASS started-clean - removed 0 old instance(s) of an earlier run; none left
+PASS create-two-instances-ready - states ready and ready after 17.4s (error codes none, none); material of story 1: 2 challenges, 1 decoy each
+PASS edge-and-reflector-attached - fake ingest (alias edge) up True, reflector in front of the shop up True, both on the instance network
+PASS planted-flag-through-sidecar - player request through the sidecar answered HTTP 200
+PASS signed-event-stored - a signed proxy.flag_seen (real) is in the fake ingest and was accepted by the engine after 0.44s
+PASS m3-credited-in-budget - C05 milestone M3 0.44s after the request (budget 10s, LOCAL timing only); C02 none
+PASS planted-flag-is-the-derived-flag - the answer of the shop matches the flag the key service derives for this instance and epoch
+PASS evidence-sealed-and-readable - 1 sealed row(s) for C05, body of 31 bytes decrypts to the redacted request and holds no flag, stored bytes are sealed
+PASS decoy-not-credited - requests answered 200; sighting kinds ['decoy', 'foreign']; C02 milestone none; decoy integrity flags 1
+PASS foreign-sighted-not-credited - sidecar reported a foreign sighting True; the engine recognised the other instance's flag (sharing flags 1); no credit
+PASS paste-submission - other instance's flag pasted: incorrect/none; own flag pasted: correct/credited; C02 now M3
+PASS second-instance-other-flags - the second instance of the same template planted its own derived flags, different from the first instance's
+PASS activity-buckets-recorded - 1 minute bucket(s), 3 request(s) counted, counts only; last activity recorded True
+PASS no-flag-in-output-or-logs - scripts/scan-flags.mjs on this output and on the logs of 6 containers: exit 0
+PASS nothing-left-over - 0 loop containers, 0 instance containers, 0 instance networks, 0 instance volumes
+detect_loop: PASS (0 failed step(s)) in 33s, LOCAL Docker Desktop only

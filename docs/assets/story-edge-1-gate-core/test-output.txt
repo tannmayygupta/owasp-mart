@@ -1,0 +1,125 @@
+# node --test apps/edge/test/*.test.mjs
+✔ no secret, a wrong secret, a near-miss secret: 401 for every call and the state does not change (10.9928ms)
+✔ the secret is read from the file: a missing, empty or short file refuses every call; a rotated file takes effect (5.7152ms)
+✔ PUT stores a record the gate then uses; DELETE makes the instance unknown (410) (4.3482ms)
+✔ strict bodies: unknown, missing and badly typed members are refused (422) and the state is unchanged (6.3295ms)
+✔ transport rules: media type, size, JSON syntax, paths, methods (7.7597ms)
+✔ epoch rule: lower access epoch, lower container epoch, equal epoch with another value: 409 and the old state remains (3.4028ms)
+✔ sync: replaces the whole list, removes the rest, all or nothing (8.3733ms)
+✔ the answers carry no secret and no stored value (2.1422ms)
+✔ constant-time hygiene: signatures, keys and secrets are compared with timingSafeEqual, never with === (3.1587ms)
+✔ safeEqual: equal, different, different length, non-strings (1.0226ms)
+✔ good ticket: 302 to /, host-only cookie with the right attributes, no-referrer, then the cookie opens the shop (7.7745ms)
+✔ reused ticket: the second use is refused with the generic 403 page (1.1991ms)
+✔ refused tickets: expired, forged, other instance, other owner, old epoch (and newer epoch): 403, nothing forwarded, same page (2.2297ms)
+✔ cookie of instance A on host B: refused (0.8914ms)
+✔ cookie signed for instance A, owner and epoch of B, sent to host B: refused (instance differs) (0.554ms)
+✔ old cookie after a new open (state access epoch raised): refused until a new ticket (1.1541ms)
+✔ cookie of another owner (state owner changed): refused (0.7082ms)
+✔ frozen: a cookie that was valid gets the 423 page and nothing is forwarded; thawing needs a new ticket (the epoch rises, as in IF-5) (1.3731ms)
+✔ closed or unknown: 410 page, nothing forwarded, the same page for both (0.8419ms)
+✔ crafted Host values: refused as unknown (410, same page), before any state lookup (1.0751ms)
+✔ other /_vm/ paths: 404 for any method, nothing forwarded (3.4152ms)
+✔ cookie: absent, empty, garbage, duplicated, forged and ticket-as-cookie are all the same 403 (1.0583ms)
+✔ key rotation: the previous key is accepted, an unknown key is not, and new cookies are signed with the current key (0.9288ms)
+✔ forward: the gate cookie is stripped, other cookies stay, the upstream name comes from the record, no header is added (0.6034ms)
+✔ the used-ticket set is bounded: when it is full a new ticket is refused, and ids are forgotten only after their expiry (1051.8694ms)
+✔ a stale ticket id is not accepted again after a purge only when the ticket itself is expired (0.6317ms)
+✔ decide never throws and refuses garbage requests (0.4847ms)
+✔ an unknown instance with a ticket gets 410, like any unknown host (no state is created by a ticket) (0.3604ms)
+✔ createGate refuses weak keys and bad zones (0.9581ms)
+✔ a zone with several labels works and a host of another zone is refused (0.2922ms)
+✔ the vectors file has the expected shape and covers every verdict (1.6809ms)
+✔ ticket vector: valid, current key -> ok (2.0997ms)
+✔ ticket vector: valid, previous key (rotation) -> ok (0.3836ms)
+✔ ticket vector: valid, exp exactly 60 s ahead -> ok (0.2601ms)
+✔ ticket vector: valid, ae 0 -> ok (0.4329ms)
+✔ ticket vector: forged, last signature character changed -> signature (0.3214ms)
+✔ ticket vector: forged, payload changed under the old signature -> signature (0.2024ms)
+✔ ticket vector: signed with an unknown key -> signature (0.1951ms)
+✔ ticket vector: signed with the cookie prefix (domain separation) -> signature (0.2726ms)
+✔ ticket vector: expired, exp equals now -> expired (0.4366ms)
+✔ ticket vector: expired, exp in the past -> expired (0.262ms)
+✔ ticket vector: exp more than 60 s ahead -> too-far (0.176ms)
+✔ ticket vector: wrong version -> claims (0.1074ms)
+✔ ticket vector: extra field -> claims (0.1227ms)
+✔ ticket vector: missing jti -> claims (0.1144ms)
+✔ ticket vector: instance id in lower case -> claims (0.0991ms)
+✔ ticket vector: owner hash in upper case -> claims (0.0914ms)
+✔ ticket vector: owner hash too short -> claims (0.0884ms)
+✔ ticket vector: ae negative -> claims (0.0853ms)
+✔ ticket vector: ae a string -> claims (0.1297ms)
+✔ ticket vector: ae a fraction -> claims (0.0985ms)
+✔ ticket vector: exp a string -> claims (0.0945ms)
+✔ ticket vector: jti of the wrong length -> claims (0.0899ms)
+✔ ticket vector: payload is not JSON -> claims (0.1343ms)
+✔ ticket vector: payload is a JSON array -> claims (0.0965ms)
+✔ ticket vector: no dot -> malformed (0.0582ms)
+✔ ticket vector: two dots -> malformed (0.0554ms)
+✔ ticket vector: empty string -> malformed (0.045ms)
+✔ ticket vector: padding in the payload part -> malformed (0.1117ms)
+✔ ticket vector: standard base64 characters in the signature -> malformed (0.1037ms)
+✔ ticket vector: signature of the wrong length -> malformed (0.0809ms)
+✔ ticket vector: whitespace around the token -> malformed (0.0591ms)
+✔ cookie vector: valid, current key -> ok (0.2345ms)
+✔ cookie vector: valid, previous key (rotation) -> ok (0.1009ms)
+✔ cookie vector: forged, signature changed -> signature (0.1038ms)
+✔ cookie vector: forged, ae raised under the old signature -> signature (0.1032ms)
+✔ cookie vector: signed with the ticket prefix (domain separation) -> signature (0.099ms)
+✔ cookie vector: a ticket used as a cookie -> signature (0.0914ms)
+✔ cookie vector: signed with an unknown key -> signature (0.1534ms)
+✔ cookie vector: wrong version -> claims (0.0911ms)
+✔ cookie vector: extra field (exp) -> claims (0.0907ms)
+✔ cookie vector: missing own -> claims (0.0979ms)
+✔ cookie vector: no dot -> malformed (0.0482ms)
+✔ cookie vector: empty string -> malformed (0.1278ms)
+✔ signing the claims of the valid vectors gives the vector bytes (current key) (0.3075ms)
+✔ a ticket is not a cookie and a cookie is not a ticket (domain separation) (0.2324ms)
+✔ the same ticket changes verdict with the clock only (0.3984ms)
+ℹ tests 77
+ℹ suites 0
+ℹ pass 77
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1341.6266
+
+# node scripts/check-contract-rules.mjs
+PASS            registry: 10 contracts, 17 folders under contracts/ all registered
+PASS            base: compared with origin/main (merge base 601ba11732); 44 file(s) differ
+                NOTICE: no tag contracts-v* exists, so the comparison with the latest tag did not run (only the pull request base is compared)
+PASS            contract[IF-6]: no file of this contract changed
+PASS            contract[IF-4]: no file of this contract changed
+PASS            contract[IF-5]: no file of this contract changed
+PASS            contract[IF-2]: no file of this contract changed
+PASS            contract[IF-1]: no file of this contract changed
+PASS            contract[DB]: no file of this contract changed
+PASS            contract[IF-7]: no file of this contract changed
+PASS            contract[IF-8]: no file of this contract changed
+PASS            contract[IF-3]: no file of this contract changed
+PASS            changelog[GATE]: new entry for GATE: 0.1.0 (2026-10-17, Tanmay, story L-17 gate core, ADR 0004 decided on delegation, D-60 D-63 D-68)
+PASS            mock[GATE]: no schema or OpenAPI file changed, so no mock change is needed
+PASS            breaking[GATE]: no breaking change in the schema or OpenAPI files
+PASS            compat: 10 row(s), every listed version exists; 20 approver row(s)
+NOT-APPLICABLE  approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+PASS            table-owners: 43 tables, every owner is a module in CODEOWNERS
+PASS            alembic: one head 0001 in 1 revisions
+PASS            bundle: contracts:bundle:check passed
+
+SUMMARY: 18 PASS, 0 FAIL, 1 NOT-APPLICABLE
+NOT-APPLICABLE: approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+
+# node --test scripts/check-contract-rules.test.mjs (last lines)
+✔ approvals: an additive change by a consumer approved by the OWNER passes (2313.2062ms)
+✔ approvals: a removed contract needs every consumer other than the author (4091.3785ms)
+✔ approvals: a COMMENTED or PENDING review without commit_id or login does not break the file; --pr-author may be written with @ (6623.3076ms)
+✔ D-46 b: contracts/COMPAT.md is guarded: a change needs a "registry change:" line, or trusted-base FAILs (2495.8935ms)
+ℹ tests 83
+ℹ suites 0
+ℹ pass 83
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 299530.2451

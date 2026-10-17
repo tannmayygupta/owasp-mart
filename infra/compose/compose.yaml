@@ -249,7 +249,8 @@ services:
   # includes /containers/{id}/exec, which cannot be switched off with the EXEC variable (found in the story 4.2 test).
   # So the proxy runs its own HAProxy file (file docker-proxy/rules.cfg, loaded as the config `docker-proxy-rules`): a deny-by-default list of the exact method and
   # path pairs SdkBackend uses (read from backend.py): _ping and version, container list/inspect/create/start/attach/remove,
-  # network list/inspect/create/remove, volume list/inspect/create/remove. Start, attach and every remove work only for objects named vm-*, and a container create only with name=vm-*. exec, images, build, commit, info, swarm, secrets, services, plugins,
+  # network list/inspect/create/remove and POST connect/disconnect (story edge-3, D-66: only for networks named vm-*; the body, which container, cannot be
+  # restricted here, so the orchestrator connects only the configured edge name), volume list/inspect/create/remove. Start, attach and every remove work only for objects named vm-*, and a container create only with name=vm-*. exec, images, build, commit, info, swarm, secrets, services, plugins,
   # system, events, auth, stop, restart, kill and the archive calls answer 403. The request body is not filtered, so the
   # orchestrator's template-id-only rule and the host rule stay the second line (ADR 0010).
   # The process runs as root inside the container because the socket file is root-owned; everything else is dropped.
@@ -286,10 +287,97 @@ services:
       start_period: 1s
     restart: "no"
 
+  # ---- Lab profile (story edge-2, D-62, D-64): the edge = stock Caddy for TLS + the gate service with the event relay ---------------
+  # Only edge-caddy publishes a port, and only 443 (80 is not published, D-28); scripts/check-lab-compose-rules.mjs enforces it. 8080, 8081 and 9090 are never published.
+  # Instance containers publish nothing; the orchestrator (story 3) attaches edge-gate to each instance network with `docker network connect`.
+  # Files the lab needs on the host (the runbook of story 5 creates them; Docker would make a FOLDER of a missing bind source and the edge would not start):
+  #   VULNMART_EDGE_CERTS (default /opt/vulnmart/lab/certs/live): fullchain.pem and privkey.pem of the wildcard certificate
+  #   VULNMART_EDGE_SECRETS (default /opt/vulnmart/lab/secrets): gate_key_current (64+ hex), gate_key_previous (optional), gate_admin_secret (16+ characters)
+  # edge-gate binds the player listener to its address on edge-public (alias edge-gate-player) and the admin listener to its address on labs-core
+  # (alias edge-gate-admin), so an instance network (where only the relay answers) cannot reach either; see apps/edge/src/server.mjs.
+  edge-gate:
+    profiles: ["lab"]
+    build:
+      context: ../..
+      dockerfile: apps/edge/Dockerfile
+    image: vulnmart-edge:local
+    container_name: vulnmart-edge-gate
+    user: "65532:65532"
+    read_only: true
+    environment:
+      EDGE_ZONE: ${VULNMART_LABS_ZONE:-labs.invalid}
+      EDGE_KEY_CURRENT_FILE: /run/secrets/gate_key_current
+      EDGE_KEY_PREVIOUS_FILE: /run/secrets/gate_key_previous
+      EDGE_ADMIN_SECRET_FILE: /run/secrets/gate_admin_secret
+      EDGE_INGEST_URL: ${VULNMART_EDGE_INGEST_URL:-http://ingest.invalid:8081}
+      EDGE_PLAYER_BIND_HOST: edge-gate-player
+      EDGE_ADMIN_BIND_HOST: edge-gate-admin
+    volumes:
+      - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_key_current:/run/secrets/gate_key_current:ro
+      - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_key_previous:/run/secrets/gate_key_previous:ro
+      - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_admin_secret:/run/secrets/gate_admin_secret:ro
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=4m,uid=65532,gid=65532
+    networks:
+      edge-public:
+        aliases: [edge-gate, edge-gate-player]
+      labs-core:
+        aliases: [edge-gate-admin]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(8081,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+    restart: unless-stopped
+
+  # Caddy 2.10.2, the same image (tag plus index digest) as infra/caddy/compose.p.yaml. Stock image, no plugin. Root with every capability dropped but
+  # NET_BIND_SERVICE, like vm-p: the private key written by lego is root-only (H-115), so a non-root user could not read it.
+  edge-caddy:
+    profiles: ["lab"]
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    container_name: vulnmart-edge-caddy
+    ports:
+      - "443:443"
+    environment:
+      EDGE_ZONE: ${VULNMART_LABS_ZONE:-labs.invalid}
+      EDGE_GATE_UPSTREAM: edge-gate:8080
+    volumes:
+      - ../caddy/Caddyfile.l:/etc/caddy/Caddyfile:ro
+      - ${VULNMART_EDGE_CERTS:-/opt/vulnmart/lab/certs/live}:/certs:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 128
+    tmpfs:
+      - /tmp
+      - /data
+      - /config
+    networks:
+      - edge-public
+    depends_on:
+      edge-gate:
+        condition: service_healthy
+    restart: unless-stopped
+
 networks:
-  # Only the orchestrator joins this network; no instance network is ever attached to it.
+  # The orchestrator and the edge-gate admin listener join this network; no instance network is ever attached to it.
   labs-core:
     name: vulnmart-labs-core
+  # Caddy and the edge-gate player listener only. It is an ordinary (outbound-capable) network because Caddy publishes 443 through it.
+  edge-public:
+    name: vulnmart-edge-public
 
 configs:
   docker-proxy-rules:

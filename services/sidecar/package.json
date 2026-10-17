@@ -1,0 +1,20 @@
+{
+  "name": "@vulnmart/sidecar",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "VulnMart instance sidecar: player-port pass-through with a response tee, flag matcher (SHA-256 digests), signed IF-4 events. Never blocks traffic.",
+  "main": "src/main.mjs",
+  "scripts": {
+    "start": "node src/main.mjs",
+    "schemas:sync": "node scripts/sync-schemas.mjs",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

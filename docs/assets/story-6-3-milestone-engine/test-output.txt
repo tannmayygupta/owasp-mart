@@ -1,0 +1,31 @@
+$ uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_ingest_rules.py apps/api/tests/test_ingest_engine.py apps/api/tests/test_ingest_c09.py apps/api/tests/test_flags_submit.py
+........................................................................ [ 80%]
+..................                                                       [100%]
+90 passed in 3.69s
+
+$ uv run --locked --package vulnmart-api pytest -q
+........................................................................ [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 19%]
+........................................................................ [ 25%]
+........................................................................ [ 32%]
+....................................sssssss............................. [ 38%]
+........................................................................ [ 45%]
+........................................................................ [ 51%]
+........................................................................ [ 58%]
+........................................................................ [ 64%]
+........................................................................ [ 71%]
+........................................................................ [ 77%]
+........................................................................ [ 84%]
+........................................................................ [ 90%]
+........................................................................ [ 97%]
+.............................                                            [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:77: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:83: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:95: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:115: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:135: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:150: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:160: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+1102 passed, 7 skipped in 314.41s (0:05:14)

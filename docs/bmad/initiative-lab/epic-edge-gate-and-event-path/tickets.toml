@@ -1,0 +1,58 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-17 from the tasks L-17 and L-18 of docs/dev/dev1-tanmay.md (lean cut for the live demo of 19 Oct 2026); approved on the developer's delegation (run through on recorded decisions D-60 to D-68, to be written into initial.md by the main session).
+# Local proof means Docker Desktop on a developer PC with stub instances; TLS with real names, the wildcard certificate and everything on vm-i / vm-p are developer runbook steps (story 5), never claimed as results.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Gate core: ticket, host-only cookie, access state and strict hostname rule"
+description = "The gate contract (contracts/edge/gate-ticket.md with test vectors) and a dependency-free Node gate library and admin API under apps/edge: HMAC ticket (60 s, single use), host-only __Host-vm_gate cookie bound to instance, owner and access epoch, in-memory access state pushed by the orchestrator (open, frozen, closed), strict hostname pattern, fail closed. Unit tested only; no Docker."
+verify = "Unit tests: a good ticket gives the cookie and a reused, expired, forged, other-instance, other-owner or old-epoch ticket or cookie is refused; frozen and closed answer without reaching the upstream; a crafted Host header never reaches a lookup; the contract vectors pass."
+covers = ["FR-INS-10", "FR-SES-04", "FR-SES-11"]
+after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Edge service: Caddy TLS in front of the gate, the event relay and a real Docker proof"
+description = "The runnable edge: stock Caddy (digest pinned) terminates TLS and matches only the strict hostname, the gate server from story 1 routes to the sidecar by its unique container name, the relay listener on 8081 forwards exactly POST /internal/v1/events with size, content-type and rate limits. Compose services in the lab profile (no host port on any instance, relay not published). A real-Docker test with stub instances on many internal networks (spike S-15, local part)."
+verify = "Real Docker: owner reaches only its own stub instance through Caddy; a second account, an edited hostname, a frozen or closed instance and a foreign Host are refused; the edge attached to 20 instance networks routes correctly; no instance container has a host port; the relay passes one event to the fake ingest and refuses every other path."
+covers = ["FR-INS-10", "NFR-ISO-04"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Orchestrator attaches the edge to instance networks and pushes access state to the gate"
+description = "The orchestrator connects the edge container to the instance network after the sidecar is up and disconnects it before the network is removed, pushes the instance record (hostname, epoch, owner hash, access, access epoch) to the gate admin API on create-ready, reset-ready, access and destroy and once at start; the docker-proxy rules allow only network connect and disconnect for vm-* networks. Both features are off unless their settings are given, so every existing test stays as it is."
+verify = "Real Docker: create attaches the edge, access open lets a ticket in and frozen refuses at once, reset moves the gate to the new epoch, destroy detaches and leaves nothing; with the gate down an access call fails and no state changes; proxy tests show connect for vm-* answers and everything else stays 403."
+covers = ["FR-INS-10", "FR-SES-04", "NFR-SEC-04"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Real ingest verifier: signature, replay, epoch and limits, through the edge relay"
+description = "The IF-4 receiver in apps/api/src/vulnmart/ingest (stream L folder): header and body checks in the order of H-08, per-instance event key from KeyPort, duplicate rule on (instance, epoch, seq), epoch above current refused, size and ts rules, an EventStore port with an in-memory implementation, the route wired in the ingest entrypoint. A conformance test runs the same vectors against it and against fake-ingest; an end-to-end test sends a stub sidecar event through the real relay to this ingest."
+verify = "A signed event is stored (202) and a repeat is 200; forged, wrong key, unknown instance, replay with another body, old or future epoch, oversize and bad schema are refused with the IF-4 status; the Python ingest and the Node fake agree on every vector; sidecar to relay to ingest works on Docker Desktop."
+covers = ["FR-DET-04", "FR-INS-10"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 5
+type = "story"
+title = "One active browser session end to end, handoffs for the platform and the VM runbook"
+description = "The access-epoch rule of FR-SES-11 proven end to end (a second open or a new login kills the earlier browser session's instance cookie), the handoff rows for Akshay (ticket, open order, login bump, ingest wiring), ADR 0004 and 0005 text with D-60 to D-68, and a numbered runbook for the developer on vm-i and vm-p (wildcard names and certificate, compose up, S-15 attach test, relay over the private link) with the evidence to save."
+verify = "Local test: cookie A works, a second ticket with a higher access epoch opens cookie B and cookie A is then refused; the handoff rows exist in HANDOFFS.md; the runbook lists each live command and what to save, and no live result is written anywhere."
+covers = ["FR-SES-11", "FR-INS-10"]
+after = [2, 3, 4]
+hitl = true
+risk = "medium"

@@ -1,0 +1,59 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-17 from the tasks L-19, L-20 and L-21 of docs/dev/dev1-tanmay.md, for the live demo of 2026-10-19; decided on the developer's delegation (decisions D-70 to D-79 are Proposed in the story plans; the main session records them).
+# Build order: 1, 2, 3, 4, then 5 (the Coraza helper is the riskiest part and has a written fallback, so it goes last).
+# L-19 = story 1. L-20 = stories 2 and 5. L-21 = stories 3 and 4. Each story is a pull request of its own when the demo needs it in main.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Flag material and checker: derive per instance and epoch, decoys, verify by recomputing, leak scan"
+description = "Platform-side code in apps/api/src/vulnmart/flags: build the flag material of a create or reset (flags, decoys, digests, event key, seed) from KeyPort, and a checker that classifies a candidate (correct, decoy, stale epoch, other instance, wrong) by recomputing, in constant time, with no flag table. A leak scan finds no flag pattern in image layers, container logs, docker inspect output or orchestrator logs. Tested with the fake KeyPort and, for the scan, against real Docker locally."
+verify = "Two instances of the same challenge hold different flags; a reset gives new flags and the checker calls the old ones stale; a decoy is a decoy; the scan finds nothing in layers, logs and inspect output of a real local instance and fails on a planted pattern."
+covers = ["FR-FLG-01", "FR-FLG-02", "FR-FLG-03", "FR-FLG-07", "FR-FLG-08"]
+after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Real sidecar in Node: flag matcher, signed events, automatic capture, never blocks (S-9)"
+description = "The product sidecar image (services/sidecar, distroless Node, built by the images workflow): the tested behaviour of the stub sidecar, plus a response matcher that finds flag-shaped strings through gzip, deflate, brotli, JSON escapes, HTML entities and percent encoding, compares their SHA-256 with the digests of the start document, and sends proxy.flag_seen, evidence.capture (redacted, 8 KiB) and an aggregated proxy.request. It copies bytes to the player unchanged and never blocks. Spike S-9 results are written down."
+verify = "A real flag in a gzip or JSON-escaped response is reported as real with the right challenge, a decoy as decoy, a foreign flag as foreign, base64 is not seen (documented); the player always gets the bytes unchanged, also with the ingest down or a broken matcher; the image passes the stub's own conformance tests."
+covers = ["FR-FLG-04", "FR-FLG-06", "FR-DET-04"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Milestone engine driven by a rules file: credit decisions, paste submission, sharing signal"
+description = "Platform-side engine in apps/api/src/vulnmart/ingest and flags: a rules file with M1 to M3 for all 11 challenges (five rule kinds, no per-challenge branches), the C09 negative-observation rule, credit of M3 only from a flag the platform recomputed, bot events never counting, best milestone counted once and kept across resets, the paste submission service (no value stored, no oracle) and the flag-sharing signal naming both instances. All stores are Protocols with in-memory fakes until Akshay's tables exist."
+verify = "Replaying the example events of every challenge credits M1, M2 and M3 as the challenge specs say; the C09 sequence credits M2 only with zero security events; a bot event credits nothing; a decoy and another instance's flag credit nothing and the latter writes a sharing signal; a reset keeps the milestones."
+covers = ["FR-DET-05", "FR-DET-06", "FR-FLG-04", "FR-FLG-05", "FR-FLG-09", "FR-DET-01"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Evidence through KeyPort, activity metadata, bot visits and the local detection loop"
+description = "Evidence capture sealed per attempt through KeyPort, activity metadata from proxy.request without bodies, bot visit records and the collector-based credit of the stored-XSS capture, the 'estimated' label rule, and one local loop: real orchestrator on Docker Desktop, real sidecar, stub shop that returns its injected flag, fake ingest, the engine reading the stored events. A runbook lists the live steps on vm-i."
+verify = "Locally: a player request that returns the flag ends in M3 and a sealed evidence row within seconds, the body redacted and capped, a shred of the attempt key makes it unreadable; bot visits are recorded and never credited as player captures; the loop script prints PASS with no flag value in its output."
+covers = ["FR-DET-03", "FR-DET-07", "FR-DET-08", "FR-DET-09", "FR-FLG-09"]
+after = [2, 3]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Coraza and Core Rule Set detect-only helper, classifier accuracy and the sidecar form (S-6, S-7)"
+description = "A small Go helper inside the sidecar image that embeds Coraza v3 and the Core Rule Set v4 in DetectionOnly mode on a loopback port; the Node sidecar asks it off the response path and sends proxy.crs_match. An accuracy script runs a labelled corpus (attacks for the challenges and benign shop traffic) and records rule tags, false positives, added latency and memory, labelled local. If the helper cannot be finished in time the sidecar runs without it and the challenges use their app events."
+verify = "Locally the helper reports the CRS tags for the sqli and ssrf samples, never changes a response, adds under 5 ms at the 95th percentile off the response path, and the accuracy table is saved; with the helper killed the sidecar keeps passing traffic and sending flag events."
+covers = ["FR-DET-02", "FR-DET-07"]
+after = [2]
+hitl = false
+risk = "high"

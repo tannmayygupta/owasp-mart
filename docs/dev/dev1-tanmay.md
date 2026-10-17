@@ -209,15 +209,18 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
 
 Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt engine and scoring work end to end.
 
-- [ ] **L-17. Edge and gate for instance access**
+- [x] **L-17. Edge and gate for instance access**
+  - Closed 2026-10-17 on the developer's instruction after local proof (edge e2e 11 passed on Docker Desktop, orchestrator attaches the edge and pushes access state: 458 orchestrator tests, real-Docker test_edge_attach.py). NOT met live: vm-i run, real certificate, real browser, gate admin reachability for a host-run orchestrator (H-143); D-60 to D-68 and ADR 0004 still Proposed.
   - Epic: `epic-edge-gate-and-event-path`
   - BMAD story: not planned yet; created when you incept `epic-edge-gate-and-event-path` (see START-HERE.md, section "First task of an epic")
   - Build: The labs edge terminates TLS for instance hostnames; a gate admits only the owner with a ticket and a host-only cookie, routes to the right sidecar and blocks frozen or closed instances.
   - Covers: FR-INS-10
   - Waits on: L-10, L-13, L-15.
   - Done when: A second account or an edited hostname cannot reach another user's instance, a frozen instance refuses requests, and no instance publishes a host port.
+  - Status 2026-10-17 (earlier status, superseded by the Closed line): gate core (contract `GATE` 0.1.0, `apps/edge` library, admin handlers, 77 tests) and edge service (Caddy, gate service, relay, compose, 11 end-to-end tests with 20 internal networks on Docker Desktop) are built, local proof only. Not done: the orchestrator attaching the edge and pushing access state, the vm-i run, a real certificate, a real browser, the developer's confirmation of D-60 to D-68 and ADR 0004. Handoffs H-136 to H-139.
 
-- [ ] **L-18. Event relay, ingest and one active browser session**
+- [x] **L-18. Event relay, ingest and one active browser session**
+  - Closed 2026-10-17 after local proof: signed event relayed to the real ingest verifier, forged and replayed refused (ingest-relay e2e), second session handled by the access epoch (apps/edge session-epoch test, 7 passed). NOT met: the platform half of FR-SES-11 (login bump, H-141) and the vm-i run.
   - Epic: `epic-edge-gate-and-event-path`
   - BMAD story: not planned yet; created when you incept `epic-edge-gate-and-event-path` (see START-HERE.md, section "First task of an epic")
   - Build: The edge relays signed sidecar events to ingest (with replay and signature checks) without giving instances a route to the platform; enforce one active browser session per candidate.
@@ -225,8 +228,10 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Waits on: L-03, L-17.
   - Done when: A signed event reaches ingest, a forged or replayed one is rejected, and a second browser session for the same candidate is handled as FR-SES-11 requires.
   - Handoffs: H-64, H-75 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status 2026-10-17 (earlier status, superseded by the Closed line): the event relay is built and tested locally (edge story 2, D-64). Not built: the real ingest verifier, one active browser session end to end, the vm-i runbook. H-75 partly answered; H-138.
 
-- [ ] **L-19. Flag derivation, injection and secrecy**
+- [x] **L-19. Flag derivation, injection and secrecy**
+  - Closed 2026-10-17 after local proof: two instances get different flags, a reset invalidates the old ones (test_lab_loop.py), flag leak scan built (scripts/scan-flags.mjs). NOT met: the real KeyPort and real InstancePort (Akshay), a scan of vm-i, decoy placement in the catalogue (H-131).
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
   - Build: Derive a unique flag per instance with a key that never enters an instance, inject at start, verify by recomputing, place decoys, keep flags out of images and logs.
@@ -234,8 +239,10 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Waits on: L-13. Use a fake KeyPort until Akshay delivers the real one.
   - Done when: Two instances of the same challenge hold different flags, a reset invalidates old ones, and a CI scan finds no flag pattern in any image layer or log.
   - Handoffs: H-63 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status 2026-10-17 (earlier status, superseded by the Closed line): flag material builder, checker and leak scan are built and tested locally with the fake KeyPort (story 6.1). Not done: the real `InstancePort` calling them, the real KeyPort, a scan of a full orchestrator-made instance and of vm-i, decoy placement in the catalogue. H-63 answered in part; H-130, H-131.
 
 - [ ] **L-20. Coraza sidecar, automatic capture and paste**
+  - Status 2026-10-17 (still not ticked): the Coraza and Core Rule Set helper (story 6.5) is NOT built and classifier accuracy (S-6) is NOT measured, which the Done-when requires. The product sidecar, automatic capture and paste are built and proved locally (see above).
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
   - Build: Coraza sidecar in detect-only mode with the OWASP Core Rule Set, flag-in-response matching, automatic capture and paste submission, fixed tags and technique detection.
@@ -243,8 +250,10 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Waits on: L-18, L-19.
   - Done when: A valid flag in a response to the owning player is credited automatically, a decoy is not, the sidecar never blocks, and classifier accuracy is measured (S-6).
   - Handoffs: H-76 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status 2026-10-17 (not ticked): the product sidecar and its image are built, 49 of 49 tests passed on Docker Desktop, S-9 table written (story 6.2); the paste service exists as a library (story 6.3). Not built: the Coraza and Core Rule Set helper, classifier accuracy (S-6), the full harness run with the product image, any run on vm-i. H-76 and H-94 answered as built; H-132.
 
-- [ ] **L-21. Milestone engine, evidence capture and sharing signal**
+- [x] **L-21. Milestone engine, evidence capture and sharing signal**
+  - Closed 2026-10-17 after local proof: milestone engine with 33 rules for all 11 challenges, C09 negative-observation rule, evidence sealed through KeyPort (fake), activity metadata and bot visits wired into the runtime. NOT met: the real tables and worker (H-130), the real catalogue (Sahil T-02/T-30).
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
   - Build: Turn events into milestones M1 to M3 for all 11 challenges, negative-observation rules, evidence capture, activity metadata, bot visit evidence and the flag-sharing signal.
@@ -252,24 +261,30 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Waits on: L-20 and the catalogue (Sahil, T-02).
   - Done when: Milestones fire from the events in the challenge specs for every challenge, including the C09 negative-observation rule, and evidence is stored through KeyPort.
   - Handoffs: H-77 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Status 2026-10-17 (earlier status, superseded by the Closed line): milestone engine with 33 rules, paste service and sharing signal are built against in-memory stores, 90 tests passed (story 6.3). Not built: evidence sealed through KeyPort, activity metadata, bot visit evidence, the tables, the ingest route and the worker. H-77 answered as built; H-133, H-134.
 
-- [ ] **L-22. Attempt state machine and server clock**
+- [x] **L-22. Attempt state machine and server clock**
+  - Closed 2026-10-17 after local proof: attempt engine and rules in packages/py-attempts (clock from instance ready, D-80 still a Proposed answer to OI-22), reachable over the demo routes. NOT met: the SQL store, the scheduler job and the real API adapter (H-146); OI-22 not confirmed by the team.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: Attempt start, server-side clock, time warnings, expiry with auto-submit, 15-minute freeze and destroy, manual submit, no pause, one attempt, cancel.
   - Covers: FR-SES-01 to 08, FR-TIM-05
   - Waits on: L-18. Clock start (OI-22) needs your decision first.
   - Done when: An attempt moves through its states without skipping, expiry auto-submits and freezes, and a lost connection never stops the clock.
+  - Status 2026-10-17 (earlier status, superseded by the Closed line): attempt rules library and attempt engine are built in `packages/py-attempts` and tested with a fake clock, store and instance control, 254 tests passed (stories 7.1, 7.2). Not done: the OI-22 confirmation (D-80 is a proposal), the API adapter, the SQL store, the scheduler job, the live check. H-127, H-128.
 
-- [ ] **L-23. Scoring engine**
+- [x] **L-23. Scoring engine**
+  - Closed 2026-10-17 after local proof: scoring reproduces all six PRD Appendix A examples; held captures stay out of the score (test_lab_loop.py, score 147 by hand). NOT met: the real ReportPort over tables (H-146), the recruiter screen.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: Server-side scoring from signed events: hiring formula, milestone credit, hint cost, time shown not scored, no penalty for wrong submissions, learner progress, held captures excluded.
   - Covers: FR-SCR-01 to 06, 09, 10
   - Waits on: L-21, L-22.
   - Done when: The tests reproduce every PRD Appendix A example and held captures stay out of the score until a human decides.
+  - Status 2026-10-17 (earlier status, superseded by the Closed line): the scoring function is built and reproduces all six PRD Appendix A examples (story 7.3, 221 package tests passed at that time). Not built: the `ReportPort` adapter, the fact source, held-capture review (OI-38), the recruiter screen. H-129.
 
-- [ ] **L-24. Backups, laptop fallback and remaining spikes**
+- [x] **L-24. Backups, laptop fallback and remaining spikes**
+  - Closed 2026-10-17 on local proof only: encrypted dump, checksum, restore into a scratch database with equal row counts, wrong passphrase and a flipped byte fail, laptop fallback up/check/down on this PC (docs/assets/story-8-4-backup-fallback/). NOT met: the backup to S3 and a restore on a VM (runbook steps), no real platform data was backed up.
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Encrypted backups to Oracle Object Storage with a restore test, the laptop fallback start procedure, and the remaining spike write-ups (S-1).
@@ -281,7 +296,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
 
 Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load check and the demo rehearsal.
 
-- [ ] **L-25. Time metrics and event log**
+- [x] **L-25. Time metrics and event log**
+  - Closed 2026-10-17 after local proof: headline time, estimated active time, resets and retries, ids-only allow-listed event log (96 new library tests across L-25 to L-28; runtime time_metrics tested). NOT met: a time method on the report port and the dashboard (H-146).
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: Headline time to capture, estimated active time, resets and retries, and the attempt event log (ids and metadata only).
@@ -289,7 +305,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Waits on: L-21, L-22.
   - Done when: Time is shown beside the score, resets are counted and the event log holds only ids and metadata.
 
-- [ ] **L-26. Reset and withdrawal during an assessment**
+- [x] **L-26. Reset and withdrawal during an assessment**
+  - Closed 2026-10-17 after local proof: reset counted with limit 3 (fourth refused before the instance is touched), withdrawal destroys, schedules deletion after 7 days, undo inside the window (engine and runtime tests). NOT met: the platform routes (H-146).
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: Handle a reset and a withdrawal in the middle of an assessment attempt.
@@ -297,7 +314,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Waits on: L-14, L-22.
   - Done when: Both are recorded in the event log and handled as FR-SES-09 and FR-SES-10 require.
 
-- [ ] **L-27. Anti-cheat signals and held-capture review**
+- [x] **L-27. Anti-cheat signals and held-capture review**
+  - Closed 2026-10-17 after local proof: held captures stay out of the score until a named recruiter or admin of the owning organisation decides, the decision is audited and final, nobody is zeroed (library and runtime tests). The idle and too-fast numbers are placeholders (OI-25). NOT met: FR-ACH-01 and 02 (submission limit coverage, the real activity gate), the review screen, OI-38 not confirmed by the team (D-92 Proposed).
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: Submission limits, activity-versus-capture check, timing anomalies, write-up similarity review, integrity signals as evidence for a human, review of held captures.
@@ -305,7 +323,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Waits on: L-21, L-23. Reviewer for held captures (OI-38) needs a decision.
   - Done when: Held captures stay out of the score until a named reviewer decides, the decision is audited and nobody is auto-zeroed.
 
-- [ ] **L-28. Cohort board and ranking aid**
+- [x] **L-28. Cohort board and ranking aid**
+  - Closed 2026-10-17 after local proof: ranking aid and private, scoped cohort rules, board off by default (D-93 Proposed). Built on the written proposal although the task says to ask about OI-26 first; confirm D-93. NOT met: the platform port and recruiter screen.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: The cohort view for recruiters and the ranking aid, with no global leaderboard.
@@ -314,6 +333,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Done when: The board and aid work as the decision on OI-26 says.
 
 - [ ] **L-29. Isolation proof and extra hardening on VM-I**
+  - Status 2026-10-17 (not ticked): `scripts/vmi-audit.mjs` (22 tests, fixtures) and runbook `docs/runbooks/vmi-hardening.md` are built; the isolation tests on VM-I are the developer's runs (Part A), no live result exists; S-8 stays open.
   - Epic: `epic-isolation-and-hardening`
   - BMAD story: not planned yet; created when you incept `epic-isolation-and-hardening` (see START-HERE.md, section "First task of an epic")
   - Build: Add user namespaces, rootless Docker or gVisor only where tests pass; raise Docker address pools; write up spikes S-3, S-8 and S-15.
@@ -322,6 +342,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Done when: The isolation tests pass on VM-I and the spike results record what worked and what did not.
 
 - [ ] **L-30. End-to-end suite and load check**
+  - Status 2026-10-17 (not ticked): local loops exist (in-process `apps/api/tests/test_lab_loop.py`; the Docker Desktop loop passes 10 of 10 steps with the stub image and the load check passes 6 of 6, laptop numbers, story 8.3), `scripts/live-smoke.mjs` is built; nothing ran on the deployed system, which the Done-when requires.
   - Epic: `epic-integration-and-demo-readiness`
   - BMAD story: not planned yet; created when you incept `epic-integration-and-demo-readiness` (see START-HERE.md, section "First task of an epic")
   - Build: An end-to-end suite for signup, instance start, a captured flag, an assessment attempt, scoring and a recruiter report on the deployed system, plus a load check.
@@ -330,6 +351,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Done when: The suite is green on the deployed system and the load numbers are recorded.
 
 - [ ] **L-31. Demo rehearsal and submission pack**
+  - Status 2026-10-17 (not ticked): the demo runbook (docs/runbooks/demo-19-oct.md) and the submission pack checker (21 items pass) are built; no rehearsal has been run or recorded.
   - Epic: `epic-integration-and-demo-readiness`
   - BMAD story: not planned yet; created when you incept `epic-integration-and-demo-readiness` (see START-HERE.md, section "First task of an epic")
   - Build: Rehearse the demo on the laptop and online, including the fallback, and check the submission pack (report evidence, repository link, demo script).

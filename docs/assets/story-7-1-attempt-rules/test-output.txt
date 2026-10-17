@@ -1,0 +1,13 @@
+uv :    Building vulnmart-attempts @ file:///C:/Users/tanma/major-project/packages/py-attempts
+At line:4 char:8
++ $out = uv run --locked --package vulnmart-attempts pytest -q packages ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Building vul...ges/py-attempts:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+      Built vulnmart-attempts @ file:///C:/Users/tanma/major-project/packages/py-attempts
+Installed 1 package in 11ms
+........................................................................ [ 47%]
+........................................................................ [ 94%]
+.........                                                                [100%]
+153 passed in 0.35s

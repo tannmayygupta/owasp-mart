@@ -11,7 +11,9 @@ dependencies = [
     "sqlalchemy==2.0.54",
     "alembic==1.20.0",
     "pydantic-settings==2.15.0",
+    "jsonschema==4.26.0",
     "vulnmart-models",
+    "vulnmart-attempts",
 ]
 
 [dependency-groups]
@@ -25,6 +27,7 @@ dev = [
 
 [tool.uv.sources]
 vulnmart-models = { workspace = true }
+vulnmart-attempts = { workspace = true }
 
 [build-system]
 requires = ["uv_build==0.12.23"]
