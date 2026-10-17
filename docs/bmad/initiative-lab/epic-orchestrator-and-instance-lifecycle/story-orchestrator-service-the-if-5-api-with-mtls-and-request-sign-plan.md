@@ -3,7 +3,7 @@ title: 'Orchestrator service: the IF-5 API with mTLS, signed requests and state 
 type: 'feature'
 ticket: '2'
 created: '2026-10-12'
-status: 'built'
+status: 'done'
 baseline_revision: 'b471cd7b3391ee19202c5d56d84ff55af83c444b'
 route: 'full'
 route_source: 'pinned'

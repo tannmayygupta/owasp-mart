@@ -1,0 +1,17 @@
+apps/orchestrator/tests/test_docker_integration.py::test_a_proxy_that_is_down_gives_failed_with_a_start_error_and_leaves_nothing
+  vulnmart_orchestrator.backend.BackendError: ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=2375): Max retries exceeded with url: /v1.55/networks/create (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=2375): Failed to establish a
+apps/orchestrator/tests/test_docker_integration.py::test_a_proxy_that_is_down_gives_failed_with_a_start_error_and_leaves_nothing
+  vulnmart_orchestrator.backend.BackendError: ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=2375): Max retries exceeded with url: /v1.55/networks/create (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=2375): Failed to establish a
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_create_reaches_ready_only_after_the_injector_exit_and_destroy_leaves_nothing
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_reset_gives_a_new_epoch_removes_the_old_objects_and_the_new_flags_only_reach_the_injector
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_a_failing_injector_gives_failed_and_leaves_nothing
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_a_shop_that_is_never_healthy_times_out_and_leaves_nothing
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_a_process_killed_during_a_real_create_leaves_nothing_after_the_first_pass_of_a_new_engine
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_a_complete_running_instance_is_adopted_ready_by_a_second_engine_and_its_objects_stay
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_the_proxy_answers_403_for_every_section_the_orchestrator_does_not_use
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_create_reset_and_destroy_work_through_the_proxy_and_leave_nothing
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_a_proxy_that_is_down_gives_failed_with_a_start_error_and_leaves_nothing
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_odd_paths_and_methods_are_refused_by_the_proxy
+PASSED apps/orchestrator/tests/test_docker_integration.py::test_the_proxy_only_drives_objects_named_vm_and_a_foreign_object_stays
+PASSED apps/orchestrator/tests/test_backend_sdk_kwargs.py::test_no_component_of_the_shop_plan_asks_for_a_privileged_host_bound_or_host_namespace_container
+12 passed, 2 warnings in 79.17s (0:01:19)

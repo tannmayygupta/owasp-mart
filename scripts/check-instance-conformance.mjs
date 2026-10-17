@@ -139,6 +139,16 @@ export function checkInspect(containers) {
   each('live-no-bind-mounts', (c) => toArray(c.Mounts).some((m) => m.Type === 'bind'), 'no bind mount');
   each('live-ports-loopback-only', (c) => Object.values(c.HostConfig?.PortBindings || {}).some((b) => toArray(b).some((x) => x.HostIp !== '127.0.0.1')), 'published ports on 127.0.0.1 only');
   each('live-injector-no-network', (c) => (String(c.Name).endsWith('-injector') ? c.HostConfig?.NetworkMode !== 'none' || Object.keys(c.NetworkSettings?.Networks || {}).some((k) => k !== 'none') : false), 'the injector must have no network');
+  // The default seccomp and AppArmor profiles and the SELinux label must stay on, and no /proc or /sys path may be unmasked.
+  const secOpt = (c) => toArray(c.HostConfig?.SecurityOpt).map((o) => String(o).trim());
+  each('seccomp-not-unconfined', (c) => secOpt(c).some((o) => /^seccomp[=:]\s*unconfined$/i.test(o)), 'seccomp must not be unconfined');
+  each('security-profiles-not-disabled', (c) => secOpt(c).some((o) => /^apparmor[=:]\s*unconfined$/i.test(o) || /^label[=:]\s*(disable|false)$/i.test(o) || /^systempaths[=:]\s*unconfined$/i.test(o)), 'apparmor=unconfined, label=disable and systempaths=unconfined are not allowed');
+  // No Docker socket: any *.sock path, a named pipe, or a bind of a directory that holds one (/, /var, /var/run, /run, /var/lib/docker).
+  const SOCK = /\.sock\b|docker_engine|containerd/i;
+  const PARENTS = new Set(['/', '/var', '/var/run', '/run', '/var/lib', '/var/lib/docker', '/var/run/docker', '/run/docker']);
+  const parentBind = (p) => PARENTS.has(String(p ?? '').replace(/\\/g, '/').replace(/(.)\/+$/, '$1'));
+  each('no-docker-socket', (c) => toArray(c.Mounts).some((m) => m.Type === 'npipe' || SOCK.test(`${m.Source ?? ''} ${m.Destination ?? ''} ${m.Name ?? ''}`) || (m.Type === 'bind' && parentBind(m.Source)))
+    || toArray(c.HostConfig?.Binds).some((b) => SOCK.test(String(b)) || parentBind(String(b).split(':')[0])), 'the Docker socket or a directory that holds it must not be mounted');
   each('live-no-secret-in-env', (c) => toArray(c.Config?.Env).some((e) => FORBIDDEN_ENV.test(String(e).split('=')[0]) || FLAG_LIKE.test(String(e))), 'no flag, seed or key in the environment');
   return results;
 }

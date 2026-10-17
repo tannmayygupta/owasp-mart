@@ -23,7 +23,7 @@ from .audit import canonical_json as canonical_json_strict
 from .errors import AttemptNotFound, EventInvalid, KeyIntegrity, KeyShredded, ScopeMissing, UnknownSetting
 from .keys import AttemptKey, Sealed, derive_event_key, derive_flag, derive_owner_hash
 from .outbox import AUDIENCES, DATA_MEMBERS, EVENT_TYPES, SCHEMA_VERSION, EmailJob, OutboxEntry, audiences_for
-from .quota import DEFAULT_MAX_INSTANCES
+from .quota import DEFAULT_COMPANY_MAX, DEFAULT_MAX_INSTANCES, DEFAULT_TOTAL_MAX, QuotaLimits
 from .scope import Scope
 from .settings import SETTINGS
 
@@ -244,12 +244,30 @@ class FakeSettingsPort:
 
 
 class FakeQuotaPort:
-    """User quota, else organisation quota, else the global one. Tests set `users`, `orgs` and `global_max` directly."""
+    """User quota, else organisation quota, else the per-user default `user_max`. Tests set `users`, `orgs` and `user_max` directly.
+    `global_max` is the older name of `user_max` (it never meant the platform-wide limit, that is `total_max`) and stays as an alias."""
 
-    def __init__(self, *, global_max: int = DEFAULT_MAX_INSTANCES):
-        self.global_max = global_max
+    def __init__(self, *, user_max: int | None = None, global_max: int | None = None, company_max: int = DEFAULT_COMPANY_MAX,
+                 total_max: int = DEFAULT_TOTAL_MAX):
+        self.user_max = user_max if user_max is not None else global_max if global_max is not None else DEFAULT_MAX_INSTANCES
+        self.company_max = company_max  # live instances one company may hold together (story 3.6)
+        self.total_max = total_max  # live instances on the whole platform (story 3.6)
         self.users: dict[str, int] = {}
         self.orgs: dict[str, int] = {}
+        self.companies: dict[str, int] = {}  # a company with its own cap
+
+    @property
+    def global_max(self) -> int:
+        return self.user_max
+
+    @global_max.setter
+    def global_max(self, value: int) -> None:
+        self.user_max = value
+
+    def limits(self, user_id: str, org_id: str | None = None) -> QuotaLimits:
+        # without an `org_id` the user has no company: the company check is skipped, by design (None)
+        company = None if org_id is None else dict(self.companies).get(org_id, self.company_max)
+        return QuotaLimits(self.max_instances(user_id, org_id), company, self.total_max)
 
     def max_instances(self, user_id: str, org_id: str | None = None) -> int:
         users, orgs = dict(self.users), dict(self.orgs)  # a snapshot, so a test changing them in another thread is read whole
@@ -257,4 +275,4 @@ class FakeQuotaPort:
             return users[user_id]
         if org_id is not None and org_id in orgs:
             return orgs[org_id]
-        return self.global_max
+        return self.user_max

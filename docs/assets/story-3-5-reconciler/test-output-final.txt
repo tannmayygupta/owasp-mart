@@ -1,0 +1,22 @@
+# Story 3.5 final verification after the review patches, 2026-10-16 (real summary lines)
+
+## uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
+........................................................................ [ 60%]
+........................................................................ [ 81%]
+...................................................................      [100%]
+355 passed in 92.09s (0:01:32)
+
+## VM_ORCH_SERVICE=python ... pytest -q (protocol, wire rules, http service, reports, mtls)
+.................................                                        [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_http_service.py:692: tests the Node fake, not the Python service
+392 passed, 1 skipped in 298.71s (0:04:58)
+
+## repo checks
+-- check-contract-rules
+SUMMARY: 15 PASS, 0 FAIL, 1 NOT-APPLICABLE
+NOT-APPLICABLE: approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+-- check-text-files
+PASS no control character, BOM or mojibake in the tracked text files
+-- scan-secrets
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree

@@ -116,3 +116,43 @@
   second round (2026-10-13): caddy-origin production-shape tests made readable for a root container without DAC override; contract rules failure of the second run still to be read from the full log.
   third round (2026-10-13): contract rules step prints a short verdict (output to a file, notice lines left out); real FAIL line of the Linux run still to be read from the next run.
   fourth round (2026-10-13): contract rules uses --trusted (trusted mode restored); the first-round removal of --tools had switched it off.
+
+- source_plan: `docs/bmad/initiative-lab/epic-orchestrator-and-instance-lifecycle/story-reset-with-new-flags-teardown-at-expiry-or-inactivity-timing-plan.md`
+  summary: A failed reset has no way back except a destroy: a repeated identical reset body answers 200 with the failed state, and the failed-start retry (OI-24, H-23, H-65) is story 3.6.
+  evidence: review of story 3.4 (edge-case and blind lenses): the platform that repeats the same body learns nothing new; the recovery today is destroy and a new create.
+- source_plan: same
+  summary: The edge `resetting` to `stopping` is in `states.py` only. The IF-5 transition table does not list it (a destroy during a reset). Add it at the next contract change; the Node fake already allows destroy in any live state.
+  evidence: story 3.4 implementation notes; no contract file may change outside a contract release.
+- source_plan: same
+  summary: `.github/workflows/ci.yml` line 51 still says "reset cases skipped until story 3.4". Change the comment together with the next workflow change (a ci.yml edit needs a `registry change:` line in contracts/CHANGELOG.md).
+  evidence: review of story 3.4 (verification-gap lens); the comment is stale, the command is correct.
+- source_plan: same
+  summary: Until H-122 is answered the orchestrator ends an instance `idle_minutes` after ready even while a player is busy (no activity signal). The platform must send a large `idle_minutes` meanwhile; the orchestrator must not face real players before the answer.
+  evidence: review of story 3.4 (blind lens, medium); the frozen matrix row says the clock runs from ready; H-122 carries the warning.
+- source_plan: same
+  summary: Smaller leftovers: `Settings.default_idle_minutes` and `default_max_minutes` are numbers for the platform and are not read by the engine; a reaper pass racing a reset and a reaper destroy on real Docker have no test; the fake activity route trusts the loopback address of the caller (only with `--backend fake`).
+  evidence: review of story 3.4 (blind, edge-case and verification-gap lenses), all low.
+- source_plan: story-reconciler-repair-differences-between-recorded-and-real-stat-plan.md
+  summary: The service uses a desired-state port that wants every instance until the platform has a source (H-123), so an orphan is never destroyed in production; only incomplete leftovers are removed and unknown complete instances are adopted.
+  evidence: story 3.5 design (ADR 0036); the fake port covers the orphan and safe-mode rows in tests.
+- source_plan: same
+  summary: An adopted instance cannot be reset (no create request is kept, the reset answers the template error) and starts with access closed; a reconciler-failed or adopted instance reports to a platform that may not know it (a 404 would be retried for ever by the pusher, H-119). Tombstone retention is not set (H-65) and the file is not backed up. Not run on vm-i.
+  evidence: story 3.5 implementation; H-123 asks the platform side.
+- source_plan: same
+  summary: Reaper `destroy` after adoption uses the `vm.expires` label only (the settings ceiling is not applied to adopted instances); reconcile of a `stopping` record whose worker gave up is left to the reaper; an unknown template label is left alone and logged.
+  evidence: story 3.5 implementation notes.
+- source_plan: story-reconciler-repair-differences-between-recorded-and-real-stat-plan.md
+  summary: Review round of story 3.5 deferrals: the tombstone append happens inside the engine lock (move it after the lock); the idle limit of an adopted instance is fixed at adoption; `AllWantedDesiredState` is a stand-in until H-123; a record in a state `Reconciler._known` does not handle is only logged.
+  evidence: coordinator review of story 3.5, 2026-10-16.
+- source_plan: story-isolation-probe-from-inside-a-real-instance-network-live-che-plan.md
+  summary: A larger Docker daemon address pool (infra/hosts/docker-daemon.json) is a proposal in the runbook docs/runbooks/isolation-vm-i.md; it changes infra/hosts and needs its own story. The live S-3 and S-15 results on vm-i are the developer's run.
+  evidence: story 4.1 plan, Never section.
+- source_plan: story-isolation-probe-from-inside-a-real-instance-network-live-che-plan.md
+  summary: The probe tries TCP over IPv4 only. UDP targets and IPv6 targets are not probed; the exact tmpfs option string of the probe containers is not compared with builder.py.
+  evidence: story 4.1 review round, 2026-10-16.
+- source_plan: story-concurrency-quotas-through-the-fake-quotaport-start-failures-plan.md
+  summary: Builds that wait for a slot have no FIFO order (they poll every 50 ms and are woken together with notify_all), so under sustained load one build can starve while later ones run. A retry keeps its build slot for up to (1 + start_retries) health timeouts, so a failing template can hold slots for a long time.
+  evidence: story 3.6 review, 2026-10-16.
+- source_plan: `docs/bmad/initiative-lab/epic-isolation-and-hardening/story-isolation-probe-from-inside-a-real-instance-network-live-che-plan.md`
+  summary: CI round 1 of the sprint 2 part 2 pull request failed on the Linux runner in two tests written on Windows (the probe test expected the gateway closed; an e2e test expected the lab profile empty). Fixed; run host-dependent tests on Linux before the push, or expect one CI round.
+  evidence: `docs/dev-log/2026-10-16-tannmayygupta-ci-fixes-sprint-2-part-2.md`

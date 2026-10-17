@@ -1,0 +1,11 @@
+* the committed compose file passes, and docker-proxy is the only service with the socket (11.6123ms)
+* exception, allowed side: docker-proxy as written passes, short and long volume form (0.7594ms)
+* exception, refused side: every other service is refused the socket in every spelling (1.3158ms)
+* a service name that is quoted, anchored or written in flow style is not taken for docker-proxy and stays checked (1.1337ms)
+* docker-proxy with a second volume, a flow-style bind or a port on every interface fails (1.0282ms)
+* volumes_from, extends, include and devices are refused (0.4994ms)
+* docker-proxy is pinned: image, command, user, privileges, capabilities (1.0862ms)
+* privileged and host network stay refused in any service, in block or flow style (0.3722ms)
+* tests 8
+* pass 8
+* fail 0

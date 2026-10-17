@@ -1,0 +1,51 @@
+# Sprint 2 (stream L) final verification of stories 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 2026-10-16; real summary lines
+
+## uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
+    warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+406 passed, 2 warnings in 135.45s (0:02:15)
+
+## VM_ORCH_SERVICE=python ... pytest -q (protocol, wire rules, http service, reports, mtls)
+.................................                                        [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_http_service.py:692: tests the Node fake, not the Python service
+392 passed, 1 skipped in 288.59s (0:04:48)
+
+## uv run --locked --package vulnmart-api pytest -q
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:135: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:150: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:160: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+973 passed, 7 skipped in 303.55s (0:05:03)
+
+## node --test "scripts/*.test.mjs" (symbols removed for plain text)
+a stale file is found by --check, written by the plain run, and CRLF alone is not stale (5853.7178ms)
+tests 763
+pass 760
+fail 1
+skipped 2
+failing tests:
+a stale file is found by --check, written by the plain run, and CRLF alone is not stale (5853.7178ms)
+(the one failure is generate-api-code.test.mjs, a Windows line-ending test that fails the same way on the PR branch of Sahil and on a stash of this work; not touched by this sprint)
+
+## node scripts/check-contract-rules.mjs
+PASS            bundle: contracts:bundle:check passed
+
+SUMMARY: 15 PASS, 0 FAIL, 1 NOT-APPLICABLE
+NOT-APPLICABLE: approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+
+## node scripts/check-text-files.mjs
+PASS no control character, BOM or mojibake in the tracked text files
+
+## node scripts/scan-secrets.mjs
+PASS no AWS key, account id, OCID, key, fingerprint, local file or public address in the tree
+
+## node scripts/verify-skills.mjs
+OK: all 217 installed skill files match the manifest.
+
+## node scripts/check-lab-compose-rules.mjs
+PASS lab compose rules: 3 file(s) checked, none uses privileged, host network or pid, the Docker socket, or a dangerous capability
+
+## leftovers: docker ps -a and networks with a vm.* label
+
+

@@ -19,6 +19,8 @@ import os
 import platform
 import secrets
 import statistics
+import sys
+import threading
 import time
 from pathlib import Path
 
@@ -96,6 +98,48 @@ def leftovers(client) -> int:
     return len(client.containers.list(all=True, filters=flt)) + len(client.networks.list(filters=flt)) + len(client.volumes.list(filters=flt))
 
 
+def concurrent_burst(orch: Orchestrator, n: int, memory_mb: int) -> dict:
+    """Story 3.6: `n` creates at once through the real worker path (one thread each, the engine's build cap decides how many run
+    together). Times are per instance, from the moment of the call until it is `ready` (a wait for a build slot is inside it; `busy` counts the creates the host refused for capacity). Every instance is destroyed at the end, also
+    after an error; the numbers hold no id, address or secret."""
+    ids = [_iid() for _ in range(n)]
+    times: dict[str, float] = {}
+    states: dict[str, str] = {}
+    lock = threading.Lock()
+
+    def one(iid: str) -> None:
+        t0 = time.monotonic()
+        try:
+            rec = orch.create(make_body(iid, memory_mb))
+            state = rec.state.value
+        except Exception as e:  # the class only: a message could carry a document
+            state = f"error:{type(e).__name__}"
+        with lock:
+            times[iid], states[iid] = time.monotonic() - t0, state
+
+    t_all = time.monotonic()
+    threads = [threading.Thread(target=one, args=(i,)) for i in ids]
+    try:
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        wall = time.monotonic() - t_all
+    finally:
+        for iid in ids:
+            try:
+                orch.destroy(iid)
+            except Exception as e:
+                print(f"destroy failed: {type(e).__name__}", file=sys.stderr, flush=True)
+    ready = [times[i] for i in ids if states.get(i) == "ready"]
+    for k, iid in enumerate(ids, 1):
+        print(f"concurrent {k}/{n}: {states.get(iid, 'unknown')} in {times.get(iid, 0.0):.2f}s", flush=True)
+    return {
+        "requested": n, "ready": len(ready), "failures": n - len(ready), "busy": sum(1 for s in states.values() if s == "error:Busy"), "wall_clock_s": round(wall, 2),
+        "most_builds_together": orch.max_builds_seen, "ready_after_s": summary(ready) if ready else None,
+    }
+
+
 def run(args: argparse.Namespace) -> dict:
     import docker
 
@@ -149,6 +193,10 @@ def run(args: argparse.Namespace) -> dict:
         for iid in ids:
             orch.destroy(iid)
     drop = (base - after) if base is not None and after is not None else None
+    burst = None
+    if args.concurrent:
+        burst = concurrent_burst(orch, args.concurrent, args.memory_mb)
+        failures += burst["failures"]
     result = {
         "date": time.strftime("%Y-%m-%d", time.gmtime()), "images": image_note, "host": host_class(),
         "docker": client.version().get("Version"), "memory_limit_mb": args.memory_mb,
@@ -158,6 +206,7 @@ def run(args: argparse.Namespace) -> dict:
         "container_memory_mb_per_instance": summary(per_instance) if per_instance else None,
         "host_mem_available_drop_mb_total": round(drop, 1) if drop is not None else None,
         "host_mem_available_drop_mb_per_instance": round(drop / len(ids), 1) if drop is not None and ids else None,
+        "concurrent_start": burst,
         "failures": failures, "leftovers_after": leftovers(client),
     }
     return result
@@ -170,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--allow-local-images", action="store_true", help="accept bare local image ids (sha256:<hex>) in --manifest (a local run only)")
     p.add_argument("--rounds", type=int, default=5, help="cold-start repeats, one instance at a time")
     p.add_argument("--count", type=int, default=5, help="instances running together for the memory numbers")
+    p.add_argument("--concurrent", type=int, default=0, help="also start N instances at the same time (0: skip); the engine builds at most max_parallel_builds together")
     p.add_argument("--memory-mb", type=int, default=256)
     p.add_argument("--health-timeout", type=float, default=60)
     p.add_argument("--settle", type=float, default=10, help="seconds to wait before reading memory")
@@ -177,8 +227,8 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
     if bool(a.stub_image) == bool(a.manifest):
         p.error("give exactly one of --stub-image and --manifest")
-    if not (1 <= a.rounds <= 50 and 1 <= a.count <= 40 and 64 <= a.memory_mb <= 8192):
-        p.error("rounds 1..50, count 1..40, memory-mb 64..8192")
+    if not (1 <= a.rounds <= 50 and 1 <= a.count <= 40 and 64 <= a.memory_mb <= 8192 and 0 <= a.concurrent <= 40):
+        p.error("rounds 1..50, count 1..40, concurrent 0..40, memory-mb 64..8192")
     result = run(a)
     text = json.dumps(result, indent=2)
     print(text)

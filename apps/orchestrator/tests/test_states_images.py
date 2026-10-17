@@ -117,3 +117,107 @@ def test_a_bare_image_id_is_refused_unless_the_allowlist_is_made_for_local_use(t
     with pytest.raises(ValueError, match="bare image id"):
         ImageAllowlist.load(f)
     assert ImageAllowlist.load(f, allow_local_ids=True).images["shop"] == bare
+
+
+# ---- Story 3.7 (D-56): the pipeline's release file `{commit, repo, images, healthchecks}` is accepted ----
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+NODE_PROBE = ["/nodejs/bin/node", "-e", "process.exit(0)"]
+
+
+def release_data(**over):
+    d = {
+        "commit": "a" * 40, "repo": "owner/name",
+        "images": {r: f"ghcr.io/owner/name/{r}@" + digest(r) for r in ("hello", "shop", "mock-services", "import-service", "bot-controller")},
+        "healthchecks": {r: list(NODE_PROBE) for r in ("shop", "mock-services", "import-service", "bot-controller")},
+    }
+    d.update(over)
+    return d
+
+
+def test_release_file_gives_four_roles_with_cmd_tests_and_skips_hello():
+    a = ImageAllowlist.from_release(release_data())
+    assert sorted(a.images) == ["bot-controller", "import-service", "mock-services", "shop"]
+    assert "hello" not in a.images
+    assert a.healthchecks["shop"] == ("CMD", *NODE_PROBE)
+
+
+def test_release_file_is_used_by_build_plan_for_the_shop_template():
+    from support import template
+    from vulnmart_orchestrator.builder import build_plan, parse_create
+    from support import body
+
+    a = ImageAllowlist.from_release(release_data(images={r: f"ghcr.io/o/n/{r}@" + digest(r) for r in ("shop", "sidecar", "injector", "import-service", "mock-services", "bot-controller", "volume-keeper")}))
+    plan = build_plan(template(), parse_create(body()), a)
+    shop = next(c for c in plan.containers if c.role == "shop")
+    assert shop.healthcheck.test[0] == "CMD" and shop.healthcheck.test[1] == "/nodejs/bin/node"
+
+
+def test_release_file_with_an_unknown_top_level_key_is_refused():
+    with pytest.raises(ValueError, match="foo"):
+        ImageAllowlist.from_release(release_data(foo=1))
+
+
+def test_release_file_healthcheck_without_an_image_is_refused():
+    d = release_data()
+    del d["images"]["shop"]
+    with pytest.raises(ValueError, match="shop"):
+        ImageAllowlist.from_release(d)
+
+
+@pytest.mark.parametrize("argv", [
+    ["/bin/sh", "-c", "exit 0"], ["/bin/bash", "-c", "x"], ["/usr/bin/wget", "-q", "x"], ["wget", "x"], ["/usr/bin/curl", "x"], ["/bin/nc", "x"],
+    ["node", "-e", "1"], [], [""], ["/x"] + ["a"] * 16, ["/x", "a" * 513], ["/x", 1], "node",
+])
+def test_release_file_refuses_a_bad_healthcheck(argv):
+    with pytest.raises(ValueError):
+        ImageAllowlist.from_release(release_data(healthchecks={"shop": argv}))
+
+
+def test_release_file_bad_digest_is_refused():
+    d = release_data()
+    d["images"]["shop"] = "ghcr.io/o/n/shop:latest"
+    with pytest.raises(ValueError):
+        ImageAllowlist.from_release(d)
+
+
+def test_release_file_healthcheck_that_starts_with_cmd_is_not_doubled():
+    a = ImageAllowlist.from_release(release_data(healthchecks={"shop": ["CMD", *NODE_PROBE]}))
+    assert a.healthchecks["shop"] == ("CMD", *NODE_PROBE)
+
+
+def test_the_strict_manifest_still_refuses_commit_and_repo():
+    with pytest.raises(ValueError):
+        ImageAllowlist.from_manifest(release_data())
+
+
+def test_load_picks_the_loader_by_file_form(tmp_path):
+    f = tmp_path / "release.json"
+    f.write_text(json.dumps(release_data()), encoding="utf-8")
+    assert ImageAllowlist.load(f).healthchecks["shop"][0] == "CMD"
+    f.write_text(json.dumps({"images": {"shop": "r.invalid/shop@" + digest("shop")}, "healthchecks": {"shop": list(NODE_PROBE)}}), encoding="utf-8")
+    assert ImageAllowlist.load(f).healthchecks["shop"] == ("CMD", *NODE_PROBE)
+    f.write_text(json.dumps({"images": {}, "foo": 1}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        ImageAllowlist.load(f)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_output_of_the_real_release_script_is_loaded(tmp_path):
+    """Runs the real `buildRelease` of scripts/images-release.mjs (a pure function: no git or registry) on the five image names (infra/images.json lists only hello until the shop PR merges), adds the healthchecks the shop PR adds, loads the result."""
+    root = Path(__file__).resolve().parents[3]
+    script = (
+        "import {buildRelease} from './scripts/images-release.mjs';"
+        "const d={registry:'ghcr.io',images:['hello','shop','mock-services','import-service','bot-controller'].map((name)=>({name}))};const dg={};for(const i of d.images)dg[i.name]='sha256:'+'b'.repeat(64);"
+        "process.stdout.write(JSON.stringify(buildRelease(d,dg,{commit:'a'.repeat(40),repo:'Owner/Name'})));"
+    )
+    out = subprocess.run(["node", "--input-type=module", "-e", script], cwd=root, capture_output=True, text=True, check=True).stdout
+    rel = json.loads(out)
+    rel["healthchecks"] = {r: list(NODE_PROBE) for r in rel["images"] if r != "hello"}
+    f = tmp_path / "release.json"
+    f.write_text(json.dumps(rel), encoding="utf-8")
+    a = ImageAllowlist.load(f)
+    assert "hello" not in a.images and a.healthchecks["shop"][:2] == ("CMD", "/nodejs/bin/node")

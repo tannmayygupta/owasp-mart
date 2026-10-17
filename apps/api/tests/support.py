@@ -34,8 +34,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SERVER = ROOT / "contracts" / "mocks" / "fake-orchestrator" / "server.mjs"
 CONTRACT_DIR = ROOT / "contracts" / "orchestrator"
 # Which service the HTTP side of the suites talks to: the Node fake of the contract (default) or the Python service of story 3.2
-# (`VM_ORCH_SERVICE=python`, started with `--backend fake`). The reset and activity cases are skipped for the Python service until
-# story 3.4 (see conftest.py).
+# (`VM_ORCH_SERVICE=python`, started with `--backend fake`). The reset and activity cases run against both (story 3.4).
 SERVICE_KIND = os.environ.get("VM_ORCH_SERVICE", "node").strip().lower()
 PYTHON_SERVICE = SERVICE_KIND == "python"
 ORCH_SRC = ROOT / "apps" / "orchestrator" / "src"

@@ -89,7 +89,7 @@ test('hello: a busy port exits 1, names the port and starts no container', async
 });
 
 test('up: a profile with no services yet exits 1 and starts nothing', () => {
-  const r = dev('up', 'lab');
+  const r = dev('up', 'mocks'); // `lab` holds the Docker socket proxy since story 4.2; `mocks` is still empty
   assert.equal(r.status, 1);
   assert.match(r.stderr, /no services yet/);
   assert.equal(containers(), '');

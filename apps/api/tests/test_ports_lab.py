@@ -152,6 +152,112 @@ def test_one_instance_per_attempt_and_the_quota_decides_how_many_a_user_runs():
         instances.request("a-ZZZZZZZZZZZZZZZZ", user_id="u-A")
 
 
+def _ask(instances, attempts, user, org=None):
+    return instances.request(attempts.seed(user_id=user, org_id=org).attempt_id, user_id=user, org_id=org)
+
+
+def test_the_quota_defaults_are_one_per_user_five_per_company_and_twenty_overall():
+    from vulnmart.ports.quota import DEFAULT_COMPANY_MAX, DEFAULT_TOTAL_MAX, QuotaPort
+    q = FakeQuotaPort()
+    assert isinstance(q, QuotaPort)
+    assert (q.limits("u-A"), q.limits("u-A", "o-1")) == (type(q.limits("u-A"))(1, None, 20), type(q.limits("u-A"))(1, 5, 20))
+    assert (DEFAULT_COMPANY_MAX, DEFAULT_TOTAL_MAX) == (5, 20)
+
+
+def test_a_second_live_instance_of_the_same_user_is_refused_and_creates_nothing():
+    attempts = FakeAttemptPort()
+    instances = FakeInstancePort(attempts)
+    _ask(instances, attempts, "u-A")
+    a2 = attempts.seed(user_id="u-A")
+    with pytest.raises(errors.InstanceQuotaReached) as err:
+        instances.request(a2.attempt_id, user_id="u-A")
+    assert err.value.code.value == "INST-QUOTA-REACHED"
+    assert instances.capacity().running == 1, "the refused request created nothing"
+
+
+def test_the_sixth_instance_of_a_company_is_refused_even_for_a_user_with_room():
+    attempts = FakeAttemptPort()
+    instances = FakeInstancePort(attempts)
+    for n in range(5):
+        _ask(instances, attempts, f"u-{n}", "o-1")
+    with pytest.raises(errors.InstanceQuotaReached) as err:
+        _ask(instances, attempts, "u-5", "o-1")
+    assert "company" in str(err.value)
+    assert _ask(instances, attempts, "u-5", "o-2").state is InstanceState.READY, "another company is not affected"
+    assert instances.capacity().running == 6
+
+
+def test_the_twenty_first_instance_on_the_platform_is_refused():
+    attempts = FakeAttemptPort()
+    instances = FakeInstancePort(attempts, total_memory_mb=65536)
+    for n in range(20):
+        _ask(instances, attempts, f"u-{n}", f"o-{n}")
+    with pytest.raises(errors.InstanceQuotaReached) as err:
+        _ask(instances, attempts, "u-X", "o-X")
+    assert "platform" in str(err.value)
+    assert instances.capacity().running == 20
+
+
+def test_a_destroyed_or_failed_instance_frees_its_place_and_the_next_request_is_accepted():
+    attempts = FakeAttemptPort()
+    instances = FakeInstancePort(attempts)
+    first = _ask(instances, attempts, "u-A", "o-1")
+    with pytest.raises(errors.InstanceQuotaReached):
+        _ask(instances, attempts, "u-A", "o-1")
+    instances.stop(first.instance_id)
+    second = _ask(instances, attempts, "u-A", "o-1")
+    with pytest.raises(errors.InstanceQuotaReached):
+        _ask(instances, attempts, "u-A", "o-1")
+    instances.advance(second.instance_id, InstanceState.FAILED, error_code="INST-START-FAILED")
+    assert _ask(instances, attempts, "u-A", "o-1").state is InstanceState.READY
+
+
+def test_a_repeat_of_an_accepted_request_is_never_refused_by_quota():
+    attempts = FakeAttemptPort()
+    quota = FakeQuotaPort()
+    instances = FakeInstancePort(attempts, quota=quota)
+    a = attempts.seed(user_id="u-A", org_id="o-1")
+    first = instances.request(a.attempt_id, user_id="u-A", org_id="o-1")
+    quota.total_max = 1
+    quota.company_max = 1
+    quota.user_max = 1
+    assert instances.request(a.attempt_id, user_id="u-A", org_id="o-1") == first
+
+
+def test_a_company_with_its_own_cap_and_a_lowered_total_are_obeyed():
+    attempts = FakeAttemptPort()
+    quota = FakeQuotaPort(total_max=3)
+    quota.companies["o-1"] = 1
+    instances = FakeInstancePort(attempts, quota=quota)
+    _ask(instances, attempts, "u-A", "o-1")
+    with pytest.raises(errors.InstanceQuotaReached):
+        _ask(instances, attempts, "u-B", "o-1")
+    _ask(instances, attempts, "u-B", "o-2")
+    _ask(instances, attempts, "u-C", "o-3")
+    with pytest.raises(errors.InstanceQuotaReached):
+        _ask(instances, attempts, "u-D", "o-4")
+
+
+def test_user_max_is_the_per_user_default_and_global_max_is_its_alias():
+    q = FakeQuotaPort(user_max=3)
+    assert (q.max_instances("u-A"), q.global_max) == (3, 3)
+    q.global_max = 2
+    assert q.user_max == 2 and FakeQuotaPort(global_max=4).user_max == 4
+    assert q.limits("u-A").company is None, "without an organisation the company check is skipped, by design"
+
+
+@pytest.mark.parametrize("state", [InstanceState.STOPPING, InstanceState.FAILED])
+def test_a_repeat_of_an_accepted_request_is_not_refused_by_quota_when_its_instance_is_stopping_or_failed(state):
+    attempts = FakeAttemptPort()
+    quota = FakeQuotaPort(total_max=1)
+    instances = FakeInstancePort(attempts, quota=quota)
+    a = attempts.seed(user_id="u-A", org_id="o-1")
+    first = instances.request(a.attempt_id, user_id="u-A", org_id="o-1")
+    instances.advance(first.instance_id, state)
+    _ask(instances, attempts, "u-B", "o-2") if state is InstanceState.FAILED else None  # the freed place may be taken meanwhile
+    again = instances.request(a.attempt_id, user_id="u-A", org_id="o-1")
+    assert again.instance_id == first.instance_id and again.state is state
+
 def test_reset_gives_a_new_epoch_only_from_ready_active_or_idle():
     attempts = FakeAttemptPort()
     instances = FakeInstancePort(attempts)

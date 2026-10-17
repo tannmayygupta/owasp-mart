@@ -1,0 +1,13 @@
+Story 3.5 reconciler, test output (Docker Desktop, 2026-10-16). Commands: uv run --locked --package vulnmart-orchestrator pytest -v <files>
+
+============================= test session starts =============================
+platform win32 -- Python 3.14.8, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\tanma\major-project\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\tanma\major-project
+configfile: pyproject.toml
+plugins: anyio-4.15.1, platformdirs-4.13.0, typeguard-4.6.0
+collecting ... collected 43 items / 42 deselected / 1 selected
+
+apps/orchestrator/tests/test_docker_integration.py::test_a_process_killed_during_a_real_create_leaves_nothing_after_the_first_pass_of_a_new_engine PASSED [100%]
+
+====================== 1 passed, 42 deselected in 2.52s =======================

@@ -3,7 +3,7 @@ title: 'Orchestrator engine: state machine and Docker instance builder (create f
 type: 'feature'
 ticket: '1'
 created: '2026-10-12'
-status: 'built'
+status: 'done'
 baseline_revision: '5d526b62be95cfd88b00726f6df505f7cb2cb948'
 route: 'full'
 route_source: 'pinned'

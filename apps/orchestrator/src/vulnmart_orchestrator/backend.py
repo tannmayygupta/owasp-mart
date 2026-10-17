@@ -39,7 +39,21 @@ class Found:
         return not (self.containers or self.networks or self.volumes)
 
 
+@dataclass(frozen=True, slots=True)
+class Seen:
+    """One Docker object found by `scan`: its kind (container, network or volume), name, labels and, for a container, its status and its
+    health (None when it has no healthcheck)."""
+
+    kind: str
+    name: str
+    labels: dict[str, str]
+    status: str = ""
+    health: str | None = None
+
+
 class Backend(Protocol):
+    def scan(self) -> tuple[Seen, ...]:
+        """Every container, network and volume that carries the label `vm.kind=inst` (the reconciler's view of the truth)."""
     def create_network(self, spec: NetworkSpec) -> None: ...
     def create_volume(self, spec: VolumeSpec) -> None: ...
     def create_container(self, spec: ContainerSpec) -> None: ...
@@ -49,7 +63,8 @@ class Backend(Protocol):
     def state(self, name: str) -> ContainerState: ...
     def wait_exit(self, name: str, timeout_s: float) -> int | None:
         """The exit code, or None if the container is still running after `timeout_s`."""
-    def find(self, instance_id: str) -> Found: ...
+    def find(self, instance_id: str, epoch: int | None = None) -> Found:
+        """Every object with the `vm.instance` label; with `epoch` only those that also carry that `vm.epoch` label."""
     def remove_container(self, name: str) -> None: ...
     def remove_network(self, name: str) -> None: ...
     def remove_volume(self, name: str) -> None: ...
@@ -75,6 +90,8 @@ class FakeBackend:
     containers: dict[str, ContainerSpec] = dc_field(default_factory=dict)
     networks: dict[str, NetworkSpec] = dc_field(default_factory=dict)
     volumes: dict[str, VolumeSpec] = dc_field(default_factory=dict)
+    statuses: dict[str, str] = dc_field(default_factory=dict)  # test aid for `scan`: a status or health other than the computed one
+    healths: dict[str, str | None] = dc_field(default_factory=dict)
     _started: set[str] = dc_field(default_factory=set)
     _polls: dict[str, int] = dc_field(default_factory=dict)
 
@@ -131,14 +148,33 @@ class FakeBackend:
         st = self.state(name)
         return st.exit_code if st.status == "exited" else None
 
-    def find(self, instance_id: str) -> Found:
+    def find(self, instance_id: str, epoch: int | None = None) -> Found:
         def mine(labels: dict[str, str]) -> bool:
-            return labels.get("vm.instance") == instance_id
+            return labels.get("vm.instance") == instance_id and (epoch is None or labels.get("vm.epoch") == str(epoch))
 
         return Found(
             tuple(n for n, s in self.containers.items() if mine(s.labels)),
             tuple(n for n, s in self.networks.items() if mine(s.labels)),
             tuple(n for n, s in self.volumes.items() if mine(s.labels)),
+        )
+
+    def _status(self, name: str) -> str:
+        if name in self.statuses:
+            return self.statuses[name]
+        if name not in self._started:
+            return "created"
+        if self.containers[name].role == "injector" and self.injector_exit is not None:
+            return "exited"
+        return "running"
+
+    def scan(self) -> tuple[Seen, ...]:
+        def inst(labels: dict[str, str]) -> bool:
+            return labels.get("vm.kind") == "inst"
+
+        return (
+            *(Seen("container", n, dict(s.labels), self._status(n), self.healths.get(n)) for n, s in self.containers.items() if inst(s.labels)),
+            *(Seen("network", n, dict(s.labels)) for n, s in self.networks.items() if inst(s.labels)),
+            *(Seen("volume", n, dict(s.labels)) for n, s in self.volumes.items() if inst(s.labels)),
         )
 
     def remove_container(self, name: str) -> None:
@@ -189,7 +225,7 @@ def _locked(name: str):
     return call
 
 
-for _name in ("create_network", "create_volume", "create_container", "start", "start_with_stdin", "wait_exit", "find",
+for _name in ("create_network", "create_volume", "create_container", "start", "start_with_stdin", "wait_exit", "find", "scan",
               "remove_container", "remove_network", "remove_volume"):
     setattr(ServiceFakeBackend, _name, _locked(_name))
 del _name
@@ -286,14 +322,33 @@ class SdkBackend:
                 return None
             time.sleep(0.2)
 
-    def find(self, instance_id: str) -> Found:
-        flt = {"label": f"vm.instance={instance_id}"}
+    def find(self, instance_id: str, epoch: int | None = None) -> Found:
+        labels = [f"vm.instance={instance_id}"] + ([f"vm.epoch={epoch}"] if epoch is not None else [])  # several label filters are ANDed
+        flt = {"label": labels}
         return Found(
             tuple(c.name for c in self._wrap(self.client.containers.list, all=True, filters=flt)),
             tuple(n.name for n in self._wrap(self.client.networks.list, filters=flt)),
             tuple(v.name for v in self._wrap(self.client.volumes.list, filters=flt)),
         )
 
+    def scan(self) -> tuple[Seen, ...]:
+        flt = {"label": ["vm.kind=inst"]}
+        # Networks and volumes first, containers last: an instance that is being built has its network and volumes before its containers,
+        # so a container is never seen without them (the three lists are not one snapshot).
+        out: list[Seen] = []
+        for n in self._wrap(self.client.networks.list, filters=flt):
+            out.append(Seen("network", n.name, dict((n.attrs or {}).get("Labels") or {})))
+        for v in self._wrap(self.client.volumes.list, filters=flt):
+            out.append(Seen("volume", v.name, dict((v.attrs or {}).get("Labels") or {})))
+        for c in self._wrap(self.client.containers.list, all=True, filters=flt):
+            state = (c.attrs or {}).get("State")
+            if not isinstance(state, dict):  # the list call only gives a text: inspect for the state and the health
+                try:
+                    state = self._wrap(self.api.inspect_container, c.id)["State"]
+                except self._docker.errors.NotFound:
+                    continue  # removed since the list
+            out.append(Seen("container", c.name, dict(c.labels or {}), state.get("Status") or "", (state.get("Health") or {}).get("Status")))
+        return tuple(out)
     def remove_container(self, name: str) -> None:
         with contextlib.suppress(self._docker.errors.NotFound):
             self._wrap(self.api.remove_container, name, v=True, force=True)

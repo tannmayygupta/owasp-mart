@@ -1,0 +1,58 @@
+round 1/1: destroyed in 7.25s
+instance 1/1: ready in 6.90s
+concurrent 1/3: ready in 7.62s
+concurrent 2/3: ready in 7.64s
+concurrent 3/3: ready in 7.64s
+{
+  "date": "2026-10-16",
+  "images": "stub instance image (L-06), two components (injector and shop)",
+  "host": {
+    "os": "Windows",
+    "kernel": "11",
+    "machine": "AMD64",
+    "cpus": 12,
+    "mem_total_mb": null
+  },
+  "docker": "29.6.2",
+  "memory_limit_mb": 256,
+  "cold_start_s": {
+    "n": 1,
+    "min": 7.25,
+    "median": 7.25,
+    "p95": 7.25,
+    "max": 7.25
+  },
+  "create_while_n_running_s": {
+    "n": 1,
+    "min": 6.9,
+    "median": 6.9,
+    "p95": 6.9,
+    "max": 6.9
+  },
+  "instances_running": 1,
+  "container_memory_mb_per_instance": {
+    "n": 1,
+    "min": 31.25,
+    "median": 31.25,
+    "p95": 31.25,
+    "max": 31.25
+  },
+  "host_mem_available_drop_mb_total": null,
+  "host_mem_available_drop_mb_per_instance": null,
+  "concurrent_start": {
+    "requested": 3,
+    "ready": 3,
+    "failures": 0,
+    "wall_clock_s": 7.65,
+    "most_builds_together": 3,
+    "ready_after_s": {
+      "n": 3,
+      "min": 7.62,
+      "median": 7.64,
+      "p95": 7.64,
+      "max": 7.64
+    }
+  },
+  "failures": 0,
+  "leftovers_after": 0
+}

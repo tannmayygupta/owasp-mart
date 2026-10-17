@@ -1,5 +1,5 @@
 """The service as a process (`python -m vulnmart_orchestrator --backend fake`): what the protocol suites of apps/api do not check, such as
-the rate limit, the reset placeholder, the command line and that no secret reaches an answer or the log. The protocol, wire, http, report
+the rate limit, the HTTP reset, the activity control and the reaper, the command line and that no secret reaches an answer or the log. The protocol, wire, http, report
 and mTLS suites run against this same service with `VM_ORCH_SERVICE=python` (see the CI step and docs/dev-log)."""
 import json
 import os
@@ -155,19 +155,75 @@ def test_create_answers_at_once_with_202_and_the_instance_becomes_ready_later(te
         s.stop()
 
 
-# ---- the reset placeholder (story 3.4) ----
-def test_reset_is_a_marked_placeholder_that_changes_nothing(svc):
+# ---- reset (story 3.4) ----
+def test_reset_answers_202_then_the_new_epoch_becomes_ready_and_a_repeat_is_200(svc):
     iid = "i-ABCDEFGHIJKLMNOP"
     svc.call("POST", "/v1/instances", create_body(iid))
     wait_state(svc, iid, "ready")
     payload = {k: body()[k] for k in ("flags", "decoys", "flag_digests", "event_key", "seed")}
-    status, problem, _ = svc.call("POST", f"/v1/instances/{iid}/reset", json.dumps({**payload, "epoch": 2}).encode())
-    assert status == 501 and problem["code"] == "ORCH-NOT-IMPLEMENTED" and "detail" not in problem
-    after = svc.call("GET", f"/v1/instances/{iid}")[1]
-    assert after["state"] == "ready" and after["epoch"] == 1
-    # the checks that come before the placeholder still run: shape, state, epoch
-    assert svc.call("POST", f"/v1/instances/{iid}/reset", json.dumps({**payload, "epoch": 3}).encode())[1]["code"] == "ORCH-STALE-EPOCH"
+    request = json.dumps({**payload, "epoch": 2}).encode()
+    status, data, _ = svc.call("POST", f"/v1/instances/{iid}/reset", request)
+    assert status == 202 and data["state"] == "resetting" and data["epoch"] == 2
+    ready = wait_state(svc, iid, "ready")
+    assert ready["epoch"] == 2 and ready["health"] == "healthy" and "flags" not in ready and "seed" not in ready
+    status, data, _ = svc.call("POST", f"/v1/instances/{iid}/reset", request)
+    assert status == 200 and data["epoch"] == 2 and data["state"] == "ready"  # the same body again: no new work
+    other = json.dumps({**payload, "epoch": 2, "seed": "OTHER-SEED-NOT-REAL-" + "0" * 24}).encode()
+    assert svc.call("POST", f"/v1/instances/{iid}/reset", other)[1]["code"] == "ORCH-REQUEST-MISMATCH"
+    # shape, state, epoch and existence checks
+    assert svc.call("POST", f"/v1/instances/{iid}/reset", json.dumps({**payload, "epoch": 4}).encode())[1]["code"] == "ORCH-STALE-EPOCH"
     assert svc.call("POST", f"/v1/instances/{iid}/reset", json.dumps({**payload, "epoch": 1}).encode())[1]["code"] == "ORCH-VALIDATION"
+    assert svc.call("POST", f"/v1/instances/{'i-' + 'Z' * 16}/reset", request)[0] == 404
+
+
+def test_the_activity_control_works_unsigned_only_on_the_fake_backend_and_moves_the_state(svc):
+    iid = "i-ABCDEFGHIJKLMNOP"
+    svc.call("POST", "/v1/instances", create_body(iid))
+    wait_state(svc, iid, "ready")
+
+    def control(state: str, target: str = f"/_fake/v1/instances/{iid}/activity", method: str = "POST"):
+        req = urllib.request.Request(svc.url + target, data=json.dumps({"state": state}).encode(), method=method,
+                                     headers={"Content-Type": "application/json"})  # no signature headers
+        try:
+            with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=10) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as err:
+            data = json.loads(err.read())
+            err.close()
+            return err.code, data
+
+    assert control("active")[1]["state"] == "active" and control("idle")[1]["state"] == "idle"
+    assert control("idle")[0] == 200  # the same state again changes nothing
+    assert control("ready")[0] == 409  # idle cannot go back to ready
+    assert control("destroyed")[0] == 409 and control("active", f"/_fake/v1/instances/i-{'Z' * 16}/activity")[0] == 404
+    assert control("active", method="GET")[1]["code"] == "ORCH-ROUTE-UNKNOWN"
+    assert control(5)[0] == 422  # a body without a text state is a validation error, not a state conflict
+
+
+def test_the_reaper_thread_destroys_an_instance_past_its_limit_and_stops_with_the_service():
+    from datetime import datetime, timedelta, timezone
+
+    from vulnmart_orchestrator.backend import FakeBackend
+    from vulnmart_orchestrator.engine import Orchestrator
+    from vulnmart_orchestrator.lifecycle import FakeSettingsPort, Settings
+    from vulnmart_orchestrator.service import Reaper
+    from support import allowlist, template
+
+    now = [datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)]
+    engine = Orchestrator(FakeBackend(), {"shop-v0": template()}, allowlist(), poll_s=0.001, now=lambda: now[0],
+                          settings=FakeSettingsPort(Settings(reaper_interval_s=0.01)))
+    engine.create(body())
+    reaper = Reaper(engine)
+    reaper.start()
+    try:
+        now[0] += timedelta(minutes=121)  # past max_minutes 120 of the default body
+        end = time.monotonic() + 5
+        while engine.get("i-ABCDEFGHIJKLMNOP").state.value != "destroyed":
+            assert time.monotonic() < end, "the reaper did not destroy the instance"
+            time.sleep(0.01)
+    finally:
+        reaper.stop()
+    assert not reaper._thread.is_alive()
 
 
 # ---- destroy ----
@@ -373,3 +429,43 @@ def test_the_image_default_is_tls_required_and_never_carries_the_test_switches()
     assert "--insecure-no-tls" not in joined and "--allow-fake-backend" not in joined and "--backend" not in joined
     assert "0.0.0.0" in joined  # so the refusal of a non-loopback address without TLS (tested above) is what protects the image
     assert "--key " not in joined and "--report-key " not in joined
+
+
+# ---- reconciler (story 3.5) ----
+def test_create_and_reset_are_busy_until_the_first_pass_has_worked_and_a_pass_opens_the_service():
+    from support import allowlist, template
+
+    from vulnmart_orchestrator.auth import Verifier
+    from vulnmart_orchestrator.backend import FakeBackend
+    from vulnmart_orchestrator.engine import Orchestrator
+    from vulnmart_orchestrator.ratelimit import RateLimiter
+    from vulnmart_orchestrator.service import ReconcileLoop, Service, _problem_of
+    from vulnmart_orchestrator.states import Busy
+
+    engine = Orchestrator(FakeBackend(), {"shop-v0": template()}, allowlist(), poll_s=0.001, reconcile_gate=True)
+    service = Service(engine, Verifier(KEY.encode()), RateLimiter(0, 1))
+    with pytest.raises(Busy) as busy:
+        service._create(create_body())
+    problem = _problem_of(busy.value)  # what the endpoint answers: 429 ORCH-BUSY with Retry-After
+    assert problem.code == "ORCH-BUSY" and problem.headers.get("Retry-After")
+    assert ReconcileLoop(engine).first_pass() is True
+    assert service._create(create_body())[0] == 202
+
+
+def test_a_destroyed_id_stays_refused_after_the_service_restarts_with_the_same_state_dir(templates, tmp_path):
+    iid = "i-ABCDEFGHIJKLMNOP"
+    first = Svc(templates, "--rate-per-s", "0", "--state-dir", str(tmp_path))
+    try:
+        first.call("POST", "/v1/instances", create_body(iid))
+        wait_state(first, iid, "ready")
+        first.call("POST", f"/v1/instances/{iid}/destroy")
+        wait_state(first, iid, "destroyed")
+    finally:
+        first.stop()
+    second = Svc(templates, "--rate-per-s", "0", "--state-dir", str(tmp_path))
+    try:
+        status, problem, _ = second.call("POST", "/v1/instances", create_body(iid))
+        assert status == 409 and problem["code"] == "ORCH-INSTANCE-EXISTS"
+        assert second.call("POST", "/v1/instances", create_body("i-ZZZZZZZZZZZZZZZZ"))[0] == 202  # another id is fine
+    finally:
+        second.stop()

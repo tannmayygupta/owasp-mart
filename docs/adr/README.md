@@ -36,5 +36,6 @@
 | 0032 | [Image builds in CI (amd64 now, arm64 behind a switch) and a human-run deploy script](0032-image-builds-in-ci-and-human-run-deploy.md) | Proposed (decided on the developer's delegation 2026-10-12) (D-51) |
 | 0033 | [Orchestrator engine and Docker instance builder](0033-orchestrator-engine-docker-builder.md) | Proposed (D-52, decided on the developer's delegation 2026-10-12) |
 | 0034 | [Orchestrator service: the IF-5 API over the engine](0034-orchestrator-service-fastapi-signing-mtls-reports.md) | Proposed (D-53, decided on the developer's delegation 2026-10-12) |
+| 0035 | [Orchestrator reset, the reaper and the timing settings](0035-orchestrator-reset-reaper-and-timing-settings.md) | Proposed (D-54, decided on the developer's delegation 2026-10-15) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

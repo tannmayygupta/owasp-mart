@@ -1,8 +1,8 @@
-# VulnMart (repo `owasp-mart`)
+# VulnMart
 
 A containerized, flag-based, intentionally vulnerable online marketplace for OWASP Top 10 practice and for hiring assessments. Each user gets a private copy of the shop, attacks it, and every exploit is detected and scored automatically.
 
-Built by three developers with Claude Code. Final submission: first week of November 2026.
+Built by three developers. Final submission: first week of November 2026.
 
 ## Where to start
 
@@ -28,7 +28,7 @@ Needs Node (version in `.node-version`), pnpm and uv (versions pinned in `packag
 |---|---|
 | `node scripts/dev.mjs doctor` | Prints tool versions with PASS or FAIL |
 | `node scripts/dev.mjs hello` | Starts a hardened hello container, checks it, removes it |
-| `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (`lab` and `mocks` are empty until later stories) |
+| `node scripts/dev.mjs up <profile...>` | Starts Compose profiles `platform`, `web`, `lab`, `mocks` (`lab` holds only the Docker socket proxy of story 4.2, `mocks` is empty until a later story) |
 | `node scripts/dev.mjs up platform web` | Starts the platform stack: Postgres, Valkey, Mailpit, the API and the dashboards dev server. Open <http://127.0.0.1:3000> (page shows API, Postgres and Valkey health), the API is on port 8000 and the Mailpit page on 8025 (all loopback only). First start builds the images and installs the dashboards' packages, so allow a few minutes. `up` does not rebuild an existing image: after changing API code run `docker compose -f infra/compose/compose.yaml --profile platform build api` (dashboards code reloads by itself) |
 | `uv run --directory apps/api pytest` | Runs the API unit tests (needs `uv`; no Docker) |
 | `docker compose -f infra/compose/compose.yaml --profile platform --profile web down -v` | Resets the platform stack: `dev.mjs down` keeps the named volumes (database data, the dashboards' `node_modules` and `.next`), so use this when you change the dev database password or want a clean database |

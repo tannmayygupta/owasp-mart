@@ -1,0 +1,1 @@
+PASS lab compose rules: 3 file(s) checked, none uses privileged, host network or pid, the Docker socket, or a dangerous capability
