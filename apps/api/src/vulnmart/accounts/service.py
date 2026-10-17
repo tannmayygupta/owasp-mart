@@ -25,7 +25,8 @@ from vulnmart.notifications.service import DbOutboxPort
 from vulnmart.notifications.templates import validate_params
 from vulnmart.ports.settings import SettingsPort
 
-from .models import EmailToken, User, UserRole
+from .models import EmailToken, User, UserRole, UserSession
+from .passwords import InvalidPassword, PasswordPolicy
 from .security import hash_password, new_token, new_user_id, normalize_email, spend_the_same_time, token_hash
 
 logger = logging.getLogger("vulnmart.accounts")
@@ -44,9 +45,10 @@ def utc_now() -> datetime:
 class InvalidInput(ValueError):
     """A value is not acceptable. `pointer` names it (JSON pointer into the body); the value is never kept."""
 
-    def __init__(self, pointer: str):
+    def __init__(self, pointer: str, kind: str = "value_error"):
         super().__init__(pointer)
         self.pointer = pointer
+        self.kind = kind  # a password rule that failed (passwords.py) or the generic "value_error"
 
 
 class TokenInvalid(Exception):
@@ -70,12 +72,23 @@ def check_password(password: str) -> None:
         raise InvalidInput("/password")
 
 
+def check_new_password(policy: PasswordPolicy, password: str, *, pointer: str, email: str | None, display_name: str | None,
+                       min_length: int = PASSWORD_MIN) -> None:
+    """Run the password rules and turn a refusal into an InvalidInput that names the field and the rule (never the password)."""
+    try:
+        policy.check(password, email=email, display_name=display_name, min_length=min_length)
+    except InvalidPassword as exc:
+        raise InvalidInput(pointer, exc.kind) from None
+
+
 class AccountService:
-    def __init__(self, sessions: sessionmaker[Session], settings: SettingsPort, *, public_origin: str, now: Clock = utc_now):
+    def __init__(self, sessions: sessionmaker[Session], settings: SettingsPort, *, public_origin: str, now: Clock = utc_now,
+                 policy: PasswordPolicy | None = None):
         self._sessions = sessions
         self._settings = settings
         self._origin = public_origin.rstrip("/")
         self._now = now
+        self._policy = policy or PasswordPolicy()  # rules 1 to 3 of passwords.py; the process passes one with the common-password list
 
     # -- helpers -----------------------------------------------------------------------------------------------------
 
@@ -106,8 +119,8 @@ class AccountService:
         email_ci = normalize_email(email)
         if email_ci is None:
             raise InvalidInput("/email")
-        check_password(password)
         name = clean_display_name(display_name)
+        check_new_password(self._policy, password, pointer="/password", email=email_ci, display_name=name)
         password_hash = hash_password(password)  # always, so a known address costs the same time as a new one
         now = self._now()
         try:
@@ -163,6 +176,59 @@ class AccountService:
             session.execute(update(EmailToken).where(EmailToken.user_id == user.id, EmailToken.purpose == "verify",
                                                      EmailToken.used_at.is_(None)).values(used_at=now))
             self._send_verification(session, user.id, now)
+
+    # -- password reset (FR-ACC-08) ------------------------------------------------------------------------------------
+
+    def request_reset(self, *, email: str) -> None:
+        """Mail a reset link to an active account and make its older unused reset links useless. Silent for any other address: the
+        answer, and about the time it takes, do not tell whether the address has an account. An unverified account may reset too: the
+        link proves the person reads that mailbox (and confirming it verifies the address)."""
+        email_ci = normalize_email(email)
+        if email_ci is None:
+            raise InvalidInput("/email")
+        now = self._now()
+        with self._sessions.begin() as session:
+            user = session.scalar(select(User).where(User.email_ci == email_ci))
+            if user is None or user.status != "active":
+                spend_the_same_time()
+                return
+            session.execute(update(EmailToken).where(EmailToken.user_id == user.id, EmailToken.purpose == "reset",
+                                                     EmailToken.used_at.is_(None)).values(used_at=now))
+            hours = int(self._settings.get("email_token_hours"))
+            token = new_token()
+            session.add(EmailToken(token_hash=token_hash(token), user_id=user.id, purpose="reset", expires_at=now + timedelta(hours=hours)))
+            self._outbox(session).enqueue_email(template="account.password_reset", to_user_id=user.id,
+                                                params={"link": f"{self._origin}/reset-password?token={token}", "expires_in_hours": hours})
+
+    def confirm_reset(self, *, token: str, new_password: str) -> str:
+        """Set a new password with a reset link, once. Returns the account's canonical email (so the caller can clear its failed-login
+        count). Raises TokenInvalid for a link that was used, expired, never existed or is not a reset link, and InvalidInput (the link
+        is not used up) for a password that breaks a rule. On success every session of the account ends (contract) and the address is
+        marked verified, because the link proved the person reads it."""
+        digest = token_hash(token)
+        now = self._now()
+        with self._sessions() as session:  # first look, without changing anything: is the link good, and whose is it
+            row = session.get(EmailToken, digest)
+            user = session.get(User, row.user_id) if row is not None else None
+            if (row is None or row.purpose != "reset" or row.used_at is not None or _aware(row.expires_at) <= now
+                    or user is None or user.status != "active"):
+                raise TokenInvalid
+            email_ci, name, user_id = user.email_ci, user.display_name, user.id
+        check_new_password(self._policy, new_password, pointer="/new_password", email=email_ci, display_name=name)
+        new_hash = hash_password(new_password)
+        with self._sessions.begin() as session:
+            claimed = session.execute(
+                update(EmailToken).where(EmailToken.token_hash == digest, EmailToken.used_at.is_(None)).values(used_at=now)).rowcount
+            if claimed != 1:
+                raise TokenInvalid  # another request used it between our look and our update
+            session.execute(update(EmailToken).where(EmailToken.user_id == user_id, EmailToken.purpose == "reset",
+                                                     EmailToken.used_at.is_(None)).values(used_at=now))  # any other reset link dies too
+            user = session.get(User, user_id)
+            user.password_hash = new_hash
+            if user.email_verified_at is None:
+                user.email_verified_at = now
+            session.execute(update(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None)).values(revoked_at=now))
+        return email_ci
 
 
 class DbRecipients:

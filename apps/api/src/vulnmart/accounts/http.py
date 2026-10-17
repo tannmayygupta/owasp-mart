@@ -34,7 +34,7 @@ from vulnmart.ports.scope import Role
 from vulnmart.problem import ProblemError
 
 from .service import AccountService, InvalidInput
-from .sessions import ResolvedSession, SessionService
+from .sessions import ResolvedSession, SessionService, UserView
 
 logger = logging.getLogger("vulnmart.accounts")
 
@@ -121,7 +121,7 @@ async def read_json(request: Request, model: type[M]) -> M:
 
 def invalid(exc: InvalidInput) -> RequestValidationError:
     loc = ("body", *[p for p in exc.pointer.split("/") if p])
-    return RequestValidationError([{"type": "value_error", "loc": loc, "msg": "", "input": None}])
+    return RequestValidationError([{"type": exc.kind, "loc": loc, "msg": "", "input": None}])
 
 
 # ---- the services and the limits ----------------------------------------------------------------------------------------
@@ -197,11 +197,13 @@ def timestamp(moment: datetime) -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def user_body(session: ResolvedSession) -> dict[str, Any]:
-    user = session.user
+def userview_body(user: UserView) -> dict[str, Any]:
     return {"user_id": user.id, "email": user.email, "display_name": user.display_name, "account_type": user.account_type,
             "email_verified": user.email_verified, "mfa_enabled": user.mfa_enabled, "created_at": timestamp(user.created_at)}
 
+
+def user_body(session: ResolvedSession) -> dict[str, Any]:
+    return userview_body(session.user)
 
 def session_body(service: SessionService, token: str, session: ResolvedSession) -> dict[str, Any]:
     return {"status": "authenticated", "user": user_body(session), "csrf_token": service.csrf_token(token),

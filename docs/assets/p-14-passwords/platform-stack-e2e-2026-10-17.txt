@@ -1,0 +1,29 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (497.3535ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (158.1325ms)
+  ✔ the page is served and the API is also reachable directly on its own port (139.6349ms)
+  ✔ API errors follow the IF-8 format through the web origin: unknown route and wrong method (68.4292ms)
+  ✔ origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (115.7454ms)
+  ✔ page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (123.08ms)
+  ✔ caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (709.2005ms)
+  ✔ mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (9734.7477ms)
+  ✔ mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost) (10048.5417ms)
+  ✔ accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (9853.9954ms)
+  ✔ sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good (8168.8315ms)
+  ✔ password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work (16170.0654ms)
+  ✔ admins (P-13): the seed command makes an admin with no learner role who cannot sign in yet, a second seed changes nothing, signup cannot make an admin (4109.4764ms)
+  ✔ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (441.986ms)
+  ✔ hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (380.6839ms)
+  ✔ web has no secrets or flags in its environment (64.9375ms)
+  ✔ Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (17392.9957ms)
+  ✔ Valkey down: public health 503 degraded, /readyz names valkey; recovers (14518.5745ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (5719.4254ms)
+✔ platform and web profiles on a real Docker engine (136008.8502ms)
+ℹ tests 19
+ℹ suites 1
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 136225.351

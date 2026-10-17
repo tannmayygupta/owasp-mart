@@ -151,9 +151,9 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: Roles are enforced in tests and an admin can only be created as FR-ACC-11 says.
   - Handoffs: H-130 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-14. Password reset, password quality and account self-service**
+- [x] **P-14. Password reset, password quality and account self-service**  (API level: the forgot-password, reset and account pages are dashboards work)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: not planned yet; created when you incept `epic-accounts-and-sessions` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `3.4` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Password reset by email, password quality rules, and self-service account management.
   - Covers: FR-ACC-08, 09
   - Waits on: P-10, P-12.
@@ -167,7 +167,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-ACC-07
   - Waits on: P-12.
   - Done when: MFA enrolment and login work in tests, and recovery is covered.
-  - Handoffs: H-130 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-130, H-134 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-16. Consent screen, consent record, minimum data and 18-and-over**
   - Epic: `epic-privacy-audit-and-keys`
@@ -266,6 +266,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Covers: FR-DSH-01, 04, FR-HNT-01, 02
   - Waits on: P-22, Tanmay's scoring (L-23) and the catalogue (T-30). Open in part: OI-15.
   - Done when: Both dashboards show live data on the deployed site and candidate hints are off by default.
+  - Handoffs: H-134 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-27. Recruiter dashboard, live monitor and hints used**
   - Epic: `epic-dashboards-and-exports`

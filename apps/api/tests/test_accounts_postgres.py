@@ -26,6 +26,8 @@ from vulnmart.accounts.security import hash_password, token_hash
 from vulnmart.accounts.admins import AdminService
 from vulnmart.accounts.roles import NotAnAdmin, RoleNotAllowed, RoleService
 from vulnmart.accounts.service import AccountService, TokenInvalid
+from vulnmart.accounts.passwords import CommonPasswordList, PasswordPolicy
+from vulnmart.accounts.self_service import SelfService
 from vulnmart.accounts.sessions import SessionService
 from vulnmart.kernel.settings import sqlalchemy_url
 from vulnmart.notifications.models import EmailOutbox
@@ -305,3 +307,66 @@ def test_an_admin_creates_another_on_postgres_and_a_failed_audit_leaves_nothing(
         assert s.scalar(select(EmailOutbox).where(EmailOutbox.template == "account.admin_created", EmailOutbox.to_user_id != new_id)) is None
     with pytest.raises(NotAnAdmin):
         service.create_admin(Scope(user_id=new_id, roles=frozenset({Role.LEARNER})), email="x@example.com", display_name="X")
+
+# ---- story P-14: reset, password change ---------------------------------------------------------------------------------
+
+def test_a_reset_link_used_at_once_sets_the_password_for_exactly_one_request(sessions):
+    verified_user(sessions)
+    service = AccountService(sessions, FakeSettingsPort(), public_origin="https://vulnmart.example", policy=PasswordPolicy(CommonPasswordList()))
+    service.request_reset(email="a@example.com")
+    with sessions() as s:
+        link = s.scalar(select(EmailOutbox.params).where(EmailOutbox.template == "account.password_reset"))["link"]
+    token = link.rsplit("token=", 1)[1]
+    results, errors = run_at_once(8, lambda: service.confirm_reset(token=token, new_password="purple tractor midnight lantern"))
+    assert errors and all(isinstance(e, TokenInvalid) for e in errors) and len(errors) == 7 and len(results) == 1, "exactly one of eight wins"
+    with sessions() as s:
+        from vulnmart.accounts.security import verify_password
+        assert verify_password(s.get(User, "u-AAAAAAAAAAAAAAAA").password_hash, "purple tractor midnight lantern")
+
+
+def test_a_reset_ends_the_sessions_on_postgres(sessions):
+    verified_user(sessions)
+    login = session_service(sessions)
+    tokens = [login.login(email="a@example.com", password=GOOD).token for _ in range(3)]
+    service = AccountService(sessions, FakeSettingsPort(), public_origin="https://vulnmart.example")
+    service.request_reset(email="a@example.com")
+    with sessions() as s:
+        link = s.scalar(select(EmailOutbox.params).where(EmailOutbox.template == "account.password_reset"))["link"]
+    service.confirm_reset(token=link.rsplit("token=", 1)[1], new_password="purple tractor midnight lantern")
+    assert [login.resolve(t) for t in tokens] == [None, None, None]
+
+
+def test_a_password_change_leaves_exactly_one_live_session_and_old_value_is_dead_on_postgres(sessions):
+    verified_user(sessions)
+    login = session_service(sessions)
+    keep, other = (login.login(email="a@example.com", password=GOOD).token for _ in range(2))
+    me = SelfService(sessions, login, PasswordPolicy(CommonPasswordList()))
+    new_token = me.change_password(user_id="u-AAAAAAAAAAAAAAAA", token=keep, current_password=GOOD, new_password="purple tractor midnight lantern")
+    assert new_token != keep and login.resolve(keep) is None and login.resolve(other) is None and login.resolve(new_token) is not None
+    with sessions() as s:
+        assert len([r for r in s.scalars(select(UserSession)) if r.revoked_at is None]) == 1
+
+
+def test_two_password_changes_at_once_do_not_both_succeed(sessions):
+    verified_user(sessions)
+    login = session_service(sessions)
+    tokens = [login.login(email="a@example.com", password=GOOD).token for _ in range(2)]
+    me = SelfService(sessions, login, PasswordPolicy(CommonPasswordList()))
+    passwords = iter(["purple tractor midnight lantern", "orange bicycle morning window"])
+    jobs = [(tokens[0], next(passwords)), (tokens[1], next(passwords))]
+    barrier, outcomes = threading.Barrier(2), []
+
+    def go(token, new):
+        barrier.wait()
+        try:
+            me.change_password(user_id="u-AAAAAAAAAAAAAAAA", token=token, current_password=GOOD, new_password=new)
+            outcomes.append("changed")
+        except Exception as exc:  # noqa: BLE001
+            outcomes.append(type(exc).__name__)
+
+    threads = [threading.Thread(target=go, args=job) for job in jobs]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert outcomes.count("changed") >= 1 and set(outcomes) <= {"changed", "InvalidCredentials", "SessionEnded"}
+    with sessions() as s:
+        assert len([r for r in s.scalars(select(UserSession)) if r.revoked_at is None]) <= 1, "never two live sessions after changes"

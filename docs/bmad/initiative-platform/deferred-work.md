@@ -42,6 +42,15 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-password-reset-quality-and-account-self-service-plan (2026-10-17)
+
+- The forgot-password, reset-password, account and signup pages (dashboards, handoff H-134); an email change (needs its own verification step).
+- Which breach check is the default is the developer's call (ADR 0044): the bundled list of 10,000 passwords misses most breached passwords (`password1234` passes); `VULNMART_BREACH_CHECK=hibp` closes that and tells a third party a 5-character hash prefix. The range client was checked against the live service by hand once for the response format and never in an automated test.
+- In `hibp` mode an outage of the service means passwords are accepted on the other rules with only a log warning; nothing alerts anyone.
+- No "your password was changed" mail (it is not in the list of FR-NTF-01); a person whose account was taken over would not be told. Worth adding to the list.
+- The refusal sentences are a first draft; the length rule is the contract's proposal (12) and the placeholder numbers (24-hour links, 3 reset mails an hour per address) are not tuned.
+- The own-details rule compares only the email, its local part and the display name from 4 characters; it does not know other personal data.
+
 ## Deferred from: story-account-types-candidate-role-and-admin-creation-plan (2026-10-17)
 
 - The routes for an admin to grant or revoke a role and to create another admin (P-28, a contract change) and the invite acceptance that calls `grant_candidate_role` with its clear refusal message and a new registry code (P-21): handoff H-133.

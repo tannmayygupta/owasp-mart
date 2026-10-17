@@ -24,6 +24,7 @@ from vulnmart.ports.audit import AuditRecord
 from vulnmart.ports.fakes import FakeAuditPort
 
 from .admins import AdminService
+from .passwords import make_policy
 from .service import InvalidInput
 
 logger = logging.getLogger("vulnmart.audit")
@@ -61,12 +62,16 @@ def main(argv: list[str] | None = None, *, settings: Settings | None = None, std
     else:
         password, generated = secrets.token_urlsafe(18), True  # 24 characters
     sessions = make_sessions(make_engine(settings.postgres_dsn), lambda: None)
-    service = AdminService(sessions, DbSettingsPort(sessions), LoggingAuditPort(), public_origin=settings.public_origin)
+    service = AdminService(sessions, DbSettingsPort(sessions), LoggingAuditPort(), public_origin=settings.public_origin, policy=make_policy(settings))
     try:
         created = service.seed_admin(email=args.email, display_name=args.name, password=password)
     except InvalidInput as exc:
-        reason = {"/email": "the email address is not valid", "/display_name": "the name must be 1 to 60 characters",
-                  "/password": "the password must be 16 to 128 characters"}.get(exc.pointer, "a value is not valid")
+        reason = {"/email": "the email address is not valid", "/display_name": "the name must be 1 to 60 characters"}.get(exc.pointer)
+        if reason is None:
+            reason = {"password_length": "the password must be 16 to 128 characters",
+                      "password_common": "the password is too easy to guess",
+                      "password_breached": "the password has appeared in a data breach",
+                      "password_identity": "the password must not contain the email address or the name"}.get(exc.kind, "a value is not valid")
         print(f"Not created: {reason}.", file=err)
         return 2
     if not created:

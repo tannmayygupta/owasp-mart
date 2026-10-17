@@ -202,7 +202,7 @@ def test_the_seed_creates_an_admin_that_cannot_sign_in_yet(sessions, admins, aud
 
 def test_seeding_the_same_address_again_changes_nothing(sessions, admins, audit):
     assert admins.seed_admin(email="root@example.com", display_name="Root", password=ADMIN_PASSWORD) is True
-    assert admins.seed_admin(email="ROOT@example.com", display_name="Other", password="another long password 456") is False
+    assert admins.seed_admin(email="ROOT@example.com", display_name="Mallory", password="a second long admin pass 456") is False
     with sessions() as s:
         users = s.scalars(select(User)).all()
     assert len(users) == 1 and users[0].display_name == "Root" and len(audit.records) == 1

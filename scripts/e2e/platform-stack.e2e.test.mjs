@@ -360,6 +360,82 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(psql(`SELECT (revoked_at IS NOT NULL) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), 't');
   }, { timeout: 180000 });
 
+  // Story P-14: password reset by mail, password quality, the profile and a password change, on the real stack through the web proxy.
+  test('password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work', async () => {
+    const email = `e2e-pw-${RUN}@example.com`;
+    const first = 'correct horse battery staple';
+    const second = 'purple tractor midnight lantern';
+    const third = 'orange bicycle morning window';
+    const cookieOf = (res) => /__Host-vm_session=([^;]+)/.exec(res.headers.getSetCookie()[0])[1];
+    const asCookie = (value) => ({ cookie: `__Host-vm_session=${value}` });
+    assert.equal((await postJson('/api/v1/accounts', { email, password: first, display_name: 'E2E Password', age_declaration: true })).status, 202);
+    const verifyMail = await mailFor(email, 'Confirm your email');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /token=([A-Za-z0-9_-]{43})/.exec(verifyMail.Text)[1] })).status, 200);
+    // two browsers are signed in
+    const loginA = await postJson('/api/v1/session', { email, password: first });
+    const loginB = await postJson('/api/v1/session', { email, password: first });
+    assert.equal(loginA.status, 200);
+    assert.equal(loginB.status, 200);
+    const [cookieA, cookieB] = [cookieOf(loginA), cookieOf(loginB)];
+
+    // forgot password: the same answer for an unknown address, the mail holds only its own link
+    const known = await postJson('/api/v1/password-reset/request', { email });
+    const unknown = await postJson('/api/v1/password-reset/request', { email: `nobody-${RUN}@example.com` });
+    assert.equal(known.status, 202);
+    assert.equal(unknown.status, 202);
+    assert.deepEqual(await known.json(), await unknown.json());
+    const resetMail = await mailFor(email, 'Reset your VulnMart password');
+    assert.ok(resetMail, 'the reset mail arrived');
+    const token = /reset-password\?token=([A-Za-z0-9_-]{43})/.exec(resetMail.Text)?.[1];
+    assert.ok(token, `a reset link in the mail: ${resetMail.Text}`);
+    assert.deepEqual([...new Set(resetMail.Text.match(/https?:\/\/[^\s]+/g))], [`http://127.0.0.1:3000/reset-password?token=${token}`], 'only its own link');
+    // a password from the list of the 10,000 most common is refused with a fixed sentence, and the link survives
+    const weak = await postJson('/api/v1/password-reset/confirm', { token, new_password: 'unbelievable' });
+    assert.equal(weak.status, 422);
+    assert.deepEqual((await weak.json()).errors, [{ pointer: '/new_password', detail: 'This password is too easy to guess. Choose another one.' }]);
+    const done = await postJson('/api/v1/password-reset/confirm', { token, new_password: second });
+    assert.equal(done.status, 204);
+    assert.equal((await postJson('/api/v1/password-reset/confirm', { token, new_password: third })).status, 400, 'a link works once');
+    // every old session ended; the old password no longer works, the new one does
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieA) })).status, 401);
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieB) })).status, 401);
+    assert.equal((await postJson('/api/v1/session', { email, password: first })).status, 401);
+    const login = await postJson('/api/v1/session', { email, password: second });
+    assert.equal(login.status, 200);
+    const { csrf_token: csrf } = await login.json();
+    const cookieC = cookieOf(login);
+
+    // the profile
+    const me = await call('GET', '/api/v1/me', { headers: asCookie(cookieC) });
+    assert.equal(me.status, 200);
+    assert.equal((await me.json()).display_name, 'E2E Password');
+    const renamed = await call('PATCH', '/api/v1/me', { body: { display_name: 'E2E  Renamed' }, headers: { ...asCookie(cookieC), 'x-csrf-token': csrf } });
+    assert.equal(renamed.status, 200);
+    assert.equal((await renamed.json()).display_name, 'E2E Renamed');
+    assert.equal((await call('PATCH', '/api/v1/me', { body: { display_name: 'No token' }, headers: asCookie(cookieC) })).status, 403);
+
+    // a password change: a wrong current password keeps the session, a right one gives a new session value and ends the others
+    const wrong = await postJson('/api/v1/me/password', { current_password: 'not the password at all', new_password: third }, { ...asCookie(cookieC), 'x-csrf-token': csrf });
+    assert.equal(wrong.status, 401);
+    assert.equal((await wrong.json()).code, 'AUTH-INVALID-CREDENTIALS');
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieC) })).status, 200);
+    const other = await postJson('/api/v1/session', { email, password: second });
+    const cookieOther = cookieOf(other);
+    const changed = await postJson('/api/v1/me/password', { current_password: second, new_password: third }, { ...asCookie(cookieC), 'x-csrf-token': csrf });
+    assert.equal(changed.status, 204);
+    const cookieD = cookieOf(changed);
+    assert.notEqual(cookieD, cookieC);
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieC) })).status, 401, 'the old value of this session is dead');
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieOther) })).status, 401, 'the other session ended');
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieD) })).status, 200);
+    assert.equal((await postJson('/api/v1/session', { email, password: second })).status, 401);
+    assert.equal((await postJson('/api/v1/session', { email, password: third })).status, 200);
+    // nothing sensitive is stored readable: the reset token is only a hash
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    assert.equal(psql(`SELECT count(*) FROM email_tokens WHERE token_hash = '${token}'`), '0');
+    assert.equal(psql(`SELECT used_at IS NOT NULL FROM email_tokens JOIN users ON users.id = email_tokens.user_id WHERE email_ci = '${email}' AND purpose = 'reset'`), 't');
+  }, { timeout: 240000 });
+
   // Story P-13: an admin exists only through the seed command (or another admin); signup cannot make one; an admin has no learner role.
   test('admins (P-13): the seed command makes an admin with no learner role who cannot sign in yet, a second seed changes nothing, signup cannot make an admin', async () => {
     const email = `e2e-admin-${RUN}@example.com`;
