@@ -246,3 +246,22 @@ test('--probe-subnet and --peer-subnet are validated and must differ (exit 2)', 
     assert.match(err.join(''), /subnet/);
   }
 });
+
+test('--runtime (S-8): every probe container gets it, the report says which, a bad name is refused, the default has none', () => {
+  const d = stubDocker({ answer: allBlocked });
+  const { exitCode, report } = runProbe({ docker: d, image: 'img', nonce: 'r1', runtime: 'runsc' });
+  assert.equal(exitCode, 0, JSON.stringify(report));
+  const runs = d.calls.filter((c) => c[0] === 'run');
+  assert.equal(runs.length, 3);
+  for (const run of runs) assert.equal(run[run.indexOf('--runtime') + 1], 'runsc');
+  assert.equal(report.runtime, 'runsc');
+  const plain = stubDocker({ answer: allBlocked });
+  const r = runProbe({ docker: plain, image: 'img', nonce: 'r2' });
+  assert.ok(plain.calls.filter((c) => c[0] === 'run').every((c) => !c.includes('--runtime')));
+  assert.ok(!('runtime' in r.report));
+  for (const bad of ['RUNSC', 'runsc;rm', '-x', 'a', 'runsc --privileged', '../x']) {
+    const err = [];
+    assert.equal(main(['--runtime', bad], { log: () => {}, err: (e) => err.push(e), docker: stubDocker({ answer: allBlocked }) }), 2, bad);
+    assert.match(err.join(''), /--runtime/);
+  }
+});

@@ -27,3 +27,5 @@ Runbook steps 5 to 7 as written were not run; 20 real instances through the orch
 
 ## Verification
 `node --test scripts/isolation-probe.test.mjs` 21 passed; live results in `docs/research/s-3-s-15-vm-i-isolation.md` and the evidence folder.
+## Progress note 2026-10-18
+- Story 4 (S-8 sandboxing, L-29 part 2) stays planned. Prep done: probe --runtime option, 22 tests pass. Live experiments blocked by the auto-mode classifier (daemon config change on vm-i); waiting for the developer's go-ahead.

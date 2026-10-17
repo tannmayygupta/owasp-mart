@@ -27,3 +27,7 @@ The finding is the point: a container on an internal network can reach the host'
 
 ## Limitations and follow-ups
 The S-15 attach was emulated (no orchestrator, no real instances); the per-hostname check and the post-restart sync delay are not measured. L-29 part 2 (S-8) is the next story. vm-i is still running.
+
+## Addendum: --runtime option (S-8 preparation)
+- scripts/isolation-probe.mjs gained --runtime <name> so the same probe can run under another OCI runtime (for example runsc) in the S-8 tests. Local: 22 tests pass (new test checks every probe container gets the flag).
+- S-8 live experiments (userns-remap, gVisor) were NOT run: the session's auto-mode classifier denied the remote step that edits the Docker daemon config on vm-i. Nothing on vm-i changed. They need the developer's go-ahead or a run by hand.
