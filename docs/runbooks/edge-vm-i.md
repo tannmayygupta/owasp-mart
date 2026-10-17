@@ -4,7 +4,7 @@ Everything here is a live step for **you** (the developer). Claude does not use 
 
 Files used: `infra/compose/compose.yaml` (profile `lab`: `edge-gate`, `edge-caddy`, `docker-proxy`, `orchestrator`), `infra/caddy/Caddyfile.l`, `docs/runbooks/certificates.md`, `docs/runbooks/isolation-vm-i.md`, `docs/runbooks/deploy.md` Part E, `contracts/edge/gate-ticket.md`.
 
-## Decision H-143 (resolved 2026-10-17): the orchestrator runs as a container on labs-core
+## Decision H-343 (resolved 2026-10-17): the orchestrator runs as a container on labs-core
 The gate admin listener answers only on the compose network `vulnmart-labs-core` (alias `edge-gate-admin`, port 9090, never published). A host process cannot resolve that alias, so the orchestrator is the compose service `orchestrator` (profile `lab`) on that network; it reaches the gate admin listener and the socket proxy (`docker-proxy:2375`) by name and mounts no Docker socket. Options (b) publishing the admin listener on loopback and (c) https for the admin listener were not taken. Step 3 gives the steps; the local proof is in `docs/assets/story-edge-6-orchestrator-container/` (30 checks, Docker Desktop; not a proof of vm-i).
 
 ## 1. Labs name and wildcard certificate
@@ -16,7 +16,7 @@ The gate admin listener answers only on the compose network `vulnmart-labs-core`
 ## 2. Gate key and gate admin secret (two secrets, files only)
 1. On vm-i create the folder `/opt/vulnmart/lab/secrets` (or set `VULNMART_EDGE_SECRETS`), mode 700.
 2. Make the folder and the three files owned by `65532:65532` (`sudo chown -R 65532:65532 /opt/vulnmart/lab/secrets`): the edge-gate and the orchestrator container both run as 65532, and the orchestrator refuses a key file that group or others can read, so `gate_admin_secret` must be mode 400 or 600 (Compose bind-mounts file secrets as they are and ignores a mode setting). Create `gate_key_current` (at least 64 hex characters, e.g. `openssl rand -hex 32` gives 64), `gate_key_previous` (create it empty with `touch` when there is no previous key: an empty file means no previous key, and the file must exist because Docker makes a folder of a missing bind source), and `gate_admin_secret` (at least 16 characters, e.g. `openssl rand -hex 24`). Mode 600. Never print them.
-3. The same `gate_key_current` bytes must be written on **vm-p** for the API (it signs the tickets; ADR 0009, handoff H-137). Copy it by hand, not through a chat. Rotation: put the new key in `gate_key_current` and the old one in `gate_key_previous`, restart `edge-gate`; remove the old one after 60 seconds plus the cookie life you accept (a cookie is signed with the key too, so a rotation ends the older browser sessions when the previous key is removed).
+3. The same `gate_key_current` bytes must be written on **vm-p** for the API (it signs the tickets; ADR 0009, handoff H-337). Copy it by hand, not through a chat. Rotation: put the new key in `gate_key_current` and the old one in `gate_key_previous`, restart `edge-gate`; remove the old one after 60 seconds plus the cookie life you accept (a cookie is signed with the key too, so a rotation ends the older browser sessions when the previous key is removed).
 4. The orchestrator container reads the admin secret from the same file (`--gate-admin-key-file /run/secrets/gate_admin_secret` in the compose service; mode 400 or 600, owner 65532).
 5. Evidence: `ls -l` of the folder with the names and modes only. Folder `docs/assets/edge-vm-i/secrets/`.
 
@@ -35,7 +35,7 @@ The gate admin listener answers only on the compose network `vulnmart-labs-core`
 7. Evidence: the listings with ids shortened. Folder `docs/assets/edge-vm-i/start/`.
 8. The same checks ran locally on Docker Desktop with throwaway secrets: `node docs/assets/story-edge-6-orchestrator-container/proof-run.mjs` (needs Docker, openssl and the stub image `vulnmart-stub-instance:local`; it reuses a running `vulnmart-docker-proxy` and removes everything else it starts). That run puts the secrets in a named volume (Docker Desktop shows bind-mounted files as mode 777) and adds `--allow-local-images` and a relaxed template schema; none of that is part of the committed service.
 
-## 3b. State reports to vm-p (edge story 7, handoff H-147 point 1)
+## 3b. State reports to vm-p (edge story 7, handoff H-347 point 1)
 The orchestrator container sends every state change of an instance to the platform: `POST /internal/v1/orch/state`, signed with a **report key** (a different key from the platform key), over https. The receiver is in the ingest app (`apps/api/src/vulnmart/lab/state_reports.py`) and exists only when `VULNMART_LAB_RUNTIME=1` and `VULNMART_ORCH_REPORT_KEY_FILE` are both set. It keeps what it receives in memory (a restart empties it; the orchestrator sends again what was not accepted). Everything below is a live step for you; the local proof is `docs/assets/story-edge-7-state-reports/` (Docker Desktop, throwaway keys; not a proof of vm-p or vm-i). Never print a key, never paste an address.
 
 **Helpers for the live check (added after the first attempt):** `scripts/make-test-certs.ps1` (run on your PC: one test CA plus the ingest, orchestrator and client certificates with the extensions Python 3.14 requires; a CA made with a plain `openssl req -x509` has no keyUsage and Python refuses it) and `scripts/orch_smoke.py` (run inside the api image: creates one instance through the orchestrator over mutual TLS, prints its states, destroys it). The exact paste-blocks were given in the chat and follow these two files.
@@ -68,7 +68,7 @@ The orchestrator container sends every state change of an instance to the platfo
 With the platform running and one live instance of your own account:
 1. Click open: the instance opens in a new tab, address `https://i-...`, and the shop is shown.
 2. Open it again in a second browser (or a private window) with the same account: the new tab works; **reload the first tab**: it must be refused (one active browser session, FR-SES-11).
-3. Log in again with the same account in another browser: the older platform session is invalid and the instance tabs of the older session are refused until a new open (needs the platform side of H-136; if it is not built yet, write "not testable yet").
+3. Log in again with the same account in another browser: the older platform session is invalid and the instance tabs of the older session are refused until a new open (needs the platform side of H-336; if it is not built yet, write "not testable yet").
 4. A second account (own invite) pastes the instance address: refused, and no ticket can be made for it.
 5. Freeze the attempt from the platform: the instance tab shows the paused page at once; thaw: the old tab stays refused, a new open works.
 6. Expiry or destroy: the tab shows the ended page; `docker network ls` shows no `vm-` network.

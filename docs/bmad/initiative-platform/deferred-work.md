@@ -42,6 +42,60 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-password-reset-quality-and-account-self-service-plan (2026-10-17)
+
+- The forgot-password, reset-password, account and signup pages (dashboards, handoff H-134); an email change (needs its own verification step).
+- Which breach check is the default is the developer's call (ADR 0044): the bundled list of 10,000 passwords misses most breached passwords (`password1234` passes); `VULNMART_BREACH_CHECK=hibp` closes that and tells a third party a 5-character hash prefix. The range client was checked against the live service by hand once for the response format and never in an automated test.
+- In `hibp` mode an outage of the service means passwords are accepted on the other rules with only a log warning; nothing alerts anyone.
+- No "your password was changed" mail (it is not in the list of FR-NTF-01); a person whose account was taken over would not be told. Worth adding to the list.
+- The refusal sentences are a first draft; the length rule is the contract's proposal (12) and the placeholder numbers (24-hour links, 3 reset mails an hour per address) are not tuned.
+- The own-details rule compares only the email, its local part and the display name from 4 characters; it does not know other personal data.
+
+## Deferred from: story-account-types-candidate-role-and-admin-creation-plan (2026-10-17)
+
+- The routes for an admin to grant or revoke a role and to create another admin (P-28, a contract change) and the invite acceptance that calls `grant_candidate_role` with its clear refusal message and a new registry code (P-21): handoff H-133.
+- Audit entries (`role.granted`, `role.revoked`, `admin.created`) go to the in-memory audit port until the durable log exists (P-17, handoff H-132); the seed command also logs them. Until P-17 a restart loses them.
+- An admin cannot sign in until the second factor exists (P-15) and an admin created by an admin cannot choose a password until the reset story (P-14) consumes the `reset` token of the mail; so no admin screen can be tried yet.
+- The seed operator knows the first admin's initial password; a change at first sign-in is P-14.
+- The wording of `account.admin_created` is a first draft.
+- A role-gated route answers 404 like an unknown route; there is no 403 in the error registry, which also means a user cannot be told "this needs a recruiter account" (a UX question for the dashboards).
+- Account type changes after creation (a person who becomes a recruiter) are not supported: a new account is needed. The database refuses the change while the account holds a role.
+
+## Deferred from: story-login-sessions-timeouts-and-csrf-plan (2026-10-17)
+
+- The routes for a user's own session list, revoking one session and "log out everywhere" (FR-ACC-04): story 3.6; the service functions are built and tested.
+- The login form and the "who am I" page (dashboards); `getMe` and `updateMe` are P-14.
+- Expired and revoked rows stay in `sessions` until a purge job exists (the retention scheduler, P-24).
+- The architecture's Valkey cache of active sessions is not built; every authenticated request is one Postgres read (plus a write at most once a minute). Measure before adding it.
+- The login limits (60 attempts an hour per visitor address; 10 wrong passwords in 15 minutes per email address) are placeholders; the per-email wait also stops the right password for that window.
+- A strict deployment accepts one dashboard origin only; `localhost` and `127.0.0.1` are different origins to the check.
+- The Argon2id hash upgrade at login (`needs_rehash`) is tested with a weak hash but no production hash is older than the current profile yet.
+- The session and CSRF behaviour was checked against the contract and a local browser-less client; not in a real browser, and not on the deployed Vercel path (handoff H-131).
+
+## Deferred from: story-learner-signup-email-verification-and-signup-abuse-protection-plan (2026-10-17)
+
+- The signup form and the verify-email page (the link in the mail points at `${public_origin}/verify-email?token=...`, a dashboards page that does not exist yet); until then a learner can only be created and verified through the API. No task before P-26 builds them: decide which dashboards story owns them.
+- Argon2id is at the OWASP minimum (19 MiB, 2 passes, 1 lane); the epic's note says it is tuned in spike S-12 on the real VM.
+- Rate limits: login, password reset and invite endpoints (FR-ACC-10) come with their stories; the numbers are placeholders; the fixed window allows up to twice the limit around a window edge.
+- `trusted_proxy_hops` is 1; behind `caddy-p` it must be 2 (handoff H-129, Tanmay) and nobody has measured it on the deployed path.
+- The breach-list check and password quality rules (FR-ACC-08) are P-14: signup checks the length only.
+- Concurrent hashing is capped at 4 per API process by a semaphore; the cap was chosen for the 256 MiB container, not measured under load.
+- The mail text of `account.already_registered` is a first draft like the other templates.
+
+## Deferred from: story-email-templates-plan (2026-10-17)
+
+- FR-NTF-04 and FR-SES-03 (in-app time warnings, recruiter alerts): story 2.3 of `epic-notifications-and-email`, after the live hub (P-22, P-23) and the dashboards (P-26, P-27). Open: where the 15 and 5 minute warnings come from (a scheduler timer that records the event, or the page computing them from `deadline_at`) and who owns the timer between this stream and stream L.
+- A single-use link sits in `email_outbox.params` while the row is `pending` or `failed` (it is removed once sent). Encrypting link parameters with the KeyPort (P-17) would close that window.
+- The nine templates were not sent to a real Mailpit in this story (Docker would not start on the developer's PC): rendering, sending through a fake provider and the SMTP message builder are tested; a real-stack check of one verification mail is still to do.
+- Wording of the nine mails is a first draft by the builder, not reviewed by the developer or a language reviewer; P-25 may change the deletion mails' parameters.
+
+## Deferred from: story-outbox-queue-worker-and-email-provider-plan (2026-10-17)
+
+- Admin HTTP routes for the failed-mail list, the outbox counts and requeue (P-28, H-128); the functions exist and are tested.
+- Provider facts not verified at build time: whether Brevo's 300 a day also counts API mail; Single Sender Verification steps; the production sender address (OI-9, OI-32). The Brevo adapter was tested against fake HTTP answers built from the documentation, never against Brevo itself (no account or key was used).
+- Spike S-18 (Dramatiq on Valkey under a worker kill and under load) is still open; this story shows delivery and a worker restart on Valkey 9.0.6, not a kill during a send.
+- Delivery is at-least-once (ADR 0040); a duplicate is possible only in the window between the provider accepting a mail and the row being marked sent.
+
 ## Deferred from: code review of story-dashboards-skeleton-with-the-same-origin-proxy-local-plan (2026-10-12)
 
 - The health page's own client call is not run in a real browser under the CSP (no browser harness yet); the e2e test fetches the same URL and checks the CSP. Add a browser test with the first dashboards story that needs one.

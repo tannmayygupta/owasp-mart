@@ -9,7 +9,7 @@
 | Report tag | attempt rules, server clock, FR-SES-01, FR-SES-02, FR-SES-03, FR-SES-06, FR-SES-08, FR-TIM-05, D-80, D-81, D-82 |
 
 ## Requirements covered
-FR-SES-01, FR-SES-02, FR-SES-03, FR-SES-06, FR-SES-08, FR-TIM-05; open question OI-22 (clock start, proposed answer); decisions D-80, D-81, D-82 (new, decided on the developer's delegation, Proposed); ADR 0041 (Proposed); handoffs H-87 (answered as a proposal), H-127 (new). Task L-22 (first of three stories; stays unticked).
+FR-SES-01, FR-SES-02, FR-SES-03, FR-SES-06, FR-SES-08, FR-TIM-05; open question OI-22 (clock start, proposed answer); decisions D-80, D-81, D-82 (new, decided on the developer's delegation, Proposed); ADR 0041 (Proposed); handoffs H-87 (answered as a proposal), H-327 (new). Task L-22 (first of three stories; stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 Nothing decided when an assessment attempt starts, ends or which state may follow which. There is now a small Python package with no dependencies that holds the ten attempt states, the allowed moves, the time rules (limit, grace, warnings, freeze) and pure functions that answer "is this request still accepted", "which warnings are due", "has it expired", "may the instance be destroyed". The clock starts when the instance is ready, as the server sees it.

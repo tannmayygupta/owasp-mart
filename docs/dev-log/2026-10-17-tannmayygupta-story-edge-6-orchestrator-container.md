@@ -1,4 +1,4 @@
-# Edge story 6: the orchestrator as a container on labs-core (H-143)
+# Edge story 6: the orchestrator as a container on labs-core (H-343)
 
 | Field | Value |
 |---|---|
@@ -9,13 +9,13 @@
 | Report tag | Deployment of the labs host: orchestrator unit, gate admin reachability |
 
 ## Requirements covered
-FR-INS-10 (the edge is attached to each instance network and gets the access state), NFR-SEC-04 (no Docker socket for the orchestrator, hardened containers, listener not public), D-58 (socket proxy), D-62 and D-66 (edge and attach), handoff H-143 (decided by the developer on 2026-10-17: option (a)).
+FR-INS-10 (the edge is attached to each instance network and gets the access state), NFR-SEC-04 (no Docker socket for the orchestrator, hardened containers, listener not public), D-58 (socket proxy), D-62 and D-66 (edge and attach), handoff H-343 (decided by the developer on 2026-10-17: option (a)).
 
 ## Summary (plain language)
 The gate admin listener is only on the compose network `vulnmart-labs-core`, so a host-run orchestrator could not reach it. The developer chose to run the orchestrator as a container on that network. This adds a compose service `orchestrator` (profile `lab`), makes the compose lint check it, and proves on Docker Desktop that one stub instance can be created through the container, that the edge gate is attached to the instance network and gets the open state, and that destroy leaves nothing behind.
 
 ## Why
-H-143: `--gate-url` refuses non-loopback plain http and the alias `edge-gate-admin` does not resolve from the host. Options (b) publish the admin listener on loopback and (c) https on the admin listener were not taken.
+H-343: `--gate-url` refuses non-loopback plain http and the alias `edge-gate-admin` does not resolve from the host. Options (b) publish the admin listener on loopback and (c) https on the admin listener were not taken.
 
 ## What was built
 - Compose service `orchestrator` (profile `lab`) in `infra/compose/compose.yaml`: image built from `apps/orchestrator/Dockerfile`, user 65532, read-only root, `cap_drop: ALL`, `no-new-privileges`, 256 MB, 128 pids, tmpfs `/tmp`, network `labs-core` only, no Docker socket.
@@ -36,7 +36,7 @@ H-143: `--gate-url` refuses non-loopback plain http and the alias `edge-gate-adm
 - `docs/assets/story-edge-6-orchestrator-container/proof-run.mjs` and `proof-output.txt`: the proof script and its real output.
 
 ## Decisions made
-H-143 option (a), decided by the developer (2026-10-17). No ADR written: the decision is recorded in the handoff row and the runbook; an ADR can follow if the developer wants one.
+H-343 option (a), decided by the developer (2026-10-17). No ADR written: the decision is recorded in the handoff row and the runbook; an ADR can follow if the developer wants one.
 
 ## Tests
 - `node --test scripts/check-lab-compose-rules.test.mjs`: 18 tests, 18 pass (was 13 before this story; 5 new tests for the orchestrator service: allowed form, published ports, socket and bypass flags, hardening, the committed service). One existing test used the name `orchestrator` as a stand-in for "any other lab service" and was changed to `relay`; another list now expects `['docker-proxy', 'edge-caddy', 'orchestrator']` as the services with ports.

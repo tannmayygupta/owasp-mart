@@ -3,7 +3,7 @@
 Buckets keyed `(instance_id, epoch, minute)` hold counts only: requests, per status class, per method class, `crs_match` per tag and
 the number of distinct route templates. No body, no query, no user text; UTC; the minute is the platform's arrival minute (never the
 instance clock). `last_activity(instance_id)` is the input for the orchestrator's idle rule (H-122 is still open: this module only
-offers the value). The stores are a Protocol with an in-memory fake until Akshay's `activity_buckets` table exists (H-130).
+offers the value). The stores are a Protocol with an in-memory fake until Akshay's `activity_buckets` table exists (H-330).
 
 `attribution_label` and `per_challenge_time_allowed` read the setting `classifier_accuracy_verified`. Until the classifier accuracy
 measurement (story 5) is accepted by the developer the setting is false (or missing), the label reads `estimated` and per-challenge

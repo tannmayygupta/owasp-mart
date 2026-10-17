@@ -1,6 +1,6 @@
 """LabRuntime: the attempt engine, scoring, flag checking, milestone engine and the event receiver in one process (D-95, D-96).
 
-All state is in memory; a restart loses attempts (the real tables are Akshay's, H-130). Keys are random per process, so no
+All state is in memory; a restart loses attempts (the real tables are Akshay's, H-330). Keys are random per process, so no
 flag or event key of one run is valid in another. Answers of this class hold ids, states, numbers and result words, never
 a flag, a digest, a key or a pasted text.
 """
@@ -111,7 +111,7 @@ class LabRuntime:
         self.integrity = InMemoryIntegritySink()
         self.directory = InMemoryInstanceDirectory()
         self.epochs = MemoryInstanceEpochs()
-        self.state_reports = StateReportStore()  # what the orchestrator reported per instance (H-147); empty without a receiver
+        self.state_reports = StateReportStore()  # what the orchestrator reported per instance (H-347); empty without a receiver
         self.events = InMemoryEventLog()
         self.engine = AttemptEngine(InMemoryAttemptStore(), HostInstanceControl(host), self.clock, events=self.attempt_log.from_engine)
         self.attempts = EngineAttemptPort(self.engine)

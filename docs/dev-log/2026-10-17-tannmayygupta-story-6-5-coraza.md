@@ -9,7 +9,7 @@
 | Report tag | Coraza, OWASP Core Rule Set, detect-only, sidecar, S-6, S-7, FR-DET-01, FR-DET-02, FR-DET-04, FR-DET-07, D-70, OI-35 |
 
 ## Requirements covered
-FR-DET-01, FR-DET-02, FR-DET-04, FR-DET-07; spikes S-6 and S-7; OI-35 (CRS tag names, partly); R-6; D-70 (Proposed in the plan); handoff H-76 (rule matches) and the new tag-mapping handoff H-133 (text in the plan, row added by the main session). Task L-20 (the Coraza part).
+FR-DET-01, FR-DET-02, FR-DET-04, FR-DET-07; spikes S-6 and S-7; OI-35 (CRS tag names, partly); R-6; D-70 (Proposed in the plan); handoff H-76 (rule matches) and the new tag-mapping handoff H-333 (text in the plan, row added by the main session). Task L-20 (the Coraza part).
 
 ## Summary (plain language, 3-5 lines)
 The sidecar now asks a small Go helper, `crs-detect` (Coraza v3 with the OWASP Core Rule Set, detection only), about each player request after the answer has been sent, and turns a match into a `proxy.crs_match` event. A missing, slow, busy or crashed helper changes nothing for the player. The helper ships inside the same distroless sidecar image. On the local corpus CRS sees SQL injection, XSS, SSRF by address and the prototype keys of C06, and nothing of the logic-bug challenges (expected). Resident memory of the helper is about 64 MiB against the 256 MiB limit.
@@ -73,5 +73,5 @@ Not a vulnerable part of the shop; this is platform detection. The helper is Det
 - 60 benign requests is a small sample; the real false-positive rate and the memory under real traffic are runbook steps on vm-i (`docs/runbooks/detection-live-check.md`).
 - p95 latency (about 65 ms) is far above p50 (about 3 ms); the cause was not investigated.
 - The plan says CRS v4.30.0; the module resolves to CRS 4.25.0 (see Decisions). The ADR and PRD text need the correction.
-- Handoff text for H-133 (tag mapping `attack-sqli` to `attack_sqli`, filter, caps) and an answer for H-76 are for the main session to record.
+- Handoff text for H-333 (tag mapping `attack-sqli` to `attack_sqli`, filter, caps) and an answer for H-76 are for the main session to record.
 - The full harness run with the product image still needs `scripts/harness.mjs` to accept a second compose file (outside this story).

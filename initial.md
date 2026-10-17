@@ -656,7 +656,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-63 - Gate push API, secrets in files, contract location (edge story 1, ADR 0040)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** the orchestrator pushes state with `PUT` and `DELETE /internal/v1/gate/instances/{id}` and `PUT /internal/v1/gate/sync`, checked by the header `X-VM-Gate-Admin` against a secret read from a file (at least 16 characters, constant time). Bodies are validated strictly; the access epoch only grows and an equal epoch with another value is 409, like IF-5. Contract `contracts/edge/gate-ticket.md`, registered as `GATE`. Planned in a later story: push before record, and the orchestrator is the only writer of gate state.
-- **Open:** the gate key file format (at least 64 hex characters, handoff H-137); Akshay as consumer of `GATE` (H-139); the admin JSON parser does not detect duplicate member names.
+- **Open:** the gate key file format (at least 64 hex characters, handoff H-337); Akshay as consumer of `GATE` (H-339); the admin JSON parser does not detect duplicate member names.
 
 ### D-64 - The event relay holds no keys (edge story 2, ADR 0040)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** the relay on port 8081 accepts only `POST /internal/v1/events`, one JSON object of at most 16 KiB with content type `application/json`, a per-peer limit (120 per 10 s), a 10 s timeout, and forwards the same bytes and the same `X-VM-Signature` header to the ingest URL. It checks the signature header shape only; the ingest verifies signatures.
@@ -664,7 +664,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-65 - The access epoch is the only session-binding mechanism (planned, edge story 5 not built, ADR 0040)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY):** the platform raises the access epoch on every open and every login of the account; the gate refuses any ticket or cookie with an older epoch; the gate never learns about platform sessions or accounts.
-- **Open:** nothing of it is built on the platform side (handoff H-136); not proved end to end.
+- **Open:** nothing of it is built on the platform side (handoff H-336); not proved end to end.
 
 ### D-66 - Docker proxy rules for network connect and disconnect (planned, edge story 3 not built, ADR 0040)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY):** the socket proxy gets rules for connect and disconnect; the request body cannot be restricted by the proxy.
@@ -688,7 +688,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-72 - Flag rules (story 6.1, ADR 0042)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** format unchanged (`VM{` plus 24 Base32 characters plus `}`); two decoys per challenge by default; digests of real flags only in IF-5; classification order correct, decoy, stale epoch, other instance, wrong; verification is always a recompute and the key never enters an instance.
-- **Open:** decoy placement has no field in IF-5 or the catalogue (handoff H-131).
+- **Open:** decoy placement has no field in IF-5 or the catalogue (handoff H-331).
 
 ### D-73 - Flag matching in responses (story 6.2, ADR 0042)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** the sidecar scans a bounded copy (1 MiB) after decoding gzip, deflate, brotli, JSON escapes, HTML entities and percent encoding, looks up SHA-256 digests, reports once per candidate and sends only `candidate_sha256`. What it cannot see (base64, hex, reversed or split strings, responses above the cap, undecodable encodings) is covered by the paste channel.
@@ -704,7 +704,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-76 - Who the player is at the sidecar (story 6.2, ADR 0042)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** everything on the player port is the owning player (the gate admits only the owner): `session_kind` `player`, `user_id` null; the platform maps the instance to the attempt and user. The bot and the mock services reach the shop on the instance network and never use the player port.
-- **Open:** how the bot reaches the shop (handoff H-132); if bot traffic arrived on the player port it would be classed as a player.
+- **Open:** how the bot reaches the shop (handoff H-332); if bot traffic arrived on the player port it would be classed as a player.
 
 ### D-77 - Evidence sealed through KeyPort (planned, story not built, ADR 0042)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY):** the sidecar builds the capture; the platform seals it per attempt with `KeyPort.encrypt` (AAD binds instance, epoch, challenge and request) only when the flag was credited or held; everything else is dropped; stores are Protocols with fakes until Akshay's tables exist.
@@ -716,15 +716,15 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-79 - Fake KeyPort only through the composition root (story 6.1, ADR 0042)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** until Akshay's real KeyPort lands (P-17) the composition root passes `FakeKeyPort`; library code takes the Protocol only; a test fails if library code imports the fake.
-- **Open:** the real KeyPort (handoff H-130).
+- **Open:** the real KeyPort (handoff H-330).
 
 ### D-80 - The assessment clock starts when the instance is ready (OI-22, story 7.1, ADR 0041)
 - **Decision (CONFIRMED by the developer 2026-10-17, answers OI-22):** the server stamps `ready_at`; the attempt moves `ready` to `running` at that moment; `started_at` = `ready_at`; `deadline_at` = `started_at` plus the time limit. The candidate's Start button only asks for the instance and has no effect on the clock, so cold start never counts (FR-TIM-05). If the instance never becomes ready the clock never starts.
-- **Open:** the start route stays pending (H-87, H-127): with this decision the Start button has no effect on the clock, so the route may be removed.
+- **Open:** the start route stays pending (H-87, H-327): with this decision the Start button has no effect on the clock, so the route may be removed.
 
 ### D-81 - Attempt rules and engine are one dependency-free package (story 7.1, ADR 0041)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** `packages/py-attempts` (`vulnmart-attempts`, module `vulnmart_attempts`, Python 3.14, standard library only). Akshay's API imports it and supplies the database store; thin port adapters will live in `apps/api/src/vulnmart/ports/`.
-- **Open:** the API dependency and Dockerfile lines (handoff H-128); the adapters are not built.
+- **Open:** the API dependency and Dockerfile lines (handoff H-328); the adapters are not built.
 
 ### D-82 - Absolute UTC instants, grace and warnings (story 7.1, ADR 0041)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** all timing is absolute UTC from an injected clock; the deadline is stored once; browser clock and connection are never inputs. Grace 60 s after the deadline for submissions only; warnings at 15 and 5 minutes left; all numbers are placeholders held in `Rules` (OI-25).
@@ -736,7 +736,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-84 - The engine is the only writer of attempt state (story 7.2, ADR 0041)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** every step is idempotent and uses compare-and-set on a version; a failed `freeze` or `destroy` leaves the record unchanged for the next tick; destroy uses a 60 s claim so two engines make one call; the scheduler runs `tick()` every 15 s (placeholder). One attempt per `(user_id, template_id)`.
-- **Open:** the plan said one attempt per invite and consent (to confirm); the SQL store and the scheduler are Akshay's (H-128).
+- **Open:** the plan said one attempt per invite and consent (to confirm); the SQL store and the scheduler are Akshay's (H-328).
 
 ### D-85 - The score is a pure function of three facts (story 7.3, ADR 0041)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** per challenge the best milestone, the hint levels unlocked and a held flag, plus the weight table. Time, wrong or decoy submissions, technique labels and other players are not parameters.
@@ -762,7 +762,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-93 - Cohort view and ranking aid (OI-26, story L-28)
 - **Decision (CONFIRMED by the developer 2026-10-17, answers OI-26):** a private cohort view, scoped to one organisation and one assessment, off unless the assessment turns it on (`cohort_board`, default false). The ranking aid uses the tie-break order score, more full captures, lower hint cost, lower estimated active time, earlier last capture; it is labelled "ranking aid, the recruiter decides" and never ranks anyone out. No global or public leaderboard exists anywhere.
-- **Built:** `packages/py-attempts/src/vulnmart_attempts/ranking.py`, `cohort.py`. Open: the platform port and recruiter screen (Akshay, H-146).
+- **Built:** `packages/py-attempts/src/vulnmart_attempts/ranking.py`, `cohort.py`. Open: the platform port and recruiter screen (Akshay, H-346).
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.

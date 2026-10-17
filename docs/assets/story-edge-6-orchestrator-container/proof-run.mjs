@@ -1,4 +1,4 @@
-// Local proof of edge story 6 (H-143 option (a)): the orchestrator runs as a CONTAINER on labs-core, through the real compose file.
+// Local proof of edge story 6 (H-343 option (a)): the orchestrator runs as a CONTAINER on labs-core, through the real compose file.
 //   Run from the repository root: node docs/assets/story-edge-6-orchestrator-container/proof-run.mjs
 // What it does (Docker Desktop, throwaway): temporary secrets, certificates, template and image manifest in a temp folder (never in the repository),
 // `docker compose --profile lab up` of the orchestrator (which brings edge-gate; the socket proxy `docker-proxy` is reused when it already runs),

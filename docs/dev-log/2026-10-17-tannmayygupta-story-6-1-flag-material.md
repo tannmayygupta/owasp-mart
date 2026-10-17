@@ -9,7 +9,7 @@
 | Report tag | flag material, flag checker, leak scan, FR-FLG-01, FR-FLG-02, FR-FLG-03, FR-FLG-07, FR-FLG-08, D-71, D-72, D-79 |
 
 ## Requirements covered
-FR-FLG-01, 02, 03, 07, 08 (FR-FLG-07 half met, see limitations), D-02, D-23; decisions D-71, D-72, D-79 (new, Proposed, in ADR 0042); handoffs H-63 (partly answered), H-130, H-131 (new). Task L-19 (stays unticked).
+FR-FLG-01, 02, 03, 07, 08 (FR-FLG-07 half met, see limitations), D-02, D-23; decisions D-71, D-72, D-79 (new, Proposed, in ADR 0042); handoffs H-63 (partly answered), H-330, H-331 (new). Task L-19 (stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 The platform can now build the flag material of a create or reset (one flag per challenge, two decoys each, digests of the real flags, the event key and a seed) using only the KeyPort interface, and can classify a candidate text as correct, decoy, stale epoch, other instance or wrong by recomputing the expected flag. A new scan script looks for the flag pattern in image layers, container logs, `docker inspect` output and a text file. No flag table exists and no flag value is printed anywhere.
@@ -55,7 +55,7 @@ None recorded in the plan notes.
 Not a vulnerable part of the shop; this is the platform's flag handling. The master key never enters an instance; flags are derived per instance and epoch. No flag value, digest of a real flag or key appears in a log line, exception text or test message; tests use the documented fake pattern only.
 
 ## Limitations and follow-ups
-- Decoy placement has no field in IF-5 `FlagMaterial` and the catalogue (IF-7) has no decoy location list: until Sahil's T-30 adds one, default texts are used and the injector decides where a decoy goes. Decoys may not be placed in the shop on the 19th (FR-FLG-07 half met); credit logic is unaffected (H-131).
+- Decoy placement has no field in IF-5 `FlagMaterial` and the catalogue (IF-7) has no decoy location list: until Sahil's T-30 adds one, default texts are used and the injector decides where a decoy goes. Decoys may not be placed in the shop on the 19th (FR-FLG-07 half met); credit logic is unaffected (H-331).
 - A full instance made through the orchestrator code was not scanned (`--instance <id>` plus the orchestrator log with `--file`): left to the integration step or the runbook step in `docs/runbooks/deploy.md`, not written yet.
 - The same scan on `vm-i` against released digests is a developer runbook step (not run).
 - The real KeyPort (P-17) replaces the fake with no change to this code; until then the composition root passes `FakeKeyPort`.

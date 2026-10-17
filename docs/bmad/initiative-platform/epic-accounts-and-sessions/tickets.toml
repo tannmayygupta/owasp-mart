@@ -1,0 +1,73 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-17: one story per task P-11 to P-15 of docs/dev/dev2-akshay.md, as START-HERE.md section 5 asks (the developer chose
+# "continue automatically"). FR-ACC-11 (admin creation) rides with P-13 as the task file says. OI-29 (CAPTCHA) answered by the developer
+# on 2026-10-17: rate limits only; not yet recorded in initial.md.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Learner signup, email verification and signup abuse protection"
+description = "Creates learner accounts with Argon2id passwords and the 18-and-over declaration, sends the verification link through the outbox, verifies it once, and rate-limits signup, verification and resend per address and per email."
+verify = "A learner signs up and verifies by email on the local stack through the web origin; a known address gets the same answer; a link works once; the fourth signup for one address in an hour is 429."
+covers = ["FR-ACC-01", "FR-ACC-02", "FR-ACC-10"]
+after = ["2.2"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Login, sessions, timeouts and CSRF"
+description = "Logs in with server-side session cookies, idle and absolute timeouts, logout, CSRF protection and the cookie rules of NFR-SEC-03."
+verify = "Login, logout and both timeouts work and a request without a CSRF token is refused."
+covers = ["FR-ACC-03", "FR-ACC-04"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Account types, candidate role and admin creation"
+description = "Separate account types, the candidate role on the same login, and admin account creation by an admin or a seed command only."
+verify = "Roles are enforced in tests and an admin can only be created as FR-ACC-11 says."
+covers = ["FR-ACC-05", "FR-ACC-06", "FR-ACC-11"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Password reset, password quality and account self-service"
+description = "Password reset by email, password quality rules including the breach list, and self-service account management."
+verify = "A reset link works once and expires, weak and breached passwords are refused and a user can change their details."
+covers = ["FR-ACC-08", "FR-ACC-09"]
+after = [2, "2.2"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Multi-factor login"
+description = "Authenticator-app (TOTP) enrolment and login, mandatory for admins and optional for recruiters, with recovery codes."
+verify = "MFA enrolment and login work in tests, and recovery is covered."
+covers = ["FR-ACC-07"]
+after = [2]
+hitl = false
+risk = "high"
+
+# Added 2026-10-17 during story 3.2 (P-12): FR-ACC-04 also says a user can list and revoke their own sessions and log out everywhere. The
+# service functions exist and are tested (SessionService.list_sessions, revoke, revoke_all), but IF-1 has no route for them, and a route
+# is a contract change (bundle, generated clients, COMPAT.md, the contract owner's look), so it is a story of its own.
+[[entry]]
+id = 6
+type = "story"
+title = "Session list, revoke and log out everywhere routes"
+description = "Adds the routes of IF-1 for a user's own session list, revoking one session and logging out everywhere, over the existing SessionService, with the contract change, regenerated bundle and clients and COMPAT entry."
+verify = "A user lists their sessions, revokes another one and logs out everywhere in a test, and the contract rules and generated clients are current."
+covers = ["FR-ACC-04"]
+after = [2]
+hitl = false
+risk = "low"

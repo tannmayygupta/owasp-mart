@@ -9,7 +9,7 @@
 | Report tag | live, helpers |
 
 ## Requirements covered
-FR-INS-07, FR-INS-11 (H-147 point 1).
+FR-INS-07, FR-INS-11 (H-347 point 1).
 
 ## Summary
 Two helpers for the developer's live run on vm-p and vm-i: `scripts/make-test-certs.ps1` and `scripts/orch_smoke.py`.

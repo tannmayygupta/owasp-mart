@@ -98,7 +98,7 @@ def install_demo_routes(app: FastAPI, runtime: LabRuntime, token: str) -> bool:
 
     @app.get(PREFIX + "/instances/{instance_id}", include_in_schema=False, dependencies=deps)
     def instance_state(instance_id: str) -> dict[str, Any]:
-        """What the orchestrator reported for an instance (state reports, H-147): the recorded state and the ordered history."""
+        """What the orchestrator reported for an instance (state reports, H-347): the recorded state and the ordered history."""
         recorded = runtime.state_reports.state_of(instance_id)
         if recorded is None:
             raise ProblemError(ErrorCode.INST_NOT_FOUND)

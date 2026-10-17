@@ -2,7 +2,7 @@
 
 The engine keeps only ids, states and instants; this adapter adds the two things the platform's port shows and the
 engine does not hold (`org_id`, `mode`) in memory, and the set of purged attempts. The real, stored version is Akshay's
-(handoff H-130); until then the demo runtime uses this one.
+(handoff H-330); until then the demo runtime uses this one.
 """
 from __future__ import annotations
 

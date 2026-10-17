@@ -8,7 +8,7 @@ there is no fallback that writes plaintext when the key is missing or shredded.
 
 `EvidenceReader` has the shape of `ReportPort.evidence` and `ReportPort.evidence_body` (`ports/reports.py`); a later story wires it
 as the data source of the real `ReportPort`. The store is a Protocol with an in-memory fake until Akshay's `evidence` table exists
-(handoff H-130). No flag, digest, key or body goes into a log line, an exception or an integrity explanation.
+(handoff H-330). No flag, digest, key or body goes into a log line, an exception or an integrity explanation.
 """
 from __future__ import annotations
 

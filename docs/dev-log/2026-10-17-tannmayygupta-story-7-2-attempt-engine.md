@@ -9,7 +9,7 @@
 | Report tag | attempt engine, expiry, auto-submit, freeze, FR-SES-02, FR-SES-04 to FR-SES-08, D-83, D-84, D-88 |
 
 ## Requirements covered
-FR-SES-02, FR-SES-04, FR-SES-05, FR-SES-06, FR-SES-07, FR-SES-08, FR-TIM-05 (library part); decisions D-83, D-84, D-88 (new, Proposed); ADR 0041; handoff H-128 (new). Task L-22 (second of its stories; stays unticked).
+FR-SES-02, FR-SES-04, FR-SES-05, FR-SES-06, FR-SES-07, FR-SES-08, FR-TIM-05 (library part); decisions D-83, D-84, D-88 (new, Proposed); ADR 0041; handoff H-328 (new). Task L-22 (second of its stories; stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 The engine runs an attempt: it starts the clock when the instance is ready, sends the time warnings, expires an overdue attempt and submits it at the deadline, freezes the instance for 15 minutes and then destroys it. It also does manual submit, cancel and "report". A repeated or concurrent tick does nothing twice. It only talks to small interfaces (a store and an instance control), so it is tested without Docker or a database.
@@ -46,12 +46,12 @@ Traceability rows: FR-SES-02, 04 to 08, FR-TIM-05.
 
 ## Problems met and how they were fixed
 - The package test forbids the token `threading`, so the in-memory store uses `_thread.allocate_lock` instead.
-- The plan wanted API edits (dependency, adapter); the developer's session forbade `apps/api` edits for this run, so the adapter spec is written into H-128 instead.
+- The plan wanted API edits (dependency, adapter); the developer's session forbade `apps/api` edits for this run, so the adapter spec is written into H-328 instead.
 
 ## Security notes (vulnerable parts only)
 Not a vulnerable part. Event dicts hold ids, state names and UTC times only (no names, emails or bodies). A lost connection is not an input anywhere, so a candidate cannot stop the clock.
 
 ## Limitations and follow-ups
 - Not proved live: the real `attempts` table store, the scheduler calling `tick()` every 15 s, the gate refusing shop requests while access is `frozen`, the orchestrator destroying the real instance after 15 minutes. All need the platform and a developer runbook run.
-- `EngineAttemptPort`, the SQL store, scheduler wiring and the `apps/api` state-name comparison test remain (H-128, Akshay's side and the integration step).
+- `EngineAttemptPort`, the SQL store, scheduler wiring and the `apps/api` state-name comparison test remain (H-328, Akshay's side and the integration step).
 - Held-capture review (OI-38) has no owner yet; `mark_reported` takes `held_open` from the caller.

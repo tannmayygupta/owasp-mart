@@ -3,7 +3,7 @@
 - **Status:** Proposed (decided on the developer's delegation; to be confirmed). D-61, D-65, D-66 are planned only: their stories are not built.
 - **Date:** 2026-10-17
 - **Deciders:** Tanmay (by delegation to Claude Code)
-- **Requirements:** FR-INS-10, FR-SES-04, FR-SES-11, NFR-ISO-04, NFR-SEC-04, D-60 to D-68; ADR 0004 (accepted for Option 1 by this decision), ADR 0005, ADR 0009; spike S-15; handoffs H-75, H-136, H-137, H-138
+- **Requirements:** FR-INS-10, FR-SES-04, FR-SES-11, NFR-ISO-04, NFR-SEC-04, D-60 to D-68; ADR 0004 (accepted for Option 1 by this decision), ADR 0005, ADR 0009; spike S-15; handoffs H-75, H-336, H-337, H-338
 
 ## Context
 Only the owner may reach an instance, a frozen or closed instance must refuse requests, a newer login must cut the older browser session, and one edge must serve many instance networks without publishing any instance port. The stub gate allowed everything and no ticket, cookie or push format existed. Stories built so far: gate core (library, admin handlers, contract `GATE` 0.1.0) and the edge service (Caddy, gate service, relay, compose, Docker Desktop end-to-end test). The orchestrator attaching the edge (D-61, D-66), the ingest verifier and the one-session story are planned, not built.

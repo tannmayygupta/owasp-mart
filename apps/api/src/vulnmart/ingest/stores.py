@@ -1,6 +1,6 @@
 """Stores of the milestone engine (story 6.3): Protocols and in-memory fakes.
 
-The real tables (`events`, `milestones`, `integrity_flags`, `flag_submissions`) are Akshay's (handoff H-130); nothing here
+The real tables (`events`, `milestones`, `integrity_flags`, `flag_submissions`) are Akshay's (handoff H-330); nothing here
 migrates. Nothing in these stores ever holds a flag, a digest of a flag or a pasted text.
 """
 from __future__ import annotations

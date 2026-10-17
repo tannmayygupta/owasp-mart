@@ -1,4 +1,4 @@
-# Edge story 7: the platform receiver for the orchestrator's state reports (H-147 point 1)
+# Edge story 7: the platform receiver for the orchestrator's state reports (H-347 point 1)
 
 | Field | Value |
 |---|---|
@@ -9,13 +9,13 @@
 | Report tag | Orchestrator to platform state path: receiver, TLS trust, report key |
 
 ## Requirements covered
-FR-INS-07 (state of an instance is known to the platform), FR-INS-11 (reports are ordered, at least once, repeats are harmless), NFR-SEC-03 (signed internal calls, no secret in logs or answers), handoffs H-16 and H-147 point 1, decision F-3 (`docs/reviews/2026-10-12-p08-contract-sign-off.md`), IF-5 section 8 (`contracts/orchestrator/orchestrator-api.md`).
+FR-INS-07 (state of an instance is known to the platform), FR-INS-11 (reports are ordered, at least once, repeats are harmless), NFR-SEC-03 (signed internal calls, no secret in logs or answers), handoffs H-16 and H-347 point 1, decision F-3 (`docs/reviews/2026-10-12-p08-contract-sign-off.md`), IF-5 section 8 (`contracts/orchestrator/orchestrator-api.md`).
 
 ## Summary (plain language)
 The orchestrator container already pushed state reports, but nothing on the platform side received them. This adds the receiver `POST /internal/v1/orch/state` to the lab runtime of the ingest app. It checks the signature, parses the body strictly, answers 204 for a new report, 200 for an identical repeat and 409 for the same identity with another body, and keeps an impossible transition as history without moving the recorded state. It exists only when the lab runtime is on and a report key file is given. The orchestrator can now take its report URL and key file from the environment, and an override compose file turns reports on with a CA file for the private certificate. A local run with the real container, TLS and a receiver restart passed.
 
 ## Why
-H-147 point 1: the container had no report URL or key and the platform had no receiver. H-16 and IF-5 section 8 define the endpoint; F-3 defines what an impossible transition does.
+H-347 point 1: the container had no report URL or key and the platform had no receiver. H-16 and IF-5 section 8 define the endpoint; F-3 defines what an impossible transition does.
 
 ## What was built
 - `apps/api/src/vulnmart/lab/state_reports.py` (stream L folder): `StateReportStore` (history per `(instance_id, epoch, transition)` through the existing `ReportIngest`, recorded state per instance, memory only), `read_report_key` (mode 0600 or stricter on POSIX, at least 32 characters), the route, and `install_state_reports` (mounts only with `VULNMART_ORCH_REPORT_KEY_FILE` set; a key file that cannot be used stops the start).
@@ -66,4 +66,4 @@ No weakness is implemented here. The receiver answers every signature failure wi
 - Live use on vm-p and vm-i is not done: the runbook section 3b gives the steps; the result is the developer's to report.
 - Memory only (D-96): the platform loses its history on a receiver restart; a persistent store is a later story.
 - The receiver is mounted only in the lab runtime of the ingest entrypoint; the production wiring on vm-p (supervision, certificate, port 9444) is the developer's deployment step.
-- Closing H-147 point 1 in `HANDOFFS.md`, the changelog, the traceability rows and the tracker are not edited here; the caller does that.
+- Closing H-347 point 1 in `HANDOFFS.md`, the changelog, the traceability rows and the tracker are not edited here; the caller does that.

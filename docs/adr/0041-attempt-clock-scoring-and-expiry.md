@@ -3,7 +3,7 @@
 - **Status:** Proposed (decided on the developer's delegation; to be confirmed)
 - **Date:** 2026-10-17
 - **Deciders:** Tanmay (by delegation to Claude Code)
-- **Requirements:** FR-SES-01 to FR-SES-08, FR-TIM-05, FR-SCR-01 to FR-SCR-06, FR-SCR-09, FR-SCR-10, PRD Appendix A, OI-22, OI-25, D-80 to D-88; handoffs H-87, H-127, H-128, H-129
+- **Requirements:** FR-SES-01 to FR-SES-08, FR-TIM-05, FR-SCR-01 to FR-SCR-06, FR-SCR-09, FR-SCR-10, PRD Appendix A, OI-22, OI-25, D-80 to D-88; handoffs H-87, H-327, H-328, H-329
 
 ## Context
 Nothing decided when an assessment attempt starts or ends, in which order expiry steps happen, or how a score is computed. The clock start was open (OI-22). The platform's `AttemptPort` and `ReportPort` only had provisional fakes. Built so far: the rules library, the engine and the scoring function in the dependency-free package `packages/py-attempts`, tested with fake clock, store and instance control. Not built: the API adapters, the database store, the scheduler wiring, the recruiter screens.
@@ -27,7 +27,7 @@ Nothing decided when an assessment attempt starts or ends, in which order expiry
 
 ## Consequences
 - Easier: the same rules for the API and the tests; every Appendix A example is a test; nothing depends on a browser clock.
-- Harder: the API must depend on the new package (H-128, needs `apps/api/pyproject.toml` and Dockerfile lines that stream L may not edit); a SQL `AttemptStore` and a fact source are Akshay's.
+- Harder: the API must depend on the new package (H-328, needs `apps/api/pyproject.toml` and Dockerfile lines that stream L may not edit); a SQL `AttemptStore` and a fact source are Akshay's.
 - To watch: the 15 s tick granularity; the destroy claim lease of 60 s; the percentages live in `ScoringRules`, not in the template yet; held-capture review (OI-38) has no owner.
 - Not proved live: the real `attempts` table, the scheduler, the gate refusing requests while frozen, the orchestrator destroying the instance after 15 minutes. These need a developer runbook run.
 

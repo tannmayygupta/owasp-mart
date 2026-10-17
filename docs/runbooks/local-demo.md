@@ -51,7 +51,7 @@ One candidate through the real pieces on Docker Desktop: lab runtime, real orche
 
 - `node --test --test-concurrency=1 scripts/e2e/loop.e2e.test.mjs` runs the ten steps (about 30 seconds once the images are built) and writes `docs/assets/story-8-3-loop-and-load/loop-output.txt`. Without Docker, `uv` or `openssl` the file skips with a message. After an interrupted run, `LOOP_CLEAN=1` first removes leftovers labelled `vm.kind=loop-test` (only those).
 - `node scripts/load-check.mjs --n 6` starts six stub instances at once and writes the ready times, memory and the machine's CPU and RAM to `docs/assets/story-8-3-loop-and-load/load-check.txt`. These are laptop numbers. The concurrency target on the deployed VM-I is not proven here; it is the runbook step of `docs/runbooks/measure-instances.md`.
-- The test publishes a small forwarder on `127.0.0.1` for the gate admin listener, because the orchestrator runs on the host (the open point H-143 in `docs/runbooks/edge-vm-i.md`). Compose is unchanged.
+- The test publishes a small forwarder on `127.0.0.1` for the gate admin listener, because the orchestrator runs on the host (the open point H-343 in `docs/runbooks/edge-vm-i.md`). Compose is unchanged.
 - Fallback if the loop is not green on the day: the in-process loop (story 8.2), `node scripts/dev.mjs demo` and `scripts/e2e/edge.e2e.test.mjs`, each shown separately.
 - Check afterwards: `docker ps -a --filter label=vm.kind=loop-test` and `docker ps -a --filter label=vm.instance` print nothing.
 

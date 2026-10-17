@@ -1,4 +1,4 @@
-# State reports proven live on vm-i and vm-p (H-147 point 1)
+# State reports proven live on vm-i and vm-p (H-347 point 1)
 
 | Field | Value |
 |---|---|
@@ -9,7 +9,7 @@
 | Report tag | live, edge, state reports |
 
 ## Requirements covered
-FR-INS-07, FR-INS-11, NFR-SEC-03, FR-INS-10; handoff H-147 (point 1 closed); H-16.
+FR-INS-07, FR-INS-11, NFR-SEC-03, FR-INS-10; handoff H-347 (point 1 closed); H-16.
 
 ## Summary
 The developer authorised Claude to run the live steps itself (their SSH agent held the key). Claude started the receiver on vm-p from the api image with TLS, turned reports on for the orchestrator container on vm-i with the override file, created one instance through the orchestrator over mutual TLS with `scripts/orch_smoke.py`, destroyed it, and read the recorded history from vm-p. Evidence: `docs/assets/edge-vm-i/reports/h147-state-reports-live.txt`.

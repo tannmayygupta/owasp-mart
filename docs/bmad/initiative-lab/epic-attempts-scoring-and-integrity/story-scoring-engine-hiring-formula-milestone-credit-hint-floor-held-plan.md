@@ -66,8 +66,8 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/prd/PRD.md
 - `apps/api/src/vulnmart/ports/reports.py:14-45` (`CHALLENGE_KEYS`, `Milestone`, `ChallengeResult`, `Score`) -- the adapter returns these; `:66-87` the Protocol.
 - `apps/api/src/vulnmart/ports/lab_fakes.py:104-170` (`FakeReportPort`) -- pattern and the protocol test.
 - `apps/api/tests/test_engine_reports.py` (new) -- `isinstance(EngineReportPort(...), ReportPort)`, an Appendix A case through the adapter, `AttemptGone` mapping, the milestone names (`none`, `M1`, `M2`, `M3`) equal the library's.
-- `apps/api/src/vulnmart/scoring/__init__.py` (read) -- the module folder P created for stream L; tables `milestones`, `integrity_flags`, `score_snapshots` are listed in `contracts/db/table-owners.yaml` (owner `scoring`); the fact source over those tables is Akshay's migration (H-129).
-- Docs: dev-log, CHANGELOG, traceability (FR-SCR-01 to 06, 09, 10), HANDOFFS rows (H-129; closes the L-23 line of "Others are waiting on you"), evidence `docs/assets/story-7-3-scoring/` (real pytest output), `docs/dev/dev1-tanmay.md` L-23 stays unticked until the developer confirms.
+- `apps/api/src/vulnmart/scoring/__init__.py` (read) -- the module folder P created for stream L; tables `milestones`, `integrity_flags`, `score_snapshots` are listed in `contracts/db/table-owners.yaml` (owner `scoring`); the fact source over those tables is Akshay's migration (H-329).
+- Docs: dev-log, CHANGELOG, traceability (FR-SCR-01 to 06, 09, 10), HANDOFFS rows (H-329; closes the L-23 line of "Others are waiting on you"), evidence `docs/assets/story-7-3-scoring/` (real pytest output), `docs/dev/dev1-tanmay.md` L-23 stays unticked until the developer confirms.
 
 ## Tasks & Acceptance
 
@@ -75,7 +75,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/prd/PRD.md
 - [ ] `catalogue.py`, `scoring.py` -- formula, half-up rounding, learner progress (D-85, D-86, D-87)
 - [ ] `engine_reports.py` in `apps/api/.../ports` -- `EngineReportPort` and the `FactSource` Protocol with an in-memory source
 - [ ] tests -- all rows above, every Appendix A example, the exhaustive property loops
-- [ ] handoff H-129 and docs as in the Code Map
+- [ ] handoff H-329 and docs as in the Code Map
 
 **Acceptance Criteria:**
 - Given the six rows of PRD Appendix A, then the results are 90, 36, 84, 6, 0 and 1000 shown, in the library test and again through `EngineReportPort`.
@@ -97,7 +97,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/prd/PRD.md
 
 ## Handoffs to add in the same commit
 
-- **H-129 (to P-26, P-05, Akshay):** `ReportPort.score` will be served by `EngineReportPort` from a `FactSource`: per attempt and challenge key the best milestone, the list of hint levels unlocked (from `hint_unlocks`) and whether a capture is held (from the review queue). Please provide that read over the `milestones`, `hint_unlocks` and `integrity_flags` tables (or tell L the column names), and cache nothing: the score is recomputed from facts on every read or on `attempt.score_updated`. The shown number is the 0 to 1000 integer; the screens show time beside it and never compute points. Default if no answer: L ships the in-memory fact source and the demo seeds facts through it.
+- **H-329 (to P-26, P-05, Akshay):** `ReportPort.score` will be served by `EngineReportPort` from a `FactSource`: per attempt and challenge key the best milestone, the list of hint levels unlocked (from `hint_unlocks`) and whether a capture is held (from the review queue). Please provide that read over the `milestones`, `hint_unlocks` and `integrity_flags` tables (or tell L the column names), and cache nothing: the score is recomputed from facts on every read or on `attempt.score_updated`. The shown number is the 0 to 1000 integer; the screens show time beside it and never compute points. Default if no answer: L ships the in-memory fact source and the demo seeds facts through it.
 
 ## Implementation Notes
 
@@ -106,5 +106,5 @@ Built 2026-10-17 (library part). Real result: `uv run --locked --package vulnmar
 - New: `catalogue.py` (`Catalogue`, `ScoringRules`), `scoring.py` (`Fact`, `compute_score`, `ScoreResult`, `learner_progress`, `learner_overview`, `Milestone`); exports added to `__init__.py`. Tests: `test_scoring_appendix_a.py` (all six rows with PRD lines, alone and through the real catalogue, plus the challenge-specs 94/125/63 figures), `test_scoring_properties.py`, `test_scoring_inputs.py`, `test_learner_progress.py`, `test_scoring_held.py`.
 - Deviation 1: the percentages live in a new `ScoringRules` (catalogue.py), not in story 7.1's `Rules`, so `Rules.to_dict` (the `attempts.rules` jsonb shape) is not changed. Template override can build a `ScoringRules` later.
 - Deviation 2: `Fact` has a fourth field `fallback` (the best non-held milestone), needed to compute a held capture at the previous milestone; it is only valid with `held`.
-- NOT built: `EngineReportPort` and its `FactSource` and `apps/api/tests/test_engine_reports.py`. `apps/api/pyproject.toml` does not depend on `vulnmart-attempts`, and stream L may not edit it. Handoff H-128 need: Akshay adds `vulnmart-attempts = { workspace = true }` to the `vulnmart-api` dependencies and sources (and the Dockerfile copy of `packages/py-attempts`), then the adapter and its test are added. `uv run --package vulnmart-api pytest -q` was not run (apps/api untouched).
-- Not done here (main session): H-129 row, dev-log, CHANGELOG, traceability.
+- NOT built: `EngineReportPort` and its `FactSource` and `apps/api/tests/test_engine_reports.py`. `apps/api/pyproject.toml` does not depend on `vulnmart-attempts`, and stream L may not edit it. Handoff H-328 need: Akshay adds `vulnmart-attempts = { workspace = true }` to the `vulnmart-api` dependencies and sources (and the Dockerfile copy of `packages/py-attempts`), then the adapter and its test are added. `uv run --package vulnmart-api pytest -q` was not run (apps/api untouched).
+- Not done here (main session): H-329 row, dev-log, CHANGELOG, traceability.

@@ -1,6 +1,6 @@
 """The milestone engine (story 6.3, D-74): events in, milestones out, driven only by `milestone_rules.json`.
 
-Pure Python over the Protocols of `stores.py`; the ingest worker (Akshay, H-130) calls `process` per verified event and
+Pure Python over the Protocols of `stores.py`; the ingest worker (Akshay, H-330) calls `process` per verified event and
 `tick` at least every 10 seconds. There is no branch on a challenge key here.
 
 Rules of credit: only an event or a platform-verified flag credits; the best milestone per (attempt, challenge) counts once and

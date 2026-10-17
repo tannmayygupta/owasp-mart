@@ -1,6 +1,6 @@
 // Story edge-5: one active browser session per candidate (FR-SES-11, D-65) at the gate. The access epoch is the only session binding:
 // every open and every login of the platform raises it (through the orchestrator, the only writer of gate state), and the gate refuses any
-// cookie or ticket of an older epoch. The platform's own session store is not in this test (handoff H-136); only the gate half is.
+// cookie or ticket of an older epoch. The platform's own session store is not in this test (handoff H-336); only the gate half is.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newJti } from '../src/tickets.mjs';

@@ -47,7 +47,7 @@ context: ['{project-root}/docs/design/challenge-specs.md', '{project-root}/contr
 - **Paste (FR-FLG-05)** `submit_flag(attempt_id, challenge_key, text)` returns `(result, credit)` as `FlagSubmissionResult`: `correct` or `incorrect` (the reason is never given: no oracle), credit `credited`, `held` or `none`. Wrong, decoy, stale and other-instance all answer `incorrect`, count toward a limit of 5 incorrect per challenge per 10 minutes (a sliding window with an injected clock; the sixth raises `FlagRateLimited` for the API to answer 429 `ATT-FLAG-RATE-LIMITED` with `Retry-After`, even for a correct value, `lab.openapi.yaml:229-236`), and write the integrity flags above. The text is never stored, logged or echoed; only `(attempt, challenge, result)` goes to the `FlagSubmissionLog` Protocol. A pasted correct flag credits M3 like an automatic one and is a no-op if M3 is already credited. The attempt must be `running` (`AttemptPort.get`), else the existing `AttemptStateInvalid`.
 - **Sharing signal (FR-FLG-09):** `other_instance` is found by recomputing the same challenge's flag for the instances in `InstanceDirectory.recent(challenge_key, template_id, within_s=...)` (live and recently ended instances, at most 200, all their epochs up to the current one; a bounded loop of HMAC calls), both from the sidecar's `candidate_sha256` and from paste. One integrity flag per `(attempt, other instance)` pair.
 - **Catalogue reads (FR-DET-01):** a loader `ingest/catalogue.py` reads `challenges/catalog/*.yaml` only in tests and in a CLI helper (YAML is not a runtime dependency); the production path takes tags from the catalogue-sync tables (owner `admin`, Sahil/Akshay). The test asserts that all 11 entries have OWASP 2021 and 2025, CWE, ATT&CK tags (present in the stubs now) and that the engine's challenge list equals the catalogue keys.
-- Stores are Protocols with in-memory fakes in `ingest/stores.py`: `EventLog` (append idempotent by `(instance_id, epoch, seq)`, read ordered by `(epoch, seq)`), `MilestoneStore`, `IntegritySink`, `InstanceDirectory`, `ActivityGate`, `FlagSubmissionLog`. The real tables (`events`, `milestones`, `integrity_flags`, `flag_submissions`: owners in `contracts/db/table-owners.yaml:37-44`) are a handoff to Akshay (H-130); nothing here migrates.
+- Stores are Protocols with in-memory fakes in `ingest/stores.py`: `EventLog` (append idempotent by `(instance_id, epoch, seq)`, read ordered by `(epoch, seq)`), `MilestoneStore`, `IntegritySink`, `InstanceDirectory`, `ActivityGate`, `FlagSubmissionLog`. The real tables (`events`, `milestones`, `integrity_flags`, `flag_submissions`: owners in `contracts/db/table-owners.yaml:37-44`) are a handoff to Akshay (H-330); nothing here migrates.
 - No flag, digest, candidate text or key in any log line, exception, repr or test message.
 
 **Never:**
@@ -94,7 +94,7 @@ context: ['{project-root}/docs/design/challenge-specs.md', '{project-root}/contr
 - `contracts/api/lab/lab.openapi.yaml:222-260` (`submitFlag`), `:829-849` (`FlagSubmissionRequest`, `FlagSubmissionResult`) -- the paste contract; read only.
 - `contracts/events/examples/valid/instance-events/` and `.../posted/` -- the example events the replay tests start from (one JSON per type); the tests add a small builder for the rest.
 - Tests: `apps/api/tests/test_ingest_rules.py`, `test_ingest_engine.py`, `test_ingest_c09.py`, `test_flags_submit.py` (new).
-- Docs: dev-log, CHANGELOG, traceability (FR-DET-01, 05, 06, FR-FLG-04, 05, 09, D-22, D-32, OI-17), HANDOFFS (H-43 proposal, H-77 answer, new rows H-130 for Akshay and H-131 for Sahil), `docs/assets/story-6-3-milestone-engine/`.
+- Docs: dev-log, CHANGELOG, traceability (FR-DET-01, 05, 06, FR-FLG-04, 05, 09, D-22, D-32, OI-17), HANDOFFS (H-43 proposal, H-77 answer, new rows H-330 for Akshay and H-331 for Sahil), `docs/assets/story-6-3-milestone-engine/`.
 
 ## Tasks & Acceptance
 
@@ -123,7 +123,7 @@ context: ['{project-root}/docs/design/challenge-specs.md', '{project-root}/contr
 - `node scripts/validate-events.mjs` and `node scripts/validate-catalog.mjs` -- expected: pass (unchanged)
 - `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs`, `uv run --locked --package vulnmart-api python scripts/check_table_owners.py` -- expected: pass
 
-**Local only / developer runbook:** nothing live; the real `events`, `milestones`, `integrity_flags`, `flag_submissions` tables and the route and worker that call the engine are Akshay's (H-130). The live proof is story 4's local loop and T-32 on `vm-i`.
+**Local only / developer runbook:** nothing live; the real `events`, `milestones`, `integrity_flags`, `flag_submissions` tables and the route and worker that call the engine are Akshay's (H-330). The live proof is story 4's local loop and T-32 on `vm-i`.
 
 ## Proposed (decided on the developer's delegation)
 
@@ -133,7 +133,7 @@ context: ['{project-root}/docs/design/challenge-specs.md', '{project-root}/contr
 ## Open (not settled here)
 
 - C03 two flags (D-75); C03 part A M2 ("response holds `<MARKER_C03A>`") has no event today (a marker would need an additive `proxy.marker_seen` type in IF-4: not proposed here), so part A reaches M3 straight from M1 or from M2 of part B.
-- `auth.attempt` `result` is a free class in the schema: the rule assumes `failure` and `success` (confirm with Sahil, H-131); C01 M2's "or the target store's order" needs the Northwind store id of the instance, so only the distinct-count branch is encoded.
+- `auth.attempt` `result` is a free class in the schema: the rule assumes `failure` and `success` (confirm with Sahil, H-331); C01 M2's "or the target store's order" needs the Northwind store id of the instance, so only the distinct-count branch is encoded.
 - `held` capture review (OI-38) has no owner yet: `ActivityGate` is a Protocol that answers allow or hold; the reviewer for held captures is a later task of the attempts epic (dev1-tanmay.md, OI-38).
 
 ## Implementation Notes
@@ -154,10 +154,10 @@ Built 2026-10-17 by the implementer session (not yet reviewed or closed; the mai
 2. C07 backup branch encodes "above 500" as `at_least` 501 and accepts a completed reset of any role as the closing event.
 3. The flag recompute runs for every `proxy.flag_seen` kind (real, decoy, foreign), not only `real`, because the sharing check needs `foreign`. Decoy integrity flags are written once per (attempt, challenge); sharing once per (attempt, other instance).
 4. A correct flag pasted for another challenge than the one named answers `incorrect` (no oracle, counts toward the limit).
-5. The C09 pending windows are held in engine memory; after a restart they are lost unless the success events are replayed (a replayed triple is a no-op, so the real worker should persist or rebuild them: part of H-130).
+5. The C09 pending windows are held in engine memory; after a restart they are lost unless the success events are replayed (a replayed triple is a no-op, so the real worker should persist or rebuild them: part of H-330).
 6. A pasted correct flag whose M3 is already credited answers `correct` / `credited` (idempotent replay); a rate-limited call is logged as `rate_limited`.
 
 **Open problems found:**
-- The event schema rejects the value `system:kyc-fallback` for `store.approved.approved_by` (`$defs/id` pattern has no colon), and the shipped example uses `system`. C11 M2 therefore cannot fire from a schema-valid event until Sahil changes the schema (additive: a `class`-style value such as `system_kyc_fallback`) or the rule value. The rule keeps the spec text. For H-131.
-- C03 M3 stays flag-only (D-75 open); C03 part A M2 has no event; C01 M2's target-store branch is not encoded; `auth.attempt` `result` values `failure` and `success` are assumed (H-131).
+- The event schema rejects the value `system:kyc-fallback` for `store.approved.approved_by` (`$defs/id` pattern has no colon), and the shipped example uses `system`. C11 M2 therefore cannot fire from a schema-valid event until Sahil changes the schema (additive: a `class`-style value such as `system_kyc_fallback`) or the rule value. The rule keeps the spec text. For H-331.
+- C03 M3 stays flag-only (D-75 open); C03 part A M2 has no event; C01 M2's target-store branch is not encoded; `auth.attempt` `result` values `failure` and `success` are assumed (H-331).
 - `held` captures have no reviewer yet (OI-38).

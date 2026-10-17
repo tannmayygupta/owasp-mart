@@ -37,5 +37,10 @@
 | 0033 | [Orchestrator engine and Docker instance builder](0033-orchestrator-engine-docker-builder.md) | Proposed (D-52, decided on the developer's delegation 2026-10-12) |
 | 0034 | [Orchestrator service: the IF-5 API over the engine](0034-orchestrator-service-fastapi-signing-mtls-reports.md) | Proposed (D-53, decided on the developer's delegation 2026-10-12) |
 | 0035 | [Orchestrator reset, the reaper and the timing settings](0035-orchestrator-reset-reaper-and-timing-settings.md) | Proposed (D-54, decided on the developer's delegation 2026-10-15) |
+| 0040 | [Email: Postgres outbox with a relay, retries in the row, Brevo as the first real provider](0040-email-outbox-relay-and-retries-in-the-row.md) | Proposed (provider answer of the developer 2026-10-17, OI-32; design for the developer to confirm) |
+| 0041 | [Signup: Argon2id profile, hashed single-use links, fail-closed rate limits](0041-signup-argon2id-link-tokens-and-fail-closed-rate-limits.md) | Proposed (OI-29 answer of the developer 2026-10-17; design for the developer to confirm) |
+| 0042 | [Sessions: hashed cookie value, HMAC CSRF token, origin check, login throttle](0042-sessions-hashed-cookie-hmac-csrf-and-login-throttle.md) | Proposed (the builder's design for the developer to confirm) |
+| 0043 | [Roles, admin creation and role-gated routes](0043-roles-admin-creation-and-role-gated-routes.md) | Proposed (the builder's design for the developer to confirm) |
+| 0044 | [Password policy: rules, a bundled common-password list, an optional breach range check](0044-password-policy-bundled-list-and-optional-range-check.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

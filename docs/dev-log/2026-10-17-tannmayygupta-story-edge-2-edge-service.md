@@ -9,7 +9,7 @@
 | Report tag | edge service, event relay, Caddy, FR-INS-10, NFR-ISO-04, S-15 local part, D-62, D-64 |
 
 ## Requirements covered
-FR-INS-10, NFR-ISO-04 (local part), spike S-15 (local part); decisions D-62, D-64, D-67 (Proposed, in ADR 0040); handoffs H-75 (relay part answered), H-137 (new, shared with story 1). Tasks L-17 and L-18 (parts; both stay unticked).
+FR-INS-10, NFR-ISO-04 (local part), spike S-15 (local part); decisions D-62, D-64, D-67 (Proposed, in ADR 0040); handoffs H-75 (relay part answered), H-337 (new, shared with story 1). Tasks L-17 and L-18 (parts; both stay unticked).
 
 ## Summary (plain language, 3-5 lines)
 The gate of story 1 is now a running edge: stock Caddy terminates TLS and accepts only the strict instance hostname, an own small gate service decides, and a relay forwards signed sidecar events to the ingest without holding any key. On Docker Desktop one gate was attached to 20 internal instance networks, each hostname reached only its own instance, and no instance container published a port. Nothing here ran on the real VM.
@@ -35,7 +35,7 @@ Caddy checks the hostname and proxies to `edge-gate:8080`. The gate proxies allo
 - `docs/assets/story-edge-2-edge-service/test-output.txt`
 
 ## Decisions made
-D-62 (stock Caddy for TLS and host matching in front of an own gate service; Caddy `forward_auth` rejected because the cookie exchange needs a redirect and it adds a hop), D-64 (relay holds no keys, only shapes traffic), D-67 (local proof boundary). Decisions made while building, to confirm: key file format of the gate key is at least 64 hex characters (the contract only says 32 bytes; stream P must sign with the same bytes, H-137); `edge-caddy` runs as root with `cap_drop ALL` plus `NET_BIND_SERVICE`, like vm-p (the lego private key is root-only), not non-root as the plan wished; relay answers 401 `EVT-BAD-SIGNATURE` for a missing or malformed signature header, 422 `EVT-SCHEMA` for not-JSON or non-object bodies, and 500 `REQ-INTERNAL` for an unreachable or slow ingest (no 502 or 504 code exists); compose host paths default to `/opt/vulnmart/lab/certs/live` and `/opt/vulnmart/lab/secrets`, and `VULNMART_LABS_ZONE` defaults to `labs.invalid`; the e2e test builds the images itself and takes the run flags from the compose file.
+D-62 (stock Caddy for TLS and host matching in front of an own gate service; Caddy `forward_auth` rejected because the cookie exchange needs a redirect and it adds a hop), D-64 (relay holds no keys, only shapes traffic), D-67 (local proof boundary). Decisions made while building, to confirm: key file format of the gate key is at least 64 hex characters (the contract only says 32 bytes; stream P must sign with the same bytes, H-337); `edge-caddy` runs as root with `cap_drop ALL` plus `NET_BIND_SERVICE`, like vm-p (the lego private key is root-only), not non-root as the plan wished; relay answers 401 `EVT-BAD-SIGNATURE` for a missing or malformed signature header, 422 `EVT-SCHEMA` for not-JSON or non-object bodies, and 500 `REQ-INTERNAL` for an unreachable or slow ingest (no 502 or 504 code exists); compose host paths default to `/opt/vulnmart/lab/certs/live` and `/opt/vulnmart/lab/secrets`, and `VULNMART_LABS_ZONE` defaults to `labs.invalid`; the e2e test builds the images itself and takes the run flags from the compose file.
 
 ## Tests
 Raw output in `docs/assets/story-edge-2-edge-service/test-output.txt`.
@@ -63,4 +63,4 @@ Not a vulnerable part; this is platform isolation. Residual risk to keep visible
 - The rate limit default (120 per 10 s per peer address) is a guess. The relay supports `http` ingest URLs only (private link).
 - `edge-gate` binding by alias needs the orchestrator (planned story 3 of the epic) to keep the alias `edge-gate-admin` on labs-core.
 - `restart: unless-stopped` plus the alias wait means a start before the networks exist retries for 10 s then exits and compose restarts it.
-- Handoffs for the key file format and the secret and certificate paths: H-137.
+- Handoffs for the key file format and the secret and certificate paths: H-337.

@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DEV = path.join(ROOT, 'scripts', 'dev.mjs');
 const COMPOSE = path.join(ROOT, 'infra', 'compose', 'compose.yaml');
-const SERVICES = ['postgres', 'valkey', 'mailpit', 'api', 'web'];
+const SERVICES = ['postgres', 'valkey', 'mailpit', 'api', 'worker', 'web'];
 const ONE_SHOT = ['migrate']; // runs the migrations, exits 0 before the API starts (story P-06)
 const NAME = (s) => `vulnmart-${s}`;
 const PORTS = [3000, 8000, 8025];
@@ -175,6 +175,298 @@ describe('platform and web profiles on a real Docker engine', () => {
       }
     }
   });
+
+  // Story P-09. The outbox row is written as the owner role through psql inside the Postgres container (no account exists yet to cause an
+  // email); the worker relays it through Valkey and Dramatiq, and Mailpit (the development provider) receives it over SMTP.
+  const RUN = Date.now().toString(36); // the Postgres volume survives `down`, so every run uses user ids of its own
+  const MAIL1 = `e2e-mail-1-${RUN}`;
+  const MAIL2 = `e2e-mail-2-${RUN}`;
+  const enqueueMail = (user) =>
+    docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-v', 'ON_ERROR_STOP=1', '-c',
+      `INSERT INTO email_outbox (template, to_user_id, params) VALUES ('system.test', '${user}', '{}')`);
+  async function mailTo(user, tries = 40) {
+    for (let i = 0; i < tries; i++) {
+      const res = await fetch('http://127.0.0.1:8025/api/v1/messages', { signal: AbortSignal.timeout(20000) });
+      const found = (await res.json()).messages.filter((m) => m.To.some((t) => t.Address === `${user}@users.vulnmart.invalid`));
+      if (found.length) return found;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return [];
+  }
+
+  test('mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq', async () => {
+    assert.equal(enqueueMail(MAIL1).status, 0);
+    const found = await mailTo(MAIL1);
+    assert.equal(found.length, 1, 'exactly one message arrived');
+    assert.equal(found[0].Subject, 'VulnMart test message');
+    await new Promise((r) => setTimeout(r, 7000)); // more than one relay pass: it must not be sent again
+    assert.equal((await mailTo(MAIL1)).length, 1);
+    const state = docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c',
+      `SELECT state || ',' || attempts FROM email_outbox WHERE to_user_id = '${MAIL1}'`);
+    assert.equal(state.stdout.trim(), 'sent,1');
+  }, { timeout: 120000 });
+
+  test('mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost)', async () => {
+    assert.equal(docker('stop', '--time', '5', NAME('worker')).status, 0);
+    assert.equal(enqueueMail(MAIL2).status, 0);
+    await new Promise((r) => setTimeout(r, 3000));
+    assert.equal((await mailTo(MAIL2, 1)).length, 0, 'nothing is sent while the worker is down');
+    assert.equal(docker('start', NAME('worker')).status, 0);
+    assert.equal((await mailTo(MAIL2, 60)).length, 1);
+  }, { timeout: 180000 });
+
+  // Story P-11: the whole learner signup path on the real stack, through the web origin (proxy, origin secret), the API, Argon2id, Postgres,
+  // the outbox, Valkey and Dramatiq, the worker's real address lookup, and Mailpit.
+  async function mailFor(address, subjectPart, tries = 60) {
+    for (let i = 0; i < tries; i++) {
+      const res = await fetch('http://127.0.0.1:8025/api/v1/messages', { signal: AbortSignal.timeout(20000) });
+      const hit = (await res.json()).messages.find((m) => m.To.some((t) => t.Address === address) && m.Subject.includes(subjectPart));
+      if (hit) return (await fetch(`http://127.0.0.1:8025/api/v1/message/${hit.ID}`, { signal: AbortSignal.timeout(20000) })).json();
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return null;
+  }
+  // Every state-changing call must carry the dashboard origin (story P-12, the Origin check of the contract).
+  const ORIGIN = 'http://127.0.0.1:3000';
+  // A pooled keep-alive socket can be closed by the Next server (5 s idle) just as a call reuses it, which fetch reports as "other side
+  // closed"; the long `docker exec` steps of some tests make that likely. The call never reached the server, so it is tried once more.
+  const call = async (method, path, { body, headers = {} } = {}) => {
+    const send = () =>
+      fetch(`${ORIGIN}${path}`, {
+        method,
+        headers: { origin: ORIGIN, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(30000),
+      });
+    try {
+      return await send();
+    } catch (e) {
+      if (e?.cause?.code !== 'UND_ERR_SOCKET') throw e;
+      return send();
+    }
+  };
+  const postJson = (path, body, headers) => call('POST', path, { body, headers });
+
+  test('accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited', async () => {
+    const email = `e2e-learner-${Date.now()}@example.com`;
+    const body = { email, password: 'correct horse battery staple', display_name: 'E2E Learner', age_declaration: true };
+    const first = await postJson('/api/v1/accounts', body);
+    assert.equal(first.status, 202);
+    assert.deepEqual(await first.json(), { status: 'accepted' });
+    assert.equal(first.headers.get('cache-control'), 'private, no-store');
+    const verify = await mailFor(email, 'Confirm your email');
+    assert.ok(verify, 'the verification mail arrived in Mailpit');
+    const token = /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(verify.Text)?.[1];
+    assert.ok(token, `a link with a token in the mail text: ${verify.Text}`);
+    assert.deepEqual([...new Set(verify.Text.match(/https?:\/\/[^\s]+/g))], [`http://127.0.0.1:3000/verify-email?token=${token}`], 'only its own link');
+    // the account exists unverified, with an Argon2id hash and the learner role
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    assert.equal(psql(`SELECT account_type || ',' || (email_verified_at IS NULL) || ',' || left(password_hash, 9) FROM users WHERE email_ci = '${email}'`), 'participant,true,$argon2id');
+    assert.equal(psql(`SELECT role FROM user_roles JOIN users ON users.id = user_roles.user_id WHERE email_ci = '${email}'`), 'learner');
+    assert.equal(psql(`SELECT count(*) FROM email_tokens WHERE token_hash = '${token}'`), '0', 'the token itself is not stored');
+    // verify once, then the same link is refused
+    const ok = await postJson('/api/v1/accounts/verify-email', { token });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { status: 'verified' });
+    const again = await postJson('/api/v1/accounts/verify-email', { token });
+    assert.equal(again.status, 400);
+    assert.equal((await again.json()).code, 'AUTH-TOKEN-INVALID');
+    assert.equal(psql(`SELECT (email_verified_at IS NOT NULL) FROM users WHERE email_ci = '${email}'`), 't');
+    // the same address again: the same answer, and a mail that says the address is known
+    const repeat = await postJson('/api/v1/accounts', { ...body, email: email.toUpperCase(), display_name: 'Someone else' });
+    assert.equal(repeat.status, 202);
+    assert.ok(await mailFor(email, 'Someone tried to sign up'), 'the already-registered mail arrived');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci = '${email}'`), '1');
+    // the per-address limit: three signups an hour (placeholder); the fourth is 429 with Retry-After
+    const fourth = await postJson('/api/v1/accounts', body);
+    const refused = await postJson('/api/v1/accounts', body);
+    assert.equal(fourth.status, 202);
+    assert.equal(refused.status, 429);
+    assert.equal((await refused.json()).code, 'REQ-RATE-LIMITED');
+    assert.match(refused.headers.get('retry-after'), /^\d+$/);
+    // bad input is 422 and never echoes the password
+    const bad = await postJson('/api/v1/accounts', { ...body, email: 'x@example.com', age_declaration: false });
+    assert.equal(bad.status, 422);
+    assert.doesNotMatch(await bad.text(), /correct horse/);
+  }, { timeout: 180000 });
+
+  // Story P-12: login, the session cookie through the real proxy, CSRF, the Origin check, logout, and a stolen cookie.
+  test('sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good', async () => {
+    const email = `e2e-login-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Login', age_declaration: true })).status, 202);
+    // right password, address not verified yet: 403, and no cookie; a wrong password is 401
+    const early = await postJson('/api/v1/session', { email, password });
+    assert.equal(early.status, 403);
+    assert.equal((await early.json()).code, 'AUTH-EMAIL-NOT-VERIFIED');
+    assert.equal(early.headers.getSetCookie().length, 0);
+    const wrong = await postJson('/api/v1/session', { email, password: 'not the password at all' });
+    assert.equal(wrong.status, 401);
+    assert.equal((await wrong.json()).code, 'AUTH-INVALID-CREDENTIALS');
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    const token = /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1];
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token })).status, 200);
+
+    // another site cannot log a visitor in
+    const forged = await postJson('/api/v1/session', { email, password }, { origin: 'https://evil.example' });
+    assert.equal(forged.status, 403);
+    assert.equal((await forged.json()).code, 'AUTH-ORIGIN-FORBIDDEN');
+
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 200);
+    assert.equal(login.headers.get('cache-control'), 'private, no-store');
+    const cookies = login.headers.getSetCookie();
+    assert.equal(cookies.length, 1, 'one cookie came back through the proxy');
+    assert.match(cookies[0], /^__Host-vm_session=[A-Za-z0-9_-]{43};/);
+    for (const part of ['Path=/', 'Secure', 'HttpOnly']) assert.ok(cookies[0].includes(part), `${part} in ${cookies[0]}`);
+    assert.match(cookies[0], /SameSite=lax/i);
+    assert.doesNotMatch(cookies[0], /Domain=|Max-Age=|Expires=/i);
+    const session = await login.json();
+    const value = /__Host-vm_session=([^;]+)/.exec(cookies[0])[1];
+    assert.equal(session.status, 'authenticated');
+    assert.equal(session.user.email, email);
+    assert.equal(session.user.account_type, 'participant');
+    assert.equal(session.user.email_verified, true);
+    assert.ok(!JSON.stringify(session).includes(value), 'the cookie value is not in the body');
+    assert.equal(psql(`SELECT count(*) FROM sessions WHERE id_hash = '${value}'`), '0', 'the cookie value itself is not stored');
+    assert.equal(psql(`SELECT count(*) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), '1');
+    const cookie = `__Host-vm_session=${value}`;
+
+    // the session, with the same csrf token
+    const current = await call('GET', '/api/v1/session', { headers: { cookie } });
+    assert.equal(current.status, 200);
+    assert.equal((await current.json()).csrf_token, session.csrf_token);
+    const nobody = await call('GET', '/api/v1/session');
+    assert.equal(nobody.status, 401);
+    assert.equal((await nobody.json()).code, 'AUTH-SESSION-REQUIRED');
+
+    // logout needs the right origin and this session's csrf token; refused calls leave the session alone
+    const noToken = await call('DELETE', '/api/v1/session', { headers: { cookie } });
+    assert.equal(noToken.status, 403);
+    assert.equal((await noToken.json()).code, 'AUTH-CSRF-FAILED');
+    const otherSite = await call('DELETE', '/api/v1/session', { headers: { cookie, 'x-csrf-token': session.csrf_token, origin: 'https://evil.example' } });
+    assert.equal(otherSite.status, 403);
+    assert.equal((await otherSite.json()).code, 'AUTH-ORIGIN-FORBIDDEN');
+    assert.equal((await call('GET', '/api/v1/session', { headers: { cookie } })).status, 200);
+    const out = await call('DELETE', '/api/v1/session', { headers: { cookie, 'x-csrf-token': session.csrf_token } });
+    assert.equal(out.status, 204);
+    assert.match(out.headers.getSetCookie()[0], /^__Host-vm_session=("")?;|Max-Age=0/i);
+    // a copy of the old cookie no longer works
+    const replay = await call('GET', '/api/v1/session', { headers: { cookie } });
+    assert.equal(replay.status, 401);
+    assert.equal((await replay.json()).code, 'AUTH-SESSION-REQUIRED');
+    assert.equal(psql(`SELECT (revoked_at IS NOT NULL) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), 't');
+  }, { timeout: 180000 });
+
+  // Story P-14: password reset by mail, password quality, the profile and a password change, on the real stack through the web proxy.
+  test('password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work', async () => {
+    const email = `e2e-pw-${RUN}@example.com`;
+    const first = 'correct horse battery staple';
+    const second = 'purple tractor midnight lantern';
+    const third = 'orange bicycle morning window';
+    const cookieOf = (res) => /__Host-vm_session=([^;]+)/.exec(res.headers.getSetCookie()[0])[1];
+    const asCookie = (value) => ({ cookie: `__Host-vm_session=${value}` });
+    assert.equal((await postJson('/api/v1/accounts', { email, password: first, display_name: 'E2E Password', age_declaration: true })).status, 202);
+    const verifyMail = await mailFor(email, 'Confirm your email');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /token=([A-Za-z0-9_-]{43})/.exec(verifyMail.Text)[1] })).status, 200);
+    // two browsers are signed in
+    const loginA = await postJson('/api/v1/session', { email, password: first });
+    const loginB = await postJson('/api/v1/session', { email, password: first });
+    assert.equal(loginA.status, 200);
+    assert.equal(loginB.status, 200);
+    const [cookieA, cookieB] = [cookieOf(loginA), cookieOf(loginB)];
+
+    // forgot password: the same answer for an unknown address, the mail holds only its own link
+    const known = await postJson('/api/v1/password-reset/request', { email });
+    const unknown = await postJson('/api/v1/password-reset/request', { email: `nobody-${RUN}@example.com` });
+    assert.equal(known.status, 202);
+    assert.equal(unknown.status, 202);
+    assert.deepEqual(await known.json(), await unknown.json());
+    const resetMail = await mailFor(email, 'Reset your VulnMart password');
+    assert.ok(resetMail, 'the reset mail arrived');
+    const token = /reset-password\?token=([A-Za-z0-9_-]{43})/.exec(resetMail.Text)?.[1];
+    assert.ok(token, `a reset link in the mail: ${resetMail.Text}`);
+    assert.deepEqual([...new Set(resetMail.Text.match(/https?:\/\/[^\s]+/g))], [`http://127.0.0.1:3000/reset-password?token=${token}`], 'only its own link');
+    // a password from the list of the 10,000 most common is refused with a fixed sentence, and the link survives
+    const weak = await postJson('/api/v1/password-reset/confirm', { token, new_password: 'unbelievable' });
+    assert.equal(weak.status, 422);
+    assert.deepEqual((await weak.json()).errors, [{ pointer: '/new_password', detail: 'This password is too easy to guess. Choose another one.' }]);
+    const done = await postJson('/api/v1/password-reset/confirm', { token, new_password: second });
+    assert.equal(done.status, 204);
+    assert.equal((await postJson('/api/v1/password-reset/confirm', { token, new_password: third })).status, 400, 'a link works once');
+    // every old session ended; the old password no longer works, the new one does
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieA) })).status, 401);
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieB) })).status, 401);
+    assert.equal((await postJson('/api/v1/session', { email, password: first })).status, 401);
+    const login = await postJson('/api/v1/session', { email, password: second });
+    assert.equal(login.status, 200);
+    const { csrf_token: csrf } = await login.json();
+    const cookieC = cookieOf(login);
+
+    // the profile
+    const me = await call('GET', '/api/v1/me', { headers: asCookie(cookieC) });
+    assert.equal(me.status, 200);
+    assert.equal((await me.json()).display_name, 'E2E Password');
+    const renamed = await call('PATCH', '/api/v1/me', { body: { display_name: 'E2E  Renamed' }, headers: { ...asCookie(cookieC), 'x-csrf-token': csrf } });
+    assert.equal(renamed.status, 200);
+    assert.equal((await renamed.json()).display_name, 'E2E Renamed');
+    assert.equal((await call('PATCH', '/api/v1/me', { body: { display_name: 'No token' }, headers: asCookie(cookieC) })).status, 403);
+
+    // a password change: a wrong current password keeps the session, a right one gives a new session value and ends the others
+    const wrong = await postJson('/api/v1/me/password', { current_password: 'not the password at all', new_password: third }, { ...asCookie(cookieC), 'x-csrf-token': csrf });
+    assert.equal(wrong.status, 401);
+    assert.equal((await wrong.json()).code, 'AUTH-INVALID-CREDENTIALS');
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieC) })).status, 200);
+    const other = await postJson('/api/v1/session', { email, password: second });
+    const cookieOther = cookieOf(other);
+    const changed = await postJson('/api/v1/me/password', { current_password: second, new_password: third }, { ...asCookie(cookieC), 'x-csrf-token': csrf });
+    assert.equal(changed.status, 204);
+    const cookieD = cookieOf(changed);
+    assert.notEqual(cookieD, cookieC);
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieC) })).status, 401, 'the old value of this session is dead');
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieOther) })).status, 401, 'the other session ended');
+    assert.equal((await call('GET', '/api/v1/session', { headers: asCookie(cookieD) })).status, 200);
+    assert.equal((await postJson('/api/v1/session', { email, password: second })).status, 401);
+    assert.equal((await postJson('/api/v1/session', { email, password: third })).status, 200);
+    // nothing sensitive is stored readable: the reset token is only a hash
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    assert.equal(psql(`SELECT count(*) FROM email_tokens WHERE token_hash = '${token}'`), '0');
+    assert.equal(psql(`SELECT used_at IS NOT NULL FROM email_tokens JOIN users ON users.id = email_tokens.user_id WHERE email_ci = '${email}' AND purpose = 'reset'`), 't');
+  }, { timeout: 240000 });
+
+  // Story P-13: an admin exists only through the seed command (or another admin); signup cannot make one; an admin has no learner role.
+  test('admins (P-13): the seed command makes an admin with no learner role who cannot sign in yet, a second seed changes nothing, signup cannot make an admin', async () => {
+    const email = `e2e-admin-${RUN}@example.com`;
+    const password = 'a long admin password 123';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const seed = (extra = []) =>
+      docker('exec', '-e', `VULNMART_SEED_ADMIN_PASSWORD=${password}`, NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', email, '--name', 'E2E Admin', ...extra);
+    const first = seed();
+    assert.equal(first.status, 0, first.stdout + first.stderr);
+    assert.ok(!(first.stdout + first.stderr).includes(password), 'the password is never printed');
+    assert.equal(psql(`SELECT account_type || ',' || (email_verified_at IS NOT NULL) || ',' || left(password_hash, 9) FROM users WHERE email_ci = '${email}'`), 'admin,true,$argon2id');
+    assert.equal(psql(`SELECT count(*) FROM user_roles JOIN users ON users.id = user_roles.user_id WHERE email_ci = '${email}'`), '0', 'an admin holds no learner or candidate role');
+    const again = seed();
+    assert.equal(again.status, 3, 'a second seed for the same address changes nothing');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci = '${email}'`), '1');
+    // the account cannot sign in before the second factor exists: no session, no cookie
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 500);
+    assert.equal((await login.json()).code, 'REQ-INTERNAL');
+    assert.equal(login.headers.getSetCookie().length, 0);
+    assert.equal(psql(`SELECT count(*) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), '0');
+    // a signup that names an account type or role is refused, and a normal signup makes a participant
+    const forged = await postJson('/api/v1/accounts', { email: `e2e-forged-${RUN}@example.com`, password, display_name: 'Forged', age_declaration: true, account_type: 'admin' });
+    assert.equal(forged.status, 422);
+    assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci = 'e2e-forged-${RUN}@example.com'`), '0');
+    // a recruiter or admin cannot be given a participant role even by SQL: the database refuses
+    const direct = docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-v', 'ON_ERROR_STOP=1', '-c',
+      `INSERT INTO user_roles (user_id, role, account_type) SELECT id, 'candidate', 'participant' FROM users WHERE email_ci = '${email}'`);
+    assert.notEqual(direct.status, 0);
+    assert.match(direct.stderr, /violates foreign key constraint/);
+  }, { timeout: 120000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {

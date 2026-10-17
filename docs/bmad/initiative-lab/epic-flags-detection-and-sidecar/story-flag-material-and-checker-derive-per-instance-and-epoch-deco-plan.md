@@ -66,7 +66,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 - `apps/orchestrator/tests/test_docker_integration.py` -- real-Docker tests; the scan test follows its skip-without-daemon pattern and its stub-instance image build.
 - `contracts/mocks/stub-instance/inject.mjs` -- the stub injector that writes `/run/vm/flags.json`; the local scan runs against instances made from it.
 - Tests: `apps/api/tests/test_flags_material.py`, `apps/api/tests/test_flags_checker.py` (new).
-- Docs: dev-log, CHANGELOG, traceability (FR-FLG-01, 02, 03, 07, 08, D-02, D-23), HANDOFFS (H-63 answer; new rows H-127 and H-128 below), evidence `docs/assets/story-6-1-flag-material/`.
+- Docs: dev-log, CHANGELOG, traceability (FR-FLG-01, 02, 03, 07, 08, D-02, D-23), HANDOFFS (H-63 answer; new rows H-327 and H-328 below), evidence `docs/assets/story-6-1-flag-material/`.
 
 ## Tasks & Acceptance
 

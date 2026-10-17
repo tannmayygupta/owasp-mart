@@ -1,4 +1,4 @@
-"""Story edge-7 (H-147 point 1, H-16, decision F-3): `POST /internal/v1/orch/state` in the lab runtime.
+"""Story edge-7 (H-347 point 1, H-16, decision F-3): `POST /internal/v1/orch/state` in the lab runtime.
 
 Checks, row by row: the route is absent without the key file; signature (every failure is the same 401 problem body); the 64 KiB limit;
 media type; strict body; new / repeat / mismatch; an impossible transition (204, history, state not moved, one warning); order and

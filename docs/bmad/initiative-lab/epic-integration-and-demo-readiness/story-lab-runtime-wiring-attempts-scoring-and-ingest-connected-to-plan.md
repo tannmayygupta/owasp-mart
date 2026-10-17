@@ -34,7 +34,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 
 **Proposed (decided on the developer's delegation):**
 - **D-95:** the integration edit of `apps/api` is limited to the three manifest files and `uv.lock` (steps 2 to 4) plus the L-owned folder `apps/api/src/vulnmart/lab/` and the stream-L entrypoint `kernel/entrypoints/ingest.py`; `main.py`, `kernel/services.py`, `kernel/settings.py`, migrations and Akshay's route modules are not touched. Akshay's real routes later call `EngineAttemptPort`, `EngineReportPort` and `FlagSubmitService` through `build_ports`; until then the demo routes are the only HTTP entry. The edit is announced to Akshay in a handoff row in the same commit and goes on the same branch as the story.
-- **D-96:** the demo runtime keeps all state in memory in one process (the ingest entrypoint process), because the real tables (`events`, `milestones`, `flag_submissions`, attempts) are Akshay's and not migrated (H-130). A restart loses attempts; this is stated in the runbook. The demo routes and the clock offset exist only behind two environment variables and a token, loopback or private network only, and are never part of the production compose profile `lab` as shipped (a compose rule test asserts neither variable is set there).
+- **D-96:** the demo runtime keeps all state in memory in one process (the ingest entrypoint process), because the real tables (`events`, `milestones`, `flag_submissions`, attempts) are Akshay's and not migrated (H-330). A restart loses attempts; this is stated in the runbook. The demo routes and the clock offset exist only behind two environment variables and a token, loopback or private network only, and are never part of the production compose profile `lab` as shipped (a compose rule test asserts neither variable is set there).
 
 ## Boundaries & Constraints
 
@@ -91,7 +91,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 ## Handoffs (proposed, add rows in the same commit; numbers to be given by the next free H id)
 
 - To Akshay (all P tasks that touch `apps/api`): the additive edit of `apps/api/pyproject.toml` (`vulnmart-attempts`, `jsonschema` runtime), `Dockerfile`, `Dockerfile.dockerignore` and `uv.lock`; please merge or confirm no conflict; do not remove them. Default if no answer: stays as written (it is additive).
-- To Akshay (P-xx scheduler, attempts and report tables): production needs the real `AttemptStore` (compare-and-set on a version column), `MilestoneStore`, event log and `flag_submissions` tables (H-130), a scheduler job calling `AttemptEngine.tick()` every 15 s, and a Python gate-ticket signer behind `InstancePort.open_ticket` (the signer exists only in Node, `apps/edge/src/tickets.mjs`; confirm owner and contract `contracts/edge/gate-ticket.md`). Until then the demo runs on the in-memory runtime (D-96).
+- To Akshay (P-xx scheduler, attempts and report tables): production needs the real `AttemptStore` (compare-and-set on a version column), `MilestoneStore`, event log and `flag_submissions` tables (H-330), a scheduler job calling `AttemptEngine.tick()` every 15 s, and a Python gate-ticket signer behind `InstancePort.open_ticket` (the signer exists only in Node, `apps/edge/src/tickets.mjs`; confirm owner and contract `contracts/edge/gate-ticket.md`). Until then the demo runs on the in-memory runtime (D-96).
 
 ## Verification
 

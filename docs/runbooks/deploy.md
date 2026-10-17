@@ -52,7 +52,7 @@ The orchestrator must never mount the Docker socket itself. The service `docker-
 7. Stop the proxy when you are done: `docker compose -f infra/compose/compose.yaml --profile lab down`, then stop vm-i (`vm_i_running = false`, `terraform apply`).
 8. Record in the dev-log: the digest line the pull printed, the five status codes of step 3, the `ss` line (address removed) and whether step 6 left anything behind. Do not claim a result you did not see.
 
-The local proof on Docker Desktop (the tests of story 4.2) is in `docs/assets/story-4-2-socket-proxy/`. The orchestrator now runs as the compose service `orchestrator` (profile `lab`, edge story 6, H-143): it uses `--docker-host tcp://docker-proxy:2375` over `vulnmart-labs-core` instead of `127.0.0.1:2375`, so the host-run command of step 5 is the alternative, not the plan; the steps are in `docs/runbooks/edge-vm-i.md` step 3.
+The local proof on Docker Desktop (the tests of story 4.2) is in `docs/assets/story-4-2-socket-proxy/`. The orchestrator now runs as the compose service `orchestrator` (profile `lab`, edge story 6, H-343): it uses `--docker-host tcp://docker-proxy:2375` over `vulnmart-labs-core` instead of `127.0.0.1:2375`, so the host-run command of step 5 is the alternative, not the plan; the steps are in `docs/runbooks/edge-vm-i.md` step 3.
 
 ## Part F. The labs edge on vm-i (edge stories 2, 3 and 5)
 The certificate, the two gate secrets, the edge services, the orchestrator container (its flags --edge-container, --gate-url and --gate-admin-key-file are set in the compose service), the S-15 attach test, the event relay and the browser check are in docs/runbooks/edge-vm-i.md (live steps for you; none of it has been run on vm-i).

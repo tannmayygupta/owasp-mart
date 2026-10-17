@@ -79,11 +79,13 @@ Proposed (decided on the developer's delegation): D-61 single internal network p
 - `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs` -- expected: pass
 
 ## Follow-up 2026-10-17 (story edge-6)
-H-143 decided by the developer: the orchestrator runs as a container on labs-core. Compose service orchestrator added and proven locally (30 checks PASS, re-run by the coordinator); dev-log 2026-10-17-tannmayygupta-story-edge-6-orchestrator-container.md; open points in H-147.
+H-343 decided by the developer: the orchestrator runs as a container on labs-core. Compose service orchestrator added and proven locally (30 checks PASS, re-run by the coordinator); dev-log 2026-10-17-tannmayygupta-story-edge-6-orchestrator-container.md; open points in H-347.
 
 ## Follow-up 2026-10-17 (story edge-7)
 State reports: platform receiver built in the lab runtime and proven locally (27 checks, receiver restart); dev-log 2026-10-17-tannmayygupta-story-edge-7-state-reports.md. Live vm-p and vm-i use is the developer's run.
 
 Follow-up 2026-10-17: live-check helpers for state reports (make-test-certs.ps1, orch_smoke.py), dev-log 2026-10-17-tannmayygupta-live-check-helpers-state-reports.md.
 Follow-up 2026-10-18: make-test-certs.ps1 fixed for a Windows openssl without a config file.
-Follow-up 2026-10-18: state reports proven live on vm-i and vm-p (H-147 point 1 closed); dev-log 2026-10-18-tannmayygupta-h147-state-reports-live.md.
+Follow-up 2026-10-18: state reports proven live on vm-i and vm-p (H-347 point 1 closed); dev-log 2026-10-18-tannmayygupta-h147-state-reports-live.md.
+
+Follow-up 2026-10-18: main merged into the branch; handoff ids of stream L renumbered to H-327..H-347 (see dev-log 2026-10-18-tannmayygupta-merge-main-and-handoff-renumbering.md).

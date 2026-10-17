@@ -9,13 +9,13 @@
 | Report tag | integration, lab runtime |
 
 ## Requirements covered
-FR-SES-02, FR-SES-04, FR-SES-09, FR-SES-10, FR-SCR-01, FR-FLG-04, FR-DET-01, FR-ACH-07, FR-TIM-01 to 03, NFR-OBS-02; D-95, D-96 (Proposed in the story plan, not yet confirmed); handoffs H-145, H-146.
+FR-SES-02, FR-SES-04, FR-SES-09, FR-SES-10, FR-SCR-01, FR-FLG-04, FR-DET-01, FR-ACH-07, FR-TIM-01 to 03, NFR-OBS-02; D-95, D-96 (Proposed in the story plan, not yet confirmed); handoffs H-345, H-346.
 
 ## Summary
 The libraries for flags, ingest, milestones, attempts and scoring were built and tested one by one but nothing connected them. This story connects them in one process in memory (`LabRuntime`), switches it on in the ingest entrypoint with `VULNMART_LAB_RUNTIME=1`, and adds token-guarded demo routes (`VULNMART_LAB_DEMO=1` plus a token) to drive one attempt over HTTP. The plan's step 1 check failed (the two port adapters `engine_attempts.py` and `engine_reports.py` did not exist), so they were written here.
 
 ## Why
-The 19 October demo needs one loop: start an attempt, capture a flag, see a score, expire, freeze, destroy. Akshay's real tables and routes are not there yet (H-130), so the runtime keeps state in memory (D-96).
+The 19 October demo needs one loop: start an attempt, capture a flag, see a score, expire, freeze, destroy. Akshay's real tables and routes are not there yet (H-330), so the runtime keeps state in memory (D-96).
 
 ## What was built
 - `apps/api/src/vulnmart/ports/engine_attempts.py`: `AttemptPort` over `AttemptEngine` (create, get, cancel, withdraw, purge).
@@ -49,11 +49,11 @@ D-95 and D-96 are Proposed in the story plan and stay Proposed until the develop
 - The first tick reported an attempt before its instance was destroyed, and the engine never destroys a `reported` attempt. Reporting now waits for `destroyed`.
 - The demo token first used `AUTH-TOKEN-INVALID`, which is a 400. Changed to `AUTH-SESSION-REQUIRED` (401).
 - `seconds: "10"` was accepted by pydantic's lax mode; the field is now strict.
-- `test_contract.py::test_the_ports_package_holds_only_the_three_modules` failed as designed for a new module; its lists were updated (H-145).
+- `test_contract.py::test_the_ports_package_holds_only_the_three_modules` failed as designed for a new module; its lists were updated (H-345).
 - A PowerShell `Set-Content -Encoding utf8` added a BOM; removed (check-text-files).
 
 ## Security notes
 The demo routes and the clock offset exist only behind two environment variables and a token, are never in a compose file (a test asserts it), and every answer holds ids, states, numbers and result words, never a flag or key. Event keys are random per process.
 
 ## Limitations and follow-ups
-State is in memory (restart loses attempts). No real KeyPort or tables (H-130, H-146). The tick runs only when a demo route is called or a scheduler calls it. `EngineCohortPort` and the report-port `time` method are not written. Real orchestrator over mTLS was not run here (story 3 covers http loopback).
+State is in memory (restart loses attempts). No real KeyPort or tables (H-330, H-346). The tick runs only when a demo route is called or a scheduler calls it. `EngineCohortPort` and the report-port `time` method are not written. Real orchestrator over mTLS was not run here (story 3 covers http loopback).

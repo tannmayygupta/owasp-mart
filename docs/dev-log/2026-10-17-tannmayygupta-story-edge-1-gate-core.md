@@ -9,7 +9,7 @@
 | Report tag | edge gate, access ticket, host-only cookie, FR-INS-10, FR-SES-04, FR-SES-11, D-60, D-63, D-68 |
 
 ## Requirements covered
-FR-INS-10, FR-SES-04, FR-SES-11 (gate core only); ADR 0004 (status changed to Accepted by delegation, pending the developer's confirmation); decisions D-60, D-63, D-68 (Proposed, in ADR 0040); handoffs H-136, H-137, H-138 (new). Task L-17 (first story; stays unticked).
+FR-INS-10, FR-SES-04, FR-SES-11 (gate core only); ADR 0004 (status changed to Accepted by delegation, pending the developer's confirmation); decisions D-60, D-63, D-68 (Proposed, in ADR 0040); handoffs H-336, H-337, H-338 (new). Task L-17 (first story; stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 Nothing decided who may reach an instance; the stub gate let everything through. There is now a small Node library that checks a signed one-time ticket, exchanges it for a host-only cookie and decides per request: allow, show a "paused" page (frozen), show an "ended" page (closed or unknown), or refuse. Only a strict hostname shape is accepted. The orchestrator will push the access state to it through admin handlers; the secret and keys are read from files.
@@ -54,7 +54,7 @@ Not a vulnerable part; this is the platform's own access control. Keys and the a
 
 ## Limitations and follow-ups
 - Not live: nothing here ran on vm-i, with a real browser, a real certificate or the real orchestrator.
-- Contract `GATE` is 0.1.0, which conflicts with tag precondition 5 (every contract labelled 1.0.0): a human decision at the release commit or in `scripts/tag-contracts.mjs`. After the tag the rules engine needs a second listed person for `GATE`; Akshay is to be added as consumer (H-136 to H-138).
+- Contract `GATE` is 0.1.0, which conflicts with tag precondition 5 (every contract labelled 1.0.0): a human decision at the release commit or in `scripts/tag-contracts.mjs`. After the tag the rules engine needs a second listed person for `GATE`; Akshay is to be added as consumer (H-336 to H-338).
 - 403 (bad ticket, known instance) versus 410 (unknown) can be told apart; kept as frozen in the plan.
 - The admin JSON parser does not detect duplicate member names (last wins); clock skew between API and gate is not handled.
 - A gate restart loses the used-ticket set and the state: everything is closed until the orchestrator syncs; a replay inside the 60 s window after a restart is the accepted residual.

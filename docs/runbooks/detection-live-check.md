@@ -8,7 +8,7 @@ Owner of the run: Tanmay with Sahil. Claude helps read the outputs; it never run
 
 - [ ] The real edge (stories edge-1 and edge-2, task L-17/L-18) and Akshay's ingest endpoint (H-75) are deployed. If they are not, **stop**: the event path does not exist and the engine has nothing to read. Record that fact; the local loop is then the only proof.
 - [ ] The release manifest carries the product sidecar image by digest (`infra/images.json`, built by the pipeline from `services/sidecar`), and the orchestrator on `vm-i` reads it.
-- [ ] You have the platform's staff view or database read access to look at `events`, `milestones` and `evidence` rows (Akshay's tables, H-130). If the tables are not there yet, use the fake-ingest style read described in step 6 and say so.
+- [ ] You have the platform's staff view or database read access to look at `events`, `milestones` and `evidence` rows (Akshay's tables, H-330). If the tables are not there yet, use the fake-ingest style read described in step 6 and say so.
 - [ ] A test attempt (a learner account of your own) with one instance of the shop template.
 
 ## Steps

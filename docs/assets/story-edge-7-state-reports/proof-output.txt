@@ -1,7 +1,7 @@
 VulnMart edge story 7: state reports from the orchestrator container to the platform receiver (run vmrep0db61b)
 Date: 2026-10-17; machine: laptop with Docker Desktop (29.6.2)
 Setup: receiver = the real ingest app (uvicorn, TLS, VULNMART_LAB_RUNTIME=1 + report key file) as a HOST process on <addr>; orchestrator = the COMPOSE CONTAINER (compose.yaml + lab.reports.yaml) reaching it as https://host.docker.internal.
-Why the container and not a host process: it is the deployed shape (H-143) and it must trust the private CA through SSL_CERT_FILE from a file secret, which a host process would not exercise.
+Why the container and not a host process: it is the deployed shape (H-343) and it must trust the private CA through SSL_CERT_FILE from a file secret, which a host process would not exercise.
 
 --- before: objects of the project already on the machine (not started by this run)
 (none)

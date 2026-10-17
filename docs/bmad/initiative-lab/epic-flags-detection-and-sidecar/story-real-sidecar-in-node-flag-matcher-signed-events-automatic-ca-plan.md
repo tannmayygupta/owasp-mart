@@ -75,7 +75,7 @@ context: ['{project-root}/contracts/events/app-events.md', '{project-root}/contr
 - `infra/images.json` -- add the `sidecar` entry (context `services/sidecar`, platform `linux/amd64`, `public`, `healthcheck`); `scripts/images-matrix.mjs` and `scripts/images-release.mjs` read it (check that the tests of those scripts still pass; no workflow edit).
 - `infra/compose/harness.yaml:139-158` (the `sidecar` service) -- a second profile or override that runs the product image instead of `vulnmart-stub-instance:local`; `scripts/harness.mjs` and `scripts/harness.test.mjs` for how the harness is started in tests.
 - `apps/shop/` -- read only (Sahil owns it): how the shop is reached and what it posts (`apps/shop/src/instance/instance.mjs:64-95`).
-- Docs: dev-log, CHANGELOG, traceability (FR-FLG-04, 06, FR-DET-04, S-9, D-01), HANDOFFS (H-76, H-94 answers; rows H-129 for Sahil below), `docs/assets/story-6-2-sidecar/`.
+- Docs: dev-log, CHANGELOG, traceability (FR-FLG-04, 06, FR-DET-04, S-9, D-01), HANDOFFS (H-76, H-94 answers; rows H-329 for Sahil below), `docs/assets/story-6-2-sidecar/`.
 
 ## Tasks & Acceptance
 
@@ -113,8 +113,8 @@ context: ['{project-root}/contracts/events/app-events.md', '{project-root}/contr
 
 ## Open (not settled here)
 
-- How the bot controller reaches the shop (directly on the instance network, assumed) and whether any traffic on the player port can be the bot: a question for Sahil (T-13), handoff H-129. Risk: if bot traffic arrives on the player port it would be classed as a player; the engine still ignores events marked `bot` from the shop.
-- The matcher cannot see C06's `auditToken` unless the response passes the sidecar (the import service answers over the shop, so it does) and C10's flag if the shop strips it; the shop owns those; flagged in H-129.
+- How the bot controller reaches the shop (directly on the instance network, assumed) and whether any traffic on the player port can be the bot: a question for Sahil (T-13), handoff H-329. Risk: if bot traffic arrives on the player port it would be classed as a player; the engine still ignores events marked `bot` from the shop.
+- The matcher cannot see C06's `auditToken` unless the response passes the sidecar (the import service answers over the shop, so it does) and C10's flag if the shop strips it; the shop owns those; flagged in H-329.
 
 ## Implementation Notes
 
@@ -144,4 +144,4 @@ Built 2026-10-17 (local run on the Windows dev PC, Docker Desktop 29.6.2, Node 2
 - `scan-flags --instance <harness>` was not run (no harness instance exists); `--image` and `--file` were run instead.
 - The compose command for the product image is `["/app/src/main.mjs", "--relay", ..., "--upstream", ...]` (distroless entry point is `node`; the stub's word `sidecar` also works but is not needed).
 
-**Open for the main session:** H-76 and H-94 answers (the product sidecar equals the stub on every case copied from its tests; differences from the stub: none found, and extra behaviour = the three sidecar events, `x-vm-*` stripping, priority drop); the H-129 row for Sahil (T-13: how the bot reaches the shop; C06 `auditToken` and C10 flag visibility through the sidecar); D-70, D-73, D-76 records; `check-instance-conformance` and the images workflow run on `main` (not run here).
+**Open for the main session:** H-76 and H-94 answers (the product sidecar equals the stub on every case copied from its tests; differences from the stub: none found, and extra behaviour = the three sidecar events, `x-vm-*` stripping, priority drop); the H-329 row for Sahil (T-13: how the bot reaches the shop; C06 `auditToken` and C10 flag visibility through the sidecar); D-70, D-73, D-76 records; `check-instance-conformance` and the images workflow run on `main` (not run here).

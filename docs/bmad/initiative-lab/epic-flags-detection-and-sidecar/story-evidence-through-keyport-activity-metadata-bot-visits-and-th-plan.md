@@ -64,7 +64,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 ## Code Map
 
 - `apps/api/src/vulnmart/ports/reports.py:48-56` (`EvidenceItem`), `:76-83` (`ReportPort.evidence`, `evidence_body`), `ports/keys.py:79-111` (`Sealed`, `encrypt`, `decrypt`, `shred`), `ports/fakes.py:148-171` (`FakeKeyPort.encrypt/decrypt/shred`), `ports/errors.py` (`KeyShredded`, `AttemptNotFound`, `AttemptGone`) -- the types and errors the recorder and reader use.
-- `apps/api/src/vulnmart/ingest/` -- new `evidence.py`, `activity.py`, `bots.py`; stores added to `ingest/stores.py` (story 3): `EvidenceStore`, `ActivityStore`, `BotVisitStore` with fakes. Real tables `evidence`, `activity_buckets` (owner `ingest`, `contracts/db/table-owners.yaml:37-39`) are Akshay's migration (H-130).
+- `apps/api/src/vulnmart/ingest/` -- new `evidence.py`, `activity.py`, `bots.py`; stores added to `ingest/stores.py` (story 3): `EvidenceStore`, `ActivityStore`, `BotVisitStore` with fakes. Real tables `evidence`, `activity_buckets` (owner `ingest`, `contracts/db/table-owners.yaml:37-39`) are Akshay's migration (H-330).
 - `contracts/events/instance-events.schema.json:1106-1134` (`data_evidence_capture`) and `app-events.md:23-26,142-143,196` (caps, redaction, `[FLAG-REDACTED]`) -- read only.
 - `contracts/mocks/fake-ingest/server.mjs:62-65` (`/_fake/events`, `/_fake/epoch`) and its test -- add `/_fake/events/full`.
 - `scripts/demo_client.py:34-135` (`step`, `new_iid`, `make_request`, `wait_state`, `docker`, `leftovers`, `full`) and `scripts/demo.mjs` -- the structure and helpers the loop reuses; `apps/orchestrator/tests/test_docker_integration.py:22,54,102` (stub image build, allowlist with local ids, commands per role) -- how a real-Docker engine is made.
@@ -73,7 +73,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 - `scripts/scan-flags.mjs` (story 1) -- the final scan.
 - `docs/runbooks/` -- new numbered section `docs/runbooks/detection-live-check.md` (the live steps: images, a real instance on vm-i, the planted-flag request, the evidence read, the scan).
 - Tests: `apps/api/tests/test_ingest_evidence.py`, `test_ingest_activity.py`, `test_ingest_bots.py` (new), `contracts/mocks/fake-ingest` test for the new route, `scripts/detect_loop.test.py` or a pytest in `apps/orchestrator/tests/test_detect_loop.py` for the loop's skip and cleanup paths.
-- Docs: dev-log, CHANGELOG, traceability (FR-DET-03, 07, 08, 09, FR-FLG-09, NFR-PRF-03 as local only), HANDOFFS (H-77 closed, H-130 extended for Akshay with the evidence and activity tables), `docs/assets/story-6-4-detection-loop/`.
+- Docs: dev-log, CHANGELOG, traceability (FR-DET-03, 07, 08, 09, FR-FLG-09, NFR-PRF-03 as local only), HANDOFFS (H-77 closed, H-330 extended for Akshay with the evidence and activity tables), `docs/assets/story-6-4-detection-loop/`.
 
 ## Tasks & Acceptance
 

@@ -9,7 +9,7 @@
 | Report tag | sidecar, flag matcher, evidence capture, spike S-9, FR-FLG-04, FR-FLG-06, FR-DET-04, D-70, D-73, D-76 |
 
 ## Requirements covered
-FR-FLG-04, FR-FLG-06, FR-DET-04; spike S-9 (run locally); D-01; decisions D-70, D-73, D-76 (Proposed, in ADR 0042); handoffs H-76 and H-94 (answered as built), H-132 (new). Task L-20 (part; stays unticked: Coraza and classifier accuracy S-6 are not built).
+FR-FLG-04, FR-FLG-06, FR-DET-04; spike S-9 (run locally); D-01; decisions D-70, D-73, D-76 (Proposed, in ADR 0042); handoffs H-76 and H-94 (answered as built), H-332 (new). Task L-20 (part; stays unticked: Coraza and classifier accuracy S-6 are not built).
 
 ## Summary (plain language, 3-5 lines)
 `services/sidecar/` held only a `.gitkeep`. It now holds a real sidecar that passes player traffic through unchanged while scanning a bounded copy of each response for flags after decoding gzip, deflate, brotli, JSON escapes, HTML entities and percent encoding. It sends signed `proxy.flag_seen`, `evidence.capture` and aggregated `proxy.request` events and never sends a flag value. It builds into a small distroless image and starts under the runtime profile.
@@ -58,6 +58,6 @@ Not a vulnerable part of the shop; this is platform detection. The sidecar holds
 ## Limitations and follow-ups
 - Coraza and CRS (story 5 of the epic) and classifier accuracy (S-6) are not built; `inspectRequest` is a no-op.
 - The full harness run with the product image needs `scripts/harness.mjs` to accept a second compose file (outside this story's files).
-- Open for Sahil (H-132): how the bot reaches the shop, and whether C06's `auditToken` and C10's flag pass through the sidecar.
+- Open for Sahil (H-332): how the bot reaches the shop, and whether C06's `auditToken` and C10's flag pass through the sidecar.
 - Difference from the stub on every case copied from its tests: none found; extra behaviour is the three sidecar events, `x-vm-*` stripping and the priority drop.
 - Live run on vm-i with a real shop is T-32 (not run).

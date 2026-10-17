@@ -32,7 +32,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 
 **Always:** all time from the injected clock; `tick()` safe to call concurrently from two processes (compare-and-set decides); `cancel` and `withdraw` refused outside their allowed states with `InvalidTransition`, mapped by the adapter to the existing `AttemptStateInvalid` (ATT-INVALID-STATE); an expired or submitted attempt cannot be reopened; the event dicts hold ids, state names and UTC times only (no names, emails, request bodies); the adapter returns the same `Attempt` dataclass as today and does not change `AttemptPort` for existing callers (new calls are additions); a lost connection is not an input anywhere, test it by never calling anything but `tick()` for the whole attempt.
 
-**Never:** a real Docker, orchestrator, database or network in the unit tests (the engine only sees `InstanceControl`); changing IF-2, IF-5, IF-3 or any contract file or an error code; adding a dependency to the package; editing `apps/api` outside `ports` and `tests`, except the two pure-addition lines of the dependency (below) announced in H-128; the Excel tracker; commits, pushes, checkout, stash, reset; live runs (AWS, vm-i).
+**Never:** a real Docker, orchestrator, database or network in the unit tests (the engine only sees `InstanceControl`); changing IF-2, IF-5, IF-3 or any contract file or an error code; adding a dependency to the package; editing `apps/api` outside `ports` and `tests`, except the two pure-addition lines of the dependency (below) announced in H-328; the Excel tracker; commits, pushes, checkout, stash, reset; live runs (AWS, vm-i).
 
 ## I/O & Edge-Case Matrix
 
@@ -66,8 +66,8 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 - `apps/api/src/vulnmart/ports/lab_fakes.py:53-101` (`FakeAttemptPort`), `:171` (`FakeInstancePort`; `:260` `force_stop`, `:225` `advance`) -- pattern for the adapter tests and the fake `InstanceControl`.
 - `apps/api/src/vulnmart/ports/instance_host.py:449` (`set_access`) -- the real freeze; `apps/orchestrator/src/vulnmart_orchestrator/engine.py:636` (`set_access`: refuses a lower access epoch, so the freeze uses `access_epoch` + 1).
 - `apps/api/src/vulnmart/ports/errors.py:57-65` (`AttemptNotFound`, `AttemptStateInvalid`, `AttemptGone`) -- error mapping.
-- `apps/api/src/vulnmart/kernel/entrypoints/scheduler.py` (read only, Akshay's) -- where `tick()` will be called (job registration is Akshay's, H-128).
-- `apps/api/pyproject.toml:6-15` and `apps/api/Dockerfile:22-30` -- two additions Akshay's CI needs once the API depends on the package: dependency `vulnmart-attempts` with `[tool.uv.sources] vulnmart-attempts = { workspace = true }`, and `COPY packages/py-attempts/pyproject.toml ...` and `COPY packages/py-attempts/src ...` lines like the `py-models` ones; also the `.dockerignore` of the API build. Made as a pure addition by L in this commit (H-128) unless Akshay answers otherwise; if he objects, the adapter module moves to the library behind a Protocol and he wires it.
+- `apps/api/src/vulnmart/kernel/entrypoints/scheduler.py` (read only, Akshay's) -- where `tick()` will be called (job registration is Akshay's, H-328).
+- `apps/api/pyproject.toml:6-15` and `apps/api/Dockerfile:22-30` -- two additions Akshay's CI needs once the API depends on the package: dependency `vulnmart-attempts` with `[tool.uv.sources] vulnmart-attempts = { workspace = true }`, and `COPY packages/py-attempts/pyproject.toml ...` and `COPY packages/py-attempts/src ...` lines like the `py-models` ones; also the `.dockerignore` of the API build. Made as a pure addition by L in this commit (H-328) unless Akshay answers otherwise; if he objects, the adapter module moves to the library behind a Protocol and he wires it.
 - `apps/api/tests/test_ports_lab.py:12-26` (pattern) -- new `apps/api/tests/test_engine_attempts.py`: `isinstance(EngineAttemptPort(...), AttemptPort)`, the state lists equal, the error mapping, one expiry run against `FakeInstancePort` (instance goes `frozen` then stopped).
 - Docs: dev-log, CHANGELOG, traceability (FR-SES-02, 04, 05, 06, 07, 08, FR-TIM-05), HANDOFFS rows, evidence `docs/assets/story-7-2-attempt-engine/` (the real pytest output), the runbook `docs/runbooks/attempt-expiry-live-check.md` (new, numbered steps for the developer, see Verification).
 
@@ -75,7 +75,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 
 **Execution:**
 - [ ] `store.py`, `engine.py` -- as in the Approach (D-83, D-84, D-88)
-- [ ] `engine_attempts.py` in `apps/api/.../ports` -- `EngineAttemptPort`; dependency and Dockerfile lines (H-128)
+- [ ] `engine_attempts.py` in `apps/api/.../ports` -- `EngineAttemptPort`; dependency and Dockerfile lines (H-328)
 - [ ] tests in the package and `apps/api/tests/test_engine_attempts.py` -- every matrix row
 - [ ] runbook for the live check, handoffs and docs as in the Code Map
 
@@ -100,7 +100,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 
 ## Handoffs to add in the same commit
 
-- **H-128 (to P-26, P-05, Akshay):** (1) the API gets the dependency `vulnmart-attempts` and the Dockerfile COPY lines (pure addition, made by L unless you object); (2) the scheduler job calls `AttemptEngine.tick()` every 15 s and the API calls `submit`, `instance_ready` (from the orchestrator state report `ready`), `cancel`; (3) the DB `AttemptStore` needs `get`, `due(now)` (attempts in `ready`, `running`, `expired` or `submitted` with `frozen_until`, ordered by deadline) and a version column for compare-and-set; (4) the dashboards show `deadline_at` and `server_time` only, never compute the remaining time from the browser clock. Default if no answer: L ships the in-memory store for the demo and Akshay writes the SQL store when the attempts migration lands.
+- **H-328 (to P-26, P-05, Akshay):** (1) the API gets the dependency `vulnmart-attempts` and the Dockerfile COPY lines (pure addition, made by L unless you object); (2) the scheduler job calls `AttemptEngine.tick()` every 15 s and the API calls `submit`, `instance_ready` (from the orchestrator state report `ready`), `cancel`; (3) the DB `AttemptStore` needs `get`, `due(now)` (attempts in `ready`, `running`, `expired` or `submitted` with `frozen_until`, ordered by deadline) and a version column for compare-and-set; (4) the dashboards show `deadline_at` and `server_time` only, never compute the remaining time from the browser clock. Default if no answer: L ships the in-memory store for the demo and Akshay writes the SQL store when the attempts migration lands.
 
 ## Implementation Notes
 
@@ -125,7 +125,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 5. `mark_reported` with `held_open > 0` or `scoring_exists=False` returns the record unchanged; from a state other than `submitted` or `reported` it raises `InvalidTransition`.
 6. A failing event sink is logged and never undoes a stored step. Control-port failures are logged with the attempt id only.
 
-**H-128 content (adapter spec for Akshay's API, to wire in the integration step; nothing applied now).**
+**H-328 content (adapter spec for Akshay's API, to wire in the integration step; nothing applied now).**
 1. `apps/api/pyproject.toml`: add dependency `vulnmart-attempts` and `[tool.uv.sources]` entry `vulnmart-attempts = { workspace = true }` (same pattern as `vulnmart-models`). `apps/api/Dockerfile` (near lines 22-30): add `COPY packages/py-attempts/pyproject.toml packages/py-attempts/pyproject.toml` and `COPY packages/py-attempts/src packages/py-attempts/src` like the `py-models` lines; check the API `.dockerignore`; run `uv lock`.
 2. `EngineAttemptPort` in `apps/api/src/vulnmart/ports/engine_attempts.py` implements the current `AttemptPort` (`create_from_consent`, `get`, `cancel`, `withdraw`, `purge`) over `AttemptEngine` and adds `instance_ready(attempt_id, at)`, `submit(attempt_id)`, `tick()`. Mapping: `create_from_consent` to `engine.create(user_id, template_id, consent_id, rules, instance_id)`; `cancel(attempt_id, by, reason)` to `engine.cancel`; `InvalidTransition` to `AttemptStateInvalid` (ATT-INVALID-STATE); `KeyError` from `get` to `AttemptNotFound`; `AttemptRecord` to the existing `Attempt` dataclass (state strings are equal to `vulnmart.ports.attempts.AttemptState`). `EngineReportPort` (name reserved) wraps `mark_reported(attempt_id, held_open, scoring_exists)` and the story 7.3 scoring call.
 3. `InstanceControl` adapter over `InstanceHost.set_access(instance_id, "frozen", access_epoch + 1)` (`instance_host.py:449`; the orchestrator refuses a lower epoch) and the destroy call; both idempotent and raising on failure.

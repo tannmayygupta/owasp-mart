@@ -180,6 +180,10 @@ services:
       # Story P-07: the API refuses /api/* without the origin secret the web proxy adds (a development value, the same
       # default as the web service below; production keeps it in the Vercel project and on VM-P, architecture 06 s3).
       VULNMART_ORIGIN_SECRET: ${VULNMART_DEV_ORIGIN_SECRET:-vulnmart-dev-origin-secret-not-a-secret}
+      # Story P-12: the key of the CSRF tokens (a development value; production reads a secret file, architecture 06 s3) and the one
+      # origin the browser may call from (the Origin check): the dashboards of the web service below.
+      VULNMART_CSRF_SECRET: ${VULNMART_DEV_CSRF_SECRET:-vulnmart-dev-csrf-secret-not-a-secret}
+      VULNMART_PUBLIC_ORIGIN: http://127.0.0.1:3000
     cap_drop:
       - ALL
     security_opt:
@@ -196,6 +200,38 @@ services:
       postgres:
         condition: service_healthy
       valkey:
+        condition: service_healthy
+    restart: "no"
+
+  # Story P-09: the mail worker (Dramatiq on Valkey plus the outbox relay) in the API image. No port is published: its health routes
+  # are for Docker only. Development mail goes to Mailpit over SMTP (its web page is on 127.0.0.1:8025); the production provider is
+  # Brevo (VULNMART_EMAIL_PROVIDER=brevo with its key as a secret file, never in this file).
+  worker:
+    profiles: ["platform"]
+    image: vulnmart-api:local
+    container_name: vulnmart-worker
+    read_only: true
+    command: ["uvicorn", "vulnmart.kernel.entrypoints.worker:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]
+    environment:
+      VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}@postgres:5432/vulnmart
+      VULNMART_VALKEY_URL: valkey://valkey:6379/0
+      VULNMART_SERVICE: worker
+      VULNMART_EMAIL_PROVIDER: smtp
+      VULNMART_SMTP_HOST: mailpit
+      VULNMART_SMTP_PORT: "1025"
+      VULNMART_EMAIL_SENDER_ADDRESS: no-reply@vulnmart.invalid
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m,uid=65532,gid=65532
+    depends_on:
+      api:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     restart: "no"
 
@@ -372,7 +408,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ---- Lab profile (edge story 6, H-143 option (a), D-58, D-62): the orchestrator as a container on labs-core -----------------------------------
+  # ---- Lab profile (edge story 6, H-343 option (a), D-58, D-62): the orchestrator as a container on labs-core -----------------------------------
   # Why a container: the gate admin listener answers only on labs-core (alias edge-gate-admin:9090, never published), and the Docker API is reached through the
   # socket proxy; a host process could do neither without publishing more. On labs-core it reaches both by name and nothing is published for them.
   # NO Docker socket here: --docker-host tcp://docker-proxy:2375 is the proxy's address on labs-core (the proxy still also publishes 127.0.0.1:2375, for a
@@ -386,7 +422,7 @@ services:
   #   templates/*.json (the instance templates), images.json (the release manifest of image digests). The gate admin secret is the same file the gate reads
   #   (VULNMART_EDGE_SECRETS/gate_admin_secret). Secrets reach the container as files under /run/secrets. Compose mounts a file secret as a bind mount (it ignores uid, gid and mode, and warns),
   # so on vm-i the HOST files must be owned by 65532:65532 with mode 0400: the service refuses a key file readable by group or others (docker-compose limit, found in the story edge-6 proof). Never mode 0644.
-  # State reports to the platform (edge story 7, H-147 point 1) are OFF by default: the service takes --report-url and --report-key-file from VM_ORCH_REPORT_URL and
+  # State reports to the platform (edge story 7, H-347 point 1) are OFF by default: the service takes --report-url and --report-key-file from VM_ORCH_REPORT_URL and
   # VM_ORCH_REPORT_KEY_FILE when no flag is given (compose cannot omit a flag conditionally). To turn them on set VULNMART_ORCH_REPORT_URL (https, the vm-p ingest address) AND add the
   # override file: docker compose -f compose.yaml -f lab.reports.yaml --profile lab up -d orchestrator (it mounts secrets/report_key and sets the key file path). With the URL empty nothing changes.
   # Image: built from apps/orchestrator/Dockerfile. --backend is the default, docker; --allow-fake-backend and --allow-local-images are never set here.

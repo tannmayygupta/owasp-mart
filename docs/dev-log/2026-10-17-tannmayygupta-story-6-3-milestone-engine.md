@@ -9,7 +9,7 @@
 | Report tag | milestone engine, rules as data, negative observation C09, paste flag, sharing signal, FR-DET-05, FR-DET-06, FR-FLG-04, FR-FLG-05, FR-FLG-09, D-74, D-75 |
 
 ## Requirements covered
-FR-DET-01 (tags read from the catalogue in a test), FR-DET-05, FR-DET-06, FR-FLG-04 (platform decides), FR-FLG-05, FR-FLG-09, D-22, D-32, OI-17; decisions D-74, D-75 (Proposed, in ADR 0042); handoffs H-43 (proposal), H-77 (answered as built), H-133, H-134 (new). Task L-21 (part; stays unticked: evidence through KeyPort, activity metadata and bot visits are a later story).
+FR-DET-01 (tags read from the catalogue in a test), FR-DET-05, FR-DET-06, FR-FLG-04 (platform decides), FR-FLG-05, FR-FLG-09, D-22, D-32, OI-17; decisions D-74, D-75 (Proposed, in ADR 0042); handoffs H-43 (proposal), H-77 (answered as built), H-333, H-334 (new). Task L-21 (part; stays unticked: evidence through KeyPort, activity metadata and bot visits are a later story).
 
 ## Summary (plain language, 3-5 lines)
 A data-driven engine now turns IF-4 events into milestones M1 to M3 for all 11 challenges from one JSON rules file (33 rules, five rule kinds). M3 is credited only from a flag the platform recomputed itself, or a correct paste; bot events never count; a decoy or another instance's flag writes an integrity flag without any flag value. The C09 "nothing was logged" rule uses the platform's arrival time and a 30 s grace. The paste service answers only correct or incorrect and limits wrong attempts.
@@ -54,8 +54,8 @@ The plan's rule language could not express two spec rules (a list-valued `tags` 
 Not a vulnerable part of the shop; this is platform scoring input. The paste path gives no oracle: wrong, decoy, stale and other-instance all answer `incorrect`; the sixth wrong paste in 10 minutes is refused even for the correct value; the text is never stored, logged or echoed. Integrity flag explanations hold instance ids and the challenge key, never a flag or digest.
 
 ## Limitations and follow-ups
-- The real tables `events`, `milestones`, `integrity_flags`, `flag_submissions`, the ingest route that calls the engine and a tick at least every 10 s are Akshay's (H-133).
-- The event schema rejects `system:kyc-fallback` for `store.approved.approved_by` (the `$defs/id` pattern has no colon; the shipped example uses `system`): C11 M2 cannot fire from a schema-valid event until Sahil changes the schema or the rule value (H-134).
-- C03 M3 is flag-only (D-75 open); C03 part A M2 has no event today; C01 M2's target-store branch is not encoded; `auth.attempt` `result` values `failure` and `success` are assumed (H-134).
+- The real tables `events`, `milestones`, `integrity_flags`, `flag_submissions`, the ingest route that calls the engine and a tick at least every 10 s are Akshay's (H-333).
+- The event schema rejects `system:kyc-fallback` for `store.approved.approved_by` (the `$defs/id` pattern has no colon; the shipped example uses `system`): C11 M2 cannot fire from a schema-valid event until Sahil changes the schema or the rule value (H-334).
+- C03 M3 is flag-only (D-75 open); C03 part A M2 has no event today; C01 M2's target-store branch is not encoded; `auth.attempt` `result` values `failure` and `success` are assumed (H-334).
 - `held` captures have no reviewer yet (OI-38).
 - Not live: the live proof is the local loop of a later story and T-32 on vm-i.

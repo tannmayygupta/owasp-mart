@@ -3,7 +3,7 @@
 A `bot.visit` event (source `bot`, session kind `bot`) is stored as `(instance_id, epoch, visit_id, ticket_id, phase, at)` and counted.
 The milestone engine ignores every bot event (`engine.is_countable`); `collector.hit` credits only through the C03 rule of
 `milestone_rules.json` (`bot_tagged`). The evidence recorder ignores bot events too. The store is a Protocol with an in-memory fake until
-Akshay's table exists (H-130).
+Akshay's table exists (H-330).
 """
 from __future__ import annotations
 

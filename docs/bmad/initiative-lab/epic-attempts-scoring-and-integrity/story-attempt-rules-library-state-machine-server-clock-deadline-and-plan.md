@@ -70,7 +70,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 - [ ] `pyproject.toml` (root) and `packages/py-attempts/pyproject.toml` -- new member, `uv lock`
 - [ ] `states.py`, `rules.py`, `clock.py`, `schedule.py` -- as in the Approach
 - [ ] tests -- every row of the matrix, the 100-pair transition test, a loop test: for 1 to 3000 random instants (seeded `random.Random(7)`) around the deadline, `accepts_request`, `warnings_due` and `expiry_due` agree with a slow reference written in the test
-- [ ] handoff rows (H-127 for Akshay) and docs as in the Code Map
+- [ ] handoff rows (H-327 for Akshay) and docs as in the Code Map
 
 **Acceptance Criteria:**
 - Given an attempt whose instance became ready at T, then `deadline_at` is T + 120 minutes and nothing in the library reads a browser or connection value.
@@ -92,7 +92,7 @@ context: ['{project-root}/docs/dev/HANDOFFS.md', '{project-root}/docs/architectu
 
 ## Handoffs to add in the same commit (rows in `docs/dev/HANDOFFS.md`)
 
-- **H-127 (to P-26, P-05, Akshay):** the attempt rules package exists; the clock starts at instance ready (D-80, answers H-87: keep the start route as "ask for the instance", the clock ignores it); please confirm the `attempts` table carries `ready_at`, `started_at`, `deadline_at`, `submitted_at`, `frozen_until` and `rules jsonb` as in architecture 04 section 2.5 (they do) plus a small `warnings_sent` array and `resets_used` integer (new, needed by story 2). Default if no answer: L adds them to the proposal in `docs/dev/messages/` and Akshay includes them in the attempts migration.
+- **H-327 (to P-26, P-05, Akshay):** the attempt rules package exists; the clock starts at instance ready (D-80, answers H-87: keep the start route as "ask for the instance", the clock ignores it); please confirm the `attempts` table carries `ready_at`, `started_at`, `deadline_at`, `submitted_at`, `frozen_until` and `rules jsonb` as in architecture 04 section 2.5 (they do) plus a small `warnings_sent` array and `resets_used` integer (new, needed by story 2). Default if no answer: L adds them to the proposal in `docs/dev/messages/` and Akshay includes them in the attempts migration.
 
 ## Implementation Notes
 
@@ -103,4 +103,4 @@ Built 2026-10-17 (status built; review and tests by the main session still to co
 - Choices inside the plan: an unknown state name such as "paused" raises `ValueError` (from the StrEnum); warnings are due only while running before the deadline and not submitted, returned longest first; a clock before `started_at` makes nothing due; the grace limit is inclusive (deadline + 60 s accepted, + 61 s refused).
 - Tests: `test_states.py` (100-pair table test, forbidden skips, reopen), `test_rules.py`, `test_schedule.py` (matrix rows, seeded 3000-instant loop against a slow reference, naive datetimes), `test_no_dependency.py`.
 - Real results: `uv lock --check` pass; `uv run --locked --package vulnmart-attempts pytest -q packages/py-attempts/tests` gives 153 passed in 0.35 s (raw output in `docs/assets/story-7-1-attempt-rules/test-output.txt`); `uv run --locked --package vulnmart-api pytest -q` gives 973 passed, 7 skipped; `node scripts/check-text-files.mjs` and `node scripts/scan-secrets.mjs` pass.
-- Not done here (by instruction): the apps/api state-name comparison test (lands in story 2), handoff H-127, dev-log, CHANGELOG, traceability.
+- Not done here (by instruction): the apps/api state-name comparison test (lands in story 2), handoff H-327, dev-log, CHANGELOG, traceability.

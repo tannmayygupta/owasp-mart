@@ -5,7 +5,7 @@
 // volume or bind and ports on 127.0.0.1 only. Any other exception needs a change to this script with a decision record. A root or privileged container can bypass host firewall rules (ADR 0027);
 // the VPC security groups and network ACLs are the real boundary, so these rights are refused up front.
 // Ports of the lab profile (story edge-2): in a service with profile `lab` only `edge-caddy` may publish, only 443:443, and 8080, 8081 and 9090 are never published.
-// The orchestrator container (edge story 6, H-143; service `orchestrator`, profile `lab`): never a socket mount (the general rule), Docker only through `--docker-host tcp://docker-proxy:2375`, mutual TLS flags present,
+// The orchestrator container (edge story 6, H-343; service `orchestrator`, profile `lab`): never a socket mount (the general rule), Docker only through `--docker-host tcp://docker-proxy:2375`, mutual TLS flags present,
 // no --insecure-no-tls, --allow-fake-backend or --allow-local-images, non-root, read_only, cap_drop ALL, no-new-privileges, on labs-core only, and a published port only as 9443 to 8443 on 127.0.0.1 or ${VULNMART_ORCH_BIND:-127.0.0.1}.
 // Two passes: a line scan for the old rules (comments are stripped first, so a comment that says "no privileged" does not fail), and a real YAML parse (js-yaml,\n// anchors and merge keys resolved) for the Docker socket, binds, ports and the pinned docker-proxy service.
 // Usage: node scripts/check-lab-compose-rules.mjs [file or folder ...]   (default: every compose or harness file in the repository)
@@ -61,7 +61,7 @@ function publishesOnLoopbackOnly(port) {
 export const EDGE_PUBLISHER = 'edge-caddy';
 export const EDGE_PORT = 443;
 export const NEVER_PUBLISHED = [8080, 8081, 9090];
-// The orchestrator container (edge story 6, H-143): the only lab service besides edge-caddy and docker-proxy that may publish a port.
+// The orchestrator container (edge story 6, H-343): the only lab service besides edge-caddy and docker-proxy that may publish a port.
 export const ORCH_SERVICE = 'orchestrator';
 export const ORCH_HOST_PORT = 9443;
 export const ORCH_CONTAINER_PORT = 8443;

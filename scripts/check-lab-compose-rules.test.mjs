@@ -132,7 +132,7 @@ test('lab ports: edge-caddy publishing 80, 8443, or 443 on another host port fai
   assert.match(bad(lab('relay', '["127.0.0.1:8000:8000"]'))[0], /must not publish a port/);
 });
 
-// ---- the orchestrator container (edge story 6, H-143)
+// ---- the orchestrator container (edge story 6, H-343)
 const ORCH_OK = `services:
   orchestrator:
     profiles: ["lab"]

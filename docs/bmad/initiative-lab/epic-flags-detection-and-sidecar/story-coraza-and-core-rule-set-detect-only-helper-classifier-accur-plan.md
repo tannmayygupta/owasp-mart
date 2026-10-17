@@ -39,7 +39,7 @@ context: ['{project-root}/docs/prd/PRD.md', '{project-root}/contracts/events/app
 - Blocking, delaying, rewriting or failing any player request or response because of a rule match, a timeout or a helper crash; calling the helper before the response bytes are on their way; response-body rules.
 - A Caddy build, a Caddy plugin, `xcaddy`, or a Traefik plugin; the full Go rewrite of the sidecar.
 - Putting the helper on a network port other than loopback; any outbound network call from it.
-- Editing contract files (the tag mapping is documented in the dev-log and in a handoff, H-133, and is not a contract change: the schema already forces it); the catalogue; `.github/workflows/**` (the images workflow builds from `infra/images.json`: the sidecar entry of story 2 gains `dockerfile` changes only); terraform; AWS; ssh; docker push; pushes and commits; git checkout, stash or reset; the Excel tracker.
+- Editing contract files (the tag mapping is documented in the dev-log and in a handoff, H-333, and is not a contract change: the schema already forces it); the catalogue; `.github/workflows/**` (the images workflow builds from `infra/images.json`: the sidecar entry of story 2 gains `dockerfile` changes only); terraform; AWS; ssh; docker push; pushes and commits; git checkout, stash or reset; the Excel tracker.
 - Claiming live numbers: latency and memory here are local; the `vm-i` numbers are a runbook step.
 
 ## I/O & Edge-Case Matrix
@@ -70,7 +70,7 @@ context: ['{project-root}/docs/prd/PRD.md', '{project-root}/contracts/events/app
 - `contracts/instance/examples/valid/instance-template/shop-template.json:106-134` -- the sidecar component limits (256 MB, 0.5 CPU, pids 128): the helper must fit inside them.
 - `scripts/crs-accuracy.mjs` (new) and `scripts/crs-accuracy.test.mjs` (new: corpus validation and output format, with a fake helper).
 - `docs/adr/` -- an ADR for D-70 is written by the main session (do not create it here); research sources to cite: Coraza (coraza.io), `corazawaf/coraza` and `corazawaf/coraza-coreruleset` releases and licences, OWASP CRS v4 release notes, `corazawaf/coraza-caddy` repository status (R-6), distroless images.
-- Docs: dev-log, CHANGELOG, traceability (FR-DET-02, 07, S-6, S-7, OI-35, R-6), HANDOFFS (H-76 answered, row H-133 below), `docs/assets/story-6-5-coraza/`.
+- Docs: dev-log, CHANGELOG, traceability (FR-DET-02, 07, S-6, S-7, OI-35, R-6), HANDOFFS (H-76 answered, row H-333 below), `docs/assets/story-6-5-coraza/`.
 
 ## Tasks & Acceptance
 
@@ -103,7 +103,7 @@ context: ['{project-root}/docs/prd/PRD.md', '{project-root}/contracts/events/app
 ## Proposed (decided on the developer's delegation)
 
 - **D-70 Sidecar form (S-7).** Node sidecar plus a small Go helper embedding Coraza and CRS, loopback only, off the response path. Compared: Caddy plugin (maintenance risk R-6, flag matching and signing would still be needed in Go); full Go program (one static binary and a small distroless image, but about two days of work to reproduce the tested stub behaviour, and no Go on the dev PC); Node alone (no usable Coraza for Node). Free licences: Coraza Apache-2.0, CRS Apache-2.0, distroless Apache-2.0.
-- **Tag mapping (part of D-70).** The CRS tag `attack-sqli` is sent as `attack_sqli` because the schema allows only `[a-z0-9_]`; told to Sahil and Akshay in H-133.
+- **Tag mapping (part of D-70).** The CRS tag `attack-sqli` is sent as `attack_sqli` because the schema allows only `[a-z0-9_]`; told to Sahil and Akshay in H-333.
 
 ## Open (not settled here)
 

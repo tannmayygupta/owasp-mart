@@ -1,0 +1,17 @@
+node --test "scripts/*.test.mjs"   (2026-10-17, Windows 11, Node 24.11.0)
+Only the totals and the failing tests are kept here (the full output was 84 KB and was trimmed by hand from the real run).
+
+ℹ tests 765
+ℹ pass 759
+ℹ fail 4
+ℹ skipped 2
+
+Failing tests:
+✖ the tracked text files have no control character, BOM or mojibake
+✖ the checked-in generated files are current and carry the header
+✖ a stale file is found by --check, written by the plain run, and CRLF alone is not stale
+✖ a changed bundle changes the generated code (the generators read the bundle, not a cache)
+
+Causes:
+- The three generate-api-code tests fail because the checked-out generated files have CRLF line endings on this Windows PC; the same test failed on the unchanged baseline run before any change of this story (see the assertion in scripts/generate-api-code.test.mjs line 61).
+- The text-hygiene test failed because of a byte order mark in the first two evidence files of this folder (written by PowerShell Tee-Object). Fixed after this run by rewriting them without the mark; re-run result below.

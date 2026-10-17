@@ -1,7 +1,7 @@
 """ReportPort over the scoring function of `vulnmart-attempts` (story 8.1, D-95). Stream L owns it.
 
 The score is `compute_score` over the facts a `FactSource` gives (best milestone, hint levels, held capture). Evidence bodies
-are not served by the demo runtime (the sealed store is Akshay's, H-130): `evidence` is empty and `evidence_body` raises
+are not served by the demo runtime (the sealed store is Akshay's, H-330): `evidence` is empty and `evidence_body` raises
 `AttemptNotFound`. Integrity flags are read from the sink the milestone engine writes to.
 """
 from __future__ import annotations

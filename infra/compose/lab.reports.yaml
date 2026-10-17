@@ -1,4 +1,4 @@
-# Override file: state reports of the orchestrator container to the platform (edge story 7, H-147 point 1). Use it ONLY when reports are wanted:
+# Override file: state reports of the orchestrator container to the platform (edge story 7, H-347 point 1). Use it ONLY when reports are wanted:
 #   VULNMART_ORCH_REPORT_URL=https://<vm-p private ingest address>:9444 \
 #   docker compose -f compose.yaml -f lab.reports.yaml --profile lab up -d orchestrator
 # It adds to the service `orchestrator`: the report key as a file secret (target report_key), the CA that signed the vm-p ingest certificate as a file secret

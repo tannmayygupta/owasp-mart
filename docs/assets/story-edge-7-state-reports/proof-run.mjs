@@ -1,4 +1,4 @@
-// Local proof of edge story 7 (H-147 point 1): the orchestrator CONTAINER pushes state reports over TLS to the platform receiver
+// Local proof of edge story 7 (H-347 point 1): the orchestrator CONTAINER pushes state reports over TLS to the platform receiver
 // `POST /internal/v1/orch/state` (apps/api/src/vulnmart/lab/state_reports.py), through the real compose files (compose.yaml + lab.reports.yaml).
 //   Run from the repository root: node docs/assets/story-edge-7-state-reports/proof-run.mjs
 // Setup (Docker Desktop, throwaway): the receiver is the real ingest app (uvicorn, VULNMART_LAB_RUNTIME=1, report key file) run as a HOST process on
@@ -136,7 +136,7 @@ try {
   log(`VulnMart edge story 7: state reports from the orchestrator container to the platform receiver (run ${RUN})`);
   log(`Date: ${new Date().toLocaleDateString('en-CA')}; machine: laptop with Docker Desktop (${(await docker(['version', '--format', '{{.Server.Version}}'])).stdout.trim()})`);
   log('Setup: receiver = the real ingest app (uvicorn, TLS, VULNMART_LAB_RUNTIME=1 + report key file) as a HOST process on 127.0.0.1; orchestrator = the COMPOSE CONTAINER (compose.yaml + lab.reports.yaml) reaching it as https://host.docker.internal.');
-  log('Why the container and not a host process: it is the deployed shape (H-143) and it must trust the private CA through SSL_CERT_FILE from a file secret, which a host process would not exercise.');
+  log('Why the container and not a host process: it is the deployed shape (H-343) and it must trust the private CA through SSL_CERT_FILE from a file secret, which a host process would not exercise.');
   log('');
   log('--- before: objects of the project already on the machine (not started by this run)');
   const before = (await docker(['ps', '-a', '--format', '{{.Names}} {{.Status}}', '--filter', `label=com.docker.compose.project=${PROJECT}`])).stdout.trim();
