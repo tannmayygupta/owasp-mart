@@ -8,6 +8,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 import vulnmart.kernel.models  # noqa: F401 - registers the kernel tables
+import vulnmart.notifications.models  # noqa: F401 - registers the email outbox
 import vulnmart.orgs.models  # noqa: F401 - registers the organisation tables
 from vulnmart.kernel.db import Base
 from vulnmart.kernel.settings import sqlalchemy_url

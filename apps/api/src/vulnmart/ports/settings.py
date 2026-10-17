@@ -21,6 +21,7 @@ SETTINGS: dict[str, int | bool | str] = {
     "candidate_retention_days": 180,  # FR-PRV-04
     "consent_withdraw_undo_days": 7,  # FR-PRV-08
     "flag_submit_per_minute": 10,  # FR-FLG (placeholder)
+    "email_daily_cap": 300,  # FR-NTF-02: mails sent per UTC day; 0 = no cap. Brevo free plan: 300 a day (unconfirmed for API mail)
 }
 
 

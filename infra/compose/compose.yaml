@@ -199,6 +199,38 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Story P-09: the mail worker (Dramatiq on Valkey plus the outbox relay) in the API image. No port is published: its health routes
+  # are for Docker only. Development mail goes to Mailpit over SMTP (its web page is on 127.0.0.1:8025); the production provider is
+  # Brevo (VULNMART_EMAIL_PROVIDER=brevo with its key as a secret file, never in this file).
+  worker:
+    profiles: ["platform"]
+    image: vulnmart-api:local
+    container_name: vulnmart-worker
+    read_only: true
+    command: ["uvicorn", "vulnmart.kernel.entrypoints.worker:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]
+    environment:
+      VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}@postgres:5432/vulnmart
+      VULNMART_VALKEY_URL: valkey://valkey:6379/0
+      VULNMART_SERVICE: worker
+      VULNMART_EMAIL_PROVIDER: smtp
+      VULNMART_SMTP_HOST: mailpit
+      VULNMART_SMTP_PORT: "1025"
+      VULNMART_EMAIL_SENDER_ADDRESS: no-reply@vulnmart.invalid
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m,uid=65532,gid=65532
+    depends_on:
+      api:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    restart: "no"
+
   # ---- Web profile (story P-01, stream P): the Next.js dev server ---------------------------------
   # Start it together with the platform profile: node scripts/dev.mjs up platform web
   # The source is bind-mounted for hot reload; node_modules and .next stay in named volumes because

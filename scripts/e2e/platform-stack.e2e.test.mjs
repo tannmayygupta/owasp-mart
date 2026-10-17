@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DEV = path.join(ROOT, 'scripts', 'dev.mjs');
 const COMPOSE = path.join(ROOT, 'infra', 'compose', 'compose.yaml');
-const SERVICES = ['postgres', 'valkey', 'mailpit', 'api', 'web'];
+const SERVICES = ['postgres', 'valkey', 'mailpit', 'api', 'worker', 'web'];
 const ONE_SHOT = ['migrate']; // runs the migrations, exits 0 before the API starts (story P-06)
 const NAME = (s) => `vulnmart-${s}`;
 const PORTS = [3000, 8000, 8025];
@@ -175,6 +175,42 @@ describe('platform and web profiles on a real Docker engine', () => {
       }
     }
   });
+
+  // Story P-09. The outbox row is written as the owner role through psql inside the Postgres container (no account exists yet to cause an
+  // email); the worker relays it through Valkey and Dramatiq, and Mailpit (the development provider) receives it over SMTP.
+  const enqueueMail = (user) =>
+    docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-v', 'ON_ERROR_STOP=1', '-c',
+      `INSERT INTO email_outbox (template, to_user_id, params) VALUES ('system.test', '${user}', '{}')`);
+  async function mailTo(user, tries = 40) {
+    for (let i = 0; i < tries; i++) {
+      const res = await fetch('http://127.0.0.1:8025/api/v1/messages', { signal: AbortSignal.timeout(20000) });
+      const found = (await res.json()).messages.filter((m) => m.To.some((t) => t.Address === `${user}@users.vulnmart.invalid`));
+      if (found.length) return found;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return [];
+  }
+
+  test('mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq', async () => {
+    assert.equal(enqueueMail('e2e-mail-1').status, 0);
+    const found = await mailTo('e2e-mail-1');
+    assert.equal(found.length, 1, 'exactly one message arrived');
+    assert.equal(found[0].Subject, 'VulnMart test message');
+    await new Promise((r) => setTimeout(r, 7000)); // more than one relay pass: it must not be sent again
+    assert.equal((await mailTo('e2e-mail-1')).length, 1);
+    const state = docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c',
+      "SELECT state || ',' || attempts FROM email_outbox WHERE to_user_id = 'e2e-mail-1'");
+    assert.equal(state.stdout.trim(), 'sent,1');
+  }, { timeout: 120000 });
+
+  test('mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost)', async () => {
+    assert.equal(docker('stop', '--time', '5', NAME('worker')).status, 0);
+    assert.equal(enqueueMail('e2e-mail-2').status, 0);
+    await new Promise((r) => setTimeout(r, 3000));
+    assert.equal((await mailTo('e2e-mail-2', 1)).length, 0, 'nothing is sent while the worker is down');
+    assert.equal(docker('start', NAME('worker')).status, 0);
+    assert.equal((await mailTo('e2e-mail-2', 60)).length, 1);
+  }, { timeout: 180000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {

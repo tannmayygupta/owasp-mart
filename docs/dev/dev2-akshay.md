@@ -107,9 +107,9 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
 
 Goal: Email, accounts, sessions, MFA and the consent screen work.
 
-- [ ] **P-09. Outbox, queue worker and email provider**
+- [x] **P-09. Outbox, queue worker and email provider**
   - Epic: `epic-notifications-and-email`
-  - BMAD story: not planned yet; created when you incept `epic-notifications-and-email` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `2.1` in `epic-notifications-and-email` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Transactional outbox, Dramatiq worker with retries, and the email provider adapter.
   - Covers: FR-NTF-02, 03
   - Waits on: P-06. Open: which provider, Resend or Brevo (OI-32).
@@ -122,6 +122,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-NTF-01, 04
   - Waits on: P-09.
   - Done when: Each email type renders and sends in a test and the warnings show in the app.
+  - Handoffs: H-128 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-11. Learner signup, email verification and signup abuse protection**
   - Epic: `epic-accounts-and-sessions`
@@ -130,6 +131,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-ACC-01, 02, 10
   - Waits on: P-10. Open: CAPTCHA choice.
   - Done when: A learner can sign up and verify by email on the local stack, and the abuse limits trigger in a test.
+  - Handoffs: H-127 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-12. Login, sessions, timeouts and CSRF**
   - Epic: `epic-accounts-and-sessions`
@@ -154,6 +156,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-ACC-08, 09
   - Waits on: P-10, P-12.
   - Done when: A reset link works once and expires, weak passwords are refused and a user can change their details.
+  - Handoffs: H-127 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-15. Multi-factor login**
   - Epic: `epic-accounts-and-sessions`
@@ -275,7 +278,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Covers: FR-ADM-01, 02, 04, 05, 06
   - Waits on: P-18 and Tanmay's L-16 (InstancePort, capacity).
   - Done when: An admin approves a company, force-stops an instance and changes a quota that the lab then enforces.
-  - Handoffs: H-15, H-122 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-15, H-122, H-128 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-29. Data exports**
   - Epic: `epic-dashboards-and-exports`
