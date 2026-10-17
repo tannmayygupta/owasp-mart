@@ -98,6 +98,28 @@ func TestBigBodyOnlyFirst8KiBInspected(t *testing.T) {
 	}
 }
 
+// The shop's own methods (PUT, PATCH, DELETE) are not an attack: the CRS default method list is widened in directives.conf.
+func TestShopMethodsAreNotFlagged(t *testing.T) {
+	in := newTestWAF(t)
+	for _, m := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"} {
+		h := map[string]string{"host": "shop", "user-agent": "Mozilla/5.0", "accept": "application/json"}
+		if m == "POST" || m == "PUT" || m == "PATCH" {
+			h["content-length"] = "0" // a real client sends it; without it rule 920180 flags the request
+		}
+		a, err := Inspect(in, Request{Method: m, URI: "/api/cart/items/LMP-0042", Headers: h})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(a.RuleIDs) != 0 {
+			t.Fatalf("%s matched: %+v", m, a)
+		}
+	}
+	a, err := Inspect(in, Request{Method: "TRACE", URI: "/x", Headers: map[string]string{"host": "shop", "user-agent": "Mozilla/5.0", "accept": "*/*"}})
+	if err != nil || len(a.RuleIDs) == 0 {
+		t.Fatalf("TRACE should still be flagged: %+v %v", a, err)
+	}
+}
+
 func TestJSONBodyIsInspected(t *testing.T) {
 	in := newTestWAF(t)
 	a, err := Inspect(in, Request{Method: "POST", URI: "/api/search", Headers: map[string]string{"host": "shop", "content-type": "application/json", "user-agent": "x"}, Body: `{"q":"1' UNION SELECT username,password FROM users--"}`})

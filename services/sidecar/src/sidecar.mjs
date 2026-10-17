@@ -11,7 +11,7 @@ import { compile, closeServer, listen, schemaErrors, sendJson, sendProblem, POST
 import { createOutbox } from './outbox.mjs';
 import { createMatcher, SCAN_CAP_BYTES } from './matcher.mjs';
 import { buildCapture, BODY_CAP_BYTES, requestRef } from './capture.mjs';
-import { flagSeenEvent, evidenceCaptureEvent, proxyRequestEvent, isoNow } from './events.mjs';
+import { flagSeenEvent, evidenceCaptureEvent, proxyRequestEvent, crsMatchEvent, isoNow } from './events.mjs';
 import { methodClass, routeTemplate } from './route.mjs';
 
 export { SEQ_MAX, DEFAULT_STATE_PATH, loadCounter } from './outbox.mjs';
@@ -21,8 +21,12 @@ export { readStartDocument, startDocumentOk } from './start.mjs';
 const HOP = new Set(['connection', 'keep-alive', 'proxy-connection', 'transfer-encoding', 'upgrade', 'te', 'trailer', 'host']);
 const INTERNAL_HEADER = /^x-vm-/i; // set by the platform's own parts; a player must not be able to send one, and none goes back out
 
-// The hook for the request-side detection helper (story 5, Coraza and CRS). It does nothing here and returns nothing.
-export function inspectRequest(/* req */) {}
+// The hook for the request-side detection helper (story 6.5, Coraza and CRS, crs.mjs). The only place the helper is called. It is called
+// after the player's answer has been handed to the socket, never throws, and resolves the proxy.crs_match data or null.
+export function inspectRequest(crs, info) {
+  if (!crs?.enabled) return undefined; // no helper: does nothing, as before story 6.5
+  try { return crs.inspect(info).catch(() => null); } catch { return Promise.resolve(null); }
+}
 
 export function createSidecar({
   start,
@@ -40,13 +44,14 @@ export function createSidecar({
   repeatWindowMs = 60000,
   maxAggregateKeys = 200,
   matcher: matcherOverride, // tests only: an object with scanResponse(buf, contentEncoding)
+  crs = null, // the detection helper (crs.mjs createCrs), or null for none (--no-crs behaviour)
   now = Date.now,
 } = {}) {
   const validatePosted = compile(SCHEMAS.posted);
   const validateWire = compile(SCHEMAS.wire);
   const outbox = createOutbox({ start, relayUrl, bufferMax, retryMinMs, retryMaxMs, requestTimeoutMs, statePath, alarm, validateWire });
   const { queue, stats } = outbox;
-  Object.assign(stats, { requests: 0, scanned: 0, scan_skipped: 0, scan_errors: 0, flag_events: 0, evidence_events: 0, flag_repeats: 0, emit_errors: 0, aggregate_overflow: 0 });
+  Object.assign(stats, { requests: 0, scanned: 0, scan_skipped: 0, scan_errors: 0, flag_events: 0, evidence_events: 0, flag_repeats: 0, emit_errors: 0, aggregate_overflow: 0, crs_events: 0, crs_errors: 0 });
 
   // A counted alarm: the first few, then every hundredth. A fixed word and a counter, never a value.
   const counts = new Map();
@@ -117,8 +122,16 @@ export function createSidecar({
     }
   }
 
+  // The request, asked about after the answer was written; a match becomes one proxy.crs_match. Anything that goes wrong is ignored.
+  async function crsOne(info) {
+    const data = await inspectRequest(crs, { method: info.method, url: info.url, headers: info.reqHeaders, bodyBuf: info.reqBody });
+    if (!data) return;
+    if (emit(crsMatchEvent({ data, routeTemplate: info.route, ts: isoNow(now) }), { low: true })) stats.crs_events += 1;
+  }
+
   function afterResponse(info) {
     try { record(info.method, info.route, info.status, info.respLen); } catch { alarmCounted('summary record failed'); }
+    if (crs?.enabled) setImmediate(() => { crsOne(info).catch(() => { stats.crs_errors += 1; alarmCounted('crs call failed'); }); });
     if (info.skipScan) { stats.scan_skipped += 1; return; }
     if (!info.respBuf.length) return;
     // a macrotask later: the answer has been handed to the socket before any scan work starts
@@ -167,7 +180,6 @@ export function createSidecar({
     req.on('data', (c) => {
       try { if (reqLen < BODY_CAP_BYTES) { const part = c.subarray(0, BODY_CAP_BYTES - reqLen); reqChunks.push(part); reqLen += part.length; } } catch { /* the copy is best effort */ }
     });
-    try { inspectRequest(req); } catch { alarmCounted('request inspection failed'); }
 
     const headers = {};
     for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && !INTERNAL_HEADER.test(k)) headers[k] = v;
@@ -210,11 +222,11 @@ export function createSidecar({
   });
 
   return {
-    events, player, stats, queue, flushAggregate,
+    events, player, stats, queue, flushAggregate, crs,
     nextSeq: outbox.nextSeq,
     async listen({ eventsPort = 9000, playerPort = 8080, host = '0.0.0.0' } = {}) {
       return { eventsPort: await listen(events, eventsPort, host), playerPort: await listen(player, playerPort, host) };
     },
-    async stop() { clearInterval(timer); outbox.stop(); await Promise.all([closeServer(events), closeServer(player)]); },
+    async stop() { clearInterval(timer); try { crs?.stop(); } catch { /* gone */ } outbox.stop(); await Promise.all([closeServer(events), closeServer(player)]); },
   };
 }

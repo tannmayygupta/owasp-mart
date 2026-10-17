@@ -156,3 +156,7 @@
 - source_plan: `docs/bmad/initiative-lab/epic-isolation-and-hardening/story-isolation-probe-from-inside-a-real-instance-network-live-che-plan.md`
   summary: CI round 1 of the sprint 2 part 2 pull request failed on the Linux runner in two tests written on Windows (the probe test expected the gateway closed; an e2e test expected the lab profile empty). Fixed; run host-dependent tests on Linux before the push, or expect one CI round.
   evidence: `docs/dev-log/2026-10-16-tannmayygupta-ci-fixes-sprint-2-part-2.md`
+
+- source_plan: story-coraza-and-core-rule-set-detect-only-helper-classifier-accur-plan.md
+  summary: The PRD and the ADR name CRS v4.30.0, which does not exist as a Go module version; the helper resolves coraza-coreruleset/v4 v4.25.0 (CRS 4.25.0, Coraza 3.8.1). The helper needs a writable /tmp at start (the instance profile has a tmpfs). C06 shows only as a generic injection at score 5, exactly at the CRS blocking threshold. The p95 latency (about 65 ms) is far above p50 (3 ms) and was not investigated. The full compose harness cannot take the override file, so the product image was not run in it.
+  evidence: story 6.5 dev-log and docs/assets/story-6-5-coraza/s6-accuracy.md

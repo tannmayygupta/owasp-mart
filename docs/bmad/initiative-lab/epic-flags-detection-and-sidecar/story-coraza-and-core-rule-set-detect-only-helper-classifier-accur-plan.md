@@ -3,7 +3,7 @@ title: 'Coraza and Core Rule Set detect-only helper, classifier accuracy and the
 type: 'feature'
 ticket: '5'
 created: '2026-10-17'
-status: 'ready-for-dev'
+status: 'done'
 baseline_revision: '601ba11732757d1dcfc62bbc371be47d511eaac0'
 route: 'full'
 route_source: 'pinned'

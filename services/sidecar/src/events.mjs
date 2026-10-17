@@ -28,6 +28,11 @@ export function evidenceCaptureEvent({ challengeKey, requestRef, capture, ts }) 
   return base('evidence.capture', ts, challengeKey, { request_ref: requestRef, body: capture.body, headers_redacted: capture.headers_redacted });
 }
 
+// data: { rule_ids, tags, anomaly_score } already mapped by crs.mjs (matchData). No request text goes into this event.
+export function crsMatchEvent({ data, routeTemplate, ts }) {
+  return base('proxy.crs_match', ts, undefined, { rule_ids: data.rule_ids, tags: data.tags, anomaly_score: data.anomaly_score, route_template: routeTemplate });
+}
+
 export function proxyRequestEvent({ method, routeTemplate, status, respLen, count, ts }) {
   return base('proxy.request', ts, undefined, {
     method, route_template: routeTemplate, status, resp_len: respLen, client_class: 'player', count: Math.min(Math.max(count, 1), 1000000),

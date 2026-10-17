@@ -241,8 +241,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Handoffs: H-63 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status 2026-10-17 (earlier status, superseded by the Closed line): flag material builder, checker and leak scan are built and tested locally with the fake KeyPort (story 6.1). Not done: the real `InstancePort` calling them, the real KeyPort, a scan of a full orchestrator-made instance and of vm-i, decoy placement in the catalogue. H-63 answered in part; H-130, H-131.
 
-- [ ] **L-20. Coraza sidecar, automatic capture and paste**
-  - Status 2026-10-17 (still not ticked): the Coraza and Core Rule Set helper (story 6.5) is NOT built and classifier accuracy (S-6) is NOT measured, which the Done-when requires. The product sidecar, automatic capture and paste are built and proved locally (see above).
+- [x] **L-20. Coraza sidecar, automatic capture and paste**
+  - Closed 2026-10-17 after local proof: the Coraza and Core Rule Set helper (story 6.5) is built into the sidecar image and S-6 is measured (15 of 32 exploits seen, 0 of 60 benign flagged, sidecar suite 69 passed, Go tests passed, re-run by the coordinator). The sidecar never blocks (tests). NOT met: nothing on vm-i, no full compose harness run with the product image; the accuracy is mixed so `classifier_accuracy_verified` stays false (your decision); CRS is 4.25.0, the PRD and ADR name 4.30.0.
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
   - Build: Coraza sidecar in detect-only mode with the OWASP Core Rule Set, flag-in-response matching, automatic capture and paste submission, fixed tags and technique detection.

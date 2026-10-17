@@ -15,6 +15,15 @@ RUN npm install -g corepack@0.36.0 \
 COPY package.json pnpm-lock.yaml ./
 RUN corepack pnpm install --prod --frozen-lockfile --ignore-workspace
 
+# ---- crs-detect: the detection-only Coraza and Core Rule Set helper (story 6.5, D-70). Go is not installed on the dev PC; this stage is the build. ----
+# golang:1.25-bookworm, pinned by digest (resolved 2026-10-17). Static binary: no cgo, no libc, trimmed and stripped.
+FROM golang:1.25-bookworm@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS crs-builder
+WORKDIR /src
+COPY crs/go.mod crs/go.sum ./
+RUN go mod download && go mod verify
+COPY crs/main.go crs/directives.conf ./
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o /out/crs-detect .
+
 # ---- runtime: distroless non-root Node 24 ----
 FROM gcr.io/distroless/nodejs24-debian12:nonroot@sha256:14d42e2511532589a7c7e01a753667a74fcc96266e137e8125006b87b0c32d0a
 WORKDIR /app
@@ -24,6 +33,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY schemas ./schemas
 COPY src ./src
 COPY package.json ./
+# The helper the sidecar starts itself (spawn, no shell) on 127.0.0.1:9100. Without this file the sidecar behaves as with --no-crs.
+COPY --from=crs-builder /out/crs-detect /app/crs-detect
 
 # Explicit non-root for defense-in-depth (do not rely on the caller's --user).
 USER 65532:65532
@@ -36,5 +47,5 @@ EXPOSE 8080 9000
 HEALTHCHECK --interval=2s --timeout=2s --retries=15 --start-period=1s \
   CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:9000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
-# Flags: --relay URL --upstream URL (defaults: the edge relay and the shop of an instance), --state FILE (default /tmp/vm-sidecar-seq.json).
+# Flags: --no-crs (no detection helper), --relay URL --upstream URL (defaults: the edge relay and the shop of an instance), --state FILE (default /tmp/vm-sidecar-seq.json).
 CMD ["/app/src/main.mjs"]

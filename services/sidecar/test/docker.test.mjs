@@ -76,6 +76,29 @@ test('image: builds, starts under the runtime profile, is healthy, passes a gzip
     assert.equal(posted.status, 202);
     assert.ok(!logs.includes(v.event_key) && !logs.includes(flag), 'no key or flag in the container log');
 
+    // Story 6.5: the detection helper inside the image. An SQLi request through the player port: the answer is the same bytes as a clean request
+    // to the same shop route, and a valid proxy.crs_match with the attack_sqli tag reaches the fake ingest. The helper needs about a second to load.
+    const sqliPath = '/api/products/search?q=%27%20UNION%20SELECT%201,2,3,4--';
+    let crsEvent;
+    assert.ok(await until(async () => {
+      await request(playerPort, { path: sqliPath, headers: { 'user-agent': 'docker-test' } });
+      await wait(250);
+      crsEvent = ing.ingest.stored.map((x) => x.event).find((e) => e.type === 'proxy.crs_match' && e.data.tags.includes('attack_sqli'));
+      return Boolean(crsEvent);
+    }, 30000), 'proxy.crs_match reached the fake ingest');
+    assert.ok(crsEvent.data.tags.includes('attack_sqli'), JSON.stringify(crsEvent.data.tags));
+    assert.ok(crsEvent.data.rule_ids.length > 0 && crsEvent.data.anomaly_score > 0);
+    assert.ok(crsEvent.data.tags.every((x) => /^[a-z0-9_]{1,32}$/.test(x)));
+    const sqliAnswer = await request(playerPort, { path: sqliPath });
+    assert.ok(sqliAnswer.body.equals(page), 'the answer to the attack request is the shop answer, unchanged');
+    await wait(1500); // the second attack request above also reports; let it arrive before counting
+    const benignBefore = ing.ingest.stored.filter((x) => x.event.type === 'proxy.crs_match' && x.event.data.tags.includes('attack_sqli')).length;
+    await request(playerPort, { path: '/api/products/search?q=blue+lamp' });
+    await wait(1000);
+    assert.equal(ing.ingest.stored.filter((x) => x.event.type === 'proxy.crs_match' && x.event.data.tags.includes('attack_sqli')).length, benignBefore, 'a benign search makes no attack_sqli crs_match');
+    assert.equal(ing.ingest.security.length, 0);
+    assert.ok(!logs.includes(v.event_key) && !logs.includes(flag), 'no key or flag in the container log after the helper ran');
+
     await wait(3000);
     const mem = docker(['stats', '--no-stream', '--format', '{{.MemUsage}}', name]).stdout.trim();
     t.diagnostic(`idle memory after the requests above (local, docker stats): ${mem}`);

@@ -7,3 +7,6 @@ Dockerfile.dockerignore
 *.md
 npm-debug.log*
 .DS_Store
+crs/.out
+crs/*_test.go
+crs/corpus.json
