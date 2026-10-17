@@ -121,6 +121,16 @@ def _reset(p: dict[str, str]) -> Rendered:
     ], link=("Choose a new password", p["link"]))
 
 
+def _admin_created(p: dict[str, str]) -> Rendered:
+    """To someone an admin made an admin account for (FR-ACC-11): the link lets them choose their own password."""
+    hours = p.get("expires_in_hours")
+    return _compose("A VulnMart administrator account was created for you", [
+        "An administrator of VulnMart created an administrator account for this email address. Use the link to choose a password.",
+        f"The link works once and expires in {hours} hours." if hours else "The link works once and expires.",
+        "Signing in as an administrator will also need an authenticator app. If you did not expect this, ignore this message: the account stays unusable.",
+    ], link=("Choose a password", p["link"]))
+
+
 def _already_registered(p: dict[str, str]) -> Rendered:
     """Sent when someone signs up with an address that already has an account (the signup answer is the same either way, FR-ACC-01)."""
     return _compose("Someone tried to sign up with your email address", [
@@ -210,6 +220,7 @@ TEMPLATES: dict[str, TemplateSpec] = {s.name: s for s in (
     _spec("account.verify", {"link"}, _verify, optional={"expires_in_hours"}, links={"link"}, secret={"link"}),
     _spec("account.password_reset", {"link"}, _reset, optional={"expires_in_hours"}, links={"link"}, secret={"link"}),
     _spec("account.already_registered", set(), _already_registered, optional={"login_url"}, links={"login_url"}),
+    _spec("account.admin_created", {"link"}, _admin_created, optional={"expires_in_hours"}, links={"link"}, secret={"link"}),
     _spec("org.approval_outcome", {"org_name", "outcome"}, _approval, optional={"reason", "login_url"}, links={"login_url"}),
     _spec("candidate.invite", {"org_name", "assessment_name", "link"}, _invite, optional={"expires_in_days"}, links={"link"}, secret={"link"}),
     _spec("recruiter.consent_withdrawn", {"org_name", "assessment_name"}, _withdrawn, optional={"deletion_on"}),

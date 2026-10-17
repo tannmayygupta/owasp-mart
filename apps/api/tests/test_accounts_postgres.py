@@ -23,11 +23,14 @@ from support import ROOT
 from test_kernel_postgres import with_db
 from vulnmart.accounts.models import EmailToken, User, UserRole, UserSession
 from vulnmart.accounts.security import hash_password, token_hash
+from vulnmart.accounts.admins import AdminService
+from vulnmart.accounts.roles import NotAnAdmin, RoleNotAllowed, RoleService
 from vulnmart.accounts.service import AccountService, TokenInvalid
 from vulnmart.accounts.sessions import SessionService
 from vulnmart.kernel.settings import sqlalchemy_url
 from vulnmart.notifications.models import EmailOutbox
-from vulnmart.ports.fakes import FakeSettingsPort
+from vulnmart.ports.fakes import FakeAuditPort, FakeSettingsPort
+from vulnmart.ports.scope import Role, Scope
 
 OWNER = os.environ.get("VULNMART_TEST_POSTGRES_DSN")
 APP = os.environ.get("VULNMART_TEST_APP_DSN")
@@ -225,3 +228,80 @@ def test_one_session_ended_at_once_ends_once_and_resolving_never_fails(sessions)
     [t.start() for t in threads]
     [t.join() for t in threads]
     assert resolved == [True] * 8
+
+# ---- story P-13: roles and admins -------------------------------------------------------------------------------------
+
+def run_at_once(count, work):
+    barrier, results, errors = threading.Barrier(count), [], []
+
+    def go():
+        barrier.wait()
+        try:
+            results.append(work())
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=go) for _ in range(count)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    return results, errors
+
+
+def test_the_candidate_role_granted_at_once_is_added_exactly_once(sessions):
+    verified_user(sessions)
+    audit = FakeAuditPort()
+    roles = RoleService(sessions, audit)
+    results, errors = run_at_once(8, lambda: roles.grant_candidate_role("u-AAAAAAAAAAAAAAAA"))
+    assert errors == [] and results.count(True) == 1 and results.count(False) == 7
+    assert roles.roles_of("u-AAAAAAAAAAAAAAAA") == {"candidate", "learner"}
+    assert len([r for r in audit.records if r.action == "role.granted"]) >= 1
+
+
+def test_the_database_and_the_service_both_refuse_a_participant_role_for_a_recruiter_or_admin(sessions):
+    with sessions.begin() as s:
+        add_user(s, "u-RRRRRRRRRRRRRRRR", "rec@example.com", "recruiter")
+        add_user(s, "u-ADMINADMINADMIN2", "admin@example.com", "admin")
+    roles = RoleService(sessions, FakeAuditPort())
+    for uid in ("u-RRRRRRRRRRRRRRRR", "u-ADMINADMINADMIN2"):
+        with pytest.raises(RoleNotAllowed):
+            roles.grant_candidate_role(uid)
+        with pytest.raises(IntegrityError):  # the same refusal from the database, whatever the code does
+            with sessions.begin() as s:
+                s.execute(text("INSERT INTO user_roles (user_id, role, account_type) VALUES (:u, 'candidate', 'participant')"), {"u": uid})
+
+
+def test_an_admin_is_created_once_whatever_the_number_of_seeds_at_once(sessions):
+    audit = FakeAuditPort()
+    service = AdminService(sessions, FakeSettingsPort(), audit, public_origin="https://vulnmart.example")
+    results, errors = run_at_once(6, lambda: service.seed_admin(email="root@example.com", display_name="Root", password="a long admin password 123"))
+    assert errors == [] and results.count(True) == 1
+    with sessions() as s:
+        users = s.scalars(select(User)).all()
+        assert [(u.account_type, u.email_ci) for u in users] == [("admin", "root@example.com")]
+        assert s.scalars(select(UserRole)).all() == []
+    assert [r.action for r in audit.records].count("admin.created") >= 1
+
+
+def test_an_admin_creates_another_on_postgres_and_a_failed_audit_leaves_nothing(sessions):
+    with sessions.begin() as s:
+        add_user(s, "u-ADMINADMINADMIN2", "admin@example.com", "admin")
+    scope = Scope(user_id="u-ADMINADMINADMIN2", roles=frozenset({Role.ADMIN}))
+    service = AdminService(sessions, FakeSettingsPort(), FakeAuditPort(), public_origin="https://vulnmart.example")
+    new_id = service.create_admin(scope, email="second@example.com", display_name="Second")
+    with sessions() as s:
+        assert s.get(User, new_id).account_type == "admin"
+        assert s.scalar(select(EmailToken.purpose).where(EmailToken.user_id == new_id)) == "reset"
+        assert s.scalar(select(EmailOutbox.template).where(EmailOutbox.to_user_id == new_id)) == "account.admin_created"
+
+    class Broken:
+        def append(self, **kw):
+            raise RuntimeError("audit down")
+
+    failing = AdminService(sessions, FakeSettingsPort(), Broken(), public_origin="https://vulnmart.example")
+    with pytest.raises(RuntimeError):
+        failing.create_admin(scope, email="third@example.com", display_name="Third")
+    with sessions() as s:
+        assert s.scalar(select(User).where(User.email_ci == "third@example.com")) is None, "no account, token or mail without its audit entry"
+        assert s.scalar(select(EmailOutbox).where(EmailOutbox.template == "account.admin_created", EmailOutbox.to_user_id != new_id)) is None
+    with pytest.raises(NotAnAdmin):
+        service.create_admin(Scope(user_id=new_id, roles=frozenset({Role.LEARNER})), email="x@example.com", display_name="X")

@@ -14,6 +14,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from vulnmart.accounts.api import router as accounts_router
+from vulnmart.accounts.admins import AdminService
+from vulnmart.accounts.roles import RoleService
 from vulnmart.accounts.service import AccountService
 from vulnmart.accounts.session_api import router as session_router
 from vulnmart.accounts.sessions import SessionService
@@ -78,6 +80,11 @@ def create_app(
     app.state.accounts = accounts or _accounts_from(settings, app.state.ports)
     app.state.rate_limiter = rate_limiter or _limiter_from(settings)
     app.state.session_service = sessions or _sessions_from(settings, app.state.ports)
+    # The role and admin services have no route yet (the admin area is story P-28); later stories find them here. The audit port is the
+    # in-memory stand-in until story P-17.
+    ports = app.state.ports
+    app.state.roles = RoleService(ports.sessions, ports.audit, app.state.session_service) if ports.sessions else None
+    app.state.admins = AdminService(ports.sessions, ports.settings, ports.audit, public_origin=settings.public_origin) if ports.sessions else None
     app.include_router(accounts_router)
     app.include_router(session_router)
 

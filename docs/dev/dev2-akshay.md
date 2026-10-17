@@ -142,9 +142,9 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: Login, logout and both timeouts work and a request without a CSRF token is refused.
   - Handoffs: H-131 (to Tanmay, L-11) (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-13. Account types, candidate role and admin creation**
+- [x] **P-13. Account types, candidate role and admin creation**  (service level: no HTTP route for role changes or admin creation yet, they come with the admin area P-28 and the invite routes P-21)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: not planned yet; created when you incept `epic-accounts-and-sessions` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `3.3` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Separate account types, the candidate role on the same login, and admin account creation.
   - Covers: FR-ACC-05, 06, 11
   - Waits on: P-12.
@@ -158,7 +158,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Covers: FR-ACC-08, 09
   - Waits on: P-10, P-12.
   - Done when: A reset link works once and expires, weak passwords are refused and a user can change their details.
-  - Handoffs: H-127, H-130 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-127, H-130, H-132 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-15. Multi-factor login**
   - Epic: `epic-accounts-and-sessions`
@@ -188,7 +188,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Covers: FR-PRV-10, 12
   - Waits on: P-12. Open in part: OI-28. Tanmay's flag and evidence tasks use your KeyPort.
   - Done when: Every sensitive action writes an audit entry and the key service encrypts and decrypts in a test.
-  - Handoffs: H-08, H-09, H-10, H-21 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-08, H-09, H-10, H-21, H-132 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-18. Recruiter signup and company approval**
   - Epic: `epic-companies-and-approval`
@@ -221,6 +221,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Covers: FR-ASM-04, 05, 06
   - Waits on: P-16, P-20.
   - Done when: Accept, re-invite and bulk work in tests and the invite purge job can see expired invites.
+  - Handoffs: H-133 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-22. Live updates hub: SSE, heartbeat, snapshot with polling fallback, fan-out**
   - Epic: `epic-live-updates`
@@ -281,7 +282,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Covers: FR-ADM-01, 02, 04, 05, 06
   - Waits on: P-18 and Tanmay's L-16 (InstancePort, capacity).
   - Done when: An admin approves a company, force-stops an instance and changes a quota that the lab then enforces.
-  - Handoffs: H-15, H-122, H-128 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-15, H-122, H-128, H-133 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-29. Data exports**
   - Epic: `epic-dashboards-and-exports`

@@ -42,6 +42,16 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-account-types-candidate-role-and-admin-creation-plan (2026-10-17)
+
+- The routes for an admin to grant or revoke a role and to create another admin (P-28, a contract change) and the invite acceptance that calls `grant_candidate_role` with its clear refusal message and a new registry code (P-21): handoff H-133.
+- Audit entries (`role.granted`, `role.revoked`, `admin.created`) go to the in-memory audit port until the durable log exists (P-17, handoff H-132); the seed command also logs them. Until P-17 a restart loses them.
+- An admin cannot sign in until the second factor exists (P-15) and an admin created by an admin cannot choose a password until the reset story (P-14) consumes the `reset` token of the mail; so no admin screen can be tried yet.
+- The seed operator knows the first admin's initial password; a change at first sign-in is P-14.
+- The wording of `account.admin_created` is a first draft.
+- A role-gated route answers 404 like an unknown route; there is no 403 in the error registry, which also means a user cannot be told "this needs a recruiter account" (a UX question for the dashboards).
+- Account type changes after creation (a person who becomes a recruiter) are not supported: a new account is needed. The database refuses the change while the account holds a role.
+
 ## Deferred from: story-login-sessions-timeouts-and-csrf-plan (2026-10-17)
 
 - The routes for a user's own session list, revoking one session and "log out everywhere" (FR-ACC-04): story 3.6; the service functions are built and tested.
