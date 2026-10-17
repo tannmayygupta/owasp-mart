@@ -25,3 +25,6 @@ Two helpers for the developer's live run on vm-p and vm-i: `scripts/make-test-ce
 
 ## Limitations and follow-ups
 Not run live yet; the live result is the developer's.
+
+## Follow-up 2026-10-18
+The developer's first run of `make-test-certs.ps1` failed at the first `openssl req` (no message, because the script hid stderr). The script worked on Claude's PC, so the likely cause is a Windows openssl build without a config file (the edge-7 proof also writes its own). The script now writes a minimal config when `OPENSSL_CONF` is unset or missing and prints the last openssl error lines. Tested with a normal setup and with `OPENSSL_CONF` pointing to a missing file: both made all certificates and passed `openssl verify -x509_strict`. The developer's real cause is not confirmed until the retry.
