@@ -21,6 +21,7 @@ from vulnmart.ports.quota import QuotaPort
 from vulnmart.ports.settings import SettingsPort
 
 from vulnmart.notifications.service import DbOutboxPort
+from vulnmart.notifications.templates import validate_params
 
 from .db import ScopedSession, make_engine, make_sessions
 from .scope import ContextScopePort, scope_or_none
@@ -58,7 +59,7 @@ def build_ports(settings: Settings, *, engine: Engine | None = None, session_sou
     events = FakeOutboxPort()
     outbox: OutboxPort = events
     if sessions is not None and session_source is not None:
-        outbox = DbOutboxPort(session_source, events)
+        outbox = DbOutboxPort(session_source, events, validator=validate_params)
         stubs.remove("outbox")
     logger.warning("ports %s are in-memory stubs until their stories (P-17, P-22)", ", ".join(stubs))
     return Ports(

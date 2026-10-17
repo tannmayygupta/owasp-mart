@@ -42,6 +42,13 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-email-templates-plan (2026-10-17)
+
+- FR-NTF-04 and FR-SES-03 (in-app time warnings, recruiter alerts): story 2.3 of `epic-notifications-and-email`, after the live hub (P-22, P-23) and the dashboards (P-26, P-27). Open: where the 15 and 5 minute warnings come from (a scheduler timer that records the event, or the page computing them from `deadline_at`) and who owns the timer between this stream and stream L.
+- A single-use link sits in `email_outbox.params` while the row is `pending` or `failed` (it is removed once sent). Encrypting link parameters with the KeyPort (P-17) would close that window.
+- The nine templates were not sent to a real Mailpit in this story (Docker would not start on the developer's PC): rendering, sending through a fake provider and the SMTP message builder are tested; a real-stack check of one verification mail is still to do.
+- Wording of the nine mails is a first draft by the builder, not reviewed by the developer or a language reviewer; P-25 may change the deletion mails' parameters.
+
 ## Deferred from: story-outbox-queue-worker-and-email-provider-plan (2026-10-17)
 
 - Admin HTTP routes for the failed-mail list, the outbox counts and requeue (P-28, H-128); the functions exist and are tested.

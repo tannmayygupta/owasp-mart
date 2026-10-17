@@ -115,9 +115,9 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Waits on: P-06. Open: which provider, Resend or Brevo (OI-32).
   - Done when: An email goes through the outbox, a failed send is retried and nothing is lost on a restart.
 
-- [ ] **P-10. Email templates and in-app warnings**
+- [x] **P-10. Email templates and in-app warnings**  (email templates built; the in-app warnings part, FR-NTF-04, was moved to story 2.3 because it needs the live hub and the dashboards: NOT built here)
   - Epic: `epic-notifications-and-email`
-  - BMAD story: not planned yet; created when you incept `epic-notifications-and-email` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, refs `2.2` (email templates, state `built`, awaiting the developer's confirmation) and `2.3` (in-app warnings, planned, blocked until P-22 to P-26) in `epic-notifications-and-email`
   - Build: Templates for every email type and in-app warnings.
   - Covers: FR-NTF-01, 04
   - Waits on: P-09.

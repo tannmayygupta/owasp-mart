@@ -36,6 +36,7 @@ MAX_ATTEMPTS = len(BACKOFF) + 1
 LEASE = timedelta(minutes=5)
 BATCH = 50
 MAX_PARAMS_BYTES = 8192
+REMOVED = "[removed after sending]"
 
 
 def utc_now() -> datetime:
@@ -51,10 +52,15 @@ class Rendered:
     subject: str
     text: str
     html: str | None = None
+    sender_name: str | None = None  # the display name of the sender when it is not VulnMart itself (FR-NTF-01: the mail names its sender)
 
 
 class UnknownTemplate(Exception):
-    """The template name has no renderer (a programming error: story P-10 owns the list)."""
+    """The template name has no renderer (a programming error: `templates.py` owns the list)."""
+
+
+class InvalidParams(ValueError):
+    """The parameters do not fit the template (missing, unknown or malformed). Raised at enqueue and again at render."""
 
 
 @runtime_checkable
@@ -78,16 +84,20 @@ class DbOutboxPort:
     (the point of an outbox). Events (`publish`) still go to `events` until the events table of story P-22 exists.
     """
 
-    def __init__(self, session_source: Callable[[], Session], events: Any, *, now: Clock = utc_now):
+    def __init__(self, session_source: Callable[[], Session], events: Any, *, now: Clock = utc_now,
+                 validator: Callable[[str, Mapping[str, Any]], None] | None = None):
         self._session_source = session_source
         self._events = events
         self._now = now
+        self._validator = validator  # checks the template name and parameters now, in the cause's transaction, not at delivery
 
     def publish(self, event: Mapping[str, Any]):
         return self._events.publish(event)
 
     def enqueue_email(self, *, template: str, to_user_id: str, params: Mapping[str, Any] | None = None) -> EmailJob:
         check_email_args(template, to_user_id, params)
+        if self._validator is not None:
+            self._validator(template, params or {})
         params = dict(params or {})
         now = self._now()
         row = EmailOutbox(template=template, to_user_id=to_user_id, params=params, state="pending", attempts=0, next_attempt_at=now)
@@ -203,19 +213,24 @@ class EmailOutboxService:
                 rendered = self._renderer.render(template, params)
             except UnknownTemplate as exc:
                 raise PermanentSendError("bad-template") from exc
+            except InvalidParams as exc:
+                raise PermanentSendError("bad-params") from exc
             message_id = self._provider.send(OutgoingEmail(
                 to=address, subject=rendered.subject, text=rendered.text, html=rendered.html,
-                sender_address=self._sender[0], sender_name=self._sender[1]))
+                sender_address=self._sender[0], sender_name=rendered.sender_name or self._sender[1]))
         except SendError as err:
             return self._record_failure(outbox_id, attempts, err)
         except Exception:  # noqa: BLE001 - a bug in a renderer or lookup must not lose the mail or kill the worker thread
             logger.exception("email %s: unexpected error while sending", outbox_id)
             return self._record_failure(outbox_id, attempts, TransientSendError("internal"))
         now = self._now()
+        secret = getattr(self._renderer, "secret_params", lambda name: frozenset())(template)
         with self._sessions.begin() as session:
             row = session.get(EmailOutbox, outbox_id)
             row.state, row.sent_at, row.provider_message_id = "sent", now, message_id[:255]
             row.attempts, row.claimed_until, row.last_error_code = attempts + 1, None, None
+            if secret:  # a single-use link is not kept once the mail left: the sent row holds nothing that opens an account
+                row.params = {k: (REMOVED if k in secret else v) for k, v in params.items()}
         logger.info("email %s sent (template %s)", outbox_id, template)
         return "sent"
 

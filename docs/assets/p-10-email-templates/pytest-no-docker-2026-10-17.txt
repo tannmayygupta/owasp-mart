@@ -1,0 +1,30 @@
+........................................................................ [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 18%]
+...................................................sssssss.............. [ 25%]
+........................................................................ [ 31%]
+........................................................................ [ 37%]
+........................................................................ [ 44%]
+........................................................................ [ 50%]
+........................................................................ [ 56%]
+.................sssss.................................................. [ 63%]
+........................................................................ [ 69%]
+........................................................................ [ 75%]
+........................................................................ [ 82%]
+........................................................................ [ 88%]
+........................................................................ [ 94%]
+..........................................................               [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:77: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:83: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:95: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:115: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:135: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:150: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_kernel_postgres.py:160: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN (see the module docstring)
+SKIPPED [1] apps\api\tests\test_notifications_postgres.py:68: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN
+SKIPPED [1] apps\api\tests\test_notifications_postgres.py:73: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN
+SKIPPED [1] apps\api\tests\test_notifications_postgres.py:94: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN
+SKIPPED [1] apps\api\tests\test_notifications_postgres.py:111: needs VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN
+SKIPPED [1] apps\api\tests\test_notifications_postgres.py:122: needs VULNMART_TEST_VALKEY_URL
+1126 passed, 12 skipped in 356.00s (0:05:55)
