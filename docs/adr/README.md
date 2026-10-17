@@ -40,5 +40,6 @@
 | 0040 | [Email: Postgres outbox with a relay, retries in the row, Brevo as the first real provider](0040-email-outbox-relay-and-retries-in-the-row.md) | Proposed (provider answer of the developer 2026-10-17, OI-32; design for the developer to confirm) |
 | 0041 | [Signup: Argon2id profile, hashed single-use links, fail-closed rate limits](0041-signup-argon2id-link-tokens-and-fail-closed-rate-limits.md) | Proposed (OI-29 answer of the developer 2026-10-17; design for the developer to confirm) |
 | 0042 | [Sessions: hashed cookie value, HMAC CSRF token, origin check, login throttle](0042-sessions-hashed-cookie-hmac-csrf-and-login-throttle.md) | Proposed (the builder's design for the developer to confirm) |
+| 0043 | [Roles, admin creation and role-gated routes](0043-roles-admin-creation-and-role-gated-routes.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

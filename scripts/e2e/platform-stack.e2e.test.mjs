@@ -228,13 +228,23 @@ describe('platform and web profiles on a real Docker engine', () => {
   }
   // Every state-changing call must carry the dashboard origin (story P-12, the Origin check of the contract).
   const ORIGIN = 'http://127.0.0.1:3000';
-  const call = (method, path, { body, headers = {} } = {}) =>
-    fetch(`${ORIGIN}${path}`, {
-      method,
-      headers: { origin: ORIGIN, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(30000),
-    });
+  // A pooled keep-alive socket can be closed by the Next server (5 s idle) just as a call reuses it, which fetch reports as "other side
+  // closed"; the long `docker exec` steps of some tests make that likely. The call never reached the server, so it is tried once more.
+  const call = async (method, path, { body, headers = {} } = {}) => {
+    const send = () =>
+      fetch(`${ORIGIN}${path}`, {
+        method,
+        headers: { origin: ORIGIN, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(30000),
+      });
+    try {
+      return await send();
+    } catch (e) {
+      if (e?.cause?.code !== 'UND_ERR_SOCKET') throw e;
+      return send();
+    }
+  };
   const postJson = (path, body, headers) => call('POST', path, { body, headers });
 
   test('accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited', async () => {
@@ -349,6 +359,38 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal((await replay.json()).code, 'AUTH-SESSION-REQUIRED');
     assert.equal(psql(`SELECT (revoked_at IS NOT NULL) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), 't');
   }, { timeout: 180000 });
+
+  // Story P-13: an admin exists only through the seed command (or another admin); signup cannot make one; an admin has no learner role.
+  test('admins (P-13): the seed command makes an admin with no learner role who cannot sign in yet, a second seed changes nothing, signup cannot make an admin', async () => {
+    const email = `e2e-admin-${RUN}@example.com`;
+    const password = 'a long admin password 123';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const seed = (extra = []) =>
+      docker('exec', '-e', `VULNMART_SEED_ADMIN_PASSWORD=${password}`, NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', email, '--name', 'E2E Admin', ...extra);
+    const first = seed();
+    assert.equal(first.status, 0, first.stdout + first.stderr);
+    assert.ok(!(first.stdout + first.stderr).includes(password), 'the password is never printed');
+    assert.equal(psql(`SELECT account_type || ',' || (email_verified_at IS NOT NULL) || ',' || left(password_hash, 9) FROM users WHERE email_ci = '${email}'`), 'admin,true,$argon2id');
+    assert.equal(psql(`SELECT count(*) FROM user_roles JOIN users ON users.id = user_roles.user_id WHERE email_ci = '${email}'`), '0', 'an admin holds no learner or candidate role');
+    const again = seed();
+    assert.equal(again.status, 3, 'a second seed for the same address changes nothing');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci = '${email}'`), '1');
+    // the account cannot sign in before the second factor exists: no session, no cookie
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 500);
+    assert.equal((await login.json()).code, 'REQ-INTERNAL');
+    assert.equal(login.headers.getSetCookie().length, 0);
+    assert.equal(psql(`SELECT count(*) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), '0');
+    // a signup that names an account type or role is refused, and a normal signup makes a participant
+    const forged = await postJson('/api/v1/accounts', { email: `e2e-forged-${RUN}@example.com`, password, display_name: 'Forged', age_declaration: true, account_type: 'admin' });
+    assert.equal(forged.status, 422);
+    assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci = 'e2e-forged-${RUN}@example.com'`), '0');
+    // a recruiter or admin cannot be given a participant role even by SQL: the database refuses
+    const direct = docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-v', 'ON_ERROR_STOP=1', '-c',
+      `INSERT INTO user_roles (user_id, role, account_type) SELECT id, 'candidate', 'participant' FROM users WHERE email_ci = '${email}'`);
+    assert.notEqual(direct.status, 0);
+    assert.match(direct.stderr, /violates foreign key constraint/);
+  }, { timeout: 120000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {

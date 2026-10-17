@@ -30,6 +30,7 @@ from vulnmart_models.error_codes import ErrorCode
 from vulnmart.kernel.ratelimit import RateLimiter, RateLimiterUnavailable
 from vulnmart.kernel.scope import ContextScopePort
 from vulnmart.kernel.service import NO_STORE
+from vulnmart.ports.scope import Role
 from vulnmart.problem import ProblemError
 
 from .service import AccountService, InvalidInput
@@ -231,6 +232,26 @@ async def authenticated(request: Request) -> AsyncIterator[Authenticated]:
     auth = await _authenticate(request)
     with _scope.acting_as(auth.session.scope):
         yield auth
+
+
+def requires(*roles: Role, csrf: bool = False):
+    """Dependency factory for a route only some roles may use (FR-ACC-01: a learner cannot reach recruiter or admin screens).
+    Any one of `roles` is enough. A caller without one is answered 404 REQ-ROUTE-UNKNOWN, the same as for a route that does not exist
+    (the contract's "not yours is not found" rule): the answer does not even say the route is there. `csrf=True` for a state-changing route."""
+    wanted = frozenset(roles)
+
+    async def dependency(request: Request) -> AsyncIterator[Authenticated]:
+        if csrf:
+            check_origin(request)
+        auth = await _authenticate(request)
+        if csrf and not session_service(request).csrf_ok(auth.token, request.headers.get("x-csrf-token")):
+            raise ProblemError(ErrorCode.AUTH_CSRF_FAILED)
+        if not (auth.session.roles & wanted):
+            raise ProblemError(ErrorCode.REQ_ROUTE_UNKNOWN)
+        with _scope.acting_as(auth.session.scope):
+            yield auth
+
+    return dependency
 
 
 async def authenticated_with_csrf(request: Request) -> AsyncIterator[Authenticated]:
