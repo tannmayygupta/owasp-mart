@@ -16,9 +16,10 @@ from dramatiq import Broker
 
 from vulnmart.kernel.settings import Settings
 
-from .fakes import DevRecipients, RegistryRenderer
+from .fakes import DevRecipients
 from .provider import BrevoApiProvider, EmailProvider, SmtpProvider
 from .service import EmailOutboxService, RecipientLookup, Renderer
+from .templates import TemplateRenderer
 
 logger = logging.getLogger("vulnmart.notifications")
 
@@ -98,5 +99,5 @@ def build_email_service(settings: Settings, sessions: Any, settings_port: Any, *
             raise RuntimeError(f"VULNMART_ENV={settings.env} needs a RecipientLookup (story P-11 provides it)")
         recipients = DevRecipients()
     return EmailOutboxService(
-        sessions, provider or make_provider(settings), recipients, renderer or RegistryRenderer(),
+        sessions, provider or make_provider(settings), recipients, renderer or TemplateRenderer(),
         settings_port, sender_address=settings.email_sender_address, sender_name=settings.email_sender_name, **extra)

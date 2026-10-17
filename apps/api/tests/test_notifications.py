@@ -404,7 +404,8 @@ def test_the_relay_hands_claimed_rows_to_a_dramatiq_worker_which_delivers_them(s
     actor = make_delivery_actor(broker, service)
     ids = enqueue(sessions, clock, n=3)
     relay = RelayLoop(service, actor)
-    worker = Worker(broker, worker_timeout=100)
+    # one thread: the in-memory SQLite database of these tests is a single shared connection, which is not safe for several threads
+    worker = Worker(broker, worker_timeout=100, worker_threads=1)
     worker.start()
     try:
         assert relay.relay_once() == 3
