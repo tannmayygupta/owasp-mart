@@ -83,3 +83,5 @@ H-143 decided by the developer: the orchestrator runs as a container on labs-cor
 
 ## Follow-up 2026-10-17 (story edge-7)
 State reports: platform receiver built in the lab runtime and proven locally (27 checks, receiver restart); dev-log 2026-10-17-tannmayygupta-story-edge-7-state-reports.md. Live vm-p and vm-i use is the developer's run.
+
+Follow-up 2026-10-17: live-check helpers for state reports (make-test-certs.ps1, orch_smoke.py), dev-log 2026-10-17-tannmayygupta-live-check-helpers-state-reports.md.
