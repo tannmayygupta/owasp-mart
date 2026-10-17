@@ -86,3 +86,4 @@ State reports: platform receiver built in the lab runtime and proven locally (27
 
 Follow-up 2026-10-17: live-check helpers for state reports (make-test-certs.ps1, orch_smoke.py), dev-log 2026-10-17-tannmayygupta-live-check-helpers-state-reports.md.
 Follow-up 2026-10-18: make-test-certs.ps1 fixed for a Windows openssl without a config file.
+Follow-up 2026-10-18: state reports proven live on vm-i and vm-p (H-147 point 1 closed); dev-log 2026-10-18-tannmayygupta-h147-state-reports-live.md.

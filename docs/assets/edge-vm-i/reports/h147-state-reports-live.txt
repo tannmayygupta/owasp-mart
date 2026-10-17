@@ -1,0 +1,29 @@
+Live run of state reports, vm-i (orchestrator container) to vm-p (receiver), AWS Sydney, 2026-10-17/18. Run by Claude over SSH on the developer's instruction and authorisation (the developer's SSH agent held the key). Addresses shown as <addr>. TEST SETUP: throwaway test CA (2 days, strict-check extensions), fake image digests, receiver = in-memory lab runtime stand-in (D-96) started from the api image with TLS, demo routes on with a random token for this test only.
+
+=== stage 2 (vm-p): receiver
+api image built; container vulnmart-ingest started
+log: Uvicorn running on https://<addr>:9444
+unsigned post -> 401
+
+=== stage 3 (vm-i): orchestrator with reports on (compose.yaml + lab.reports.yaml)
+vulnmart-orchestrator Up 25 seconds (healthy)
+VM_ORCH_REPORT_KEY_FILE=/run/secrets/report_key
+SSL_CERT_FILE=/run/secrets/report_ca
+
+=== stage 4 (vm-i): one instance through the orchestrator over mutual TLS (scripts/orch_smoke.py, platform client HttpInstanceHost)
+create i-MWIF7GOHREXTVU57: accepted, state requested
+resting state: failed            (expected: the fake image digests cannot be pulled)
+destroy: destroyed
+failed pushes in the orchestrator log: 0
+
+=== stage 5 (vm-p): what the receiver recorded (GET /internal/v1/lab-demo/instances/<id>)
+state destroyed; transitions (epoch 1): 1 null->requested, 2 requested->provisioning, 3 provisioning->failed, 4 failed->stopping, 5 stopping->destroyed   (numbers 1 to 5, no gap, no duplicate)
+receiver log: one WARNING "state report refused: bad signature" = the unsigned test post of stage 2 (expected); no "impossible transition".
+
+=== mutual TLS on the orchestrator port (vm-i)
+curl without a client certificate -> "Empty reply from server" (connection closed, no HTTP answer)
+curl with a client certificate, unsigned request -> http 401 (reached the application)
+ss: 9443 listens on the private address only
+
+=== cleanup
+vm-p: ingest container removed, no files in the ingest folder, no stage files. vm-i: compose down -v, no containers, no vm-* network, no secret files. PC: test certificate folder deleted.
