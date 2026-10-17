@@ -40,6 +40,21 @@ class StaticRecipients:
         return self._addresses.get(user_id)
 
 
+class FallbackRecipients:
+    """The first lookup that knows the user id wins. In development the real lookup comes first and `DevRecipients` catches the ids
+    of hand-made outbox rows (the stack test writes rows for users that do not exist)."""
+
+    def __init__(self, *lookups):
+        self._lookups = lookups
+
+    def address_for(self, user_id: str) -> str | None:
+        for lookup in self._lookups:
+            address = lookup.address_for(user_id)
+            if address:
+                return address
+        return None
+
+
 class DevRecipients:
     """Development and test only (the worker refuses it in staging and production): every user id has the address
     `<user id>@users.vulnmart.invalid`, which Mailpit catches. Story P-11 replaces it with the account lookup."""
@@ -67,4 +82,4 @@ class RegistryRenderer:
             raise UnknownTemplate(template) from exc
 
 
-__all__ = ["DevRecipients", "FakeEmailProvider", "RegistryRenderer", "SendError", "StaticRecipients"]
+__all__ = ["DevRecipients", "FakeEmailProvider", "FallbackRecipients", "RegistryRenderer", "SendError", "StaticRecipients"]

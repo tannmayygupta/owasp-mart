@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     brevo_api_key: str | None = Field(default=None, repr=False)
     brevo_api_key_file: str | None = None  # production reads secrets from files (architecture 06 s3); the file wins
     email_relay_interval_seconds: float = Field(default=5.0, gt=0, le=600)
+    # Accounts (story P-11). `public_origin` is the dashboards' address that links in mail point to (https in staging and production).
+    public_origin: str = "http://127.0.0.1:3000"
+    # How many proxies we run in front of the API and append to x-forwarded-for; the entry this many from the right is the visitor.
+    # Counted only when an origin secret protects the API (architecture 03 rule 4). Behind caddy-p it will be 2 (see handoff H-129).
+    trusted_proxy_hops: int = Field(default=1, ge=0, le=5)
 
     def origin_secrets_value(self) -> str | None:
         """The configured origin secret(s): the file's content when a file is named, else the environment value."""

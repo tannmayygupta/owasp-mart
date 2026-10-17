@@ -121,6 +121,14 @@ def _reset(p: dict[str, str]) -> Rendered:
     ], link=("Choose a new password", p["link"]))
 
 
+def _already_registered(p: dict[str, str]) -> Rendered:
+    """Sent when someone signs up with an address that already has an account (the signup answer is the same either way, FR-ACC-01)."""
+    return _compose("Someone tried to sign up with your email address", [
+        "Someone tried to create a VulnMart account with this email address, which already has one.",
+        "If it was you, sign in with your existing password, or reset it if you forgot it. If it was not you, you can ignore this message: nothing changed.",
+    ], link=("Sign in to VulnMart", p["login_url"]) if "login_url" in p else None)
+
+
 def _approval(p: dict[str, str]) -> Rendered:
     org = p["org_name"]
     if p["outcome"] == "approved":
@@ -201,6 +209,7 @@ def _spec(name: str, required: set[str], build, *, optional: set[str] = frozense
 TEMPLATES: dict[str, TemplateSpec] = {s.name: s for s in (
     _spec("account.verify", {"link"}, _verify, optional={"expires_in_hours"}, links={"link"}, secret={"link"}),
     _spec("account.password_reset", {"link"}, _reset, optional={"expires_in_hours"}, links={"link"}, secret={"link"}),
+    _spec("account.already_registered", set(), _already_registered, optional={"login_url"}, links={"login_url"}),
     _spec("org.approval_outcome", {"org_name", "outcome"}, _approval, optional={"reason", "login_url"}, links={"login_url"}),
     _spec("candidate.invite", {"org_name", "assessment_name", "link"}, _invite, optional={"expires_in_days"}, links={"link"}, secret={"link"}),
     _spec("recruiter.consent_withdrawn", {"org_name", "assessment_name"}, _withdrawn, optional={"deletion_on"}),

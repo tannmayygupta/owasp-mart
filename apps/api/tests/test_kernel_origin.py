@@ -138,7 +138,9 @@ def test_a_strict_environment_without_an_origin_secret_fails_at_startup(env, tmp
 
 @pytest.mark.parametrize("env", ["staging", "production"])
 def test_a_strict_environment_with_a_secret_starts_and_checks_it(env):
-    with TestClient(create_app({}, settings=Settings(env=env, origin_secret=SECRET))) as c:
+    # a strict environment also needs the Valkey address for the rate limits (story P-11); the client connects only when first used
+    settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0")
+    with TestClient(create_app({}, settings=settings)) as c:
         assert c.get("/api/v1/health").status_code == 403
         assert c.get("/api/v1/health", headers={"x-origin-secret": SECRET}).status_code == 200
 

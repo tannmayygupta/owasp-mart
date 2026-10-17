@@ -1,0 +1,85 @@
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 23%]
+..........................................FF............................ [ 29%]
+........................................................................ [ 35%]
+........................................................................ [ 41%]
+........................................................................ [ 47%]
+........................................................................ [ 53%]
+........................................................................ [ 58%]
+........................................................................ [ 64%]
+........................................................................ [ 70%]
+........................................................................ [ 76%]
+........................................................................ [ 82%]
+........................................................................ [ 88%]
+........................................................................ [ 94%]
+......................................................................   [100%]
+================================== FAILURES ===================================
+____ test_a_strict_environment_with_a_secret_starts_and_checks_it[staging] ____
+
+env = 'staging'
+
+    @pytest.mark.parametrize("env", ["staging", "production"])
+    def test_a_strict_environment_with_a_secret_starts_and_checks_it(env):
+>       with TestClient(create_app({}, settings=Settings(env=env, origin_secret=SECRET))) as c:
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+apps\api\tests\test_kernel_origin.py:141: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+apps\api\src\vulnmart\main.py:62: in create_app
+    app.state.rate_limiter = rate_limiter or _limiter_from(settings)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+settings = Settings(env='staging', service='api', version='0.0.0-dev', commit='unknown', log_level='INFO', check_timeout_seconds=...brevo_api_key_file=None, email_relay_interval_seconds=5.0, public_origin='http://127.0.0.1:3000', trusted_proxy_hops=1)
+
+    def _limiter_from(settings: Settings) -> RateLimiter:
+        """Valkey counters when an address is set; in-process counters otherwise (dev and tests only: not shared between processes)."""
+        if settings.valkey_url:
+            import valkey
+    
+            return ValkeyRateLimiter(valkey.Valkey.from_url(settings.valkey_url, socket_timeout=2, socket_connect_timeout=2, max_connections=4))
+        if settings.env in ("staging", "production"):
+>           raise RuntimeError(f"VULNMART_ENV={settings.env} needs VULNMART_VALKEY_URL for the rate limits")
+E           RuntimeError: VULNMART_ENV=staging needs VULNMART_VALKEY_URL for the rate limits
+
+apps\api\src\vulnmart\main.py:42: RuntimeError
+---------------------------- Captured stderr call -----------------------------
+%(levelname)-5.5s [%(name)s] %(message)s
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+__ test_a_strict_environment_with_a_secret_starts_and_checks_it[production] ___
+
+env = 'production'
+
+    @pytest.mark.parametrize("env", ["staging", "production"])
+    def test_a_strict_environment_with_a_secret_starts_and_checks_it(env):
+>       with TestClient(create_app({}, settings=Settings(env=env, origin_secret=SECRET))) as c:
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+apps\api\tests\test_kernel_origin.py:141: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+apps\api\src\vulnmart\main.py:62: in create_app
+    app.state.rate_limiter = rate_limiter or _limiter_from(settings)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+settings = Settings(env='production', service='api', version='0.0.0-dev', commit='unknown', log_level='INFO', check_timeout_secon...brevo_api_key_file=None, email_relay_interval_seconds=5.0, public_origin='http://127.0.0.1:3000', trusted_proxy_hops=1)
+
+    def _limiter_from(settings: Settings) -> RateLimiter:
+        """Valkey counters when an address is set; in-process counters otherwise (dev and tests only: not shared between processes)."""
+        if settings.valkey_url:
+            import valkey
+    
+            return ValkeyRateLimiter(valkey.Valkey.from_url(settings.valkey_url, socket_timeout=2, socket_connect_timeout=2, max_connections=4))
+        if settings.env in ("staging", "production"):
+>           raise RuntimeError(f"VULNMART_ENV={settings.env} needs VULNMART_VALKEY_URL for the rate limits")
+E           RuntimeError: VULNMART_ENV=production needs VULNMART_VALKEY_URL for the rate limits
+
+apps\api\src\vulnmart\main.py:42: RuntimeError
+---------------------------- Captured stderr call -----------------------------
+%(levelname)-5.5s [%(name)s] %(message)s
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+2 failed, 1220 passed in 384.80s (0:06:24)

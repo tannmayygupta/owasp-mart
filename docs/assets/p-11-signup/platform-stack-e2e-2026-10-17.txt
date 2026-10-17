@@ -1,0 +1,26 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (1921.4855ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (1661.9928ms)
+  ✔ the page is served and the API is also reachable directly on its own port (766.6984ms)
+  ✔ API errors follow the IF-8 format through the web origin: unknown route and wrong method (187.6767ms)
+  ✔ origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (198.4868ms)
+  ✔ page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (193.6736ms)
+  ✔ caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (1249.4518ms)
+  ✔ mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (12809.5374ms)
+  ✔ mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost) (11197.0927ms)
+  ✔ accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (10145.3623ms)
+  ✔ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (387.2011ms)
+  ✔ hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (332.8009ms)
+  ✔ web has no secrets or flags in its environment (59.4734ms)
+  ✔ Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (4928.5126ms)
+  ✔ Valkey down: public health 503 degraded, /readyz names valkey; recovers (7682.722ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (6062.3627ms)
+✔ platform and web profiles on a real Docker engine (152822.4666ms)
+ℹ tests 16
+ℹ suites 1
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 153043.6861

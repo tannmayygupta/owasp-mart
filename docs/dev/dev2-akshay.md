@@ -124,14 +124,14 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: Each email type renders and sends in a test and the warnings show in the app.
   - Handoffs: H-128 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-11. Learner signup, email verification and signup abuse protection**
+- [x] **P-11. Learner signup, email verification and signup abuse protection**
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: not planned yet; created when you incept `epic-accounts-and-sessions` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `3.1` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Learner signup with Argon2id passwords, email verification and rate limits against abuse.
   - Covers: FR-ACC-01, 02, 10
   - Waits on: P-10. Open: CAPTCHA choice.
   - Done when: A learner can sign up and verify by email on the local stack, and the abuse limits trigger in a test.
-  - Handoffs: H-127 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-127 (answered in P-11), H-129 (to Tanmay, L-11) (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-12. Login, sessions, timeouts and CSRF**
   - Epic: `epic-accounts-and-sessions`
