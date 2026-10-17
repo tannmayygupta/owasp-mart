@@ -3,7 +3,7 @@ title: 'Isolation probe from inside a real instance network, live checks and the
 type: 'feature'
 ticket: '1'
 created: '2026-10-16'
-status: 'built'
+status: 'done'
 baseline_revision: '1ee5c019bb1ede4ec4d587476f05023ed514ad17'
 route: 'full'
 route_source: 'pinned'

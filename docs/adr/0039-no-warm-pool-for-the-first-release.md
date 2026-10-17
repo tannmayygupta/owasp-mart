@@ -1,6 +1,6 @@
 # 0039. No warm pool for the first release; the numbers that would change it
 
-- **Status:** Proposed (D-59, decided on the developer's delegation, story 3.6 "Concurrency, quotas, start failures, warm-pool decision", 2026-10-16; to be confirmed by the developer after the vm-i numbers)
+- **Status:** Accepted (D-59, decided on the developer's delegation, story 3.6 "Concurrency, quotas, start failures, warm-pool decision", 2026-10-16; confirmed by the developer 2026-10-17)
 - **Date:** 2026-10-16
 - **Deciders:** Tanmay (by delegation to Claude Code)
 - **Requirements:** FR-INS-06, FR-INS-07, FR-INS-08, FR-INS-09, OI-21, OI-24, D-59; handoffs H-66, H-72, H-79; spike S-4

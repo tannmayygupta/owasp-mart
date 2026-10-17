@@ -1,6 +1,6 @@
 # 0036. Orchestrator reconciler: Docker labels are the truth, tombstones in a small file
 
-- **Status:** Proposed (D-55, decided on the developer's delegation; to be confirmed)
+- **Status:** Accepted (D-55, decided on the developer's delegation; confirmed by the developer 2026-10-17)
 - **Date:** 2026-10-16
 - **Deciders:** Tanmay (by delegation to Claude Code, story "Reconciler: repair differences between recorded and real state (spike S-13)", task L-14 part 2)
 - **Requirements:** FR-INS-05, FR-INS-07, NFR-AVL-04; decisions D-54, D-52; spike S-13; handoffs H-61, H-65, H-67; architecture `docs/architecture/05-key-flows.md` section 9

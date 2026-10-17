@@ -1,6 +1,6 @@
 # 0037. Isolation probe from inside an instance network
 
-- **Status:** Proposed (D-57, decided on the developer's delegation; to be confirmed)
+- **Status:** Accepted (D-57, decided on the developer's delegation; confirmed by the developer 2026-10-17)
 - **Date:** 2026-10-16
 - **Deciders:** Tanmay (by delegation to Claude Code, story 4.1 "Isolation probe from inside a real instance network, live checks and the VM-I runbook")
 - **Requirements:** NFR-ISO-01 to NFR-ISO-04, FR-INS-02; decisions D-43, D-52; spikes S-3, S-15; handoff H-62

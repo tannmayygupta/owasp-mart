@@ -1,6 +1,6 @@
 # 0035. Orchestrator reset, the reaper and the timing settings
 
-- **Status:** Proposed (D-54, decided on the developer's delegation; to be confirmed)
+- **Status:** Accepted (D-54, decided on the developer's delegation; confirmed by the developer 2026-10-17)
 - **Date:** 2026-10-15
 - **Deciders:** Tanmay (by delegation to Claude Code, story "Reset with new flags, teardown at expiry or inactivity, timing defaults", task L-14 part 1)
 - **Requirements:** FR-INS-03, FR-INS-04, FR-INS-07; decisions D-52, D-53, D-42; contracts IF-5 and IF-6; handoffs H-57, H-59, H-61, H-65, H-67
