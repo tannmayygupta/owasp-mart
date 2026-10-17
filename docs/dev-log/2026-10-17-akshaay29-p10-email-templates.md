@@ -37,7 +37,7 @@ No ADR. Claude's scoping decision, for the developer to confirm: FR-NTF-04 is a 
 On the developer's Windows 11 PC, Python 3.14.8, uv 0.12.23. Output in `docs/assets/p-10-email-templates/`.
 - `uv run --package vulnmart-api pytest apps/api/tests -q -rs`: **1126 passed, 12 skipped** (356 s). The 12 skipped are the Postgres and Valkey tests of `test_kernel_postgres.py` and `test_notifications_postgres.py`: Docker could not be started during this story, so they were NOT run again after P-10's changes (they passed in P-09 on real Postgres and Valkey, 1020 passed).
 - The new `test_notification_templates.py` plus `test_notifications.py`: 153 passed, repeated 5 times with the same result.
-- `node scripts/check-contract-rules.mjs`: 15 PASS, 0 FAIL (1 not applicable). `node --test scripts/check-text-files.test.mjs scripts/progress-page.test.mjs`: 22 of 22 pass. The full `node --test "scripts/*.test.mjs"` was NOT re-run for this story (this story changes no script except none; the P-09 run showed only the Windows line-ending failures).
+- `node scripts/check-contract-rules.mjs`: 15 PASS, 0 FAIL (1 not applicable). `node --test scripts/check-text-files.test.mjs scripts/progress-page.test.mjs`: 22 of 22 pass. The full `node --test "scripts/*.test.mjs"` was NOT re-run for this story (this story changes no script; the P-09 run showed only the Windows line-ending failures and the BOM one, since fixed).
 - NOT run: the real Docker stack (a verification mail to Mailpit); CI on GitHub (see the pull request).
 
 ## Evidence
