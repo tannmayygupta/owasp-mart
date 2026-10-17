@@ -109,3 +109,6 @@ context: ['{project-root}/docs/prd/PRD.md', '{project-root}/contracts/events/app
 
 - Whether CRS v4.30.0 exists as a published module version and whether 256 MB holds with CRS loaded: the spike answers both; the fallback (`--no-crs`, app events only) keeps the demo working. Risk for the 19th: highest of the five stories (Go build and CRS memory are unmeasured); it is last in the order so it cannot block the loop.
 - CRS may not catch a URL in a JSON body at paranoia level 1 (OI-35, unverified): C10 relies on `importer.fetch_attempt` and `meta.request_served` whatever the spike finds.
+
+## Follow-up 2026-10-17
+The full compose harness now runs with the product sidecar image (HARNESS_PRODUCT_SIDECAR=1): conformance PASS (23 rules), harness PASS; dev-log 2026-10-17-tannmayygupta-story-6-5-harness-product-sidecar.md.

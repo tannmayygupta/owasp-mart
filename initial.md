@@ -719,8 +719,8 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 - **Open:** the real KeyPort (handoff H-130).
 
 ### D-80 - The assessment clock starts when the instance is ready (OI-22, story 7.1, ADR 0041)
-- **Decision (developer's delegation, 2026-10-17; PROPOSED, answers OI-22 as a proposal):** the server stamps `ready_at`; the attempt moves `ready` to `running` at that moment; `started_at` = `ready_at`; `deadline_at` = `started_at` plus the time limit. The candidate's Start button only asks for the instance and has no effect on the clock, so cold start never counts (FR-TIM-05). If the instance never becomes ready the clock never starts.
-- **Open:** the developer's confirmation of OI-22; the start route stays pending (H-87, H-127).
+- **Decision (CONFIRMED by the developer 2026-10-17, answers OI-22):** the server stamps `ready_at`; the attempt moves `ready` to `running` at that moment; `started_at` = `ready_at`; `deadline_at` = `started_at` plus the time limit. The candidate's Start button only asks for the instance and has no effect on the clock, so cold start never counts (FR-TIM-05). If the instance never becomes ready the clock never starts.
+- **Open:** the start route stays pending (H-87, H-127): with this decision the Start button has no effect on the clock, so the route may be removed.
 
 ### D-81 - Attempt rules and engine are one dependency-free package (story 7.1, ADR 0041)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** `packages/py-attempts` (`vulnmart-attempts`, module `vulnmart_attempts`, Python 3.14, standard library only). Akshay's API imports it and supplies the database store; thin port adapters will live in `apps/api/src/vulnmart/ports/`.
@@ -748,7 +748,7 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-87 - Held captures and learner mode (story 7.3, ADR 0041)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** a held capture is computed as if the held milestone had not been reached (the best non-held milestone), flagged `held`, never zeroed; accepting it changes the fact and the score is recomputed from facts every time. Learner mode shows stars, tick and badge, never a hint penalty.
-- **Open:** the reviewer for held captures (OI-38).
+- **Open:** none for the reviewer: decided in D-92 (OI-38).
 
 ### D-88 - `reported` only through `mark_reported` (story 7.2, ADR 0041)
 - **Decision (developer's delegation, 2026-10-17; PROPOSED):** `submitted` becomes `reported` only after the final score snapshot and only when no held capture is open (FR-SCR-10).
@@ -756,6 +756,13 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ---
 
+### D-92 - Reviewer of a held capture (OI-38, story L-27)
+- **Decision (CONFIRMED by the developer 2026-10-17, answers OI-38):** the reviewer is the recruiter of the organisation that owns the assessment, and an organisation admin may review as well; nobody outside the organisation. The decision (accept or reject) is audited with the reviewer id and a note, and it is final. Nothing is auto-zeroed: a rejected capture stays out of the score. After 7 days an open held capture raises a reminder event (`held_review_overdue`, ids only) and the attempt stays `submitted` (D-88). `may_review` is supplied by the platform (RBAC is Akshay's); the library default allows `recruiter` or `admin` of the owning organisation.
+- **Built:** `packages/py-attempts/src/vulnmart_attempts/review.py`, wired in the lab runtime (`decide_held`). The idle and too-fast thresholds are placeholders (OI-25).
+
+### D-93 - Cohort view and ranking aid (OI-26, story L-28)
+- **Decision (CONFIRMED by the developer 2026-10-17, answers OI-26):** a private cohort view, scoped to one organisation and one assessment, off unless the assessment turns it on (`cohort_board`, default false). The ranking aid uses the tie-break order score, more full captures, lower hint cost, lower estimated active time, earlier last capture; it is labelled "ranking aid, the recruiter decides" and never ranks anyone out. No global or public leaderboard exists anywhere.
+- **Built:** `packages/py-attempts/src/vulnmart_attempts/ranking.py`, `cohort.py`. Open: the platform port and recruiter screen (Akshay, H-146).
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.

@@ -242,7 +242,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Status 2026-10-17 (earlier status, superseded by the Closed line): flag material builder, checker and leak scan are built and tested locally with the fake KeyPort (story 6.1). Not done: the real `InstancePort` calling them, the real KeyPort, a scan of a full orchestrator-made instance and of vm-i, decoy placement in the catalogue. H-63 answered in part; H-130, H-131.
 
 - [x] **L-20. Coraza sidecar, automatic capture and paste**
-  - Closed 2026-10-17 after local proof: the Coraza and Core Rule Set helper (story 6.5) is built into the sidecar image and S-6 is measured (15 of 32 exploits seen, 0 of 60 benign flagged, sidecar suite 69 passed, Go tests passed, re-run by the coordinator). The sidecar never blocks (tests). NOT met: nothing on vm-i, no full compose harness run with the product image; the accuracy is mixed so `classifier_accuracy_verified` stays false (your decision); CRS is 4.25.0, the PRD and ADR name 4.30.0.
+  - Closed 2026-10-17 after local proof: the Coraza and Core Rule Set helper (story 6.5) is built into the sidecar image and S-6 is measured (15 of 32 exploits seen, 0 of 60 benign flagged, sidecar suite 69 passed, Go tests passed, re-run by the coordinator). The sidecar never blocks (tests). NOT met: nothing on vm-i, no full compose harness run with the product image; the accuracy is mixed so `classifier_accuracy_verified` stays false (your decision); CRS is 4.25.0 (newest Go module; upstream 4.30.0 exists, loading it needs the release tarball in the image build), the PRD names 4.30.0.
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
   - Build: Coraza sidecar in detect-only mode with the OWASP Core Rule Set, flag-in-response matching, automatic capture and paste submission, fixed tags and technique detection.
@@ -264,7 +264,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Status 2026-10-17 (earlier status, superseded by the Closed line): milestone engine with 33 rules, paste service and sharing signal are built against in-memory stores, 90 tests passed (story 6.3). Not built: evidence sealed through KeyPort, activity metadata, bot visit evidence, the tables, the ingest route and the worker. H-77 answered as built; H-133, H-134.
 
 - [x] **L-22. Attempt state machine and server clock**
-  - Closed 2026-10-17 after local proof: attempt engine and rules in packages/py-attempts (clock from instance ready, D-80 still a Proposed answer to OI-22), reachable over the demo routes. NOT met: the SQL store, the scheduler job and the real API adapter (H-146); OI-22 not confirmed by the team.
+  - Closed 2026-10-17 after local proof: attempt engine and rules in packages/py-attempts (clock from instance ready, D-80 confirmed by the developer 2026-10-17), reachable over the demo routes. NOT met: the SQL store, the scheduler job and the real API adapter (H-146).
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: Attempt start, server-side clock, time warnings, expiry with auto-submit, 15-minute freeze and destroy, manual submit, no pause, one attempt, cancel.
@@ -315,7 +315,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Done when: Both are recorded in the event log and handled as FR-SES-09 and FR-SES-10 require.
 
 - [x] **L-27. Anti-cheat signals and held-capture review**
-  - Closed 2026-10-17 after local proof: held captures stay out of the score until a named recruiter or admin of the owning organisation decides, the decision is audited and final, nobody is zeroed (library and runtime tests). The idle and too-fast numbers are placeholders (OI-25). NOT met: FR-ACH-01 and 02 (submission limit coverage, the real activity gate), the review screen, OI-38 not confirmed by the team (D-92 Proposed).
+  - Closed 2026-10-17 after local proof: held captures stay out of the score until a named recruiter or admin of the owning organisation decides, the decision is audited and final, nobody is zeroed (library and runtime tests). The idle and too-fast numbers are placeholders (OI-25). NOT met: FR-ACH-01 and 02 (submission limit coverage, the real activity gate), the review screen, D-92 (OI-38) confirmed 2026-10-17.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: Submission limits, activity-versus-capture check, timing anomalies, write-up similarity review, integrity signals as evidence for a human, review of held captures.
@@ -324,7 +324,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Done when: Held captures stay out of the score until a named reviewer decides, the decision is audited and nobody is auto-zeroed.
 
 - [x] **L-28. Cohort board and ranking aid**
-  - Closed 2026-10-17 after local proof: ranking aid and private, scoped cohort rules, board off by default (D-93 Proposed). Built on the written proposal although the task says to ask about OI-26 first; confirm D-93. NOT met: the platform port and recruiter screen.
+  - Closed 2026-10-17 after local proof: ranking aid and private, scoped cohort rules, board off by default (D-93 confirmed by the developer 2026-10-17, OI-26 answered). NOT met: the platform port and recruiter screen.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
   - Build: The cohort view for recruiters and the ranking aid, with no global leaderboard.
