@@ -132,6 +132,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Status 2026-10-11 (story 1.7): everything that needs no other stream is built and tested (COMPAT.md, the CI approvals rule, the tag script, Tanmay's handoffs, ADR 0029, runbook); NOT met (ticked on the developer's instruction): the tag `contracts-v1.0.0` waits for the sign-offs of Akshay (P-08) and Sahil (T-03), the open checklist boxes and the release commit (relabel 1.0.0). Run `node scripts/tag-contracts.mjs --dry-run`.
 
 - [x] **L-10. DuckDNS names and certificates**
+  - Domain decision 2026-10-17 (developer): there is no custom domain, only AWS credit and Vercel. The plan stands unchanged: two free DuckDNS names (labs wildcard by DNS-01, platform) on the AWS hosts, and the free `*.vercel.app` name for the site with the same-origin rewrite to the platform DuckDNS name. First live check is S-16 (does `*.<labs-name>.duckdns.org` resolve); if it fails, research a fallback before any certificate work.
   - Closed 2026-10-12 on the developer's instruction (ticked on the developer's instruction, live steps open). Still open (developer, live): DuckDNS names, lego staging then production, renewal, S-16 result. NOT met: Done-when (real certificates issued and renewing, S-16 recorded).
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
@@ -210,7 +211,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
 Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt engine and scoring work end to end.
 
 - [x] **L-17. Edge and gate for instance access**
-  - Closed 2026-10-17 on the developer's instruction after local proof (edge e2e 11 passed on Docker Desktop, orchestrator attaches the edge and pushes access state: 458 orchestrator tests, real-Docker test_edge_attach.py). NOT met live: vm-i run, real certificate, real browser, gate admin reachability for a host-run orchestrator (H-143); D-60 to D-68 and ADR 0004 still Proposed.
+  - Closed 2026-10-17 on the developer's instruction after local proof (edge e2e 11 passed on Docker Desktop, orchestrator attaches the edge and pushes access state: 458 orchestrator tests, real-Docker test_edge_attach.py). NOT met live: vm-i run, real certificate, real browser, gate admin reachability: decided 2026-10-17, orchestrator runs as a container on labs-core and is proven locally (H-143 answered, open points in H-147); D-60 to D-68 and ADR 0004 still Proposed.
   - Epic: `epic-edge-gate-and-event-path`
   - BMAD story: not planned yet; created when you incept `epic-edge-gate-and-event-path` (see START-HERE.md, section "First task of an epic")
   - Build: The labs edge terminates TLS for instance hostnames; a gate admits only the owner with a ticket and a host-only cookie, routes to the right sidecar and blocks frozen or closed instances.

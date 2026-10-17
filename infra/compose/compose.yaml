@@ -254,7 +254,8 @@ services:
   # system, events, auth, stop, restart, kill and the archive calls answer 403. The request body is not filtered, so the
   # orchestrator's template-id-only rule and the host rule stay the second line (ADR 0010).
   # The process runs as root inside the container because the socket file is root-owned; everything else is dropped.
-  # The orchestrator uses it with: --docker-host tcp://127.0.0.1:2375
+  # A host-run orchestrator uses it with: --docker-host tcp://127.0.0.1:2375. The orchestrator CONTAINER (service `orchestrator` below) uses tcp://docker-proxy:2375 over labs-core;
+# that needs no published port, the 127.0.0.1 publication is only for the host.
   docker-proxy:
     profiles: ["lab"]
     image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
@@ -371,6 +372,83 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ---- Lab profile (edge story 6, H-143 option (a), D-58, D-62): the orchestrator as a container on labs-core -----------------------------------
+  # Why a container: the gate admin listener answers only on labs-core (alias edge-gate-admin:9090, never published), and the Docker API is reached through the
+  # socket proxy; a host process could do neither without publishing more. On labs-core it reaches both by name and nothing is published for them.
+  # NO Docker socket here: --docker-host tcp://docker-proxy:2375 is the proxy's address on labs-core (the proxy still also publishes 127.0.0.1:2375, for a
+  # host-run orchestrator or for the checks of Part E; the container does not use that publication). It attaches the edge named vulnmart-edge-gate to every
+  # instance network and pushes access state to the gate (story edge-3).
+  # Listener (IF-5): the process listens on 0.0.0.0:8443 INSIDE the container with mutual TLS (the service refuses a non-loopback address without TLS); the host side is
+  # published as ${VULNMART_ORCH_BIND}:9443, default 127.0.0.1. On vm-i set VULNMART_ORCH_BIND to the private VPC address of vm-i (never a public one, never 0.0.0.0): the security
+  # group (vm-p to vm-i on 9443 only) is the real boundary, mutual TLS is the second line. scripts/check-lab-compose-rules.mjs enforces this exact form.
+  # Files the operator provides under VULNMART_ORCH_DIR (default /opt/vulnmart/lab/orchestrator; docs/runbooks/edge-vm-i.md step 3 creates them):
+  #   secrets/platform_key (the platform signing key, 32+ chars), secrets/tls_cert.pem, secrets/tls_key.pem, secrets/tls_ca.pem (server certificate, its key, the CA that signs the vm-p client certificate),
+  #   templates/*.json (the instance templates), images.json (the release manifest of image digests). The gate admin secret is the same file the gate reads
+  #   (VULNMART_EDGE_SECRETS/gate_admin_secret). Secrets reach the container as files under /run/secrets. Compose mounts a file secret as a bind mount (it ignores uid, gid and mode, and warns),
+  # so on vm-i the HOST files must be owned by 65532:65532 with mode 0400: the service refuses a key file readable by group or others (docker-compose limit, found in the story edge-6 proof). Never mode 0644.
+  # Not wired yet (open): --report-url and the report key for state reports to the platform (needs the ingest address of vm-p, handoff H-68).
+  # Image: built from apps/orchestrator/Dockerfile. --backend is the default, docker; --allow-fake-backend and --allow-local-images are never set here.
+  orchestrator:
+    profiles: ["lab"]
+    build:
+      context: ../..
+      dockerfile: apps/orchestrator/Dockerfile
+    image: vulnmart-orchestrator:local
+    container_name: vulnmart-orchestrator
+    user: "65532:65532"
+    read_only: true
+    command:
+      - --templates-dir
+      - /etc/vulnmart/templates
+      - --images-manifest
+      - /etc/vulnmart/images.json
+      - --state-dir
+      - /var/lib/vulnmart/orchestrator
+      - --docker-host
+      - tcp://docker-proxy:2375
+      - --edge-container
+      - vulnmart-edge-gate
+      - --gate-url
+      - http://edge-gate-admin:9090
+      - --gate-admin-key-file
+      - /run/secrets/gate_admin_secret
+      - --key-file
+      - /run/secrets/platform_key
+      - --tls-cert
+      - /run/secrets/tls_cert
+      - --tls-key
+      - /run/secrets/tls_key
+      - --tls-ca
+      - /run/secrets/tls_ca
+    secrets:
+      - { source: orch-platform-key, target: platform_key }
+      - { source: orch-gate-admin, target: gate_admin_secret }
+      - { source: orch-tls-cert, target: tls_cert }
+      - { source: orch-tls-key, target: tls_key }
+      - { source: orch-tls-ca, target: tls_ca }
+    volumes:
+      - ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/templates:/etc/vulnmart/templates:ro
+      - ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/images.json:/etc/vulnmart/images.json:ro
+      - orch-state:/var/lib/vulnmart/orchestrator
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m,uid=65532,gid=65532
+    networks:
+      - labs-core
+    ports:
+      - "${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"
+    depends_on:
+      docker-proxy:
+        condition: service_healthy
+      edge-gate:
+        condition: service_healthy
+    restart: unless-stopped
+
 networks:
   # The orchestrator and the edge-gate admin listener join this network; no instance network is ever attached to it.
   labs-core:
@@ -383,7 +461,20 @@ configs:
   docker-proxy-rules:
     file: ./docker-proxy/rules.cfg
 
+secrets:
+  orch-platform-key:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/platform_key
+  orch-gate-admin:
+    file: ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_admin_secret
+  orch-tls-cert:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/tls_cert.pem
+  orch-tls-key:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/tls_key.pem
+  orch-tls-ca:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/tls_ca.pem
+
 volumes:
+  orch-state:
   pg-data:
   web-node-modules:
   web-next:

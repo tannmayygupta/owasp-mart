@@ -77,3 +77,6 @@ Proposed (decided on the developer's delegation): D-61 single internal network p
 - `uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests` -- expected: pass (Docker running; the new file included)
 - `node --test scripts/check-lab-compose-rules.test.mjs` -- expected: pass
 - `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs` -- expected: pass
+
+## Follow-up 2026-10-17 (story edge-6)
+H-143 decided by the developer: the orchestrator runs as a container on labs-core. Compose service orchestrator added and proven locally (30 checks PASS, re-run by the coordinator); dev-log 2026-10-17-tannmayygupta-story-edge-6-orchestrator-container.md; open points in H-147.

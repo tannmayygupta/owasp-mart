@@ -1,7 +1,8 @@
 # VulnMart orchestrator service image (story 3.2, D10). Same pattern as apps/api/Dockerfile.
 # Build context is the REPOSITORY ROOT (the uv workspace lockfile lives there):
 #   docker build -f apps/orchestrator/Dockerfile .
-# There is no compose service and no Docker socket proxy wiring yet (deployment is a later story). At run time the service needs, from
+# The compose service `orchestrator` (profile lab, infra/compose/compose.yaml, edge story 6) runs this image on the labs-core network with the socket
+# proxy as Docker host. At run time the service needs, from
 # the operator and never from the image: the two signing keys (environment variables VM_ORCH_PLATFORM_KEY and VM_ORCH_REPORT_KEY, or the
 # files --key-file and --report-key-file with mode 0600; there is no key option on the command line, it would show in `ps`), the template folder
 # (--templates-dir), the release manifest of image digests (--images-manifest), the three TLS files (--tls-cert, --tls-key, --tls-ca)
@@ -41,6 +42,8 @@ FROM python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4c
 COPY --from=builder /opt/venv /opt/venv
 # The template schema the service checks every template against at start (the templates themselves come from the operator).
 COPY contracts/instance/instance-template.schema.json /app/contracts/instance/instance-template.schema.json
+# The folder for --state-dir (tombstones of destroyed ids). A named volume mounted here takes this owner on first use (compose service `orchestrator`).
+RUN mkdir -p /var/lib/vulnmart/orchestrator && chown 65532:65532 /var/lib/vulnmart/orchestrator
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

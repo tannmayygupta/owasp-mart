@@ -5,6 +5,8 @@
 // volume or bind and ports on 127.0.0.1 only. Any other exception needs a change to this script with a decision record. A root or privileged container can bypass host firewall rules (ADR 0027);
 // the VPC security groups and network ACLs are the real boundary, so these rights are refused up front.
 // Ports of the lab profile (story edge-2): in a service with profile `lab` only `edge-caddy` may publish, only 443:443, and 8080, 8081 and 9090 are never published.
+// The orchestrator container (edge story 6, H-143; service `orchestrator`, profile `lab`): never a socket mount (the general rule), Docker only through `--docker-host tcp://docker-proxy:2375`, mutual TLS flags present,
+// no --insecure-no-tls, --allow-fake-backend or --allow-local-images, non-root, read_only, cap_drop ALL, no-new-privileges, on labs-core only, and a published port only as 9443 to 8443 on 127.0.0.1 or ${VULNMART_ORCH_BIND:-127.0.0.1}.
 // Two passes: a line scan for the old rules (comments are stripped first, so a comment that says "no privileged" does not fail), and a real YAML parse (js-yaml,\n// anchors and merge keys resolved) for the Docker socket, binds, ports and the pinned docker-proxy service.
 // Usage: node scripts/check-lab-compose-rules.mjs [file or folder ...]   (default: every compose or harness file in the repository)
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -59,6 +61,42 @@ function publishesOnLoopbackOnly(port) {
 export const EDGE_PUBLISHER = 'edge-caddy';
 export const EDGE_PORT = 443;
 export const NEVER_PUBLISHED = [8080, 8081, 9090];
+// The orchestrator container (edge story 6, H-143): the only lab service besides edge-caddy and docker-proxy that may publish a port.
+export const ORCH_SERVICE = 'orchestrator';
+export const ORCH_HOST_PORT = 9443;
+export const ORCH_CONTAINER_PORT = 8443;
+export const ORCH_BIND_VAR = '${VULNMART_ORCH_BIND:-127.0.0.1}';
+export const ORCH_PORT_FORMS = [`127.0.0.1:${ORCH_HOST_PORT}:${ORCH_CONTAINER_PORT}`, `${ORCH_BIND_VAR}:${ORCH_HOST_PORT}:${ORCH_CONTAINER_PORT}`];
+// Flags that must never appear in the orchestrator's command: no TLS bypass, no fake backend, no local image ids, and no Docker API except the socket proxy on labs-core.
+export const ORCH_FORBIDDEN_FLAGS = ['--insecure-no-tls', '--allow-fake-backend', '--allow-local-images'];
+export const ORCH_DOCKER_HOST = 'tcp://docker-proxy:2375';
+
+/** Checks of the orchestrator service on top of the general rules: hardening, no TLS bypass, Docker only through the proxy. */
+function checkOrchestrator(def, name) {
+  const out = [];
+  const fail = (msg) => out.push(`${name}: service ${ORCH_SERVICE}: ${msg}`);
+  const cmd = asList(def.command).map(String);
+  for (const flag of ORCH_FORBIDDEN_FLAGS) if (cmd.includes(flag)) fail(`the command must not contain ${flag}`);
+  const flagValue = (flag) => { const i = cmd.indexOf(flag); return i >= 0 ? cmd[i + 1] : undefined; };
+  if (flagValue('--backend') !== undefined && flagValue('--backend') !== 'docker') fail('--backend must be docker (or not set)');
+  if (flagValue('--docker-host') !== ORCH_DOCKER_HOST) fail(`--docker-host must be ${ORCH_DOCKER_HOST} (the socket proxy over labs-core), never a socket or the host`);
+  for (const f of ['--tls-cert', '--tls-key', '--tls-ca']) if (!flagValue(f)) fail(`the command must set ${f} (mutual TLS is required on the published listener)`);
+  if (def.user === undefined || /^(0|root)(:|$)/.test(String(def.user))) fail('user must be set to a non-root user');
+  if (def.read_only !== true) fail('read_only must be true');
+  if (!asList(def.cap_drop).map(String).includes('ALL')) fail('cap_drop must contain ALL');
+  if (asList(def.cap_add).length) fail('cap_add must be empty');
+  if (!asList(def.security_opt).map(String).includes('no-new-privileges:true')) fail('security_opt must contain no-new-privileges:true');
+  const nets = Array.isArray(def.networks) ? def.networks.map(String) : Object.keys(def.networks ?? {});
+  if (nets.length !== 1 || nets[0] !== 'labs-core') fail('networks must be exactly labs-core');
+  for (const s of asList(def.secrets)) {
+    const target = typeof s === 'string' ? s : String(s?.target ?? s?.source ?? '');
+    if (/\//.test(target)) fail(`a secret target is a file name under /run/secrets, not a path (${target})`);
+  }
+  for (const e of Object.entries(def.environment && typeof def.environment === 'object' && !Array.isArray(def.environment) ? def.environment : {})) {
+    if (/DOCKER_HOST|DOCKER_SOCK/i.test(e[0])) fail(`environment ${e[0]} is not allowed (the Docker address is the --docker-host flag)`);
+  }
+  return out;
+}
 
 /** { host, container } of one ports entry (short or long form); a number or null when it cannot be read (a range, a variable, a missing value). */
 export function portNumbers(port) {
@@ -81,6 +119,14 @@ function checkLabPorts(svc, def, name) {
     if (container === null) { fail(`the ports entry ${JSON.stringify(p)} cannot be read (a range or a variable is not allowed for a lab service)`); continue; }
     if (NEVER_PUBLISHED.includes(container) || (host !== null && NEVER_PUBLISHED.includes(host))) fail(`port ${NEVER_PUBLISHED.includes(container) ? container : host} (8080, 8081 and 9090) must never be published`);
     if (svc === SOCKET_PROXY_SERVICE) continue; // its own rule: loopback only
+    if (svc === ORCH_SERVICE) {
+      // the one other publisher: the orchestrator listener, 9443 on the host to 8443 in the container, bound to loopback or to the operator's private address variable
+      const ok = typeof p === 'string'
+        ? ORCH_PORT_FORMS.includes(p.trim())
+        : p && typeof p === 'object' && Number(p.target) === ORCH_CONTAINER_PORT && Number(p.published) === ORCH_HOST_PORT && (p.host_ip === '127.0.0.1' || p.host_ip === ORCH_BIND_VAR);
+      if (!ok) fail(`${ORCH_SERVICE} may publish only ${ORCH_PORT_FORMS.map((f) => JSON.stringify(f)).join(' or ')} (loopback by default, never 0.0.0.0, never a public address), got ${JSON.stringify(p)}`);
+      continue;
+    }
     if (svc !== EDGE_PUBLISHER) fail(`a lab service must not publish a port (only ${EDGE_PUBLISHER} publishes, and only ${EDGE_PORT})`);
     else if (container !== EDGE_PORT || host !== EDGE_PORT) fail(`${EDGE_PUBLISHER} may publish only ${EDGE_PORT}:${EDGE_PORT} (got ${JSON.stringify(p)})`);
   }
@@ -116,6 +162,7 @@ function checkParsed(text, name, lineProblems) {
       if (exposesSocket(src) || /docker/.test(src)) fail(`${where}: a device entry that exposes the Docker socket is not allowed`);
     }
     problems.push(...checkLabPorts(svc, def, name));
+    if (svc === ORCH_SERVICE && asList(def.profiles).map(String).includes('lab')) problems.push(...checkOrchestrator(def, name));
     const vols = asList(def.volumes).map(volumeInfo);
     if (svc !== SOCKET_PROXY_SERVICE) {
       for (const v of vols) {

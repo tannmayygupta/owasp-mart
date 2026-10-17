@@ -129,7 +129,75 @@ test('lab ports: edge-caddy publishing 80, 8443, or 443 on another host port fai
     assert.match(bad(lab('edge-caddy', p)).join('\n'), /may publish only 443:443|cannot be read/, p);
   }
   assert.match(bad(lab('edge-gate', '["443:443"]'))[0], /service edge-gate: a lab service must not publish a port/);
-  assert.match(bad(lab('orchestrator', '["127.0.0.1:8000:8000"]'))[0], /must not publish a port/);
+  assert.match(bad(lab('relay', '["127.0.0.1:8000:8000"]'))[0], /must not publish a port/);
+});
+
+// ---- the orchestrator container (edge story 6, H-143)
+const ORCH_OK = `services:
+  orchestrator:
+    profiles: ["lab"]
+    user: "65532:65532"
+    read_only: true
+    command: ["--templates-dir", "/t", "--docker-host", "tcp://docker-proxy:2375", "--edge-container", "vulnmart-edge-gate", "--tls-cert", "/run/secrets/tls_cert", "--tls-key", "/run/secrets/tls_key", "--tls-ca", "/run/secrets/tls_ca"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [labs-core]
+    secrets: [{ source: s, target: platform_key }]
+    ports: ["\${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"]
+`;
+const orch = (from, to) => bad(ORCH_OK.replace(from, to));
+
+test('orchestrator container: the service as designed passes, with the loopback form and the long form too', () => {
+  assert.deepEqual(bad(ORCH_OK), []);
+  assert.deepEqual(orch('"${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"', '"127.0.0.1:9443:8443"'), []);
+  assert.deepEqual(orch('["${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"]', '\n      - { target: 8443, published: 9443, host_ip: 127.0.0.1 }'), []);
+});
+
+test('orchestrator container: a published port beyond loopback, another port or a bare publication fails', () => {
+  for (const p of ['"9443:8443"', '"0.0.0.0:9443:8443"', '"${VULNMART_ORCH_BIND}:9443:8443"', '"${VULNMART_ORCH_BIND:-0.0.0.0}:9443:8443"', '"127.0.0.1:8443:8443"', '"127.0.0.1:9443:9443"', '"10.0.0.5:9443:8443"', '8443', '"127.0.0.1:9443:8443", "127.0.0.1:9444:8443"']) {
+    assert.match(orch('"${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"', p).join('\n'), /orchestrator may publish only|cannot be read/, p);
+  }
+  assert.match(orch('["${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"]', '\n      - { target: 8443, published: 9443 }').join('\n'), /may publish only/);
+  assert.match(orch('"${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"', '"127.0.0.1:9090:9090"').join('\n'), /never be published/);
+});
+
+test('orchestrator container: no socket, privileged, host network, TLS bypass, fake backend, local images or Docker address other than the proxy', () => {
+  assert.match(orch('networks: [labs-core]', 'networks: [labs-core]\n    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]').join('\n'), /Docker socket mount is not allowed.*service orchestrator/);
+  assert.match(orch('networks: [labs-core]', 'networks: [labs-core]\n    volumes: ["/var/run:/r"]').join('\n'), /Docker socket mount/);
+  assert.match(orch('read_only: true', 'read_only: true\n    privileged: true').join('\n'), /privileged/);
+  assert.match(orch('read_only: true', 'read_only: true\n    network_mode: host').join('\n'), /network_mode: host/);
+  assert.match(orch('"--templates-dir"', '"--insecure-no-tls", "--templates-dir"').join('\n'), /--insecure-no-tls/);
+  assert.match(orch('"--templates-dir"', '"--allow-fake-backend", "--backend", "fake", "--templates-dir"').join('\n'), /--allow-fake-backend[\s\S]*--backend must be docker/);
+  assert.match(orch('"--templates-dir"', '"--allow-local-images", "--templates-dir"').join('\n'), /--allow-local-images/);
+  assert.match(orch('tcp://docker-proxy:2375', 'tcp://127.0.0.1:2375').join('\n'), /--docker-host must be tcp:\/\/docker-proxy:2375/);
+  assert.match(orch('tcp://docker-proxy:2375', 'unix:///var/run/docker.sock').join('\n'), /--docker-host must be/);
+  assert.match(orch('"--docker-host", "tcp://docker-proxy:2375", ', '').join('\n'), /--docker-host must be/);
+  assert.match(orch('networks: [labs-core]', 'networks: [labs-core]\n    environment:\n      DOCKER_HOST: unix:///x').join('\n'), /DOCKER_HOST is not allowed/);
+  assert.match(orch('"--tls-ca", "/run/secrets/tls_ca"', '"--x"').join('\n'), /must set --tls-ca/);
+});
+
+test('orchestrator container: hardening is required (non-root, read-only, cap_drop ALL, no-new-privileges, only labs-core, secret names are file names)', () => {
+  assert.match(orch('    user: "65532:65532"\n', '').join('\n'), /non-root/);
+  assert.match(orch('user: "65532:65532"', 'user: "0"').join('\n'), /non-root/);
+  assert.match(orch('read_only: true', 'read_only: false').join('\n'), /read_only must be true/);
+  assert.match(orch('cap_drop: [ALL]', 'cap_drop: [CHOWN]').join('\n'), /cap_drop must contain ALL/);
+  assert.match(orch('cap_drop: [ALL]', 'cap_drop: [ALL]\n    cap_add: [CHOWN]').join('\n'), /cap_add must be empty/);
+  assert.match(orch('security_opt: ["no-new-privileges:true"]', 'security_opt: []').join('\n'), /no-new-privileges/);
+  assert.match(orch('networks: [labs-core]', 'networks: [labs-core, edge-public]').join('\n'), /exactly labs-core/);
+  assert.match(orch('networks: [labs-core]', 'networks: [edge-public]').join('\n'), /exactly labs-core/);
+  assert.match(orch('target: platform_key', 'target: /etc/key').join('\n'), /file name under \/run\/secrets/);
+});
+
+test('orchestrator container: the committed service is the one designed here (published form, no socket, secrets as files)', () => {
+  const doc = yaml.load(readFileSync(path.join(ROOT, 'infra', 'compose', 'compose.yaml'), 'utf8'));
+  const o = doc.services.orchestrator;
+  assert.deepEqual(o.profiles, ['lab']);
+  assert.deepEqual(o.ports, ['${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443']);
+  assert.equal((o.volumes ?? []).filter((v) => String(v).includes('docker.sock')).length, 0);
+  assert.deepEqual(o.networks, ['labs-core']);
+  assert.ok(o.command.includes('tcp://docker-proxy:2375') && o.command.includes('http://edge-gate-admin:9090') && o.command.includes('vulnmart-edge-gate'));
+  assert.ok(o.secrets.length === 5 && o.secrets.every((s) => s.source && /^[a-z_]+$/.test(s.target)));
+  assert.deepEqual(checkFiles([path.join(ROOT, 'infra', 'compose', 'compose.yaml')]), []);
 });
 
 test('lab ports: services outside the lab profile and the docker-proxy loopback port are not touched by this rule', () => {
@@ -144,7 +212,7 @@ test('lab ports: the committed compose file has edge-caddy as its only lab servi
   const labServices = Object.entries(doc.services).filter(([, d]) => (d.profiles ?? []).includes('lab'));
   assert.ok(labServices.some(([n]) => n === 'edge-caddy') && labServices.some(([n]) => n === 'edge-gate'));
   const publishing = labServices.filter(([, d]) => (d.ports ?? []).length).map(([n]) => n).sort();
-  assert.deepEqual(publishing, ['docker-proxy', 'edge-caddy']);
+  assert.deepEqual(publishing, ['docker-proxy', 'edge-caddy', 'orchestrator']);
   assert.deepEqual(doc.services['edge-caddy'].ports, ['443:443']);
   assert.equal(doc.services['edge-gate'].ports, undefined);
   assert.deepEqual(checkFiles([path.join(ROOT, 'infra', 'compose', 'compose.yaml')]), []);
