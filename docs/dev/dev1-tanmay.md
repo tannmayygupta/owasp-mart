@@ -339,6 +339,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Done when: The board and aid work as the decision on OI-26 says.
 
 - [ ] **L-29. Isolation proof and extra hardening on VM-I**
+  - Sprint 4 run 2026-10-18 (L-29 part 1, still not ticked): S-3 answered live (the per-subnet INPUT rule blocks the gateway; an uncovered subnet leaks gateway:22), probe PASS after a Docker restart and a reboot, vm-i exposes only 22, read-only audit 8 PASS 0 FAIL, S-15 emulated with the real edge-gate (restart healthy in 3.3 s with 20 networks); research note docs/research/s-3-s-15-vm-i-isolation.md. Open for the Done-when: part 2 (S-8: user namespaces, rootless Docker, gVisor, wider pools) and 20 real instances through the orchestrator.
   - Status 2026-10-17 (not ticked): `scripts/vmi-audit.mjs` (22 tests, fixtures) and runbook `docs/runbooks/vmi-hardening.md` are built; the isolation tests on VM-I are the developer's runs (Part A), no live result exists; S-8 stays open.
   - Epic: `epic-isolation-and-hardening`
   - BMAD story: not planned yet; created when you incept `epic-isolation-and-hardening` (see START-HERE.md, section "First task of an epic")

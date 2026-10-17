@@ -1,0 +1,4 @@
+vm-i, 2026-10-18 (step 3b of docs/runbooks/isolation-vm-i.md, run by Claude over SSH on the developer's authorisation)
+probe subnet and peer subnet of the baseline report: both inside LABS_DOCKER_SUBNETS (two /16 sets in /etc/vulnmart/egress.env); probe differs from peer: yes.
+The daemon address pool is ONE /16 base with /24 networks (256 networks in total), inside the covered set, so a network that Docker creates by itself is always covered by the host rules.
+The run is therefore valid: the rules applied to the probe network.

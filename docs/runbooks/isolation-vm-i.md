@@ -39,6 +39,9 @@ All steps are yours. I (Claude) do not call AWS or SSH to hosts. Paste back the 
 
 **Live record (2026-10-17):** steps 1 to 4 ran on vm-i (Claude over SSH, developer's authorisation): Node 24.21.0 had to be installed first (vm-i has none; a tarball into the home folder, checksum verified; run the probe as `sudo env PATH=$HOME/nodejs/bin:$PATH node scripts/isolation-probe.mjs`, plain `sudo node` does not see it), baseline PASS with the host rule on (16 blocked, control reached, gateway rows timeout). Steps 5 to 7 (host rule off) were refused by the auto-mode safety check when Claude tried them, so they are still to be run by the developer, and steps 8 to 12 are not run. Evidence: `docs/assets/story-4-1-isolation-probe/vm-i-rule-on.json` and `vm-i-stdout.txt`.
 
+
+**Live record 2026-10-18 (story 4.3):** steps 3b, 8, 9, 10 and 11 ran on vm-i; steps 5 to 7 were replaced by a variant that touches no firewall rule: run the probe on fixed subnets outside the covered sets (`node scripts/isolation-probe.mjs --probe-subnet 10.250.250.0/24 --peer-subnet 10.250.251.0/24`, it is meant to FAIL with `open: network-gateway:22`) and compare it with the baseline. Result and consequences: `docs/research/s-3-s-15-vm-i-isolation.md`. Notes from the run: `/tmp` is cleared by a reboot, save reports in your home folder; S-15 was measured by attaching the real edge-gate to 1, 5, 10 and 20 networks by script.
+
 ## Evidence to save under `docs/assets/story-4-1-isolation-probe/`
 
 - `vm-i-rule-on.json`, `vm-i-rule-off.json`, `vm-i-after-docker-restart.json`, `vm-i-after-reboot.json` (the `--out` files; they hold target names and states only).

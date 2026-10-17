@@ -1,0 +1,8 @@
+S-15 on vm-i, 2026-10-18 (Claude over SSH). The REAL edge-gate container (compose service edge-gate) was attached to N internal networks created and connected by a script (the orchestrator is not involved), memory read with docker stats, then restarted with docker restart.
+networks attached | edge networks in docker inspect (incl. 2 compose networks) | memory | restart returned | healthy again | networks after restart
+1  | 3  | 24.4 MiB | 0.33 s | 2.42 s | 3
+5  | 7  | 17.4 MiB | 0.51 s | 2.59 s | 7
+10 | 12 | 17.4 MiB | 0.73 s | 2.80 s | 12
+20 | 22 | 17.4 MiB | 1.18 s | 3.29 s | 22
+attach time: about 26 ms per network (0.52 s for 20); edge-gate healthy 2.08 s after first start; CPU 0.00 percent at rest; all networks removed afterwards (0 left).
+NOT measured: the per-hostname request check and the sync delay after an edge restart (they need instances created by the orchestrator and the reconcile pass); 20 REAL instances were not started.

@@ -22,3 +22,24 @@ covers = ["NFR-SEC-02", "NFR-SEC-04", "NFR-ISO-04"]
 after = [1]
 hitl = false
 risk = "high"
+[[entry]]
+id = 3
+type = "story"
+title = "VM-I host isolation proof: S-3 host rule on and off, persistence across a Docker restart and a reboot, port scan, S-15 attach timing, and the read-only audit (L-29 part 1)"
+description = "Run the remaining live steps of docs/runbooks/isolation-vm-i.md on vm-i (steps 3b to 11) and the read-only audit scripts/vmi-audit.mjs on its command bundle, then record what each result shows. The baseline probe with the host rule on already passed live on 2026-10-17. S-3 answers whether the host INPUT rule or the DOCKER-USER chain stops a container from reaching the host through the gateway; S-15 measures the edge restart and attach behaviour with many instance networks."
+verify = "Each step's real output is saved under docs/assets/story-4-1-isolation-probe/ (names, states and numbers only), the probe passes after a Docker restart and after a reboot, the port scan shows only the allowed ports, S-3 and S-15 each get a one-sentence answer in the research notes, and the audit prints PASS or a named FAIL line per check. A step that a safety check refuses is recorded as not run, not as passed."
+covers = ["NFR-ISO-05", "NFR-ISO-06", "NFR-ISO-07", "NFR-SEC-04"]
+after = [1, 2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "S-8 hardening experiments on VM-I: user namespaces, rootless Docker, gVisor and wider Docker address pools, keeping only what passes the probe and an instance run (L-29 part 2)"
+description = "For each candidate (userns-remap, rootless Docker, the gVisor runtime runsc, a larger default-address-pool) change one thing at a time on the empty vm-i, run the isolation probe and a stub instance start, and keep the change only if both pass; otherwise revert it and record why. Write the S-8 result and the address-pool decision."
+verify = "For every candidate a recorded row: change made, probe result, instance run result, kept or reverted and why; vm-i is back in a state where the probe and a stub instance pass; the research note docs/research/s-8-instance-sandboxing.md states what worked and what did not."
+covers = ["NFR-ISO-05", "NFR-ISO-06", "NFR-ISO-07"]
+after = [3]
+hitl = false
+risk = "high"

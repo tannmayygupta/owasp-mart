@@ -69,3 +69,36 @@ covers = ["LX-1", "LX-3", "LX-4"]
 after = [2]
 hitl = true
 risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Live lab loop on the deployed hosts: platform receiver on vm-p, orchestrator and edge on vm-i, real certificate and DuckDNS hostname, one captured flag and a score (L-30, lab side)"
+description = "The lab half of the end-to-end loop on the real hosts: the lab runtime on vm-p creates an attempt through the vm-i orchestrator over mutual TLS, the instance (stub image) is opened through the real edge and the wildcard certificate at its DuckDNS hostname from the developer's PC, the sidecar's signed events reach the vm-p receiver, a flag is submitted and the score is read, the deadline is advanced, the instance is frozen and destroyed, and nothing is left behind."
+verify = "A scripted run from the developer's PC prints one PASS line per step with real status codes (ticket accepted, no cookie refused, shop answers through the real certificate, milestone credited, score equals the hand number, frozen page, destroyed), the vm-i containers and networks are empty afterwards, and the evidence has no flag, key or address."
+covers = ["LX-1", "FR-INS-10", "FR-SES-11", "FR-DET-01", "FR-SCR-01"]
+after = [3]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Platform-wide end-to-end suite on the deployed system: signup, instance start, a captured flag, an attempt, scoring and a recruiter report (L-30, rest)"
+description = "The part of L-30 that needs the platform and the shop on the deployed hosts: signup and login, starting a lab from the dashboard, a captured flag, an assessment attempt, the score and the recruiter report. It cannot start until Akshay's deployed platform (P-32) and Sahil's deployed shop (T-32) are merged and running; this entry records the wait and the acceptance criteria so the suite can be written the day they land."
+verify = "The suite is green on the deployed system and the load numbers are recorded (the lab-side load numbers already exist for the stub image)."
+covers = ["LX-1", "LX-2"]
+after = [7]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Demo rehearsal on the laptop and online, including the fallback, and the submission pack check (L-31)"
+description = "Two recorded rehearsal passes of docs/runbooks/demo-19-oct.md (laptop with the fallback, and online on the deployed hosts), the failures found written into its failure table, and a final run of scripts/check-submission-pack.mjs. Part of this needs a person, so it is hitl: the steps that can run unattended are run, the rest is a checklist for the developer."
+verify = "docs/runbooks/demo-19-oct.md holds two filled rehearsal records with real timings and the problems found; check-submission-pack passes; a step nobody could run is marked not run."
+covers = ["LX-3", "LX-4"]
+after = [7]
+hitl = true
+risk = "medium"
