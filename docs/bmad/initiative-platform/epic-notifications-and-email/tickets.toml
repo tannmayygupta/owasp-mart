@@ -1,0 +1,25 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-17: one story per task of docs/dev/dev2-akshay.md (P-09, P-10), as START-HERE.md section 5 asks. The developer
+# chose "continue automatically" and the Brevo single-sender provider (OI-32 answer, 2026-10-17); neither is yet recorded in initial.md.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Outbox, queue worker and email provider"
+description = "Writes email_outbox in the caller's transaction, relays due rows to a Dramatiq worker on Valkey with back-off retries and a daily cap, and sends through a Brevo (API) or SMTP (Mailpit) provider adapter."
+verify = "An email enqueued in a transaction is delivered to Mailpit, a failing provider is retried with back-off until it succeeds or is marked failed, a restart loses nothing, and 5 rows over a cap of 2 go out over two days in order."
+covers = ["FR-NTF-02", "FR-NTF-03"]
+after = ["epic-platform-baseline"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Email templates and in-app warnings"
+description = "Renders every email type (verification, reset, approval outcome, invite, withdrawal, deletion, retention warning) from one template registry and exposes in-app warnings."
+verify = "Each template renders with its own link only and sends through the outbox in a test; a warning is stored and read back through the API."
+covers = ["FR-NTF-01", "FR-NTF-04"]
+after = [1]
+hitl = false
+risk = "low"

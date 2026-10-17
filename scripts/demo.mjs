@@ -18,7 +18,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PROJECT = 'vulnmart-demo';
 export const STUB_TAG = 'vulnmart-stub-instance:local';
 export const SHOP_TAG = 'vulnmart-shop:local';
-export const PLATFORM_CONTAINERS = ['postgres', 'valkey', 'mailpit', 'migrate', 'api', 'web'].map((s) => `vulnmart-${s}`);
+export const PLATFORM_CONTAINERS = ['postgres', 'valkey', 'mailpit', 'migrate', 'api', 'worker', 'web'].map((s) => `vulnmart-${s}`);
 export const EVIDENCE_FILE = path.join(ROOT, 'docs', 'assets', 'local-demo', 'demo-output.txt');
 const TEMPLATE_FILE = path.join(ROOT, 'contracts', 'instance', 'examples', 'valid', 'instance-template', 'shop-template.json');
 const TEMPLATE_SCHEMA = path.join(ROOT, 'contracts', 'instance', 'instance-template.schema.json');

@@ -42,6 +42,13 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-outbox-queue-worker-and-email-provider-plan (2026-10-17)
+
+- Admin HTTP routes for the failed-mail list, the outbox counts and requeue (P-28, H-128); the functions exist and are tested.
+- Provider facts not verified at build time: whether Brevo's 300 a day also counts API mail; Single Sender Verification steps; the production sender address (OI-9, OI-32). The Brevo adapter was tested against fake HTTP answers built from the documentation, never against Brevo itself (no account or key was used).
+- Spike S-18 (Dramatiq on Valkey under a worker kill and under load) is still open; this story shows delivery and a worker restart on Valkey 9.0.6, not a kill during a send.
+- Delivery is at-least-once (ADR 0040); a duplicate is possible only in the window between the provider accepting a mail and the row being marked sent.
+
 ## Deferred from: code review of story-dashboards-skeleton-with-the-same-origin-proxy-local-plan (2026-10-12)
 
 - The health page's own client call is not run in a real browser under the CSP (no browser harness yet); the e2e test fetches the same URL and checks the CSP. Add a browser test with the first dashboards story that needs one.

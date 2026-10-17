@@ -42,6 +42,18 @@ class Settings(BaseSettings):
     # Production reads it from a file (architecture 06 s3: secrets are files under /run/secrets); the file wins.
     origin_secret: str | None = Field(default=None, repr=False)
     origin_secret_file: str | None = None
+    # Email (story P-09, OI-32 answer 2026-10-17: Brevo single sender). `smtp` talks to Mailpit in development; `brevo` uses the API.
+    email_provider: Literal["smtp", "brevo"] = "smtp"
+    email_sender_address: str = "no-reply@vulnmart.invalid"  # for Brevo: the verified single sender
+    email_sender_name: str = "VulnMart"
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=1025, ge=1, le=65535)
+    smtp_starttls: bool = False
+    smtp_username: str | None = None
+    smtp_password: str | None = Field(default=None, repr=False)
+    brevo_api_key: str | None = Field(default=None, repr=False)
+    brevo_api_key_file: str | None = None  # production reads secrets from files (architecture 06 s3); the file wins
+    email_relay_interval_seconds: float = Field(default=5.0, gt=0, le=600)
 
     def origin_secrets_value(self) -> str | None:
         """The configured origin secret(s): the file's content when a file is named, else the environment value."""
@@ -49,6 +61,12 @@ class Settings(BaseSettings):
             with open(self.origin_secret_file, encoding="utf-8") as f:
                 return f.read().strip()
         return self.origin_secret
+
+    def brevo_key_value(self) -> str | None:
+        if self.brevo_api_key_file:
+            with open(self.brevo_api_key_file, encoding="utf-8") as f:
+                return f.read().strip()
+        return self.brevo_api_key
 
 
 @lru_cache(maxsize=1)

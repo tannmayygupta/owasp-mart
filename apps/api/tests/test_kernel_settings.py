@@ -87,8 +87,8 @@ def test_an_unknown_name_or_a_wrongly_typed_row_is_refused(port):
 
 def test_the_history_has_one_root_and_one_head():
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0001"]
-    assert [r.revision for r in script.walk_revisions()] == ["0001"]
+    assert script.get_heads() == ["0002"]
+    assert [r.revision for r in script.walk_revisions()] == ["0002", "0001"]
 
 
 def test_stream_l_single_head_check_passes():
@@ -112,6 +112,7 @@ def test_the_offline_sql_creates_the_five_tables_with_forced_row_level_security(
         assert f"CREATE POLICY org_scope ON {table}" in sql
     assert "current_setting('vulnmart.org_id', true)" in sql
     assert "GRANT SELECT, INSERT, UPDATE, DELETE ON settings, quotas, job_runs, organizations, org_members TO vulnmart_app" in sql
+    assert "CREATE TABLE email_outbox" in sql and "GRANT SELECT, INSERT, UPDATE, DELETE ON email_outbox TO vulnmart_app" in sql
     assert "BYPASSRLS" not in sql and "OWNER TO vulnmart_app" not in sql, "the app role gets row rights only"
 
 
@@ -128,4 +129,7 @@ def test_every_table_of_the_metadata_is_in_the_table_owners_file():
 
     owners = {row["table"] for row in yaml.safe_load((ROOT / "contracts" / "db" / "table-owners.yaml").read_text(encoding="utf-8"))["tables"]}
     assert set(Base.metadata.tables) <= owners
-    assert json.dumps(sorted(Base.metadata.tables)) == json.dumps(["job_runs", "org_members", "organizations", "quotas", "settings"])
+    import vulnmart.notifications.models  # noqa: F401 - registers email_outbox whichever test ran first
+
+    assert json.dumps(sorted(Base.metadata.tables)) == json.dumps(
+        ["email_outbox", "job_runs", "org_members", "organizations", "quotas", "settings"])
