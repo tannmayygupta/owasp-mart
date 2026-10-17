@@ -9,6 +9,10 @@
 // section 6: /version carries no secrets).
 
 import express from 'express';
+import { configureViews } from './web/views.mjs';
+import { loadUser, checkCsrf } from './web/middleware.mjs';
+import { registerRoutes } from './web/routes.mjs';
+import { registerStaffRoutes } from './web/routes-staff.mjs';
 
 // Build id and catalogue version are supplied by the environment at run time.
 // They default to "dev" so the skeleton answers even outside an instance.
@@ -22,7 +26,13 @@ const CATALOGUE_VERSION = process.env.VM_CATALOG_VERSION ?? 'dev';
 // (instance contract section 5/6).
 const ALWAYS_READY = () => true;
 
-export function createApp({ isReady = ALWAYS_READY } = {}) {
+// Build the app. Pass { db } to mount the customer-facing shop (T-14); without
+// a db only the health endpoints are served (the T-01 skeleton / health tests).
+// Pass { isReady } (T-04) to gate /readyz behind the instance marker + snapshot;
+// without it the shop is always-ready (tests / local runs). Pass { emit } to post
+// app events to the sidecar on built flows (T-09, IF-4); without it emission is a
+// no-op (local runs and tests that do not assert on events).
+export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -48,6 +58,24 @@ export function createApp({ isReady = ALWAYS_READY } = {}) {
     res.status(200).json({ build: BUILD_ID, catalogue_version: CATALOGUE_VERSION });
   });
 
+  // The customer-facing marketplace (T-14), mounted only when a db is given.
+  if (db) {
+    configureViews(app);
+    app.use(express.urlencoded({ extended: false }));
+    // In instance mode the snapshot db opens only after the injector marker; until
+    // then answer marketplace routes with a clean 503 (the health endpoints above
+    // are already served) rather than letting a db access throw a logged 500. In
+    // tests / local runs `isReady` is always-ready, so this is a no-op there.
+    app.use((_req, res, next) => {
+      if (!isReady()) return res.status(503).json({ code: 'SHOP-NOT-READY', message: 'Not ready' });
+      next();
+    });
+    app.use(loadUser(db));
+    app.use(checkCsrf);
+    registerRoutes(app, db, emit);
+    registerStaffRoutes(app, db);
+  }
+
   // Terminal handler: unknown routes return a JSON body, never a stack trace
   // (instance contract error-body style: code, message).
   app.use((_req, res) => {
@@ -55,10 +83,12 @@ export function createApp({ isReady = ALWAYS_READY } = {}) {
   });
 
   // Error handler (4-arg): a thrown route error returns the same JSON shape
-  // rather than Express's default non-JSON body, and never a stack trace
-  // (NFR-SEC-03). Kept minimal here; routes that throw arrive in later stories.
+  // rather than Express's default non-JSON body, and never a stack trace to the
+  // client (NFR-SEC-03). The error IS logged server-side so an unexpected 500 is
+  // diagnosable (the instance log is not player-visible; it carries no flags).
   // eslint-disable-next-line no-unused-vars
-  app.use((_err, _req, res, _next) => {
+  app.use((err, _req, res, _next) => {
+    console.error('shop 500:', err?.stack ?? err?.message ?? err);
     res.status(500).json({ code: 'SHOP-INTERNAL', message: 'Internal error' });
   });
 

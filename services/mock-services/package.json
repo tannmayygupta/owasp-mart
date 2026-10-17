@@ -1,0 +1,15 @@
+{
+  "name": "@vulnmart/mock-services",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Combined per-instance mock services (payment, KYC, metadata, XSS collector). Node built-ins only.",
+  "scripts": {
+    "start": "node src/main.mjs",
+    "reach:check": "node instance-harness/mock-reach-check.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

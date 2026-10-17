@@ -1,0 +1,14 @@
+{% extends "layout.njk" %}
+{% block title %}Shop{% endblock %}
+{% block body %}
+<form method="get" action="/shop"><input name="q" value="{{ q }}" placeholder="Search products"><button>Search</button></form>
+<div class="grid" style="margin-top:1rem">
+  {% for p in products %}
+  <div class="card">
+    <a href="/product/{{ p.id }}"><strong>{{ p.title }}</strong></a>
+    <p class="muted">{{ p.description }}</p>
+    <p class="price">{{ p.price_cents | cents }}</p>
+  </div>
+  {% else %}<p class="muted">No products found.</p>{% endfor %}
+</div>
+{% endblock %}

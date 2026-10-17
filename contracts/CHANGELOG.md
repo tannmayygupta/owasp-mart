@@ -254,6 +254,15 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
+### 2026-10-15 (Sahil, Sprint 2 to main — images.yml path filters, PR #14 review A1)
+- registry change: `.github/workflows/images.yml` adds `services/**` to the `push` and `pull_request` path filters, so a change to the new `services/mock-services`, `services/import-service` or `services/bot` images triggers the image build. Workflow change only — no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract, or any rule. (The same change also adds an optional per-image `healthcheck` argv to `infra/images.json` and emits it from `scripts/images-release.mjs`; those files are not guarded contract paths.)
+
+### 2026-10-15 (Sahil, T-03 contracts v1.0.0 sign-off)
+- registry change: in `contracts/COMPAT.md` the four stream-T Approvals rows (IF-4 consumer, IF-6 consumer, IF-7 owner, DB consumer) are set to `approved` at version 1.0.0 — Sahil's sign-off. No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
+
+### 2026-10-12 (Sahil, Sprint 2, T-11/T-12/T-13)
+- registry change: the `app tests` CI job in `.github/workflows/ci.yml` now also runs `services/*/test/**/*.test.mjs`, so the new `services/mock-services`, `services/import-service` and `services/bot` test suites run in CI alongside `apps/*`. Workflow change only — no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract, or any rule.
+
 ### 2026-10-11 (Tanmay, story L-09 preparation, ADR 0029)
 - registry change: new rule `approvals` (starts with the first tag `contracts-v*`: a pull request that changes a contract needs one approval from an owner or consumer, or from every consumer other than the author when the change is declared BREAKING (if the author is the only consumer, one approval from any other listed person), never the author's own, never one given before a later change of the contract files; the approvers are read from the base copy of `contracts/COMPAT.md`); `compat` reads only the `## Versions` table; the job `contract-rules` fetches the pull request reviews in a separate step (`pull-requests: read`) and hands the file to the checker; new file `contracts/COMPAT.md` (also guarded: an edit of it needs a `registry change:` line; CODEOWNERS lists the three owners); new script `scripts/tag-contracts.mjs` (checks the preconditions and prints the tag commands, never pushes).
 

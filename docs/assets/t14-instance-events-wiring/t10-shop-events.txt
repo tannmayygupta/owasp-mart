@@ -1,0 +1,14 @@
+PASS live-shop-up
+PASS live-sidecar-reachable
+PASS live-ingest-up
+PASS live-ready-after-injection
+PASS live-sidecar-accepts-event
+PASS live-real-login-succeeds
+PASS live-fake-ingest-accepts-shop-event
+PASS live-real-action-reaches-ingest
+PASS live-ingest-rejects-unsigned
+PASS live-no-route-to-platform
+PASS live-no-egress
+PASS live-no-secret-in-ingest-readout
+
+shop-events: PASS (12 checks)
