@@ -156,8 +156,8 @@ def test_invalid_input_is_refused_and_leaves_nothing(service, sessions, kwargs, 
 
 def test_the_eleven_character_boundary(service, sessions):
     with pytest.raises(InvalidInput):
-        service.signup(email="a@example.com", password="x" * 11, display_name="A")
-    service.signup(email="a@example.com", password="x" * 12, display_name="A")
+        service.signup(email="a@example.com", password="abcdefghijk", display_name="A")
+    service.signup(email="a@example.com", password="abcdefghijkl", display_name="A")
     assert len(users(sessions)) == 1
 
 

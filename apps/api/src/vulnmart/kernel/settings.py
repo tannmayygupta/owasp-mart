@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # file wins; staging and production do not start without one. dev and test make a random key per process (tokens then end with it).
     csrf_secret: str | None = Field(default=None, repr=False)
     csrf_secret_file: str | None = None
+    # Password quality (story P-14): `local` checks the bundled list of common passwords; `hibp` also asks the Pwned Passwords range API (it
+    # sees only the first 5 characters of a SHA-1); `off` is for dev and test only.
+    breach_check: Literal["local", "hibp", "off"] = "local"
 
     def csrf_key(self) -> bytes | None:
         """The configured CSRF key as bytes, or None when none is set."""

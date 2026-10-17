@@ -32,13 +32,13 @@ from vulnmart.ports.settings import SettingsPort
 from .models import EmailToken, User
 from .roles import NotAnAdmin
 from .security import hash_password, new_token, new_user_id, normalize_email, token_hash
-from .service import InvalidInput, clean_display_name
+from .passwords import PasswordPolicy
+from .service import InvalidInput, check_new_password, clean_display_name
 
 logger = logging.getLogger("vulnmart.accounts")
 
 Clock = Callable[[], datetime]
 ADMIN_PASSWORD_MIN = 16
-PASSWORD_MAX = 128
 SEED_ACTOR = "system:seed"
 
 
@@ -52,20 +52,20 @@ class EmailInUse(Exception):
 
 class AdminService:
     def __init__(self, sessions: sessionmaker[Session], settings: SettingsPort, audit: AuditPort, *, public_origin: str,
-                 now: Clock = utc_now):
+                 now: Clock = utc_now, policy: PasswordPolicy | None = None):
         self._sessions = sessions
         self._settings = settings
         self._audit = audit
         self._origin = public_origin.rstrip("/")
         self._now = now
+        self._policy = policy or PasswordPolicy()
 
     def _new_admin(self, session: Session, *, email: str, display_name: str, password: str, now: datetime) -> User:
         email_ci = normalize_email(email)
         if email_ci is None:
             raise InvalidInput("/email")
         name = clean_display_name(display_name)
-        if not ADMIN_PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
-            raise InvalidInput("/password")
+        check_new_password(self._policy, password, pointer="/password", email=email_ci, display_name=name, min_length=ADMIN_PASSWORD_MIN)
         if session.scalar(select(User.id).where(User.email_ci == email_ci)) is not None:
             raise EmailInUse
         user = User(id=new_user_id(), account_type="admin", email=email.strip()[:254], email_ci=email_ci, password_hash=hash_password(password),

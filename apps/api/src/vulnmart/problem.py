@@ -99,6 +99,12 @@ def _pointer(loc: Sequence[object]) -> str:
 _DETAILS = {
     "missing": "This field is required.",
     "json_invalid": "The request body is not valid JSON.",
+    # password quality (story P-14): fixed sentences that tell the person what to change and never repeat the password
+    "password_length": "The password must be 12 to 128 characters long.",
+    "password_common": "This password is too easy to guess. Choose another one.",
+    "password_breached": "This password has appeared in a data breach. Choose another one.",
+    "password_identity": "The password must not contain your email address or your name.",
+    "password_same": "The new password must be different from the current one.",
 }
 
 

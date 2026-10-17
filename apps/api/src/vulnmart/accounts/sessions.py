@@ -198,13 +198,17 @@ class SessionService:
     def rotate(self, token: str) -> str | None:
         """A new session value for the same login after a privilege change (FR-ACC-03): the old value stops working, the absolute
         deadline stays. None when the old value is not a live session."""
-        digest, now = token_hash(token), self._now()
         with self._sessions.begin() as session:
-            row = session.get(UserSession, digest)
-            if row is None or row.revoked_at is not None:
-                return None
-            row.revoked_at = now
-            return self._create(session, row.user_id, now, _aware(row.absolute_expires_at), row.ip_trunc, row.ua_class)
+            return self.rotate_in(session, token)
+
+    def rotate_in(self, session: Session, token: str) -> str | None:
+        """`rotate` inside a transaction the caller owns (a password change does everything or nothing)."""
+        digest, now = token_hash(token), self._now()
+        row = session.get(UserSession, digest)
+        if row is None or row.revoked_at is not None:
+            return None
+        row.revoked_at = now
+        return self._create(session, row.user_id, now, _aware(row.absolute_expires_at), row.ip_trunc, row.ua_class)
 
     # -- a user's own sessions (FR-ACC-04) ----------------------------------------------------------------------------
 
@@ -232,13 +236,15 @@ class SessionService:
 
     def revoke_all(self, user_id: str, *, keep: str | None = None) -> int:
         """Log out everywhere (FR-ACC-04), optionally keeping the session behind the `keep` cookie value (a password change)."""
-        keep_hash = token_hash(keep) if keep else None
         with self._sessions.begin() as session:
-            query = update(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
-            if keep_hash:
-                query = query.where(UserSession.id_hash != keep_hash)
-            return session.execute(query.values(revoked_at=self._now())).rowcount
+            return self.revoke_all_in(session, user_id, keep=keep)
 
+    def revoke_all_in(self, session: Session, user_id: str, *, keep: str | None = None) -> int:
+        """`revoke_all` inside a transaction the caller owns."""
+        query = update(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+        if keep:
+            query = query.where(UserSession.id_hash != token_hash(keep))
+        return session.execute(query.values(revoked_at=self._now())).rowcount
     # -- CSRF --------------------------------------------------------------------------------------------------------
 
     def csrf_token(self, token: str) -> str:
