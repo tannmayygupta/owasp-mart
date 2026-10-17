@@ -165,6 +165,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Done when: A hello stack from CI runs on both VMs and on the laptop.
 
 - [x] **L-13. Orchestrator creates an instance from a template**
+  - Live 2026-10-17 (S-4): cold start measured on vm-i with the STUB image (median 2.12 s, p95 2.81 s, 10 rounds; about 30 MiB per instance; evidence `docs/assets/orchestrator-measure/vm-i-s4-measure-result.json`, `docs/research/s4-cold-start-and-memory.md`). The Done-when "cold-start time measured and recorded" is met for the stub; the real shop images (T-04, L-12) will be heavier and must be measured again.
   - Closed 2026-10-12 on the developer's instruction. Done-when NOT met: S-4 not measured on vm-i (developer run, runbook `docs/runbooks/measure-instances.md`); reset (3.4) and reconciler (3.5) belong to L-14. ONE sprint PR carries L-13 too (branch shared-L-13 is not pushed); Sahil's T-09 waits for this PR being merged, tell him then.
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
@@ -187,6 +188,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Status (2026-10-16): ticked on the developer's instruction to complete sprint 2 from our side. Stories 3.4 (reset, reaper, settings; ADR 0035, D-54) and 3.5 (reconciler, tombstones, startup gate; ADR 0036, D-55) are built, reviewed with four lenses and tested locally (orchestrator 406 tests, shared protocol suites 392 passed, real-Docker kill test: no orphan after the first pass). NOT met live: nothing ran on vm-i; the platform activity signal and the desired-state list are open (H-122, H-123, Akshay); the stories stay `built` until the developer confirms them. Open leftovers are in `docs/bmad/initiative-lab/deferred-work.md`.
 
 - [ ] **L-15. Instance isolation and hardening**
+  - Live 2026-10-17 (partial, not ticked): on vm-i the baseline isolation probe PASSES with the host rule on (16 forbidden targets blocked, control reached, gateway rows timeout; `docs/assets/story-4-1-isolation-probe/vm-i-rule-on.json`). NOT done: S-3 host rule off (the auto-mode safety check refused the script; the developer runs steps 5 to 7 of `docs/runbooks/isolation-vm-i.md`), the subnet check 3b, Docker restart and reboot (steps 8 and 9), the port scan, S-15 with 20 instances, the socket proxy in front of the orchestrator on vm-i.
   - Epic: `epic-isolation-and-hardening`
   - BMAD story: not planned yet; created when you incept `epic-isolation-and-hardening` (see START-HERE.md, section "First task of an epic")
   - Build: Internal networks with no route out, a host rule that drops instance-to-host traffic, hardened containers, the Docker socket behind a proxy, template-ID-only orchestrator requests.
@@ -196,7 +198,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Handoffs: H-62, H-71 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status (2026-10-16): NOT ticked. Stories 4.1 (isolation probe from inside a real instance network, conformance rules, VM-I runbook `docs/runbooks/isolation-vm-i.md`; ADR 0037, D-57) and 4.2 (Docker socket behind a filtering proxy, compose rule on a real YAML parse; ADRs 0010 and 0038, D-58) are built, reviewed and tested on Docker Desktop (the probe reports 16 forbidden targets blocked and the control reached). Done-when needs the developer's run on VM-I (S-3 host rule on and off, S-15, the proxy in front of the orchestrator): runbook steps, handoff H-125. Tick when the evidence is saved.
 
-- [ ] **L-16. Concurrency, quotas, start failures and warm-pool decision**
+- [x] **L-16. Concurrency, quotas, start failures and warm-pool decision**
+  - Closed 2026-10-17 after a live run on vm-i (Claude over SSH, developer's authorisation): 10 and 20 stub instances started at once, 10 of 10 and 20 of 20 ready, 0 failed, 0 refused, wall 8.0 s and 16.1 s, p95 ready 8.0 s and 16.1 s, build cap held at 4, about 30 MiB per instance, nothing left behind (`docs/assets/story-3-6-concurrency-quotas/vm-i-concurrent-10.json`, `-20.json`); quotas and failed starts were proven locally (story 3.6). ADR 0039 stays accepted: no warm pool unless the real shop's p95 exceeds 30 s or a start is refused. NOT met: numbers with the real images (T-04, L-12), the real InstancePort and quota numbers (Akshay, H-79, H-126).
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
   - Build: Start many instances at once without manual work, enforce per-user, per-company and global quotas through QuotaPort (a fake until Akshay's P-28), handle start failures, decide whether a warm pool is needed.

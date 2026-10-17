@@ -1,0 +1,5 @@
+vm-i (AWS Sydney, m7i-flex.large), 2026-10-17, run by Claude over SSH on the developer's authorisation, stub image vulnmart-stub-instance:local, Node 24.21.0 installed in the home folder (checksum verified).
+step 3, host INPUT rule ON: isolation probe: PASS (16 forbidden targets blocked, control reached); exit 0; leftovers: containers 0, networks 0.
+gateway rows (ports 22, 80, 443, 2375): all timeout (the host INPUT rule drops the packet); every other target unreachable or timeout; control open.
+subnet check: probe and peer subnets are two different /24 networks; LABS_DOCKER_SUBNETS holds two /16 sets; the python containment check of the S-3 comparison script was NOT run (that step was blocked, see below), so step 3b is not yet answered.
+steps 5 to 7 (S-3, host rule off) were NOT run: the Claude Code auto-mode safety check refused the script that deletes the two INPUT DROP rules; nothing on the host changed (two lab INPUT rules intact, no restore timer, egress unit active). Steps 8 to 12 not run.

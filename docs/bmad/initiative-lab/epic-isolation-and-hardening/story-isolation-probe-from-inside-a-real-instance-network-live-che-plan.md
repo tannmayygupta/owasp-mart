@@ -99,3 +99,5 @@ A probe on a default bridge proves nothing about an instance network, so the pro
 - `node scripts/isolation-probe.mjs` -- expected: exit 0, report saved to evidence
 - `node --test scripts/isolation-probe.test.mjs scripts/check-instance-conformance.test.mjs scripts/infra-isolation.test.mjs` -- expected: pass
 - `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs` -- expected: pass
+
+Follow-up 2026-10-17: live results on vm-i (stub image), dev-log 2026-10-17-tannmayygupta-live-measurements-vm-i.md.

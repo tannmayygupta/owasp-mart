@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-17",
+  "images": "stub instance image (L-06), two components (injector and shop)",
+  "host": {
+    "os": "Linux",
+    "kernel": "7.0.0-1014-aws",
+    "machine": "x86_64",
+    "cpus": 2,
+    "mem_total_mb": 7776
+  },
+  "docker": "29.9.0",
+  "memory_limit_mb": 256,
+  "cold_start_s": {
+    "n": 1,
+    "min": 2.11,
+    "median": 2.11,
+    "p95": 2.11,
+    "max": 2.11
+  },
+  "create_while_n_running_s": {
+    "n": 1,
+    "min": 2.14,
+    "median": 2.14,
+    "p95": 2.14,
+    "max": 2.14
+  },
+  "instances_running": 1,
+  "container_memory_mb_per_instance": {
+    "n": 1,
+    "min": 30.05,
+    "median": 30.05,
+    "p95": 30.05,
+    "max": 30.05
+  },
+  "host_mem_available_drop_mb_total": -34.9,
+  "host_mem_available_drop_mb_per_instance": -34.9,
+  "concurrent_start": {
+    "requested": 20,
+    "ready": 20,
+    "failures": 0,
+    "busy": 0,
+    "wall_clock_s": 16.14,
+    "most_builds_together": 4,
+    "ready_after_s": {
+      "n": 20,
+      "min": 2.87,
+      "median": 9.18,
+      "p95": 16.13,
+      "max": 16.13
+    }
+  },
+  "failures": 0,
+  "leftovers_after": 0
+}
