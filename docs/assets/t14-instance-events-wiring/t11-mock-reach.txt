@@ -1,0 +1,8 @@
+PASS live-inside-payment-reachable
+PASS live-inside-kyc-reachable
+PASS live-inside-metadata-reachable
+PASS live-inside-collector-reachable
+PASS live-outside-no-route
+PASS live-not-published-to-host
+
+mock-services: PASS (6 checks)

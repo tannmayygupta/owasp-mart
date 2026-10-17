@@ -9,6 +9,11 @@ import { hash } from '../../src/identity/password.mjs';
 // A documented, non-secret demo password for the seeded world accounts.
 export const SEED_PASSWORD = 'vulnmart-seed-demo';
 
+// Every plaintext login password this contribution seeds. A single global test
+// aggregates `seededPasswords` across all contributions and asserts they are
+// all distinct, enforcing FR-SHP-08 (no password reused across challenges).
+export const seededPasswords = [SEED_PASSWORD];
+
 export default function seed(db, ctx) {
   const ts = ctx.ts;
   const pw = hash(SEED_PASSWORD);

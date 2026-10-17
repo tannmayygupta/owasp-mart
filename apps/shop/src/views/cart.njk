@@ -1,0 +1,19 @@
+{% extends "layout.njk" %}
+{% block title %}Cart{% endblock %}
+{% block body %}
+<h1>Your cart</h1>
+<table><tr><th>Item</th><th>Qty</th><th>Line</th></tr>
+{% for i in cart.items %}<tr><td>{{ i.title }}</td><td>{{ i.qty }}</td><td>{{ i.line_cents | cents }}</td></tr>
+{% else %}<tr><td colspan="3" class="muted">Empty.</td></tr>{% endfor %}
+<tr><th>Total</th><th></th><th>{{ cart.total_cents | cents }}</th></tr></table>
+{% if cart.items|length %}
+<form method="post" action="/checkout" class="card" style="margin-top:1rem">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h3>Checkout</h3>
+  <p><input name="line1" placeholder="Address line 1" required></p>
+  <p><input name="city" placeholder="City" required> <input name="country" placeholder="Country" required></p>
+  <p><input name="card" placeholder="Card number (simulated)" required></p>
+  <button>Pay {{ cart.total_cents | cents }}</button>
+</form>
+{% endif %}
+{% endblock %}

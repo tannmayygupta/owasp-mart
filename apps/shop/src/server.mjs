@@ -5,7 +5,12 @@
 // only; the shop has no egress of its own (that boundary is enforced in T-09).
 
 import { createApp } from './app.mjs';
-import { makeReadiness } from './instance/instance.mjs';
+import { openDb } from './db/index.mjs';
+import { migrate } from './db/migrate.mjs';
+import { makeReadiness, lazyDb, makeEmitter } from './instance/instance.mjs';
+// `seedAll` is imported dynamically in the local-run branch only: the seed data
+// lives outside src/ and is NOT shipped in the instance image (the instance gets
+// a pre-seeded snapshot from the injector), so the instance path must not load it.
 
 // Resolve PORT once. An unset value defaults to 3000; a set-but-invalid value is
 // a misconfiguration we fail loudly on rather than binding a random port. The
@@ -36,10 +41,33 @@ function instanceReadiness(env) {
   if (set !== 3) {
     throw new Error('instance mode needs all of VM_SNAPSHOT_PATH, VM_FLAGS_PATH and VM_DB_PATH (or none)');
   }
-  return makeReadiness({ snapshotPath, flagsPath, dbPath }).ready;
+  return makeReadiness({ snapshotPath, flagsPath, dbPath });
 }
 
-const app = createApp({ isReady: instanceReadiness(process.env) });
+// Reconcile the T-14 marketplace (needs an open db) with the T-04 instance
+// readiness (db appears from the injected snapshot only after the marker). For a
+// local / non-instance run we open, migrate and seed a fresh db and mount the
+// full shop, always-ready, with no event emission (no sidecar). In an instance
+// the db comes from the injected snapshot once ready, so the marketplace mounts
+// on a lazy handle (the routes resolve the db per request, after /readyz is 200)
+// and app events are posted to the sidecar (T-09, IF-4).
+const readiness = instanceReadiness(process.env);
+let db;
+let emit;
+if (!readiness) {
+  db = openDb(process.env.VM_DB_PATH ?? ':memory:');
+  migrate(db);
+  if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
+    const { seedAll } = await import('../seed/registry.mjs');
+    await seedAll(db);
+  }
+  emit = () => {};
+} else {
+  db = lazyDb(readiness.getDb);
+  emit = makeEmitter(process.env.VM_SIDECAR_EVENTS_URL);
+}
+
+const app = createApp({ db, isReady: readiness?.ready, emit });
 const server = app.listen(PORT, HOST, () => {
   console.log(`vulnmart-shop listening on http://${HOST}:${PORT}`);
 });

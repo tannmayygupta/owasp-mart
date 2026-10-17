@@ -107,7 +107,9 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
 
 Goal: The shop runs inside an instance (health, events, mock services, import service, bot) and the customer, support, finance and admin flows work.
 
-- [ ] **T-09. Health, readiness after the injector marker and runtime profile**
+> Tick vs plan status (CLAUDE.md task-cycle step 4): a `[x]` here means the task's "Done when" criteria are met and verified (tests/harness/demo with recorded output). The matching BMAD story plan under `docs/bmad/initiative-target/` stays `status: built` — in review on PR #14 — and advances to `done` (via `bmad-ticket`) only when the developer (Sahil) confirms, per step 4. So `[x]` here with `built` in the plan is expected while the sprint PR is open, not a mismatch to "fix".
+
+- [x] **T-09. Health, readiness after the injector marker and runtime profile**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Health endpoints, ready only after the injector writes the marker, running non-root with a read-only filesystem and no egress.
@@ -116,7 +118,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: The shop is never ready before the marker and runs under the runtime profile in the harness.
   - Handoffs: H-24, H-26, H-27, H-30, H-31, H-32, H-33, H-34 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-10. Shop boundaries and signed app events**
+- [x] **T-10. Shop boundaries and signed app events**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The shop has no route to the platform database, Valkey, the orchestrator or other instances, and sends signed app events through the sidecar.
@@ -125,7 +127,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: Boundary tests pass and the fake ingest accepts the shop's events.
   - Handoffs: H-35, H-36, H-37, H-38, H-39, H-40 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-11. Mock services container**
+- [x] **T-11. Mock services container**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Combined mock services: payment, KYC, metadata and the XSS collector, reachable only inside the instance network.
@@ -134,7 +136,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: Each mock answers inside the instance and is unreachable from outside.
   - Handoffs: H-28, H-31, H-36, H-37, H-38, H-40, H-47, H-52, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-12. Isolated import service**
+- [x] **T-12. Isolated import service**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: An import service that runs a fresh process per job with no network and no database access.
@@ -143,7 +145,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: A job runs in a fresh process and cannot reach the network or the database.
   - Handoffs: H-28, H-29, H-31, H-36, H-38 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-13. Support-agent bot**
+- [x] **T-13. Support-agent bot**
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The bot controller that opens only pages of its own instance for a fixed time.
@@ -152,7 +154,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: The bot visits an allowed page, refuses others and its memory per instance is measured (S-5).
   - Handoffs: H-31, H-36, H-38, H-44 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-14. Customer flows**
+- [x] **T-14. Customer flows**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Browse, search, cart, checkout with the simulated payment, orders, reviews and support tickets.
@@ -160,7 +162,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Waits on: T-07, T-08.
   - Done when: A customer can complete the whole flow in a fresh instance.
 
-- [ ] **T-15. Support, finance and admin flows**
+- [x] **T-15. Support, finance and admin flows**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Support, finance and admin screens following the permission matrix.
@@ -168,7 +170,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Waits on: T-07.
   - Done when: Each role works as the matrix says in tests.
 
-- [ ] **T-16. Seeded accounts for the challenges**
+- [x] **T-16. Seeded accounts for the challenges**
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Seeded accounts for every challenge.

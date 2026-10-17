@@ -7,6 +7,38 @@
       "dockerfile": "infra/hello/Dockerfile",
       "platforms": ["linux/amd64"],
       "public": true
+    },
+    {
+      "name": "shop",
+      "context": "apps/shop",
+      "dockerfile": "apps/shop/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true,
+      "healthcheck": ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT ?? 3000)+'/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    },
+    {
+      "name": "mock-services",
+      "context": "services/mock-services",
+      "dockerfile": "services/mock-services/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true,
+      "healthcheck": ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:9101/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    },
+    {
+      "name": "import-service",
+      "context": "services/import-service",
+      "dockerfile": "services/import-service/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true,
+      "healthcheck": ["/nodejs/bin/node", "-e", "require('net').connect(process.env.VM_IMPORT_SOCKET).on('connect',function(){this.end();process.exit(0)}).on('error',()=>process.exit(1))"]
+    },
+    {
+      "name": "bot-controller",
+      "context": "services/bot",
+      "dockerfile": "services/bot/Dockerfile",
+      "platforms": ["linux/amd64"],
+      "public": true,
+      "healthcheck": ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||9200)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
     }
   ]
 }

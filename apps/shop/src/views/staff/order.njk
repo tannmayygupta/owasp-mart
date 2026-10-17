@@ -1,0 +1,7 @@
+{% extends "layout.njk" %}{% block title %}Order #{{ order.id }}{% endblock %}{% block body %}
+<h1>Order #{{ order.id }}{% if order.redacted %} <span class="muted">(amounts only)</span>{% endif %}</h1>
+<p>Status: {{ order.status }} · Total {{ order.total_cents | cents }}</p>
+{% if not order.redacted and order.ship_line1 %}<p class="muted">Ship: {{ order.ship_line1 }}, {{ order.ship_city }}, {{ order.ship_country }}</p>{% endif %}
+<table><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Status</th></tr>
+{% for it in order.items %}<tr><td>{{ it.product_id }}</td><td>{{ it.qty }}</td><td>{{ it.unit_price_cents | cents }}</td><td>{{ it.status }}</td></tr>{% endfor %}</table>
+{% endblock %}

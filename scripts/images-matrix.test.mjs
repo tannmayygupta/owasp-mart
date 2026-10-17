@@ -59,8 +59,34 @@ test('validation refuses each invalid entry (exit 1 path)', () => {
   assert.match(validateImages(good(), () => false).join('\n'), /does not exist/);
 });
 
+test('healthcheck is optional; a valid exec argv passes, bad shapes and shells fail', () => {
+  const hc = ['/nodejs/bin/node', '-e', "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1))"];
+  const withHc = () => { const d = good(); d.images[0].healthcheck = hc; return d; };
+  assert.deepEqual(validateImages(withHc()), [], 'a node-exec healthcheck is valid');
+  assert.deepEqual(validateImages(good()), [], 'an image without a healthcheck is still valid (optional)');
+  const bad = (v, re) => { const d = good(); d.images[0].healthcheck = v; assert.match(validateImages(d).join('\n'), re); };
+  bad([], /healthcheck must be a non-empty list/);
+  bad('node -e x', /healthcheck must be a non-empty list/);
+  bad(['/nodejs/bin/node', 42], /healthcheck must be a non-empty list/);
+  bad(['/nodejs/bin/node', ''], /healthcheck must be a non-empty list/);
+  bad(['/bin/sh', '-c', 'curl localhost'], /must exec a binary directly, not a shell/);
+  bad(['wget', '-q', 'http://x'], /not a shell/);
+  bad(['/usr/bin/bash', '-c', 'x'], /not a shell/);
+  bad(['nc', '-z', '127.0.0.1', '80'], /not a shell/);
+  bad(['/usr/bin/ncat', 'x'], /not a shell/);
+});
+
 const SHA = 'a'.repeat(40);
 const D = `sha256:${'b'.repeat(64)}`;
+
+test('release manifest: healthchecks map is emitted per role, and omitted when none declare one', () => {
+  const noHc = buildRelease(good(), { hello: D }, { commit: SHA, repo: 'o/r' });
+  assert.ok(!('healthchecks' in noHc), 'no healthchecks key when no image declares one');
+  const d = good();
+  d.images[0].healthcheck = ['/nodejs/bin/node', '-e', 'process.exit(0)'];
+  const r = buildRelease(d, { hello: D }, { commit: SHA, repo: 'o/r' });
+  assert.deepEqual(r.healthchecks, { hello: ['/nodejs/bin/node', '-e', 'process.exit(0)'] });
+});
 
 test('release manifest: a digest reference per image and the commit; lower-cases the repository', () => {
   const r = buildRelease(good(), { hello: D }, { commit: SHA, repo: 'Owner/Repo' });

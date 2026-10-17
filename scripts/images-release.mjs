@@ -15,12 +15,18 @@ export function buildRelease(data, digests, { commit, repo }) {
   if (!/^[0-9a-f]{40}$/.test(commit ?? '')) throw new Error('commit must be a 40-character hex sha');
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo ?? '')) throw new Error('repo must be owner/name');
   const images = {};
+  const healthchecks = {};
   for (const img of data.images) {
     const d = digests[img.name];
     if (!DIGEST.test(d ?? '')) throw new Error(`no valid digest for image "${img.name}"`);
     images[img.name] = `${data.registry}/${repo.toLowerCase()}/${img.name}@${d}`;
+    // The orchestrator consumes a per-role healthcheck argv for images without a
+    // shell (distroless); it is optional, so only images that declare one appear.
+    if (img.healthcheck) healthchecks[img.name] = img.healthcheck;
   }
-  return { commit, repo: repo.toLowerCase(), images }; // the repository is recorded so that deploy can check the image path against it
+  const release = { commit, repo: repo.toLowerCase(), images }; // the repository is recorded so that deploy can check the image path against it
+  if (Object.keys(healthchecks).length) release.healthchecks = healthchecks;
+  return release;
 }
 
 export const USAGE = 'usage: node scripts/images-release.mjs --digests <dir> --commit <sha> --repo <owner/name> --out <file>';

@@ -10,8 +10,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const IMAGES_FILE = path.join(ROOT, 'infra', 'images.json');
 export const PLATFORMS = { 'linux/amd64': { runner: 'ubuntu-24.04', suffix: 'amd64' }, 'linux/arm64': { runner: 'ubuntu-24.04-arm', suffix: 'arm64' } };
 const KEYS = ['name', 'context', 'dockerfile', 'platforms', 'public'];
+const OPTIONAL_KEYS = ['healthcheck'];
 const NAME = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const REGISTRY = /^[a-z0-9.-]+$/;
+// A healthcheck must be a direct exec of a binary, never a shell: distroless
+// images have no shell and the orchestrator runs the argv as-is (no wrapping).
+const SHELLISH = /(^|\/)(sh|bash|dash|ash|zsh|wget|curl|nc|ncat|netcat)$/;
 
 const badPath = (p) => typeof p !== 'string' || p === '' || path.isAbsolute(p) || /^[a-zA-Z]:/.test(p) || p.includes('\\') || p.split('/').some((s) => s === '..' || s === '');
 
@@ -26,7 +30,7 @@ export function validateImages(data, exists) {
   data.images.forEach((img, i) => {
     const at = `images[${i}]`;
     if (!img || typeof img !== 'object' || Array.isArray(img)) return errs.push(`${at} must be an object`);
-    for (const k of Object.keys(img)) if (!KEYS.includes(k)) errs.push(`${at}: unknown key "${k}"`);
+    for (const k of Object.keys(img)) if (!KEYS.includes(k) && !OPTIONAL_KEYS.includes(k)) errs.push(`${at}: unknown key "${k}"`);
     for (const k of KEYS) if (!(k in img)) errs.push(`${at}: missing "${k}"`);
     if ('name' in img) {
       if (typeof img.name !== 'string' || !NAME.test(img.name)) errs.push(`${at}: name must be lower-case letters, digits and dashes`);
@@ -42,6 +46,14 @@ export function validateImages(data, exists) {
       if (!Array.isArray(img.platforms) || img.platforms.length === 0 || img.platforms.some((p) => !PLATFORMS[p]) || new Set(img.platforms).size !== img.platforms.length) errs.push(`${at}: platforms must be a non-empty list without repeats from ${Object.keys(PLATFORMS).join(', ')}`);
     }
     if ('public' in img && typeof img.public !== 'boolean') errs.push(`${at}: public must be true or false`);
+    if ('healthcheck' in img) {
+      const hc = img.healthcheck;
+      if (!Array.isArray(hc) || hc.length === 0 || hc.some((a) => typeof a !== 'string' || a === '')) {
+        errs.push(`${at}: healthcheck must be a non-empty list of non-empty strings (the exec argv)`);
+      } else if (SHELLISH.test(hc[0])) {
+        errs.push(`${at}: healthcheck must exec a binary directly, not a shell (${hc[0]})`);
+      }
+    }
   });
   return errs;
 }
