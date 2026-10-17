@@ -386,7 +386,9 @@ services:
   #   templates/*.json (the instance templates), images.json (the release manifest of image digests). The gate admin secret is the same file the gate reads
   #   (VULNMART_EDGE_SECRETS/gate_admin_secret). Secrets reach the container as files under /run/secrets. Compose mounts a file secret as a bind mount (it ignores uid, gid and mode, and warns),
   # so on vm-i the HOST files must be owned by 65532:65532 with mode 0400: the service refuses a key file readable by group or others (docker-compose limit, found in the story edge-6 proof). Never mode 0644.
-  # Not wired yet (open): --report-url and the report key for state reports to the platform (needs the ingest address of vm-p, handoff H-68).
+  # State reports to the platform (edge story 7, H-147 point 1) are OFF by default: the service takes --report-url and --report-key-file from VM_ORCH_REPORT_URL and
+  # VM_ORCH_REPORT_KEY_FILE when no flag is given (compose cannot omit a flag conditionally). To turn them on set VULNMART_ORCH_REPORT_URL (https, the vm-p ingest address) AND add the
+  # override file: docker compose -f compose.yaml -f lab.reports.yaml --profile lab up -d orchestrator (it mounts secrets/report_key and sets the key file path). With the URL empty nothing changes.
   # Image: built from apps/orchestrator/Dockerfile. --backend is the default, docker; --allow-fake-backend and --allow-local-images are never set here.
   orchestrator:
     profiles: ["lab"]
@@ -420,6 +422,8 @@ services:
       - /run/secrets/tls_key
       - --tls-ca
       - /run/secrets/tls_ca
+    environment:
+      VM_ORCH_REPORT_URL: ${VULNMART_ORCH_REPORT_URL:-}
     secrets:
       - { source: orch-platform-key, target: platform_key }
       - { source: orch-gate-admin, target: gate_admin_secret }

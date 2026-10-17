@@ -17,6 +17,9 @@ if os.environ.get("VULNMART_LAB_RUNTIME") == "1":
     _runtime = build_lab_runtime(os.environ)
     app.state.ingest_handler = _runtime.handler
     app.state.lab = _runtime
+    from vulnmart.lab.state_reports import install_state_reports  # route only with VULNMART_ORCH_REPORT_KEY_FILE set
+
+    install_state_reports(app, _runtime, os.environ)
     if os.environ.get("VULNMART_LAB_DEMO") == "1":
         from vulnmart.lab.demo_routes import install_demo_routes
 

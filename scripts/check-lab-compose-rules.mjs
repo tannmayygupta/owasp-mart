@@ -16,7 +16,7 @@ import yaml from 'js-yaml';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_DIRS = new Set(['node_modules', '.git', '.terraform', '.venv', 'dist', 'build']);
-const FILE_NAME = /^(docker-)?compose[^/]*\.ya?ml$|^docker-[^/]*\.ya?ml$|^harness[^/]*\.ya?ml$|^[^/]*\.compose\.ya?ml$/i;
+const FILE_NAME = /^(docker-)?compose[^/]*\.ya?ml$|^docker-[^/]*\.ya?ml$|^harness[^/]*\.ya?ml$|^[^/]*\.compose\.ya?ml$|^lab\.reports\.ya?ml$/i;
 export const SOCKET_PROXY_SERVICE = 'docker-proxy';
 export const SOCKET_PROXY_IMAGE = 'tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459';
 export const SOCKET_PROXY_COMMAND = ['haproxy', '-f', '/usr/local/etc/haproxy/docker-proxy-rules.cfg'];
@@ -94,6 +94,7 @@ function checkOrchestrator(def, name) {
   }
   for (const e of Object.entries(def.environment && typeof def.environment === 'object' && !Array.isArray(def.environment) ? def.environment : {})) {
     if (/DOCKER_HOST|DOCKER_SOCK/i.test(e[0])) fail(`environment ${e[0]} is not allowed (the Docker address is the --docker-host flag)`);
+    if (/^VM_ORCH_(PLATFORM|REPORT)_KEY$/.test(e[0])) fail(`environment ${e[0]} would put a signing key into docker inspect: use a file secret and the _FILE variable`);
   }
   return out;
 }
@@ -133,6 +134,42 @@ function checkLabPorts(svc, def, name) {
   return out;
 }
 
+// The override file `lab.reports.yaml` (edge story 7) may only add the report key and report CA secrets and the two variables that name them to the
+// service `orchestrator`; it is never merged by the default `up`, so it must not be able to change anything else of that service.
+export const OVERRIDE_FILE = /(^|\/)lab\.reports\.ya?ml$/;
+export const OVERRIDE_ENV = { VM_ORCH_REPORT_KEY_FILE: '/run/secrets/report_key', SSL_CERT_FILE: '/run/secrets/report_ca' };
+export const OVERRIDE_SECRETS = {
+  'orch-report-key': { target: 'report_key', file: '${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/report_key' },
+  'orch-report-ca': { target: 'report_ca', file: '${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/report_ca.pem' },
+};
+
+function checkOverride(doc, name) {
+  const out = [];
+  const fail = (msg) => out.push(`${name}: ${msg}`);
+  for (const k of Object.keys(doc)) if (!['services', 'secrets'].includes(k)) fail(`an override file may have only services and secrets at the top, not ${k}`);
+  const services = doc.services && typeof doc.services === 'object' ? doc.services : {};
+  for (const [svc, def] of Object.entries(services)) {
+    if (svc !== ORCH_SERVICE) { fail(`an override file may change only the service ${ORCH_SERVICE}, not ${svc}`); continue; }
+    for (const k of Object.keys(def ?? {})) if (!['environment', 'secrets'].includes(k)) fail(`service ${svc}: an override may add only environment and secrets, not ${k}`);
+    const env = def?.environment;
+    const pairs = Array.isArray(env) ? env.map((e) => String(e).split(/=(.*)/s).slice(0, 2)) : Object.entries(env ?? {});
+    for (const [k, v] of pairs) {
+      if (!(k in OVERRIDE_ENV)) fail(`service ${svc}: environment ${k} is not allowed in an override (only ${Object.keys(OVERRIDE_ENV).join(', ')})`);
+      else if (String(v) !== OVERRIDE_ENV[k]) fail(`service ${svc}: ${k} must be ${OVERRIDE_ENV[k]}`);
+    }
+    for (const s of Array.isArray(def?.secrets) ? def.secrets : []) {
+      const source = typeof s === 'string' ? s : String(s?.source ?? '');
+      const target = typeof s === 'string' ? s : String(s?.target ?? s?.source ?? '');
+      if (!(source in OVERRIDE_SECRETS) || target !== OVERRIDE_SECRETS[source].target) fail(`service ${svc}: an override may add only the secrets ${Object.keys(OVERRIDE_SECRETS).join(' and ')} with their fixed target (got ${JSON.stringify(s)})`);
+    }
+  }
+  const top = doc.secrets && typeof doc.secrets === 'object' ? doc.secrets : {};
+  for (const [k, v] of Object.entries(top)) {
+    if (!(k in OVERRIDE_SECRETS)) fail(`secrets: only ${Object.keys(OVERRIDE_SECRETS).join(' and ')} may be defined here, not ${k}`);
+    else if (!v || typeof v !== 'object' || Object.keys(v).join() !== 'file' || String(v.file) !== OVERRIDE_SECRETS[k].file) fail(`secrets: ${k} must be {file: ${OVERRIDE_SECRETS[k].file}}`);
+  }
+  return out;
+}
 /** Checks on the parsed document: the one Docker socket exception (service docker-proxy) and the shapes a line scan cannot see. */
 function checkParsed(text, name, lineProblems) {
   const problems = [];
@@ -145,6 +182,7 @@ function checkParsed(text, name, lineProblems) {
   }
   if (!doc || typeof doc !== 'object') return problems;
   if (doc.include !== undefined) fail('include is not allowed (a compose file may not pull in another one unchecked)');
+  if (OVERRIDE_FILE.test(name)) problems.push(...checkOverride(doc, name));
   const has = (kind) => lineProblems.some((p) => p.includes(kind));
   for (const [svc, def] of Object.entries(doc.services && typeof doc.services === 'object' ? doc.services : {})) {
     if (!def || typeof def !== 'object') continue;

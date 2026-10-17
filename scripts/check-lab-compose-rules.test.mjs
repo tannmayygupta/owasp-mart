@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
-import { checkComposeText, checkFiles, SOCKET_PROXY_IMAGE, SOCKET_PROXY_COMMAND } from './check-lab-compose-rules.mjs';
+import { checkComposeText, checkFiles, findComposeFiles, SOCKET_PROXY_IMAGE, SOCKET_PROXY_COMMAND } from './check-lab-compose-rules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOCK = '/var/run/docker.sock';
@@ -198,6 +198,47 @@ test('orchestrator container: the committed service is the one designed here (pu
   assert.ok(o.command.includes('tcp://docker-proxy:2375') && o.command.includes('http://edge-gate-admin:9090') && o.command.includes('vulnmart-edge-gate'));
   assert.ok(o.secrets.length === 5 && o.secrets.every((s) => s.source && /^[a-z_]+$/.test(s.target)));
   assert.deepEqual(checkFiles([path.join(ROOT, 'infra', 'compose', 'compose.yaml')]), []);
+});
+
+// ---- the report override file (edge story 7): lab.reports.yaml, only the report key and CA secrets and the two variables that name them
+const REPORTS_FILE = path.join(ROOT, 'infra', 'compose', 'lab.reports.yaml');
+const reportsText = () => readFileSync(REPORTS_FILE, 'utf8').replace(/\r\n/g, '\n');
+const ov = (from, to) => checkComposeText(reportsText().replace(from, to), 'infra/compose/lab.reports.yaml');
+
+test('report override: the committed file passes, is found by the default scan, and the base file does not mention it', () => {
+  assert.deepEqual(checkFiles([REPORTS_FILE]), []);
+  assert.ok(findComposeFiles([path.join(ROOT, 'infra', 'compose')]).some((f) => f.endsWith('lab.reports.yaml')));
+  assert.ok(!readFileSync(path.join(ROOT, 'infra', 'compose', 'compose.yaml'), 'utf8').split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join('\n').includes('lab.reports'));
+  const doc = yaml.load(reportsText());
+  assert.deepEqual(Object.keys(doc.services), ['orchestrator']);
+  assert.deepEqual(doc.services.orchestrator.environment, { VM_ORCH_REPORT_KEY_FILE: '/run/secrets/report_key', SSL_CERT_FILE: '/run/secrets/report_ca' });
+});
+
+test('report override: a change of anything else on the orchestrator, another service, a key in the environment or a changed secret fails', () => {
+  const text = (s) => s.join('\n').replace(/\s+$/, '');
+  assert.match(ov('    environment:', '    ports: ["0.0.0.0:9443:8443"]\n    environment:').join('\n'), /may add only environment and secrets, not ports/);
+  assert.match(ov('    environment:', '    command: ["--insecure-no-tls"]\n    environment:').join('\n'), /not command/);
+  assert.match(ov('    environment:', '    privileged: true\n    environment:').join('\n'), /privileged/);
+  assert.match(ov('    environment:', '    volumes: ["/var/run/docker.sock:/s"]\n    environment:').join('\n'), /Docker socket mount is not allowed/);
+  assert.match(ov('services:\n', 'services:\n  edge-gate:\n    environment: { A: b }\n').join('\n'), /only the service orchestrator, not edge-gate/);
+  assert.match(ov('      SSL_CERT_FILE: /run/secrets/report_ca', '      SSL_CERT_FILE: /etc/ssl/other.pem').join('\n'), /SSL_CERT_FILE must be \/run\/secrets\/report_ca/);
+  assert.match(ov('      SSL_CERT_FILE: /run/secrets/report_ca', '      VM_ORCH_REPORT_KEY: hunter2hunter2hunter2hunter2hunter2').join('\n'), /VM_ORCH_REPORT_KEY is not allowed/);
+  assert.match(ov('      SSL_CERT_FILE: /run/secrets/report_ca', '      DOCKER_HOST: tcp://x:1').join('\n'), /DOCKER_HOST is not allowed/);
+  assert.match(ov('target: report_key', 'target: other').join('\n'), /only the secrets orch-report-key and orch-report-ca/);
+  assert.match(ov('source: orch-report-ca', 'source: orch-platform-key').join('\n'), /only the secrets/);
+  assert.match(ov('/secrets/report_key\n  orch-report-ca', '/secrets/../../etc/shadow\n  orch-report-ca').join('\n'), /orch-report-key must be \{file:/);
+  assert.match(ov('secrets:\n  orch-report-key:', 'secrets:\n  other:\n    file: /etc/passwd\n  orch-report-key:').join('\n'), /only orch-report-key and orch-report-ca may be defined here, not other/);
+  assert.match(ov('\nservices:', '\nvolumes:\n  x: {}\nservices:').join('\n'), /only services and secrets at the top, not volumes/);
+  assert.equal(text(ov('nothing-to-replace', 'x')), '');
+});
+
+test('report override: the base orchestrator service takes the URL from the environment and never a key', () => {
+  const o = yaml.load(readFileSync(path.join(ROOT, 'infra', 'compose', 'compose.yaml'), 'utf8')).services.orchestrator;
+  assert.deepEqual(o.environment, { VM_ORCH_REPORT_URL: '${VULNMART_ORCH_REPORT_URL:-}' });
+  assert.ok(!o.command.includes('--report-url') && !o.command.includes('--report-key-file'));
+  assert.match(orch('networks: [labs-core]', 'networks: [labs-core]\n    environment: { VM_ORCH_PLATFORM_KEY: x }').join('\n'), /VM_ORCH_PLATFORM_KEY would put a signing key into docker inspect/);
+  assert.match(orch('networks: [labs-core]', 'networks: [labs-core]\n    environment: { VM_ORCH_REPORT_KEY: x }').join('\n'), /VM_ORCH_REPORT_KEY would put a signing key/);
+  assert.deepEqual(orch('networks: [labs-core]', 'networks: [labs-core]\n    environment: { VM_ORCH_REPORT_URL: "${VULNMART_ORCH_REPORT_URL:-}" }'), []);
 });
 
 test('lab ports: services outside the lab profile and the docker-proxy loopback port are not touched by this rule', () => {

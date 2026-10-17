@@ -1,0 +1,23 @@
+# Override file: state reports of the orchestrator container to the platform (edge story 7, H-147 point 1). Use it ONLY when reports are wanted:
+#   VULNMART_ORCH_REPORT_URL=https://<vm-p private ingest address>:9444 \
+#   docker compose -f compose.yaml -f lab.reports.yaml --profile lab up -d orchestrator
+# It adds to the service `orchestrator`: the report key as a file secret (target report_key), the CA that signed the vm-p ingest certificate as a file secret
+# (target report_ca), and the two variables that name them (VM_ORCH_REPORT_KEY_FILE, and SSL_CERT_FILE, which Python's TLS client reads as its trusted CA file:
+# the pusher has no CA option of its own and needs none). The URL itself comes from the base file (VM_ORCH_REPORT_URL, from VULNMART_ORCH_REPORT_URL).
+# Files under ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/: report_key and report_ca.pem. On Linux owned by 65532:65532, mode 0400, like the other key files.
+# The base compose.yaml does not mention this file, so a missing file never breaks the default `up`. scripts/check-lab-compose-rules.mjs checks this file too:
+# nothing but these additions is allowed here.
+services:
+  orchestrator:
+    environment:
+      VM_ORCH_REPORT_KEY_FILE: /run/secrets/report_key
+      SSL_CERT_FILE: /run/secrets/report_ca
+    secrets:
+      - { source: orch-report-key, target: report_key }
+      - { source: orch-report-ca, target: report_ca }
+
+secrets:
+  orch-report-key:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/report_key
+  orch-report-ca:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/report_ca.pem

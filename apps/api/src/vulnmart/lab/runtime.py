@@ -40,6 +40,7 @@ from vulnmart.ingest.stores import (
 )
 from vulnmart.lab.clock import OffsetClock
 from vulnmart.lab.control import HostInstanceControl
+from vulnmart.lab.state_reports import StateReportStore
 from vulnmart.ports.attempts import AttemptState
 from vulnmart.ports.engine_attempts import EngineAttemptPort
 from vulnmart.ports.engine_reports import EngineReportPort
@@ -110,6 +111,7 @@ class LabRuntime:
         self.integrity = InMemoryIntegritySink()
         self.directory = InMemoryInstanceDirectory()
         self.epochs = MemoryInstanceEpochs()
+        self.state_reports = StateReportStore()  # what the orchestrator reported per instance (H-147); empty without a receiver
         self.events = InMemoryEventLog()
         self.engine = AttemptEngine(InMemoryAttemptStore(), HostInstanceControl(host), self.clock, events=self.attempt_log.from_engine)
         self.attempts = EngineAttemptPort(self.engine)
@@ -136,6 +138,11 @@ class LabRuntime:
         self.held_store, self.audit = InMemoryHeldStore(), InMemoryAudit()
         self.review = HeldCaptureReview(self.held_store, self.audit, self.clock, default_may_review(self.org_of_attempt),
                                         events=self.attempt_log.append)
+
+    @property
+    def instance_states(self) -> dict[str, str]:
+        """instance id -> the state the orchestrator last reported (a copy; empty when no receiver is mounted or nothing arrived)."""
+        return self.state_reports.states()
 
     def _sync_held(self, attempt_id: str) -> None:
         """Every capture the milestone store holds becomes an open item of the review (FR-ACH-07)."""

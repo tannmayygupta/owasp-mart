@@ -80,3 +80,6 @@ Proposed (decided on the developer's delegation): D-61 single internal network p
 
 ## Follow-up 2026-10-17 (story edge-6)
 H-143 decided by the developer: the orchestrator runs as a container on labs-core. Compose service orchestrator added and proven locally (30 checks PASS, re-run by the coordinator); dev-log 2026-10-17-tannmayygupta-story-edge-6-orchestrator-container.md; open points in H-147.
+
+## Follow-up 2026-10-17 (story edge-7)
+State reports: platform receiver built in the lab runtime and proven locally (27 checks, receiver restart); dev-log 2026-10-17-tannmayygupta-story-edge-7-state-reports.md. Live vm-p and vm-i use is the developer's run.

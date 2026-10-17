@@ -96,6 +96,16 @@ def install_demo_routes(app: FastAPI, runtime: LabRuntime, token: str) -> bool:
     def state(attempt_id: str) -> dict[str, Any]:
         return _call(runtime.state, attempt_id)
 
+    @app.get(PREFIX + "/instances/{instance_id}", include_in_schema=False, dependencies=deps)
+    def instance_state(instance_id: str) -> dict[str, Any]:
+        """What the orchestrator reported for an instance (state reports, H-147): the recorded state and the ordered history."""
+        recorded = runtime.state_reports.state_of(instance_id)
+        if recorded is None:
+            raise ProblemError(ErrorCode.INST_NOT_FOUND)
+        return {"instance_id": instance_id, "state": recorded.value,
+                "transitions": [{"epoch": r.epoch, "transition": r.transition, "from_state": r.from_state.value if r.from_state else None,
+                                 "to_state": r.to_state.value} for r in runtime.state_reports.history(instance_id)]}
+
     @app.post(PREFIX + "/attempts/{attempt_id}/flags", include_in_schema=False, dependencies=deps)
     def flag(attempt_id: str, body: FlagBody) -> dict[str, str]:
         res = _call(runtime.submit_flag, attempt_id, body.challenge_key, body.text)

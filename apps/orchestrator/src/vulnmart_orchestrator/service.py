@@ -34,7 +34,7 @@ import sys
 import threading
 import time
 import urllib.parse
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -563,8 +563,20 @@ def tls_context(cert: str, key: str, ca: str) -> ssl.SSLContext:
     return ctx
 
 
+def apply_env_fallbacks(args: argparse.Namespace, environ: Mapping[str, str] | None = None) -> argparse.Namespace:
+    """`--report-url` and `--report-key-file` fall back to VM_ORCH_REPORT_URL and VM_ORCH_REPORT_KEY_FILE (a flag wins; an empty variable is
+    unset). Compose cannot leave a flag out conditionally, so the container passes these two as environment entries that are empty by default
+    (state reports are then off, as before). The key is still read from a file: the environment variable holds a path, never the key."""
+    env = os.environ if environ is None else environ
+    if not args.report_url:
+        args.report_url = env.get("VM_ORCH_REPORT_URL") or None
+    if not args.report_key_file:
+        args.report_key_file = env.get("VM_ORCH_REPORT_KEY_FILE") or None
+    return args
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    args = apply_env_fallbacks(build_parser().parse_args(argv))
     try:
         tls = [args.tls_cert, args.tls_key, args.tls_ca]
         if any(tls) and not all(tls):
