@@ -1,0 +1,27 @@
+Live run of L-10 on vm-p and vm-i (AWS Sydney), 2026-10-17, run by Claude over SSH on the developer's authorisation. The DuckDNS tokens were typed by the developer into local files with a hidden prompt, copied to the hosts (mode 600 root), and the local copies were overwritten and deleted. No token is shown anywhere. Names are the developer's public DuckDNS names.
+
+=== S-16 (from the developer's PC): node scripts/check-duckdns.mjs tanmay-labs-prod.duckdns.org
+match: a random label resolves to the same A record as the name
+both names resolve to the public address of their own host (compared, not printed); i-aaaaaaaaaaaaaaaa.<labs name> resolves to the vm-i address
+
+=== lego v5.5.2 installed on both hosts by vulnmart-install-lego.sh (pinned checksum); renewal timer enabled
+
+=== first staging run: FAILED (script bug)
+lego: flag provided but not defined: -accept-tos   (lego v5 has one command, `run`; all flags go after it; there is no `renew` command)
+fix: infra/hosts/vulnmart-certs.sh now calls `lego run <flags>` and renews with `lego run --renew-days N` (flags checked against `lego run --help` of v5.5.2); scripts/certs-host.test.mjs updated
+
+=== second staging run: FAILED (DNS propagation check)
+lego set the TXT record (the token works), then: dns01: time limit exceeded: last error: authoritative ... (the hosts reach only the VPC resolver on port 53)
+fix: LEGO_EXTRA_ARGS=--dns.propagation.disable-ans in /etc/vulnmart/certs.env on both hosts (skips the authoritative-nameserver check, the recursive check stays); no firewall change
+
+=== staging: vm-p exit 0, "staging certificate for tanmay-platform-prod.duckdns.org written"; vm-i exit 0, "staging certificate for *.tanmay-labs-prod.duckdns.org written"; markers set
+
+=== production, once per name
+vm-p: exit 0, state=ok days_left=89, issuer: Let's Encrypt (CN YE2), subject CN=tanmay-platform-prod.duckdns.org, notAfter Jan 15 2027, SAN DNS:tanmay-platform-prod.duckdns.org, fullchain.pem 644 root, privkey.pem 600 root
+vm-i: exit 0, state=ok days_left=89, issuer: Let's Encrypt (CN YE2), subject CN=*.tanmay-labs-prod.duckdns.org, notAfter Jan 15 2027, SAN DNS:*.tanmay-labs-prod.duckdns.org, fullchain.pem 644 root, privkey.pem 600 root
+
+=== renewal
+timer on both hosts: next run 2026-10-18 03:21 UTC (vm-p) and 03:59 UTC (vm-i), Persistent=true
+manual run when not due (both): "certificate valid for 89 more days (renew at 30); nothing to do"; the Caddy reload hook printed "No such container: vulnmart-origin-caddy-1" (ignored, Caddy not deployed yet)
+real renewal on vm-p (temporary RENEW_DAYS=100, removed afterwards): lego waited a random 7m24s, "renewed"; notAfter moved from 18:58:21 to 19:07:36; status state=ok days_left=89
+(this renewal cost one more certificate on that name; not repeated)

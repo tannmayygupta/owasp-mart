@@ -17,6 +17,8 @@ References to the AWS runbook mean `docs/runbooks/aws-account-and-vms.md`, writt
 - `RENEW_DAYS` must stay below half of the certificate lifetime (Let's Encrypt is moving from 90 to 64 and then 45 days: at 45 days a value above 22 would renew every run). Today 30 is right for 90 days; lower it when the lifetime shortens.
 - Size note: the cloud-init user data is 15261 bytes gzipped for three developer keys (limit 16384, margin 1123 bytes; measured by `scripts/cloud-hosts.test.mjs`). A host file that grows needs a trim or the plain-text treatment of the other files.
 
+**Live record (2026-10-17, docs/assets/l-10-certificates/live-run.txt):** all of parts A to F were run with the developer's names; real Let's Encrypt certificates are on both hosts. Two things found live and fixed: (1) lego v5 has one command, `run`, and every flag goes after it (the script had the older form and the lego flags were unverified, as the deferred-work note warned); renewal is `lego run --renew-days N`; `lego renew` does not exist in v5. (2) The hosts reach only the VPC resolver on port 53, so lego's authoritative-nameserver propagation check times out: set `LEGO_EXTRA_ARGS=--dns.propagation.disable-ans` in `certs.env` (verified against `lego run --help`; the recursive check stays; no firewall change).
+
 ## Part A. Accounts and names (browser, once)
 1. Platform name: sign in at duckdns.org with your account, add a subdomain `<platform>`, set its current ip to the **public address of vm-p**. This must be the Elastic IP (it survives stop and start; a replaced host keeps the association when the Elastic IP resource is kept), never an address that changes. Check: `nslookup <platform>.duckdns.org` answers that address.
 2. Labs name: sign in with a **different** DuckDNS account (ADR 0003: separate tokens), add a subdomain `<labs>`, current ip = public address (Elastic IP) of vm-i. Check: `nslookup <labs>.duckdns.org`.
@@ -61,6 +63,7 @@ sudo install -m 0640 /dev/null /etc/vulnmart/certs.env
 sudo tee /etc/vulnmart/certs.env > /dev/null <<'EOF'
 CERT_NAME="<platform>.duckdns.org"
 CERT_EMAIL="you@example.org"
+LEGO_EXTRA_ARGS=--dns.propagation.disable-ans
 EOF
 ```
 
