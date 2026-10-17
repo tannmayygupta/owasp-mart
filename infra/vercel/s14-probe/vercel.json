@@ -4,6 +4,7 @@
     {
       "src": "/api/(.*)",
       "dest": "https://REPLACE-WITH-PLATFORM-NAME.duckdns.org/api/$1",
+      "headers": { "x-vercel-enable-rewrite-caching": "0" },
       "transforms": [
         {
           "type": "request.headers",

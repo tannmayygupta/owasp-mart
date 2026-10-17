@@ -43,10 +43,12 @@ export function validateVercelConfig(cfg) {
   if (!Array.isArray(cfg.routes) || cfg.routes.length !== 1) return [...problems, '"routes" must hold exactly one route (the /api/ route)'];
   const [r] = cfg.routes;
   if (!isObj(r)) return [...problems, 'the route must be an object'];
-  for (const k of Object.keys(r)) if (!['src', 'dest', 'transforms'].includes(k)) problems.push(`unexpected route key "${k}"`);
+  for (const k of Object.keys(r)) if (!['src', 'dest', 'transforms', 'headers'].includes(k)) problems.push(`unexpected route key "${k}"`);
   if (r.src !== '/api/(.*)') problems.push('route src must be "/api/(.*)"');
   const destOk = typeof r.dest === 'string' && (r.dest === `https://${PLACEHOLDER_HOST}/api/$1` || /^https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?\.duckdns\.org\/api\/\$1$/.test(r.dest));
   if (!destOk) problems.push('route dest must be "https://<label>.duckdns.org/api/$1" (the placeholder host in the committed file): one DuckDNS host, the /api prefix kept (ADR 0031 D2)');
+  // Found live (S-14, 2026-10-18): Vercel caches an external rewrite by default (x-vercel-cache: HIT served one visitor's answer to another). A top-level `headers` entry did not stop it; the header INSIDE the route does.
+  if (!isObj(r.headers) || !sameKeys(r.headers, ['x-vercel-enable-rewrite-caching']) || r.headers['x-vercel-enable-rewrite-caching'] !== '0') problems.push('route needs headers exactly { "x-vercel-enable-rewrite-caching": "0" } (Vercel caches external rewrites by default; found live in S-14)');
   const t = r.transforms;
   if (!Array.isArray(t) || t.length !== 1) problems.push('route needs exactly one transform');
   else if (!isObj(t[0])) problems.push('the transform must be an object');

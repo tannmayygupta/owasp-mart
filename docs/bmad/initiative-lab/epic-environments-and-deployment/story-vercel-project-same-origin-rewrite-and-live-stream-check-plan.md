@@ -119,3 +119,5 @@ Why `routes` and not Middleware: Vercel documents the transform for exactly this
 **Commands:**
 - `node --test scripts/e2e/caddy-origin.e2e.test.mjs scripts/check-sse-rewrite.test.mjs` -- expected: all pass
 - `node --test "scripts/*.test.mjs"`, `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs`, `node scripts/check-contract-rules.mjs` -- expected: pass
+
+Follow-up 2026-10-18: proven live (S-14 all ten checks, cache opt-out header found); dev-log 2026-10-18-tannmayygupta-l-11-vercel-live.md.

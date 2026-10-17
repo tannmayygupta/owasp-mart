@@ -262,6 +262,10 @@ test('validator: each broken shape is named, none crashes', () => {
   assert.match(mutate((c) => { c.routes[0].src = '/(.*)'; }), /src must be/);
   assert.match(mutate((c) => { c.routes[0].env = ['ORIGIN_URL']; }), /unexpected route key "env"/);
   assert.match(mutate((c) => { c.routes[0].note = 'hunter2'; }), /unexpected route key "note"/);
+  // S-14 live finding (2026-10-18): the cache opt-out must sit inside the route, with value 0 and nothing else.
+  assert.match(mutate((c) => { delete c.routes[0].headers; }), /x-vercel-enable-rewrite-caching/);
+  assert.match(mutate((c) => { c.routes[0].headers['x-vercel-enable-rewrite-caching'] = '1'; }), /x-vercel-enable-rewrite-caching/);
+  assert.match(mutate((c) => { c.routes[0].headers['cache-control'] = 'public'; }), /x-vercel-enable-rewrite-caching/);
   assert.match(mutate((c) => { c.routes[0].transforms[0].note = 'hunter2'; }), /unexpected transform key/);
   assert.match(mutate((c) => { c.extra = 'x'; }), /unexpected top-level key "extra"/);
   assert.match(mutate((c) => { c.$schema = 'https://evil.example/schema.json'; }), /"\$schema" must be/);

@@ -162,3 +162,5 @@
   evidence: story 6.5 dev-log and docs/assets/story-6-5-coraza/s6-accuracy.md
 
 - RESOLVED 2026-10-17 (live): the lego v5.5.2 flags of the DuckDNS item above were checked with the real binary on vm-p and vm-i. They were wrong (v5 has one command, run, with all flags after it; no renew command). The script and its tests were fixed and a real issuance and one real renewal worked (docs/assets/l-10-certificates/live-run.txt). Propagation: the hosts reach only the VPC resolver, so LEGO_EXTRA_ARGS=--dns.propagation.disable-ans is set in certs.env (no firewall change).
+
+- RESOLVED 2026-10-18 (live): the Vercel item above (the routes transform, SSE through the rewrite, Host header, caching) was run on a throwaway project: all ten S-14 checks pass; env expansion works on Hobby; the shared cache needed the route-level opt-out header (added to the template and the validator). See docs/research/s-14-vercel-sse.md.
