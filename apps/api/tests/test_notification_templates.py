@@ -23,6 +23,7 @@ LINK = "https://vulnmart.example/verify?t=single-use-value"
 SAMPLES: dict[str, dict] = {
     "account.verify": {"link": LINK, "expires_in_hours": 24},
     "account.password_reset": {"link": LINK, "expires_in_hours": 24},
+    "account.already_registered": {"login_url": "https://vulnmart.example/login"},
     "org.approval_outcome": {"org_name": "Acme Security", "outcome": "approved", "login_url": "https://vulnmart.example/login"},
     "candidate.invite": {"org_name": "Acme Security", "assessment_name": "Web basics", "link": LINK, "expires_in_days": 7},
     "recruiter.consent_withdrawn": {"org_name": "Acme Security", "assessment_name": "Web basics", "deletion_on": "2026-10-24"},
@@ -35,8 +36,9 @@ SAMPLES: dict[str, dict] = {
 FORBIDDEN_NAMES = ("password", "token", "flag", "secret", "api_key", "email", "address", "to")
 
 
-def test_the_samples_cover_every_type_of_the_requirement():
-    assert set(SAMPLES) == set(EMAIL_TYPES) and len(EMAIL_TYPES) == 9
+def test_the_samples_cover_every_type():
+    # nine types of FR-NTF-01 plus `account.already_registered` that the signup contract asks for (story P-11)
+    assert set(SAMPLES) == set(EMAIL_TYPES) and len(EMAIL_TYPES) == 10
 
 
 @pytest.mark.parametrize("name", EMAIL_TYPES)

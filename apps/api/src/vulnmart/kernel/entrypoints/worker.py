@@ -35,7 +35,13 @@ def mail_lifespan(settings: Settings | None = None):
 
         ports = build_ports(settings)
         assert ports.sessions is not None  # a Postgres address is set
-        service = build_email_service(settings, ports.sessions, ports.settings)
+        from vulnmart.accounts.service import DbRecipients
+        from vulnmart.notifications.fakes import DevRecipients, FallbackRecipients
+
+        recipients = DbRecipients(ports.sessions)  # the real lookup (story P-11, handoff H-127)
+        if settings.env in ("dev", "test"):
+            recipients = FallbackRecipients(recipients, DevRecipients())
+        service = build_email_service(settings, ports.sessions, ports.settings, recipients=recipients)
         broker = make_broker(settings.valkey_url)
         actor = make_delivery_actor(broker, service)
         worker = Worker(broker, worker_threads=2)

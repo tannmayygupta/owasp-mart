@@ -42,6 +42,16 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-learner-signup-email-verification-and-signup-abuse-protection-plan (2026-10-17)
+
+- The signup form and the verify-email page (the link in the mail points at `${public_origin}/verify-email?token=...`, a dashboards page that does not exist yet); until then a learner can only be created and verified through the API. No task before P-26 builds them: decide which dashboards story owns them.
+- Argon2id is at the OWASP minimum (19 MiB, 2 passes, 1 lane); the epic's note says it is tuned in spike S-12 on the real VM.
+- Rate limits: login, password reset and invite endpoints (FR-ACC-10) come with their stories; the numbers are placeholders; the fixed window allows up to twice the limit around a window edge.
+- `trusted_proxy_hops` is 1; behind `caddy-p` it must be 2 (handoff H-129, Tanmay) and nobody has measured it on the deployed path.
+- The breach-list check and password quality rules (FR-ACC-08) are P-14: signup checks the length only.
+- Concurrent hashing is capped at 4 per API process by a semaphore; the cap was chosen for the 256 MiB container, not measured under load.
+- The mail text of `account.already_registered` is a first draft like the other templates.
+
 ## Deferred from: story-email-templates-plan (2026-10-17)
 
 - FR-NTF-04 and FR-SES-03 (in-app time warnings, recruiter alerts): story 2.3 of `epic-notifications-and-email`, after the live hub (P-22, P-23) and the dashboards (P-26, P-27). Open: where the 15 and 5 minute warnings come from (a scheduler timer that records the event, or the page computing them from `deadline_at`) and who owns the timer between this stream and stream L.

@@ -178,6 +178,9 @@ describe('platform and web profiles on a real Docker engine', () => {
 
   // Story P-09. The outbox row is written as the owner role through psql inside the Postgres container (no account exists yet to cause an
   // email); the worker relays it through Valkey and Dramatiq, and Mailpit (the development provider) receives it over SMTP.
+  const RUN = Date.now().toString(36); // the Postgres volume survives `down`, so every run uses user ids of its own
+  const MAIL1 = `e2e-mail-1-${RUN}`;
+  const MAIL2 = `e2e-mail-2-${RUN}`;
   const enqueueMail = (user) =>
     docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-v', 'ON_ERROR_STOP=1', '-c',
       `INSERT INTO email_outbox (template, to_user_id, params) VALUES ('system.test', '${user}', '{}')`);
@@ -192,24 +195,81 @@ describe('platform and web profiles on a real Docker engine', () => {
   }
 
   test('mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq', async () => {
-    assert.equal(enqueueMail('e2e-mail-1').status, 0);
-    const found = await mailTo('e2e-mail-1');
+    assert.equal(enqueueMail(MAIL1).status, 0);
+    const found = await mailTo(MAIL1);
     assert.equal(found.length, 1, 'exactly one message arrived');
     assert.equal(found[0].Subject, 'VulnMart test message');
     await new Promise((r) => setTimeout(r, 7000)); // more than one relay pass: it must not be sent again
-    assert.equal((await mailTo('e2e-mail-1')).length, 1);
+    assert.equal((await mailTo(MAIL1)).length, 1);
     const state = docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c',
-      "SELECT state || ',' || attempts FROM email_outbox WHERE to_user_id = 'e2e-mail-1'");
+      `SELECT state || ',' || attempts FROM email_outbox WHERE to_user_id = '${MAIL1}'`);
     assert.equal(state.stdout.trim(), 'sent,1');
   }, { timeout: 120000 });
 
   test('mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost)', async () => {
     assert.equal(docker('stop', '--time', '5', NAME('worker')).status, 0);
-    assert.equal(enqueueMail('e2e-mail-2').status, 0);
+    assert.equal(enqueueMail(MAIL2).status, 0);
     await new Promise((r) => setTimeout(r, 3000));
-    assert.equal((await mailTo('e2e-mail-2', 1)).length, 0, 'nothing is sent while the worker is down');
+    assert.equal((await mailTo(MAIL2, 1)).length, 0, 'nothing is sent while the worker is down');
     assert.equal(docker('start', NAME('worker')).status, 0);
-    assert.equal((await mailTo('e2e-mail-2', 60)).length, 1);
+    assert.equal((await mailTo(MAIL2, 60)).length, 1);
+  }, { timeout: 180000 });
+
+  // Story P-11: the whole learner signup path on the real stack, through the web origin (proxy, origin secret), the API, Argon2id, Postgres,
+  // the outbox, Valkey and Dramatiq, the worker's real address lookup, and Mailpit.
+  async function mailFor(address, subjectPart, tries = 60) {
+    for (let i = 0; i < tries; i++) {
+      const res = await fetch('http://127.0.0.1:8025/api/v1/messages', { signal: AbortSignal.timeout(20000) });
+      const hit = (await res.json()).messages.find((m) => m.To.some((t) => t.Address === address) && m.Subject.includes(subjectPart));
+      if (hit) return (await fetch(`http://127.0.0.1:8025/api/v1/message/${hit.ID}`, { signal: AbortSignal.timeout(20000) })).json();
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return null;
+  }
+  const postJson = (path, body) =>
+    fetch(`http://127.0.0.1:3000${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
+
+  test('accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited', async () => {
+    const email = `e2e-learner-${Date.now()}@example.com`;
+    const body = { email, password: 'correct horse battery staple', display_name: 'E2E Learner', age_declaration: true };
+    const first = await postJson('/api/v1/accounts', body);
+    assert.equal(first.status, 202);
+    assert.deepEqual(await first.json(), { status: 'accepted' });
+    assert.equal(first.headers.get('cache-control'), 'private, no-store');
+    const verify = await mailFor(email, 'Confirm your email');
+    assert.ok(verify, 'the verification mail arrived in Mailpit');
+    const token = /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(verify.Text)?.[1];
+    assert.ok(token, `a link with a token in the mail text: ${verify.Text}`);
+    assert.deepEqual([...new Set(verify.Text.match(/https?:\/\/[^\s]+/g))], [`http://127.0.0.1:3000/verify-email?token=${token}`], 'only its own link');
+    // the account exists unverified, with an Argon2id hash and the learner role
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    assert.equal(psql(`SELECT account_type || ',' || (email_verified_at IS NULL) || ',' || left(password_hash, 9) FROM users WHERE email_ci = '${email}'`), 'participant,true,$argon2id');
+    assert.equal(psql(`SELECT role FROM user_roles JOIN users ON users.id = user_roles.user_id WHERE email_ci = '${email}'`), 'learner');
+    assert.equal(psql(`SELECT count(*) FROM email_tokens WHERE token_hash = '${token}'`), '0', 'the token itself is not stored');
+    // verify once, then the same link is refused
+    const ok = await postJson('/api/v1/accounts/verify-email', { token });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { status: 'verified' });
+    const again = await postJson('/api/v1/accounts/verify-email', { token });
+    assert.equal(again.status, 400);
+    assert.equal((await again.json()).code, 'AUTH-TOKEN-INVALID');
+    assert.equal(psql(`SELECT (email_verified_at IS NOT NULL) FROM users WHERE email_ci = '${email}'`), 't');
+    // the same address again: the same answer, and a mail that says the address is known
+    const repeat = await postJson('/api/v1/accounts', { ...body, email: email.toUpperCase(), display_name: 'Someone else' });
+    assert.equal(repeat.status, 202);
+    assert.ok(await mailFor(email, 'Someone tried to sign up'), 'the already-registered mail arrived');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci = '${email}'`), '1');
+    // the per-address limit: three signups an hour (placeholder); the fourth is 429 with Retry-After
+    const fourth = await postJson('/api/v1/accounts', body);
+    const refused = await postJson('/api/v1/accounts', body);
+    assert.equal(fourth.status, 202);
+    assert.equal(refused.status, 429);
+    assert.equal((await refused.json()).code, 'REQ-RATE-LIMITED');
+    assert.match(refused.headers.get('retry-after'), /^\d+$/);
+    // bad input is 422 and never echoes the password
+    const bad = await postJson('/api/v1/accounts', { ...body, email: 'x@example.com', age_declaration: false });
+    assert.equal(bad.status, 422);
+    assert.doesNotMatch(await bad.text(), /correct horse/);
   }, { timeout: 180000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
