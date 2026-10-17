@@ -1,6 +1,6 @@
 # 0010. Orchestrator privileges and the host-side drop rule
 
-- **Status:** Accepted with conditions for the socket proxy part (D-58, decided on the developer's delegation in story 4.2, 2026-10-16; to be confirmed by the developer). The host rule part stays Proposed until spike S-3 is run on vm-i.
+- **Status:** Accepted with conditions for the socket proxy part (D-58, decided on the developer's delegation in story 4.2, 2026-10-16; confirmed by the developer 2026-10-17). The host rule part stays Proposed until spike S-3 is run on vm-i.
 - **Date:** 2026-10-08 (updated 2026-10-16)
 - **Deciders:** (pending the user); the socket proxy part by Tanmay through delegation to Claude Code (story 4.2)
 - **Requirements:** D-23, D-58, NFR-SEC-02, NFR-SEC-04, NFR-ISO-02, NFR-ISO-04, NFR-ISO-05

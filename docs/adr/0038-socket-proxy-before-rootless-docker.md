@@ -1,6 +1,6 @@
 # 0038. A socket proxy now, rootless Docker later (spike S-8 stays open)
 
-- **Status:** Proposed (D-58, decided on the developer's delegation, story 4.2 "Docker socket behind a proxy for the orchestrator", 2026-10-16; to be confirmed)
+- **Status:** Accepted (D-58, decided on the developer's delegation, story 4.2 "Docker socket behind a proxy for the orchestrator", 2026-10-16; confirmed by the developer 2026-10-17)
 - **Date:** 2026-10-16
 - **Deciders:** Tanmay (by delegation to Claude Code)
 - **Requirements:** D-23, D-58, NFR-SEC-02, NFR-SEC-04, NFR-ISO-04; ADR 0010; spike S-8, task L-29

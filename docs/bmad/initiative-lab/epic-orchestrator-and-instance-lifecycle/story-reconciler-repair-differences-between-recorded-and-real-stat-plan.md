@@ -3,7 +3,7 @@ title: 'Reconciler: repair differences between recorded and real state (spike S-
 type: 'feature'
 ticket: '5'
 created: '2026-10-16'
-status: 'built'
+status: 'done'
 baseline_revision: '65734bc4e95bec12c729b8c29b675ab36f37518b'
 route: 'full'
 route_source: 'pinned'
