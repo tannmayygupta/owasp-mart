@@ -142,10 +142,12 @@ services:
     image: vulnmart-api:local
     container_name: vulnmart-migrate
     read_only: true
-    command: ["alembic", "-c", "/app/alembic.ini", "upgrade", "head"]
+    # Story P-17: the Alembic history of `vulnmart`, then the keystore database `vm_keystore` with its own role (idempotent, so it runs at every start).
+    command: ["python", "-m", "vulnmart.kernel.migrate"]
     environment:
       VULNMART_MIGRATE_DSN: postgresql://vulnmart:${VULNMART_DEV_DB_PASSWORD:-vulnmart-dev-only-not-a-secret}@postgres:5432/vulnmart
       VULNMART_APP_ROLE: vulnmart_app
+      VULNMART_KEYSTORE_PASSWORD: ${VULNMART_DEV_KEYSTORE_PASSWORD:-vulnmart-keys-dev-only-not-a-secret}
     cap_drop:
       - ALL
     security_opt:
@@ -184,6 +186,15 @@ services:
       # origin the browser may call from (the Origin check): the dashboards of the web service below.
       VULNMART_CSRF_SECRET: ${VULNMART_DEV_CSRF_SECRET:-vulnmart-dev-csrf-secret-not-a-secret}
       VULNMART_PUBLIC_ORIGIN: http://127.0.0.1:3000
+      # Story P-15: the field key that seals second-factor secrets (a development value; production reads a secret file, architecture 06 s3).
+      VULNMART_FIELD_SECRET: ${VULNMART_DEV_FIELD_SECRET:-vulnmart-dev-field-secret-not-a-secret-0123456789}
+      # Story P-17: the key service. The wrapped per-attempt keys live in the separate database vm_keystore (own role); the KEK and the three masters
+      # are development values (production reads secret files, architecture 06 s3; never reuse these).
+      VULNMART_KEYSTORE_DSN: postgresql://vulnmart_keys:${VULNMART_DEV_KEYSTORE_PASSWORD:-vulnmart-keys-dev-only-not-a-secret}@postgres:5432/vm_keystore
+      VULNMART_KEK: "1:dnVsbm1hcnQtZGV2LWtlay1ub3QtYS1zZWNyZXQtMDA="
+      VULNMART_EVENT_MASTER: dnVsbm1hcnQtZGV2LWV2dC1ub3QtYS1zZWNyZXQtMDA=
+      VULNMART_FLAG_KEY: dnVsbm1hcnQtZGV2LWZsZy1ub3QtYS1zZWNyZXQtMDA=
+      VULNMART_OWNER_KEY: dnVsbm1hcnQtZGV2LW93bi1ub3QtYS1zZWNyZXQtMDA=
     cap_drop:
       - ALL
     security_opt:

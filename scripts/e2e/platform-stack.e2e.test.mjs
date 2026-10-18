@@ -4,6 +4,7 @@
 // Node built-ins only. The stack is started once, then the tests inspect and disturb it, then `down` is checked last.
 import { describe, test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import net from 'node:net';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -437,7 +438,7 @@ describe('platform and web profiles on a real Docker engine', () => {
   }, { timeout: 240000 });
 
   // Story P-13: an admin exists only through the seed command (or another admin); signup cannot make one; an admin has no learner role.
-  test('admins (P-13): the seed command makes an admin with no learner role who cannot sign in yet, a second seed changes nothing, signup cannot make an admin', async () => {
+  test('admins (P-13): the seed command makes an admin with no learner role who signs in without admin powers, a second seed changes nothing, signup cannot make an admin', async () => {
     const email = `e2e-admin-${RUN}@example.com`;
     const password = 'a long admin password 123';
     const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
@@ -451,12 +452,14 @@ describe('platform and web profiles on a real Docker engine', () => {
     const again = seed();
     assert.equal(again.status, 3, 'a second seed for the same address changes nothing');
     assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci = '${email}'`), '1');
-    // the account cannot sign in before the second factor exists: no session, no cookie
+    // the admin can sign in with the password (to enrol a second factor) but the session has no admin powers until one is proved (story P-15)
     const login = await postJson('/api/v1/session', { email, password });
-    assert.equal(login.status, 500);
-    assert.equal((await login.json()).code, 'REQ-INTERNAL');
-    assert.equal(login.headers.getSetCookie().length, 0);
-    assert.equal(psql(`SELECT count(*) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}'`), '0');
+    assert.equal(login.status, 200);
+    const loginBody = await login.json();
+    assert.equal(loginBody.user.account_type, 'admin');
+    assert.equal(loginBody.user.mfa_enabled, false);
+    assert.equal(login.headers.getSetCookie().length, 1);
+    assert.equal(psql(`SELECT count(*) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}' AND mfa_at IS NULL`), '1', 'the session records that no second factor was proved');
     // a signup that names an account type or role is refused, and a normal signup makes a participant
     const forged = await postJson('/api/v1/accounts', { email: `e2e-forged-${RUN}@example.com`, password, display_name: 'Forged', age_declaration: true, account_type: 'admin' });
     assert.equal(forged.status, 422);
@@ -466,6 +469,224 @@ describe('platform and web profiles on a real Docker engine', () => {
       `INSERT INTO user_roles (user_id, role, account_type) SELECT id, 'candidate', 'participant' FROM users WHERE email_ci = '${email}'`);
     assert.notEqual(direct.status, 0);
     assert.match(direct.stderr, /violates foreign key constraint/);
+  }, { timeout: 120000 });
+
+  // Story P-15: the second factor on the real stack. The test is the authenticator app: it reads the secret from the otpauth address and makes the
+  // 6-digit codes itself (RFC 6238: HMAC-SHA1 of the 30-second step).
+  const base32 = (text) => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let bits = 0, value = 0;
+    const bytes = [];
+    for (const ch of text.replace(/=+$/, '').toUpperCase()) {
+      value = (value << 5) | alphabet.indexOf(ch);
+      bits += 5;
+      if (bits >= 8) { bytes.push((value >>> (bits - 8)) & 255); bits -= 8; }
+    }
+    return Buffer.from(bytes);
+  };
+  const totpCode = (secret, step) => {
+    const counter = Buffer.alloc(8);
+    counter.writeBigUInt64BE(BigInt(step));
+    const hmac = crypto.createHmac('sha1', base32(secret)).update(counter).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const number = (((hmac[offset] & 0x7f) << 24) | (hmac[offset + 1] << 16) | (hmac[offset + 2] << 8) | hmac[offset + 3]) % 1000000;
+    return String(number).padStart(6, '0');
+  };
+  const stepNow = () => Math.floor(Date.now() / 30000);
+
+  test('mfa (P-15): an admin enrols an authenticator app, then needs the code (or a recovery code, once) to sign in; a code cannot be replayed', async () => {
+    const email = `e2e-mfa-${RUN}@example.com`;
+    const password = 'a long admin password 123';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const seeded = docker('exec', '-e', `VULNMART_SEED_ADMIN_PASSWORD=${password}`, NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', email, '--name', 'E2E MFA Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const cookieOf = (res) => /__Host-vm_session=([^;]+)/.exec(res.headers.getSetCookie()[0])[1];
+    const asCookie = (value) => ({ cookie: `__Host-vm_session=${value}` });
+
+    // 1. password only: a session that carries no admin role, but can enrol
+    const first = await postJson('/api/v1/session', { email, password });
+    assert.equal(first.status, 200);
+    const firstBody = await first.json();
+    assert.equal(firstBody.user.mfa_enabled, false);
+    let cookie = cookieOf(first);
+    const start = await postJson('/api/v1/me/mfa', undefined, { ...asCookie(cookie), 'x-csrf-token': firstBody.csrf_token });
+    assert.equal(start.status, 200);
+    const uri = (await start.json()).otpauth_uri;
+    assert.match(uri, /^otpauth:\/\/totp\/VulnMart%3A/);
+    const secret = new URL(uri).searchParams.get('secret');
+    assert.match(secret, /^[A-Z2-7]{32}$/);
+    assert.equal(psql(`SELECT enabled_at IS NULL FROM mfa_credentials JOIN users ON users.id = mfa_credentials.user_id WHERE email_ci = '${email}'`), 't', 'pending until a code confirms it');
+    assert.equal((await postJson('/api/v1/me/mfa/confirm', { code: '000000' }, { ...asCookie(cookie), 'x-csrf-token': firstBody.csrf_token })).status, 401);
+    const confirm = await postJson('/api/v1/me/mfa/confirm', { code: totpCode(secret, stepNow()) }, { ...asCookie(cookie), 'x-csrf-token': firstBody.csrf_token });
+    assert.equal(confirm.status, 200);
+    const recovery = (await confirm.json()).recovery_codes;
+    assert.equal(recovery.length, 10);
+    assert.ok(recovery.every((c) => /^[A-Z2-7]{10}$/.test(c)));
+    assert.notEqual(cookieOf(confirm), cookie, 'the session value changed');
+    cookie = cookieOf(confirm);
+    assert.equal((await call('GET', '/api/v1/me', { headers: asCookie(cookie) })).status, 200);
+    // what is stored: a sealed secret, keyed hashes, no codes
+    const stored = psql(`SELECT secret_enc FROM mfa_credentials JOIN users ON users.id = mfa_credentials.user_id WHERE email_ci = '${email}'`);
+    assert.ok(stored.startsWith('v1.') && !stored.includes(secret), 'the secret is sealed');
+    assert.equal(psql(`SELECT count(*) FROM recovery_codes JOIN users ON users.id = recovery_codes.user_id WHERE email_ci = '${email}' AND length(code_hash) = 64`), '10');
+    assert.equal(psql(`SELECT count(*) FROM recovery_codes WHERE code_hash = '${recovery[0]}'`), '0', 'a recovery code itself is not stored');
+    // 2. an admin cannot turn it off
+    const csrf = (await (await call('GET', '/api/v1/session', { headers: asCookie(cookie) })).json()).csrf_token;
+    const off = await call('DELETE', '/api/v1/me/mfa', { body: { password }, headers: { ...asCookie(cookie), 'x-csrf-token': csrf } });
+    assert.equal(off.status, 409);
+    assert.equal((await off.json()).code, 'AUTH-MFA-STATE');
+    assert.equal((await call('DELETE', '/api/v1/session', { headers: { ...asCookie(cookie), 'x-csrf-token': csrf } })).status, 204);
+
+    // 3. the next sign-in: password, then a ticket and no cookie, then the code
+    const step1 = await postJson('/api/v1/session', { email, password });
+    assert.equal(step1.status, 200);
+    const challenge = await step1.json();
+    assert.equal(challenge.status, 'mfa_required');
+    assert.equal(step1.headers.getSetCookie().length, 0, 'no cookie before the second step');
+    assert.equal(psql(`SELECT count(*) FROM email_tokens WHERE purpose = 'mfa' AND token_hash = '${challenge.mfa_ticket}'`), '0', 'the ticket is stored only as a hash');
+    const wrong = await postJson('/api/v1/session/mfa', { mfa_ticket: challenge.mfa_ticket, code: '000000' });
+    assert.equal(wrong.status, 401);
+    assert.equal((await wrong.json()).code, 'AUTH-MFA-INVALID');
+    const goodCode = totpCode(secret, stepNow() + 1); // the confirming code used this step; the window accepts the next one
+    const done = await postJson('/api/v1/session/mfa', { mfa_ticket: challenge.mfa_ticket, code: goodCode });
+    assert.equal(done.status, 200);
+    assert.equal((await done.json()).user.mfa_enabled, true);
+    assert.equal(done.headers.getSetCookie().length, 1);
+    assert.equal(psql(`SELECT count(*) FROM sessions JOIN users ON users.id = sessions.user_id WHERE email_ci = '${email}' AND mfa_at IS NOT NULL AND revoked_at IS NULL`), '1');
+    // 4. a ticket works once, and a code cannot be replayed
+    assert.equal((await postJson('/api/v1/session/mfa', { mfa_ticket: challenge.mfa_ticket, code: goodCode })).status, 401);
+    const again = await (await postJson('/api/v1/session', { email, password })).json();
+    const replay = await postJson('/api/v1/session/mfa', { mfa_ticket: again.mfa_ticket, code: goodCode });
+    assert.equal(replay.status, 401);
+    // 5. a recovery code signs in once
+    const viaRecovery = await postJson('/api/v1/session/mfa', { mfa_ticket: (await (await postJson('/api/v1/session', { email, password })).json()).mfa_ticket, code: recovery[0] });
+    assert.equal(viaRecovery.status, 200);
+    const reused = await postJson('/api/v1/session/mfa', { mfa_ticket: (await (await postJson('/api/v1/session', { email, password })).json()).mfa_ticket, code: recovery[0] });
+    assert.equal(reused.status, 401);
+    assert.equal(psql(`SELECT count(*) FROM recovery_codes JOIN users ON users.id = recovery_codes.user_id WHERE email_ci = '${email}' AND used_at IS NOT NULL`), '1');
+  }, { timeout: 240000 });
+
+  // Story P-16: the consent routes through the real proxy. No attempt in state consent exists on the stack until the invite flow (P-21), so the
+  // routes can only show what they refuse; the notice, the record and the race are proved against a fake attempt side in the pytest suite.
+  test('consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record', async () => {
+    const email = `e2e-consent-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psqlAs = (...args) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', ...args);
+    const psql = (sql) => psqlAs('-c', sql).stdout.trim();
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Consent', age_declaration: true })).status, 202);
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    const attempt = 'a-ABCDEFGHIJKLMNOP';
+    const notice = `/api/v1/consent/notice?attempt_id=${attempt}`;
+    const body = { attempt_id: attempt, notice_version: '2026-10-18.1', notice_text_sha256: '0'.repeat(64), decision: 'granted' };
+
+    assert.equal((await call('GET', notice)).status, 401);
+    assert.equal((await call('GET', '/api/v1/me/consents')).status, 401);
+    assert.equal((await postJson('/api/v1/consent', body)).status, 401);
+
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 200);
+    const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(login.headers.getSetCookie()[0])[1]}`;
+    const csrf = (await login.json()).csrf_token;
+
+    const missing = await call('GET', notice, { headers: { cookie } });
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).code, 'ATT-NOT-FOUND');
+    assert.equal(missing.headers.get('cache-control'), 'private, no-store');
+    assert.equal((await call('GET', '/api/v1/consent/notice?attempt_id=nope', { headers: { cookie } })).status, 422);
+    assert.equal((await postJson('/api/v1/consent', body, { cookie })).status, 403, 'no CSRF token');
+    assert.equal((await postJson('/api/v1/consent', body, { cookie, 'x-csrf-token': csrf, origin: 'https://evil.example' })).status, 403, 'another site');
+    const unknown = await postJson('/api/v1/consent', body, { cookie, 'x-csrf-token': csrf });
+    assert.equal(unknown.status, 404);
+    assert.equal((await unknown.json()).code, 'ATT-NOT-FOUND');
+    const own = await call('GET', '/api/v1/me/consents', { headers: { cookie } });
+    assert.equal(own.status, 200);
+    assert.deepEqual(await own.json(), { items: [], has_more: false });
+    assert.equal((await call('GET', '/api/v1/me/consents?limit=101', { headers: { cookie } })).status, 422);
+    assert.equal(psql(`SELECT count(*) FROM consent_records`), '0', 'nothing was written by the refused calls');
+
+    // the database itself: the application role has SELECT and INSERT only, and cannot change a record
+    assert.equal(psql(`SELECT version_num FROM alembic_version`).length > 0, true);
+    assert.equal(psql(`SELECT string_agg(privilege_type, ',' ORDER BY privilege_type) FROM information_schema.role_table_grants WHERE table_name = 'consent_records' AND grantee = 'vulnmart_app'`), 'INSERT,SELECT');
+    assert.equal(psql(`INSERT INTO consent_records (id, user_id, attempt_id, notice_version, notice_text_sha256, notice_text_snapshot, retention_days_shown, controller_name_shown, action, audit_seq) VALUES ('k-E2ETESTE2ETESTAA', 'u-X', '${attempt}', '2026-10-18.1', '${'a'.repeat(64)}', 't', 180, 'C', 'granted', 1) RETURNING 1`).split('\n')[0], '1');
+    for (const sql of ["UPDATE consent_records SET action = 'declined'", 'DELETE FROM consent_records', 'TRUNCATE consent_records']) {
+      const refused = psqlAs('-c', `SET ROLE vulnmart_app; ${sql}`);
+      assert.notEqual(refused.status, 0, sql);
+      assert.match(refused.stderr, /permission denied/, sql);
+    }
+    assert.equal(psql(`SELECT action FROM consent_records WHERE attempt_id = '${attempt}'`), 'granted');
+    psql(`DELETE FROM consent_records WHERE attempt_id = '${attempt}'`); // clean up as the owner, so a rerun on this volume starts empty
+  }, { timeout: 120000 });
+
+  // Story P-17: the audit log and the key service on the real stack. A login through the proxy leaves a pseudonymised entry in the hash chain, the chain
+  // verifies and anchors, and the key service (database vm_keystore, its own role, the KEK from the environment) creates, uses and shreds a key.
+  test('audit and keys (P-17): a login is logged under a pseudonym, the chain verifies and anchors; a key is created, used and shredded in vm_keystore', async () => {
+    const email = `e2e-audit-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psqlDb = (db, sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', db, '-At', '-c', sql).stdout.trim();
+    const psql = (sql) => psqlDb('vulnmart', sql);
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Audit', age_declaration: true })).status, 202);
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    assert.equal((await postJson('/api/v1/session', { email, password: 'not the password at all' })).status, 401);
+    assert.equal((await postJson('/api/v1/session', { email, password })).status, 200);
+
+    // the entries exist, under pseudonyms: the user id and the address are nowhere in the table
+    const userId = psql(`SELECT id FROM users WHERE email_ci = '${email}'`);
+    assert.match(userId, /^u-[A-Z2-7]{16}$/);
+    const pseudonym = psql(`SELECT subject_id FROM subject_map WHERE user_id = '${userId}'`);
+    assert.match(pseudonym, /^s-[A-Z2-7]{16}$/);
+    assert.equal(psql(`SELECT string_agg(action, ',' ORDER BY seq) FROM audit_log WHERE subject = '${pseudonym}'`), 'auth.login_failed,auth.login');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE actor || coalesce(subject, '') || details LIKE '%${userId}%' OR details LIKE '%${email}%'`), '0');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE actor = '${pseudonym}' AND action = 'auth.login'`), '1');
+
+    // the database role of the API can read and append to the log and cannot change it
+    for (const sql of ["UPDATE audit_log SET actor = 'x'", 'DELETE FROM audit_log', 'TRUNCATE audit_log']) {
+      const refused = docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-c', `SET ROLE vulnmart_app; ${sql}`);
+      assert.notEqual(refused.status, 0, sql);
+      assert.match(refused.stderr, /permission denied/, sql);
+    }
+
+    // inside the API container: the real ports, as the running process builds them
+    const program = [
+      'import json, secrets',
+      'from vulnmart.main import app',
+      'from vulnmart.ports.errors import KeyShredded',
+      'p = app.state.ports',
+      'a = "a-E2E" + secrets.token_hex(6).upper()',
+      'out = {"keys": type(p.keys).__name__, "audit": type(p.audit_db).__name__}',
+      'p.keys.create_attempt_key(a)',
+      's = p.keys.encrypt(a, b"evidence", b"row")',
+      'out["round_trip"] = p.keys.decrypt(a, s, b"row").decode()',
+      'out["shred"] = p.keys.shred(a)',
+      'try:',
+      '    p.keys.decrypt(a, s, b"row")',
+      '    out["after_shred"] = "readable"',
+      'except KeyShredded:',
+      '    out["after_shred"] = "shredded"',
+      'v = p.audit_db.verify()',
+      'out["verify"] = [v.ok, v.checked >= 2]',
+      'r = app.state.audit_anchors.anchor()',
+      'out["anchor"] = [r.head_seq >= 2, r.witness]',
+      'print(json.dumps(out))',
+    ].join('\n');
+    const run = docker('exec', NAME('api'), 'python', '-c', program);
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(JSON.parse(run.stdout.trim().split('\n').pop()), {
+      keys: 'DbKeyPort', audit: 'DbAuditPort', round_trip: 'evidence', shred: true, after_shred: 'shredded', verify: [true, true], anchor: [true, 'db'],
+    });
+    assert.equal(psql(`SELECT count(*) FROM audit_anchor WHERE anchor_date = current_date`), '1');
+
+    // the keys are in their own database, with their own role, and the application's role cannot reach it
+    assert.equal(psqlDb('vm_keystore', 'SELECT count(*) FROM deks') >= '0', true);
+    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM shredded WHERE attempt_id LIKE 'a-E2E%'`), '1');
+    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM deks WHERE attempt_id LIKE 'a-E2E%'`), '0', 'the wrapped key is gone, not marked');
+    assert.equal(psql(`SELECT count(*) FROM pg_tables WHERE tablename IN ('deks', 'shredded')`), '0', 'no key table in the data database');
+    const appToKeys = docker('exec', '-e', 'PGPASSWORD=vulnmart-app-dev-only-not-a-secret', NAME('postgres'), 'psql', '-h', '127.0.0.1', '-U', 'vulnmart_app', '-d', 'vm_keystore', '-c', 'SELECT 1');
+    assert.notEqual(appToKeys.status, 0);
+    assert.match(appToKeys.stderr, /permission denied|not allowed|CONNECT/i);
   }, { timeout: 120000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {

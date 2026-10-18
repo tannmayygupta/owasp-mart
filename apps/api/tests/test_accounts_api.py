@@ -265,12 +265,12 @@ def test_client_address_rules():
 @pytest.mark.parametrize("env", ["staging", "production"])
 def test_a_strict_environment_will_not_start_without_valkey_for_the_rate_limits(env):
     with pytest.raises(RuntimeError, match="VULNMART_VALKEY_URL"):
-        create_app({}, settings=Settings(env=env, origin_secret=SECRET, csrf_secret="k" * 32))
+        create_app({}, settings=Settings(env=env, origin_secret=SECRET, csrf_secret="k" * 32, field_secret="f" * 32))
 
 
 @pytest.mark.parametrize("env", ["staging", "production"])
 def test_a_strict_environment_will_not_send_links_over_plain_http(env):
-    settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0", csrf_secret="k" * 32,
+    settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0", csrf_secret="k" * 32, field_secret="f" * 32,
                         postgres_dsn="postgresql://app@db.invalid/vulnmart", public_origin="http://vulnmart.example")
     with pytest.raises(RuntimeError, match="https://"):
         create_app({}, settings=settings)
@@ -302,3 +302,15 @@ def test_when_the_limiter_store_is_down_the_request_is_refused_not_let_through(s
 
 def test_a_denied_decision_carries_its_wait():
     assert RateDecision(False, 30).retry_after == 30
+
+@pytest.mark.parametrize("env", ["staging", "production"])
+def test_a_strict_environment_will_not_start_without_a_field_key_for_the_second_factor(env):
+    settings = Settings(env=env, origin_secret=SECRET, csrf_secret="k" * 32, valkey_url="valkey://valkey.invalid:6379/0")
+    with pytest.raises(RuntimeError, match="FIELD_SECRET"):
+        create_app({}, settings=settings)
+    create_app({}, settings=settings.model_copy(update={"field_secret": "f" * 32}))  # starts with one
+
+
+def test_a_field_key_secret_that_is_too_short_stops_the_start():
+    with pytest.raises(ValueError):
+        create_app({}, settings=Settings(field_secret="too short"))

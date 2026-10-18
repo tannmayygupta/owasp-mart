@@ -42,6 +42,17 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-multi-factor-login-plan (2026-10-18)
+
+- OI-13 stays open: whether recruiter MFA becomes mandatory and whether passkeys replace or add to TOTP. Only TOTP exists.
+- The field key is a setting until the key service (P-17, handoff H-135); changing it makes every sealed TOTP secret unreadable and every recovery code unmatched, so it needs a migration plan before the first real use.
+- An admin who loses the phone and all recovery codes can be recovered only by an operator in the database; no runbook step exists for that yet (the runbook says it must be done by hand).
+- No mail tells a person that a recovery code was used or that the second factor was turned on or off (not in the list of FR-NTF-01); the audit entries exist (in memory until P-17).
+- The enrolment and sign-in pages (dashboards): the otpauth address and the recovery codes are shown once by the API and a page must not store them (handoff H-135).
+- An account can start enrolment again and again before confirming (each replaces the pending secret); only the per-address login limit bounds it.
+- Learners and candidates may also turn the factor on; no page offers it and no requirement asks for it.
+- ASVS 5.0 and NIST SP 800-63B were not re-read; RFC 6238 was checked by its published test vectors and by an independent Node implementation, not by reading the RFC.
+
 ## Deferred from: story-password-reset-quality-and-account-self-service-plan (2026-10-17)
 
 - The forgot-password, reset-password, account and signup pages (dashboards, handoff H-134); an email change (needs its own verification step).
@@ -99,3 +110,29 @@
 ## Deferred from: code review of story-dashboards-skeleton-with-the-same-origin-proxy-local-plan (2026-10-12)
 
 - The health page's own client call is not run in a real browser under the CSP (no browser harness yet); the e2e test fetches the same URL and checks the CSP. Add a browser test with the first dashboards story that needs one.
+
+## Deferred from: story-consent-screen-consent-record-minimum-data-and-18-and-over-plan (2026-10-18)
+
+- The consent page (dashboards): the unticked agree box, the Start and Decline buttons, reading the notice from getConsentNotice and sending the version and hash back.
+- No attempt in state `consent` exists until the invite flow (P-21); the running API uses an empty `ConsentTargets`, so every attempt id is 404. The real port, and the step out of `consent` in stream L's `AttemptPort` (handoff H-136).
+- The contract, architecture 04 section 10.1 and `AttemptPort.cancel` disagree about where a decline ends the attempt (`cancelled` or `withdrawn`).
+- Withdrawal (P-25): a new row with action `withdrawn`; the withdraw route, the 7-day undo and the recruiter mail.
+- The notice wording is a draft; a lawyer has not reviewed it (OI-33). A new wording needs a new version line in `privacy/notice.py` (the old line stays).
+- OI-37 is answered (assessment retention plus 12 months, `consent_record_extra_months`) but not yet written into `initial.md`; the purge that shrinks an expired record to hash and version (P-24) and the pseudonymisation on deletion (P-25) are UPDATEs the application role cannot do: a decision for P-24 (handoff H-136).
+- `audit_seq` links to the in-memory audit stand-in until P-17, so it points at nothing durable yet.
+- The inventory test lists the columns of the tables of streams P; the lab's tables (attempts, evidence, events) are inventoried by stream L's stories.
+- The rate limit on decisions (30 an hour per account) is a placeholder.
+
+## Deferred from: story-audit-log-and-key-service-plan (2026-10-18)
+
+- The 12-month purge of audit rows (needs a privileged path that writes a checkpoint first) and the scheduled daily anchor job and chain check with an admin alert: story P-24.
+- The audit entries of events that do not exist yet (approvals, invites, views and exports of candidate data, assessment steps, deletion steps, retention changes, admin access, log reads, failed access to resources): each is written by the story that creates the event.
+- The keystore snapshot after every shred (new snapshot, then delete older ones), the 14-day backup of the data database off VM-P, shipping the anchor file off the machine, and mounting a writable volume for it: operator and deployment steps (runbook, P-32, L-17); nothing was run on a VM.
+- A restore drill with real backup files (spike S-19); the test here uses a copy of the data taken before the shred.
+- The signed one-line commit to a separate repository and the email to the admins (ADR 0008) are not built; the anchor is a table row and a signed line in a file.
+- KeyPort.flag has no key version argument (handoff H-137); the three master keys have no rotation procedure.
+- The seed-admin command still writes its `admin.created` entry to an in-memory port, not to the durable log.
+- The audit write is committed before the caller's transaction (an action that rolls back still leaves its entry); joining the caller's transaction needs a request-scoped session.
+- Raw user ids remain in other tables (consent records, the email outbox): the pseudonym protects the audit log only (P-25).
+- Every failed login writes an audit row; the volume is bounded by the rate limits but not by retention until P-24.
+- OI-28 is answered (self-hosted on VM-P) but not yet written into initial.md.

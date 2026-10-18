@@ -28,6 +28,7 @@ import vulnmart.accounts.models  # noqa: F401
 import vulnmart.kernel.models  # noqa: F401
 import vulnmart.notifications.models  # noqa: F401
 import vulnmart.orgs.models  # noqa: F401
+import vulnmart.privacy.models  # noqa: F401
 from support import ROOT
 from vulnmart.kernel.db import Base, make_engine, make_sessions
 from vulnmart.kernel.scope import ContextScopePort, scope_or_none
