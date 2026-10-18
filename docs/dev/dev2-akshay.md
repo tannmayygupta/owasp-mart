@@ -182,14 +182,14 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 Goal: Audit and keys, companies, assessments and invites, live updates, retention.
 
-- [ ] **P-17. Audit log and key service**
+- [x] **P-17. Audit log and key service**  (the mechanism and the entries that exist today: logins, failed logins, logouts, roles, admins, second factor, consent; every other sensitive action writes its entry in the story that creates it; OI-28 answered, anchor schedule and purge are P-24, snapshot and anchor shipping are operator steps)
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: not planned yet; created when you incept `epic-privacy-audit-and-keys` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `4.2` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Append-only audit log, encryption at rest and the key service with a KeyPort.
   - Covers: FR-PRV-10, 12
   - Waits on: P-12. Open in part: OI-28. Tanmay's flag and evidence tasks use your KeyPort.
   - Done when: Every sensitive action writes an audit entry and the key service encrypts and decrypts in a test.
-  - Handoffs: H-08, H-09, H-10, H-21, H-132, H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-08, H-09, H-10, H-21, H-132, H-135 (answered here), H-137 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-18. Recruiter signup and company approval**
   - Epic: `epic-companies-and-approval`

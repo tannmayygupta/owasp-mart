@@ -26,6 +26,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from vulnmart.ports.audit import AuditPort
 from vulnmart.ports.scope import Role, Scope
 from vulnmart.ports.settings import SettingsPort
 
@@ -114,13 +115,18 @@ def _view(user: User, *, mfa: bool = False) -> UserView:
 
 
 class SessionService:
-    def __init__(self, sessions: sessionmaker[Session], settings: SettingsPort, csrf_key: bytes, *, now: Clock = utc_now):
+    def __init__(self, sessions: sessionmaker[Session], settings: SettingsPort, csrf_key: bytes, *, now: Clock = utc_now, audit: AuditPort | None = None):
         if len(csrf_key) < 16:
             raise ValueError("the CSRF key is at least 16 bytes")
         self._sessions = sessions
         self._settings = settings
         self._csrf_key = csrf_key
         self._now = now
+        self._audit = audit  # logins, failed logins and logouts are written to the audit log (story P-17, FR-PRV-10) when one is given
+
+    def _record(self, action: str, *, actor: str, subject: str | None, **details: object) -> None:
+        if self._audit is not None:
+            self._audit.append(actor=actor, action=action, subject=subject, details=details)
 
     # -- limits ------------------------------------------------------------------------------------------------------
 
@@ -144,10 +150,13 @@ class SessionService:
             second_factor = user is not None and mfa_enabled(session, user.id)
         if user is None or user.status != "active":
             spend_the_same_time()
+            self._record("auth.login_failed", actor="system:login", subject=None, reason="unknown_or_inactive")
             raise InvalidCredentials
         if not verify_password(user.password_hash, password):
+            self._record("auth.login_failed", actor="system:login", subject=user.id, reason="bad_password")
             raise InvalidCredentials
         if user.email_verified_at is None:
+            self._record("auth.login_failed", actor="system:login", subject=user.id, reason="not_verified")
             raise EmailNotVerified
         new_hash = hash_password(password) if needs_rehash(user.password_hash) else None  # raise the cost of an old hash at a login
         if new_hash:
@@ -165,6 +174,7 @@ class SessionService:
             token = self._create(session, user_id, now, now + self._absolute(), ip_trunc, ua_class, mfa_at=now if mfa else None)
         resolved = self.resolve(token)
         assert resolved is not None  # created a moment ago
+        self._record("auth.login", actor=user_id, subject=user_id, mfa=mfa)
         return LoginResult(token=token, session=resolved)
 
     def _create(self, session: Session, user_id: str, now: datetime, absolute_expires_at: datetime, ip_trunc: str | None,
@@ -207,8 +217,11 @@ class SessionService:
     def logout(self, token: str) -> bool:
         """End the session now (FR-ACC-03). False when there was nothing live to end."""
         with self._sessions.begin() as session:
+            owner = session.scalar(select(UserSession.user_id).where(UserSession.id_hash == token_hash(token), UserSession.revoked_at.is_(None)))
             done = session.execute(update(UserSession).where(UserSession.id_hash == token_hash(token), UserSession.revoked_at.is_(None))
                                    .values(revoked_at=self._now())).rowcount
+        if done == 1 and owner is not None:
+            self._record("auth.logout", actor=owner, subject=owner)
         return done == 1
 
     def rotate(self, token: str) -> str | None:

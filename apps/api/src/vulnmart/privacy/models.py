@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, Integer, String, Text, func, text
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from vulnmart.kernel.db import Base
@@ -47,3 +47,15 @@ class ConsentRecord(Base):
     ua_hash: Mapped[str | None] = mapped_column(String(64))
     method: Mapped[str] = mapped_column(String(8), nullable=False, server_default="web")
     audit_seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+class SubjectMap(Base):
+    """The identity behind a pseudonymous subject id of the audit log (FR-PRV-10). Deleting the row (deletion workflow, story P-25) leaves the audit
+    rows in place and identifying nobody. No foreign key to `users`: a pseudonym is needed while the user row is still being created in another
+    transaction, and the mapping is removed explicitly, not by a cascade."""
+
+    __tablename__ = "subject_map"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_subject_map_user_id"),)
+
+    subject_id: Mapped[str] = mapped_column(String(18), primary_key=True)  # `s-` and 16 Base32 characters
+    user_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
