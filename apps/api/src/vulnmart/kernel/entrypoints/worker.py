@@ -41,7 +41,11 @@ def mail_lifespan(settings: Settings | None = None):
         recipients = DbRecipients(ports.sessions)  # the real lookup (story P-11, handoff H-127)
         if settings.env in ("dev", "test"):
             recipients = FallbackRecipients(recipients, DevRecipients())
-        service = build_email_service(settings, ports.sessions, ports.settings, recipients=recipients)
+        from vulnmart.accounts.fieldkeys import from_settings as field_keys_from_settings
+
+        keys = field_keys_from_settings(settings)  # the same secret as the API, so the address of an invited candidate (sealed by the API) opens here
+        service = build_email_service(settings, ports.sessions, ports.settings, recipients=recipients,
+                                      address_opener=lambda sealed, aad: keys.open(sealed, account=aad))
         broker = make_broker(settings.valkey_url)
         actor = make_delivery_actor(broker, service)
         worker = Worker(broker, worker_threads=2)

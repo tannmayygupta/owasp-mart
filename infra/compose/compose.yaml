@@ -227,6 +227,8 @@ services:
       VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}@postgres:5432/vulnmart
       VULNMART_VALKEY_URL: valkey://valkey:6379/0
       VULNMART_SERVICE: worker
+      # Story P-20: the field secret of the API (a development value; production reads a secret file), so the worker opens the address of an invited candidate that the API sealed.
+      VULNMART_FIELD_SECRET: ${VULNMART_DEV_FIELD_SECRET:-vulnmart-dev-field-secret-not-a-secret-0123456789}
       VULNMART_EMAIL_PROVIDER: smtp
       VULNMART_SMTP_HOST: mailpit
       VULNMART_SMTP_PORT: "1025"

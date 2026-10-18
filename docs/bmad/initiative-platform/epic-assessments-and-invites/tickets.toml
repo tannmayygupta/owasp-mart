@@ -1,0 +1,27 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-18: one story per task of docs/dev/dev2-akshay.md that names this epic (P-20, P-21), as START-HERE.md section 5 asks (the developer chose
+# "continue automatically"). OI-14 and OI-15 answered by the developer on 2026-10-18: the write-up is a template setting (default optional) and when a candidate sees
+# their results is a template setting (default right after submit); not yet recorded in initial.md. The routes of IF-1 for templates and invites are a contract change
+# and belong to the routes story of the companies epic (5.3), because IF-1 has no recruiter routes at all.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Assessment template, creating and sending invites, invite lifecycle"
+description = "A recruiter of an active company makes and edits assessment templates (the fields of FR-ASM-01, with the things that cannot be switched off refused), invites a candidate by email (a 256-bit token kept only as a hash, bound to the address, the rules copied onto the invite, the daily cap and the terms checked, the mail through the outbox with the address sealed because the candidate has no account), and tracks the invite through created, sent, opened, consented, started, expired, cancelled, declined and revoked with resend and revoke."
+verify = "A recruiter creates a template and sends an invite on the local stack and the invite email arrives at an address with no account; the database holds only the hash of the token; a resend kills the old link; the cap and the terms refuse; one company cannot see another's templates or invites."
+covers = ["FR-ASM-01", "FR-ASM-02", "FR-ASM-03"]
+after = ["4.1", "5.2"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Accepting invites, re-invite after a fault and bulk invites"
+description = "The candidate opens the link, signs in or registers (18 or over), the verified address must match the invite, the consent screen comes first (declining ends the invite), accepting adds the candidate role and hands a consented attempt to the lab port; a re-invite after a fault creates a new attempt and marks the old one superseded; bulk invites; the invite purge can see expired invites."
+verify = "Accept, decline, re-invite and bulk work in tests and the invite purge job can see expired invites."
+covers = ["FR-ASM-04", "FR-ASM-05", "FR-ASM-06"]
+after = [1]
+hitl = false
+risk = "high"

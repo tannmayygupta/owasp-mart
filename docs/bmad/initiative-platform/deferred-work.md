@@ -160,3 +160,16 @@
 - A colleague's outcome mail reuses the company approval template ("your company has been approved"); a dedicated template changes the FR-NTF-01 list.
 - The owner is not told about a new join request by mail (the list is pulled); a stream already open when a recruiter is removed or suspended is for the live-update stories to close (P-22, P-23).
 - OI-11's second half (company-name verification beyond the email domain) was not asked and is not built.
+
+## Deferred from: story-assessment-template-creating-and-sending-invites-invite-lifecycle-plan (2026-10-18)
+
+- No HTTP route for templates or invites (story 5.3, a contract change); the dashboards screens (P-26, P-27).
+- Accepting an invite (opening the link, sign-in or registration with a matching verified address, the consent screen, the candidate role, handing a consented attempt to the lab port), a re-invite after a fault that supersedes the old attempt, and bulk invites: story P-21. `Invite.superseded_by` exists and nothing writes it.
+- The consent notice shows the setting `candidate_retention_days`; the template has its own `retention_days`, which the consent notice should show once `ConsentTargets` is real (P-21).
+- `expire_all` exists; the scheduler that calls it daily, and the invite purge that empties `token_hash` (the column is nullable for it), are story P-24.
+- A resend is not limited and does not count against the daily cap; only a created invite counts.
+- `sent` is read from the queued mail when the invite is read and can lag until then; opening the link counts as delivery.
+- An outbox row of a failed invite mail keeps its sealed address until an admin requeues it or it is removed.
+- A deleted candidate's invite keeps `email_ci`; whether deletion clears it is for P-25.
+- The template ranges are the research placeholders of OI-25 (time 30 to 480, resets 0 to 10, expiry 1 to 30, retention 30 to 365); OI-14 and OI-15 are answered but not yet in `initial.md`. A cost percentage of hints (default 20 when hints are on) is a placeholder.
+- A template cannot be archived, only deleted when it has no invites.

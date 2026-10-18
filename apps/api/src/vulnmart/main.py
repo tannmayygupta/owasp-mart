@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from vulnmart.accounts.api import router as accounts_router
 from vulnmart.accounts.directory import UserDirectory
 from vulnmart.accounts.admins import AdminService
-from vulnmart.accounts.fieldkeys import FieldKeys
+from vulnmart.accounts.fieldkeys import FieldKeys, from_settings as fieldkeys_from_settings
 from vulnmart.accounts.me_api import router as me_router
 from vulnmart.accounts.mfa import MfaService
 from vulnmart.accounts.mfa_api import router as mfa_router
@@ -33,6 +33,7 @@ from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRa
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
+from vulnmart.assessments.service import AssessmentService
 from vulnmart.orgs.service import CompanyService
 from vulnmart.privacy.api import router as consent_router
 from vulnmart.privacy.consent import ConsentService
@@ -65,14 +66,9 @@ def _sessions_from(settings: Settings, ports) -> SessionService | None:
 
 
 def field_keys_from(settings: Settings) -> FieldKeys:
-    """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
-    secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
-    secret = settings.field_key_secret()
-    if secret is None:
-        if settings.env in ("staging", "production"):
-            raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
-        secret = secrets.token_bytes(32)
-    return FieldKeys.from_secret(secret)
+    """The field key of the accounts module (seals TOTP secrets and the address of an invited candidate in the mail outbox, keys the hash of recovery codes).
+    See `accounts.fieldkeys.from_settings`."""
+    return fieldkeys_from_settings(settings)
 
 
 def _limiter_from(settings: Settings) -> RateLimiter:
@@ -139,6 +135,10 @@ def create_app(
                                                FileAnchorSink(settings.audit_anchor_file) if settings.audit_anchor_file else None)
     else:
         app.state.audit_anchors = None
+    # Assessment templates and invites (story P-20): no route yet (IF-1 has none for recruiters, story 5.3); the invite story (P-21) and the dashboards use this.
+    app.state.assessments = (AssessmentService(ports.sessions, app.state.companies, ports.audit, ports.scope, ports.settings, field_keys or field_keys_from(settings),
+                                               public_origin=settings.public_origin)
+                             if app.state.companies is not None else None)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)
