@@ -257,7 +257,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the release gate and deployed verification.
 
-- [ ] **T-25. C07 Authentication Failures (weak password-reset code)**
+- [x] **T-25. C07 Authentication Failures (weak password-reset code)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C07 on the finance account; the reset mailbox is unreadable by the player.

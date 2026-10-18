@@ -6,6 +6,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../domain/shop-s
 import * as staff from '../domain/staff-service.mjs';
 import * as money from '../domain/money-service.mjs';
 import { renderTicketMessageHtml } from '../challenges/c03b-ticket-xss.mjs';
+import { financeSettlementReference } from '../challenges/c07-password-reset.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -52,6 +53,11 @@ export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {} 
   app.post('/staff/refunds/:id/approve', SUPPORT, h((req, res) => { money.approveRefund(db, req.user, req.params.id, { amount: req.body.amount ? Number(req.body.amount) : undefined, idempotencyKey: req.body.idempotency_key || undefined }); res.redirect('/staff/refunds'); }));
   app.post('/staff/refunds/:id/reject', SUPPORT, h((req, res) => { money.rejectRefund(db, req.user, req.params.id); res.redirect('/staff/refunds'); }));
   app.post('/staff/refunds/:id/process', SUPPORT, h((req, res) => { money.processRefund(db, req.user, req.params.id); res.redirect('/staff/refunds'); }));
+
+  // C07 (Authentication Failures): the finance settlement settings page. Shown
+  // only to a finance session; its "settlement reference" is the C07 flag,
+  // reachable only after taking over the finance account via the reset flow.
+  app.get('/finance/settings/settlement', FINANCE, h((req, res) => res.render('staff/settlement', { reference: financeSettlementReference(db) })));
 
   // Finance: payouts + commissions, and payout accrual (T-18).
   app.get('/staff/payouts', FINANCE, h((req, res) => res.render('staff/payouts', { payouts: staff.listPayouts(db, req.user), commissions: staff.listCommissions(db, req.user) })));

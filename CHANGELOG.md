@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Added (Sprint 4, Sahil, stream T)
+- C07 Authentication Failures challenge (story 6.3 / T-25, FR-CHL-08, CWE-307/640): the shop's password-reset flow (migration 0006 adds `password_resets` + an internal `mailbox`) with `/auth/forgot`, `/auth/reset/confirm`, a finance settlement settings page (`/finance/settings/settlement`, the flag), and a test-only mailbox (`/test/mailbox`, VM_TEST). The fixed (default) build issues a 128-bit hashed token, answers generically, and kills the token after an attempt limit; the vulnerable build (`VM_CHALLENGE_C07=vulnerable`) issues a 4-digit code with no attempt limit and a response that reveals whether the account exists, so the finance account is taken over by brute force and its settlement flag read. Events `auth.reset_requested`, `auth.reset_confirm_batch`, `auth.password_reset_completed`. Exploit test passes on the vulnerable build and fails on the fixed one; the reset code is never returned by a route.
+
 ### Changed (Sprint 3 close, 2026-10-18, Sahil)
 - Developer confirmed the Sprint 3 stories done after PR #28 merged (CLAUDE.md task-cycle step 4): T-17, T-18 (seller flows, money model) and T-19 to T-24 (challenges C01–C06) — the story plans under `docs/bmad/initiative-target/` move from `built` to `done`. Excel tracker to be set Done = Yes by hand.
 
