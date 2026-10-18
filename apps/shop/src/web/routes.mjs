@@ -4,6 +4,7 @@ import { authenticate } from '../identity/accounts.mjs';
 import { setSession, clearSession, newCsrfToken } from './session.mjs';
 import { requireCustomer } from './middleware.mjs';
 import * as shop from '../domain/shop-service.mjs';
+import * as giftcards from '../challenges/c02-gift-card-codes.mjs';
 
 // Map a service error to an HTTP response; rethrow anything unexpected.
 function handleError(err, res) {
@@ -22,8 +23,31 @@ const h = (fn) => async (req, res, next) => {
   }
 };
 
-export function registerRoutes(app, db, emit = () => {}) {
+// JSON error mapper for the /api endpoints (they must not render HTML pages).
+function handleJsonError(err, res) {
+  if (err instanceof shop.ForbiddenError) return res.status(403).json({ error: 'forbidden' });
+  if (err instanceof shop.NotFoundError) return res.status(404).json({ error: err.message });
+  if (err instanceof shop.ValidationError) return res.status(400).json({ error: err.message });
+  throw err;
+}
+const hj = (fn) => async (req, res, next) => {
+  try { await fn(req, res); } catch (e) { try { handleJsonError(e, res); } catch (u) { next(u); } }
+};
+
+export function registerRoutes(app, db, emit = () => {}, { challenges = {} } = {}) {
   app.get('/', (_req, res) => res.redirect('/shop'));
+
+  // C02 (Cryptographic Failures): gift-card wallet. Buy a card (simulated
+  // payment) and redeem a code. The code-derivation weakness lives entirely in
+  // the challenge module; these are thin JSON adapters.
+  app.post('/api/wallet/buy', requireCustomer, hj((req, res) => {
+    const out = giftcards.buyCard(db, req.user, { amount_cents: req.body?.amount_cents ? Number(req.body.amount_cents) : undefined }, { challenges });
+    res.json(out);
+  }));
+  app.post('/api/wallet/redeem', requireCustomer, hj((req, res) => {
+    const out = giftcards.redeem(db, req.user, req.body?.code, { challenges, emit });
+    res.json(out);
+  }));
 
   // Catalogue
   app.get('/shop', h((req, res) => {

@@ -208,7 +208,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one, and the flag appears only on the intended path.
   - Handoffs: H-45 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-20. C02 Cryptographic Failures (gift-card codes from a weak hash)**
+- [x] **T-20. C02 Cryptographic Failures (gift-card codes from a weak hash)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C02 as designed with its flag, milestones, hints, write-up and exploit test.

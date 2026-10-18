@@ -73,7 +73,7 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
     });
     app.use(loadUser(db));
     app.use(checkCsrf);
-    registerRoutes(app, db, emit);
+    registerRoutes(app, db, emit, { challenges });
     registerStaffRoutes(app, db);
     registerSellerRoutes(app, db, { emit, challenges });
   }
