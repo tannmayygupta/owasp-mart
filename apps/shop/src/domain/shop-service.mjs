@@ -116,9 +116,10 @@ function simulatePayment({ card = '' }) {
   return { ok, last4: ok ? digits.slice(-4) : null };
 }
 
-export function checkout(db, user, { ship = {}, card = '' }) {
+export function checkout(db, user, { ship = {}, card = '', note = '' }) {
   if (!can('customer', 'cart_checkout', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
   if (!ship.line1 || !ship.city || !ship.country) throw new ValidationError('a shipping address is required');
+  const buyerNote = note ? String(note).slice(0, 2000) : null;
   const cart = getOrCreateCart(db, user.id);
   const { items, total_cents } = getCart(db, user);
   if (items.length === 0) throw new ValidationError('the cart is empty');
@@ -131,6 +132,9 @@ export function checkout(db, user, { ship = {}, card = '' }) {
       )
       .run(user.id, total_cents, ship.line1, ship.city, ship.country);
     const orderId = Number(order.lastInsertRowid);
+    // Human-facing sequential order number, and the optional buyer note.
+    db.prepare('UPDATE orders SET order_no = ?, buyer_note = ? WHERE id = ?')
+      .run(`VM-1${String(orderId).padStart(5, '0')}`, buyerNote, orderId);
 
     const pay = simulatePayment({ card });
     db.prepare('INSERT INTO payments (order_id, method, status, amount_cents, card_last4) VALUES (?, ?, ?, ?, ?)')

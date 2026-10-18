@@ -183,7 +183,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 Goal: Seller and money flows, and challenges C01 to C06.
 
-- [ ] **T-17. Seller flows**
+- [x] **T-17. Seller flows**
   - Epic: `epic-shop-seller-and-money`
   - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: Seller store registration and approval, products, fulfilment and staff.
@@ -191,7 +191,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Waits on: T-14. Open in part: OI-20.
   - Done when: A seller registers, waits for approval, lists products and fulfils orders; a pending seller cannot publish.
 
-- [ ] **T-18. Refunds, disputes, commissions and payouts**
+- [x] **T-18. Refunds, disputes, commissions and payouts**
   - Epic: `epic-shop-seller-and-money`
   - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: The correct marketplace money model with refunds, disputes, proportional commission reversal, append-only ledger.
@@ -199,7 +199,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Waits on: T-17. Open in part: OI-19.
   - Done when: A partial refund reverses commission in proportion and refunded total never exceeds the amount paid on any path.
 
-- [ ] **T-19. C01 Broken Access Control (cross-store order read)**
+- [x] **T-19. C01 Broken Access Control (cross-store order read)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C01 as designed with its flag, milestones, hints, write-up and exploit test.
@@ -208,7 +208,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one, and the flag appears only on the intended path.
   - Handoffs: H-45 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-20. C02 Cryptographic Failures (gift-card codes from a weak hash)**
+- [x] **T-20. C02 Cryptographic Failures (gift-card codes from a weak hash)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C02 as designed with its flag, milestones, hints, write-up and exploit test.
@@ -217,7 +217,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one.
   - Handoffs: H-46 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-21. C03 Injection (SQL injection and stored XSS)**
+- [x] **T-21. C03 Injection (SQL injection and stored XSS)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C03 parts A and B: SQL injection against a read-only catalogue file and stored XSS visited by the bot.
@@ -226,7 +226,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit tests pass and fail as required, and SQL injection cannot reach other data.
   - Handoffs: H-47 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-22. C04 Insecure Design (refund total beyond the amount paid)**
+- [x] **T-22. C04 Insecure Design (refund total beyond the amount paid)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C04 as a separate quick-refund path on top of the correct model.
@@ -235,7 +235,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one.
   - Handoffs: H-48 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-23. C05 Security Misconfiguration (unauthenticated diagnostics page)**
+- [x] **T-23. C05 Security Misconfiguration (unauthenticated diagnostics page)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C05 with a diagnostics page that shows only a synthetic object.
@@ -244,7 +244,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes and fails as required and no real data is exposed.
   - Handoffs: H-49 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-24. C06 Vulnerable Components (prototype pollution in the import service)**
+- [x] **T-24. C06 Vulnerable Components (prototype pollution in the import service)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C06 with the old lodash in the isolated import service; confirm the pollution input works on Node 24.

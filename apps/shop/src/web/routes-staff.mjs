@@ -4,6 +4,8 @@
 import { requireRole } from './middleware.mjs';
 import { ForbiddenError, NotFoundError, ValidationError } from '../domain/shop-service.mjs';
 import * as staff from '../domain/staff-service.mjs';
+import * as money from '../domain/money-service.mjs';
+import { renderTicketMessageHtml } from '../challenges/c03b-ticket-xss.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -19,9 +21,20 @@ const FINANCE = requireRole('finance', 'admin');
 const ADMIN = requireRole('admin');
 const back = (res, title, message) => res.render('message', { title, message });
 
-export function registerStaffRoutes(app, db) {
+export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {} } = {}) {
+  void emit;
   // Support: tickets, disputes, review moderation, order read.
   app.get('/staff/tickets', SUPPORT, h((req, res) => res.render('staff/tickets', { tickets: staff.listTickets(db, req.user) })));
+
+  // C03 part B: the support console ticket detail. Each message body is passed
+  // through the challenge render helper (FIXED escapes it; VULNERABLE leaves raw
+  // HTML — the stored XSS the support bot would then open). The precomputed HTML
+  // is inserted by the view with `| safe`, the one deliberate unescaped spot.
+  app.get('/staff/tickets/:id', SUPPORT, h((req, res) => {
+    const ticket = staff.getTicketWithMessages(db, req.user, req.params.id);
+    const messages = ticket.messages.map((m) => ({ ...m, body_html: renderTicketMessageHtml(m.body, { challenges }) }));
+    res.render('staff/ticket-detail', { ticket, messages });
+  }));
   app.post('/staff/tickets/:id/reply', SUPPORT, h((req, res) => { staff.replyTicket(db, req.user, req.params.id, req.body.body); res.redirect('/staff/tickets'); }));
   app.post('/staff/tickets/:id/assign', SUPPORT, h((req, res) => { staff.assignTicket(db, req.user, req.params.id, req.body.assignee_id); res.redirect('/staff/tickets'); }));
   app.post('/staff/tickets/:id/resolve', SUPPORT, h((req, res) => { staff.resolveTicket(db, req.user, req.params.id); res.redirect('/staff/tickets'); }));
@@ -33,8 +46,17 @@ export function registerStaffRoutes(app, db) {
 
   app.get('/staff/order/:id', requireRole('support_agent', 'finance', 'admin'), h((req, res) => res.render('staff/order', { order: staff.viewOrder(db, req.user, req.params.id) })));
 
-  // Finance: payouts + commissions.
+  // Support/admin: refund decisions (T-18). Approve (optionally a partial amount),
+  // reject, or process an approved refund (which reverses commission in proportion).
+  app.get('/staff/refunds', SUPPORT, h((req, res) => res.render('staff/refunds', { refunds: money.listRefunds(db, req.user) })));
+  app.post('/staff/refunds/:id/approve', SUPPORT, h((req, res) => { money.approveRefund(db, req.user, req.params.id, { amount: req.body.amount ? Number(req.body.amount) : undefined, idempotencyKey: req.body.idempotency_key || undefined }); res.redirect('/staff/refunds'); }));
+  app.post('/staff/refunds/:id/reject', SUPPORT, h((req, res) => { money.rejectRefund(db, req.user, req.params.id); res.redirect('/staff/refunds'); }));
+  app.post('/staff/refunds/:id/process', SUPPORT, h((req, res) => { money.processRefund(db, req.user, req.params.id); res.redirect('/staff/refunds'); }));
+
+  // Finance: payouts + commissions, and payout accrual (T-18).
   app.get('/staff/payouts', FINANCE, h((req, res) => res.render('staff/payouts', { payouts: staff.listPayouts(db, req.user), commissions: staff.listCommissions(db, req.user) })));
+  app.post('/staff/payouts/accrue', FINANCE, h((req, res) => { money.accruePayout(db, req.user, req.body.store_id, req.body.period); res.redirect('/staff/payouts'); }));
+  app.post('/staff/payouts/:id/ready', FINANCE, h((req, res) => { money.markPayoutReady(db, req.user, req.params.id); res.redirect('/staff/payouts'); }));
   app.post('/staff/payouts/:id/approve', FINANCE, h((req, res) => { staff.approvePayout(db, req.user, req.params.id); res.redirect('/staff/payouts'); }));
   app.post('/staff/payouts/:id/hold', ADMIN, h((req, res) => { staff.holdPayout(db, req.user, req.params.id); res.redirect('/staff/payouts'); }));
 

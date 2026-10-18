@@ -1,0 +1,64 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-18 from the T-stream task file (docs/dev/dev3-sahil.md); one
+# story per task (T-19..T-22 = C01..C04) plus a refactor sweep. Each challenge is
+# one isolated vulnerable path with an exploit test (pass on the vulnerable build,
+# fail on the fixed build); the correct baseline is epics 3 and 4.
+
+[[entry]]
+id = 1
+type = "story"
+title = "C01 Broken Access Control (cross-store order read)"
+description = "Seller order detail by sequential order number with the store-ownership check missing in the vulnerable build (IDOR, CWE-639). Flag in a competitor order's buyer_note; detection event shop.cross_store_order_read."
+verify = "The exploit test passes on the vulnerable build and fails (403/404) on the fixed build; the support order view never exposes buyer_note."
+covers = ["FR-CHL-02"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-14 (customer flows) and T-17 (seller flows) — both done.
+
+[[entry]]
+id = 2
+type = "story"
+title = "C02 Cryptographic Failures (gift-card codes from a weak hash)"
+description = "Gift-card / reset-style codes derived from a predictable weak hash in the vulnerable build, so a code is forgeable; the fix uses a CSPRNG. CWE-327/338."
+verify = "The exploit test forges a valid code on the vulnerable build and fails on the fixed build."
+covers = ["FR-CHL-03"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-14 (customer flows) — done.
+
+[[entry]]
+id = 3
+type = "story"
+title = "C03 Injection (SQL injection and stored XSS)"
+description = "A search path that builds SQL by string concatenation (vulnerable build) and a ticket-message render that is not escaped (stored XSS) in one isolated spot; the fix parameterises and escapes. CWE-89/79."
+verify = "The exploit tests pass and fail as required; SQL injection cannot reach other data; the bot renders the XSS only on the vulnerable build."
+covers = ["FR-CHL-04"]
+after = []
+hitl = false
+risk = "high"
+# Waits on T-11 (mock collector), T-13 (bot), T-14 — all done.
+
+[[entry]]
+id = 4
+type = "story"
+title = "C04 Insecure Design (refund total beyond the amount paid)"
+description = "A quick-refund path that skips the refunded-total <= paid invariant (vulnerable build), allowing a payout beyond the amount paid; the fix keeps the T-18 invariant. CWE-840."
+verify = "The exploit test over-refunds on the vulnerable build and fails on the fixed build."
+covers = ["FR-CHL-05"]
+after = [1]
+hitl = false
+risk = "medium"
+# Waits on T-18 (money model) — done.
+
+[[entry]]
+id = 5
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what this epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3, 4]
+hitl = false
+risk = "low"
