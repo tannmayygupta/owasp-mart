@@ -364,3 +364,30 @@ def test_activity_reports_are_throttled_per_instance_and_a_failing_orchestrator_
     rt._activity_sent.clear()
     assert post(rt, flag_event(rt, iid, "C01", "after the outage", 20, clock)).status in (200, 202)
     time.sleep(0.2)  # the event was accepted; the failed report is only logged
+
+
+def test_nothing_credits_after_the_deadline_even_before_the_tick_has_submitted_the_attempt():
+    """Audit blocker B5: the tick that submits an expired attempt runs up to a minute later; in that gap neither a paste nor a sidecar event may score."""
+    from vulnmart.ports.errors import AttemptStateInvalid
+
+    rt, clock, host = make_runtime()
+    s = rt.start_attempt("u-late")
+    play(rt, s.instance_id)
+    clock.advance(minutes=121)  # past the 120-minute deadline, tick not yet run
+    assert rt.engine.get(s.attempt_id).state.value == "running"
+    with pytest.raises(AttemptStateInvalid):
+        rt.submit_flag(s.attempt_id, "C02", rt.keys.flag(s.instance_id, "C02", 1))
+    assert post(rt, flag_event(rt, s.instance_id, "C02", rt.keys.flag(s.instance_id, "C02", 1), 1, clock)).status in (200, 202)
+    assert rt.milestones.best(s.attempt_id, "C02").value != "M3", "the event is kept, it scores nothing"
+    rt.tick()
+    assert rt.state(s.attempt_id)["state"] == "submitted"
+    assert post(rt, flag_event(rt, s.instance_id, "C03", rt.keys.flag(s.instance_id, "C03", 1), 2, clock)).status in (200, 202)
+    assert rt.milestones.best(s.attempt_id, "C03").value != "M3", "and after the submit as well"
+
+
+def test_a_flag_event_inside_the_window_still_credits():
+    rt, clock, _ = make_runtime()
+    s = rt.start_attempt("u-inside")
+    clock.advance(minutes=5)
+    assert post(rt, flag_event(rt, s.instance_id, "C02", rt.keys.flag(s.instance_id, "C02", 1), 1, clock)).status in (200, 202)
+    assert rt.milestones.best(s.attempt_id, "C02").value == "M3"

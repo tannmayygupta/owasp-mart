@@ -1,0 +1,113 @@
+{
+  "ok": true,
+  "image": "vulnmart-stub-instance:local",
+  "profile": {
+    "user": "65532:65532",
+    "internal": true,
+    "failures": []
+  },
+  "subnets": {
+    "probe": [
+      "172.30.5.0/24"
+    ],
+    "peer": [
+      "172.30.6.0/24"
+    ]
+  },
+  "host_docker_internal": "mapped with --add-host host.docker.internal:host-gateway",
+  "control": "open",
+  "targets": [
+    {
+      "name": "network-gateway:22",
+      "state": "timeout",
+      "open": false
+    },
+    {
+      "name": "network-gateway:80",
+      "state": "timeout",
+      "open": false
+    },
+    {
+      "name": "network-gateway:443",
+      "state": "timeout",
+      "open": false
+    },
+    {
+      "name": "network-gateway:2375",
+      "state": "timeout",
+      "open": false
+    },
+    {
+      "name": "host.docker.internal:80",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "docker0-address:22",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "docker0-address:2375",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "peer-instance-network:8080",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "peer-instance-network:443",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "metadata-169.254.169.254:80",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "public-address:443",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "public-address:53",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "lan-10.0.0.1:443",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "lan-192.168.1.1:443",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "lan-10.255.255.254:443",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "platform-ingest-port:9444",
+      "state": "unreachable",
+      "open": false
+    },
+    {
+      "name": "platform-name:443",
+      "state": "timeout",
+      "open": false
+    },
+    {
+      "name": "platform-like-name:443",
+      "state": "timeout",
+      "open": false
+    }
+  ],
+  "problems": [],
+  "leftovers": 0
+}

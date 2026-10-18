@@ -163,6 +163,10 @@ test('labs chain (finding D1): the jump alone is not enough, the content must ho
   assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 169\.254\.0\.0\/16 -j DROP\n/, ''))[0].detail, /metadata/);
   assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 10\.0\.0\.0\/16 -j DROP\n/, ''))[0].detail, /private network range/);
   assert.match(auditLabsChain(good.replace('-A VULNMART-LABS -d 169.254.0.0/16 -j DROP', '-A VULNMART-LABS -j RETURN\n-A VULNMART-LABS -d 169.254.0.0/16 -j DROP'))[0].detail, /blanket RETURN/);
+  // audit blocker B4
+  assert.match(auditLabsChain(good.replace('-A VULNMART-LABS -j DROP', '-A VULNMART-LABS -p tcp -m tcp --dport 443 -j ACCEPT\n-A VULNMART-LABS -j DROP'))[0].detail, /tcp 443 to every destination/);
+  assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 172\.\d+\.0\.0\/16 -j DROP\n/g, ''))[0].detail, /between the container subnets/);
+  assert.equal(auditLabsChain(good.replace('-A VULNMART-LABS -j DROP', '-A VULNMART-LABS -p tcp -d 10.0.0.9/32 --dport 443 -j ACCEPT\n-A VULNMART-LABS -j DROP'))[0].status, 'PASS', 'a 443 rule that names its destination is not the open one');
 });
 
 test('inspect (finding D2): added capabilities, host IPC, devices, unconfined profiles, a bind of a path below a sensitive one, a lookalike proxy name', () => {

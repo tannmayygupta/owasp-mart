@@ -17,6 +17,7 @@ export const PROBE_LABEL = 'vm.kind=isolation-probe';
 export const STUB_IMAGE = 'vulnmart-stub-instance:local';
 export const FALLBACK_IMAGE = 'node:24.21.0-alpine';
 export const LISTEN_PORT = 8080;
+export const PEER_HTTPS_PORT = 443; // the peer also listens here: the host chain must not let a container reach another network's tcp/443 (audit blocker B4)
 
 // The probe program, run with `node -e` inside the container. argv: JSON list of {name, host, port, control?}. Prints one JSON array.
 export const PROBE_JS = [
@@ -33,7 +34,7 @@ export const PROBE_JS = [
   'Promise.all(targets.map(tryOne)).then((r)=>{process.stdout.write(JSON.stringify(r),()=>process.exit(0))});',
 ].join('');
 // Listener for the sidecar and the peer: accepts and closes.
-export const LISTEN_JS = `require('net').createServer((s)=>s.end()).listen(${LISTEN_PORT},'0.0.0.0');`;
+export const LISTEN_JS = `for(const p of [${LISTEN_PORT},${PEER_HTTPS_PORT}])require('net').createServer((s)=>s.end()).listen(p,'0.0.0.0');`;
 const SLEEP_JS = 'setTimeout(()=>{},300000);';
 // Checks that a listener answers on its own loopback (so a "blocked" peer is not just a peer that never started).
 const SELF_JS = `const net=require('net');let n=0;const t=()=>{const s=net.connect(${LISTEN_PORT},'127.0.0.1');s.on('connect',()=>{process.stdout.write('up');process.exit(0)});s.on('error',()=>{if(++n>20){process.stdout.write('down');process.exit(1)}setTimeout(t,250)})};t();`;
@@ -54,10 +55,12 @@ export function buildTargets({ gateway, docker0, peerIp }) {
   t.push({ name: 'host.docker.internal:80', host: 'host.docker.internal', port: 80 });
   for (const p of [22, 2375]) t.push({ name: `docker0-address:${p}`, host: docker0, port: p });
   t.push({ name: `peer-instance-network:${LISTEN_PORT}`, host: peerIp, port: LISTEN_PORT });
+  t.push({ name: `peer-instance-network:${PEER_HTTPS_PORT}`, host: peerIp, port: PEER_HTTPS_PORT });
   t.push({ name: 'metadata-169.254.169.254:80', host: '169.254.169.254', port: 80 });
   t.push({ name: 'public-address:443', host: '1.1.1.1', port: 443 });
   t.push({ name: 'public-address:53', host: '1.1.1.1', port: 53 });
   for (const h of ['10.0.0.1', '192.168.1.1', '10.255.255.254']) t.push({ name: `lan-${h}:443`, host: h, port: 443 });
+  t.push({ name: 'platform-ingest-port:9444', host: '10.0.0.1', port: 9444 }); // the platform's event port is only for the control plane
   t.push({ name: 'platform-name:443', host: 'platform', port: 443 });
   t.push({ name: 'platform-like-name:443', host: 'api.vulnmart.internal', port: 443 });
   return t;

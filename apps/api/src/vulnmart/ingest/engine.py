@@ -10,7 +10,7 @@ No flag, digest or key goes into a log line, an exception or an explanation text
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -116,13 +116,16 @@ def apply_check(check: FlagCheck, info: InstanceInfo, *, event_epoch: int, at: d
 
 class MilestoneEngine:
     def __init__(self, *, log: EventLog, milestones: MilestoneStore, integrity: IntegritySink, directory: InstanceDirectory,
-                 checker: FlagChecker, gate: ActivityGate | None = None, rules: Mapping[str, Any] | None = None) -> None:
+                 checker: FlagChecker, gate: ActivityGate | None = None, rules: Mapping[str, Any] | None = None,
+                 is_open: Callable[[str, datetime], bool] | None = None) -> None:
         self.log, self.milestones, self.integrity = log, milestones, integrity
         self.directory, self.checker = directory, checker
         self.gate: ActivityGate = gate or AllowAllGate()
         self.rules: Mapping[str, Any] = rules if rules is not None else rules_mod.load_rules()
         self._types = {(ck, m): rules_mod.rule_types(r) for ck, ms in self.rules["challenges"].items() for m, r in ms.items()}
-        self._pending: dict[tuple[str, int, int, str], _Pending] = {}  # in memory: a restart replays the success events
+        # `is_open(attempt_id, at)`: was the attempt running at `at` (not yet over, before its deadline)? Events after that are stored but never credit (audit B5).
+        self._is_open = is_open or (lambda attempt_id, at: True)
+        self._pending: dict[tuple[str, int, int, str], _Pending] = {}  # in memory; `recover` rebuilds it from the stored events after a restart
 
     # ---- public ----
 
@@ -134,6 +137,8 @@ class MilestoneEngine:
         info = self.directory.get(event["instance_id"])
         if info is None or not is_countable(event):
             return res
+        if not self._is_open(info.attempt_id, received_at):
+            return res  # the attempt is over (submitted, expired, cancelled, withdrawn or past its deadline): the event is kept, it credits nothing
         if event["type"] == _FLAG_EVENT:
             self._flag_event(event, info, received_at, res)
             return res
@@ -152,6 +157,26 @@ class MilestoneEngine:
         res.credits += self._settle_zero_grace(received_at)
         return res
 
+    def recover(self, infos: Iterable[InstanceInfo]) -> int:
+        """Rebuild the open negative-observation windows (C09 M2) of the given instances from the stored events, after a restart (audit B5: the windows
+        lived only in memory and a replayed event is a no-op). Deterministic and safe to repeat: a window already settled is evaluated again to the same
+        answer and a credit is only ever raised once. Returns the number of windows now pending."""
+        for info in infos:
+            rows = [r for r in self.log.read(info.instance_id, info.epoch) if is_countable(r.event)]
+            for cur in rows:
+                if not self._is_open(info.attempt_id, cur.received_at):
+                    continue
+                for ck in info.challenge_keys:
+                    for m, milestone in (("m2", Milestone.M2), ("m1", Milestone.M1)):
+                        rule = self.rules["challenges"].get(ck, {}).get(m)
+                        if rule is None or cur.event["type"] not in self._types[(ck, m)]:
+                            continue
+                        # a negative window is only opened here (`tick` settles it); another rule that holds also makes good a credit the crash lost
+                        if self._eval(rule, info, ck, cur, rows):
+                            self.milestones.credit(info.attempt_id, ck, milestone, cur.received_at)
+                            break
+        return len(self._pending)
+
     def tick(self, now: datetime) -> list[Credit]:
         """Finalise the negative-observation windows whose grace period is over. Call at least every 10 seconds."""
         out: list[Credit] = []
@@ -159,6 +184,8 @@ class MilestoneEngine:
             if p.due > now:
                 continue
             del self._pending[key]
+            if not self._is_open(p.attempt_id, p.success_at):
+                continue  # the success happened after the attempt ended
             rows = self.log.read(p.instance_id, p.epoch)
             start = p.success_at - timedelta(seconds=p.rule_window_s)
             logged = any(r.event["type"] == p.absent_type and rules_mod.field_value(r.event, p.group_by) == p.account

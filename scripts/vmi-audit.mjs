@@ -166,9 +166,12 @@ export function auditLabsChain(text) {
   if (!rules.some((r) => /-d 169\.254\.0\.0\/16 -j DROP$/.test(r))) problems.push('no DROP for the metadata and link-local range 169.254.0.0/16');
   const vpcDrop = rules.some((r) => {
     const m = /-d (\d+\.\d+\.\d+\.\d+\/\d+) -j DROP$/.exec(r);
-    return m && /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(m[1]) && parseCidr(m[1])?.len <= 16;
+    return m && /^(10\.|192\.168\.)/.test(m[1]) && parseCidr(m[1])?.len <= 16; // the VPC (10.x here); the 172.16.0.0/12 drops are the container subnets, checked below
   });
   if (!vpcDrop) problems.push('no DROP for the private network range of the VPC');
+  // audit blocker B4: no tcp/443 ACCEPT for every destination, and the container subnets must be dropped from each other (an ACCEPT in DOCKER-USER skips Docker's isolation)
+  if (rules.some((r) => /-p tcp( -m tcp)? --dport 443 -j ACCEPT$/.test(r) && !/ -d /.test(r))) problems.push('an ACCEPT for tcp 443 to every destination: a container could reach any HTTPS address and other networks');
+  if (!rules.some((r) => /-d 172\.(1[6-9]|2\d|3[01])\.\d+\.\d+\/\d+ -j DROP$/.test(r))) problems.push('no DROP between the container subnets (172.16.0.0/12): networks of different instances are not kept apart on the host');
   for (const r of rules) {
     if (/-j (ACCEPT|RETURN)$/.test(r) && !/(-p |-d |--ctstate)/.test(r)) problems.push(`a blanket ${/ACCEPT/.test(r) ? 'ACCEPT' : 'RETURN'} rule: ${r.replace('-A VULNMART-LABS ', '')}`);
   }

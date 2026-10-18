@@ -128,7 +128,7 @@ class LabRuntime:
         self.checker = FlagChecker(self.keys)
         gate_kw = {"gate": gate} if gate is not None else {}
         self.milestone_engine = MilestoneEngine(log=self.events, milestones=self.milestones, integrity=self.integrity,
-                                                directory=self.directory, checker=self.checker, **gate_kw)
+                                                directory=self.directory, checker=self.checker, is_open=self._attempt_open, **gate_kw)
         self.activity = s.activity
         self.bots = BotRecorder(s.bots)
         self.evidence = EvidenceRecorder(keys=self.keys, store=self.evidence_store, directory=self.directory, checker=self.checker,
@@ -150,6 +150,25 @@ class LabRuntime:
         self.held_store, self.audit = s.held, s.audit
         self.review = HeldCaptureReview(self.held_store, self.audit, self.clock, default_may_review(self.org_of_attempt),
                                         events=self.attempt_log.append)
+        self._recover_windows()
+    def _recover_windows(self) -> None:
+        """After a restart: rebuild the open C09 windows of the running attempts from the stored events (audit blocker B5). Never raises."""
+        try:
+            infos = [i for rec in self.engine.in_states(AttemptState_.READY, AttemptState_.RUNNING)
+                     if (i := self.directory.for_attempt(rec.id)) is not None]
+            if infos:
+                self.milestone_engine.recover(infos)
+        except Exception:
+            log.exception("recovering the negative-observation windows failed; the next restart tries again")
+
+    def _attempt_open(self, attempt_id: str, at: datetime) -> bool:
+        """Was the attempt running at `at`: started, not over, and `at` not past its deadline (the tick that submits an expired attempt runs up to a
+        minute later, so the deadline itself is checked as well). Audit blocker B5: events after the end store and credit nothing."""
+        rec = self._record_or_none(attempt_id)
+        if rec is None or rec.state not in (AttemptState_.READY, AttemptState_.RUNNING):
+            return False
+        return rec.deadline_at is None or at <= rec.deadline_at
+
     def _record_or_none(self, attempt_id: str) -> Any | None:
         try:
             return self.engine.get(attempt_id)
@@ -363,6 +382,10 @@ class LabRuntime:
             self._sleep(self._ready_poll)
 
     def submit_flag(self, attempt_id: str, challenge_key: str, text: str) -> FlagSubmissionResult:
+        self.attempts.get(attempt_id)  # AttemptNotFound, AttemptGone
+        rec = self._record_or_none(attempt_id)
+        if rec is not None and rec.state is AttemptState_.RUNNING and rec.deadline_at is not None and self.clock() > rec.deadline_at:
+            raise AttemptStateInvalid("the attempt is over: its deadline has passed")  # the tick that submits it runs up to a minute later
         result = self.submit_service.submit_flag(attempt_id, challenge_key, text)
         info = self.directory.for_attempt(attempt_id)
         extra = {"instance_id": info.instance_id} if info else {}

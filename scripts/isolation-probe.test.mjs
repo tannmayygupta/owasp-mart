@@ -47,6 +47,7 @@ test('buildTargets covers gateway, host names, docker0, peer, metadata, public 4
   const names = buildTargets({ gateway: 'g', docker0: 'd', peerIp: 'p' }).map((t) => t.name).join(' ');
   for (const part of ['network-gateway', 'host.docker.internal', 'docker0-address', 'peer-instance-network', '169.254.169.254', 'public-address:443', 'public-address:53', 'lan-10.0.0.1', 'lan-192.168.1.1', 'platform-name']) assert.ok(names.includes(part), part);
   assert.equal(buildTargets({ gateway: 'g', docker0: 'd', peerIp: 'p' }).filter((t) => t.name.startsWith('lan-')).length, 3);
+  assert.ok(names.includes('peer-instance-network:443') && names.includes('platform-ingest-port:9444'), 'audit blocker B4: a peer network on 443 and the platform event port are forbidden targets');
 });
 
 test('isolated network: every target blocked, control reached, exit 0, labelled objects used and removed', () => {

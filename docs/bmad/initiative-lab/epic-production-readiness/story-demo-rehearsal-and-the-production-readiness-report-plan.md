@@ -18,3 +18,5 @@ The readiness report is written: docs/audit/2026-10-18-lab-stream-audit.md (six 
 CI of the audit pull request needed a second round (tests that pinned the old renewal hook, the shared cloud-init template); see the dev-log of the audit.
 
 Audit blockers B1 (activity to the orchestrator) and B6 (activity gate on pasted flags) are fixed in code with tests (docs/dev-log/2026-10-19-tannmayygupta-audit-fixes-b1-b6.md); live proof follows. B2 was fixed on 2026-10-18.
+
+Audit blockers B3, B4 and B5 are fixed on 2026-10-19 (docs/dev-log/2026-10-19-tannmayygupta-audit-fixes-b3-b4-b5.md); all six blockers of the audit are now closed. Story stays in progress until the rehearsal is run.

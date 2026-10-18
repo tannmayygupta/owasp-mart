@@ -203,9 +203,9 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Done when: Learner instances stop after 60 minutes idle or 4 hours total; killing the orchestrator mid-provision leaves no orphans after the reconciler runs.
   - Handoffs: H-59, H-61, H-65, H-67 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status (2026-10-16): ticked on the developer's instruction to complete sprint 2 from our side. Stories 3.4 (reset, reaper, settings; ADR 0035, D-54) and 3.5 (reconciler, tombstones, startup gate; ADR 0036, D-55) are built, reviewed with four lenses and tested locally (orchestrator 406 tests, shared protocol suites 392 passed, real-Docker kill test: no orphan after the first pass). NOT met live: nothing ran on vm-i; the platform activity signal and the desired-state list are open (H-122, H-123, Akshay); the stories stay `built` until the developer confirms them. Open leftovers are in `docs/bmad/initiative-lab/deferred-work.md`.
-  - Audit 2026-10-18: OPEN. Idle teardown cannot work in the real service: no signed route records activity, so instances die idle_minutes after ready even while played (audit B1; needs the IF-5 route and Akshay's H-122). Reconciler uses an all-wanted desired state (H-123). No live kill test. Details: docs/audit/2026-10-18-lab-stream-audit.md
+  - Audit 2026-10-19: OPEN. Blocker B1 fixed and live: the platform now reports player activity to the orchestrator (IF-5 1.1.0, signed route; the deployed journey shows the instance `active` after play). Not yet run live: an instance actually destroyed after its idle limit without play and kept alive with play; the reconciler's all-wanted desired state (H-123, Akshay); no live kill test. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
-- [ ] **L-15. Instance isolation and hardening**
+- [x] **L-15. Instance isolation and hardening**
   - Live 2026-10-17 (partial, not ticked): on vm-i the baseline isolation probe PASSES with the host rule on (16 forbidden targets blocked, control reached, gateway rows timeout; `docs/assets/story-4-1-isolation-probe/vm-i-rule-on.json`). NOT done: S-3 host rule off (the auto-mode safety check refused the script; the developer runs steps 5 to 7 of `docs/runbooks/isolation-vm-i.md`), the subnet check 3b, Docker restart and reboot (steps 8 and 9), the port scan, S-15 with 20 instances, the socket proxy in front of the orchestrator on vm-i.
   - Epic: `epic-isolation-and-hardening`
   - BMAD story: not planned yet; created when you incept `epic-isolation-and-hardening` (see START-HERE.md, section "First task of an epic")
@@ -216,7 +216,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Handoffs: H-62, H-71 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Ticked 2026-10-18: the Done-when (unreachable from inside an instance, tested on VM-I) is met by the live probe PASS, S-3 answer, restart and reboot persistence, port scan and audit 8 PASS (L-29 part 1). Not measured: 20 real instances through the orchestrator (S-15 was emulated).
   - Status (2026-10-16, superseded): NOT ticked. Stories 4.1 (isolation probe from inside a real instance network, conformance rules, VM-I runbook `docs/runbooks/isolation-vm-i.md`; ADR 0037, D-57) and 4.2 (Docker socket behind a filtering proxy, compose rule on a real YAML parse; ADRs 0010 and 0038, D-58) are built, reviewed and tested on Docker Desktop (the probe reports 16 forbidden targets blocked and the control reached). Done-when needs the developer's run on VM-I (S-3 host rule on and off, S-15, the proxy in front of the orchestrator): runbook steps, handoff H-125. Tick when the evidence is saved.
-  - Audit 2026-10-18: OPEN. The host chain accepts tcp/443 and tcp/9444 before its final drop and nothing probes instance-to-instance 443 (audit B4); isolation was probed live only from a probe-made network, not from an orchestrator-made instance. Details: docs/audit/2026-10-18-lab-stream-audit.md
+  - Audit 2026-10-19: VERIFIED live. Blocker B4 fixed: the labs chain accepts no tcp/443 for containers and drops traffic between container networks; the probe on vm-i passes 18 of 18 forbidden targets (peer network on 80/443, the platform event port, gateway, metadata, LAN, public) with the control reached and nothing left over; host audit 9 PASS. The probe uses the network profile the orchestrator builds, not an orchestrator-made instance. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-16. Concurrency, quotas, start failures and warm-pool decision**
   - Closed 2026-10-17 after a live run on vm-i (Claude over SSH, developer's authorisation): 10 and 20 stub instances started at once, 10 of 10 and 20 of 20 ready, 0 failed, 0 refused, wall 8.0 s and 16.1 s, p95 ready 8.0 s and 16.1 s, build cap held at 4, about 30 MiB per instance, nothing left behind (`docs/assets/story-3-6-concurrency-quotas/vm-i-concurrent-10.json`, `-20.json`); quotas and failed starts were proven locally (story 3.6). ADR 0039 stays accepted: no warm pool unless the real shop's p95 exceeds 30 s or a start is refused. NOT met: numbers with the real images (T-04, L-12), the real InstancePort and quota numbers (Akshay, H-79, H-126).
@@ -291,7 +291,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Done when: Milestones fire from the events in the challenge specs for every challenge, including the C09 negative-observation rule, and evidence is stored through KeyPort.
   - Handoffs: H-77 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status 2026-10-17 (earlier status, superseded by the Closed line): milestone engine with 33 rules, paste service and sharing signal are built against in-memory stores, 90 tests passed (story 6.3). Not built: evidence sealed through KeyPort, activity metadata, bot visit evidence, the tables, the ingest route and the worker. H-77 answered as built; H-333, H-334.
-  - Audit 2026-10-18: OPEN. Rules for all 11 challenges fire in tests; spec deviations (C01 M2, C03 single key, C07 M1, C08 M2), C09 M2 lost on restart (B5), FR-TIM-04 events never emitted. Details: docs/audit/2026-10-18-lab-stream-audit.md
+  - Audit 2026-10-19: OPEN. Blocker B5 fixed (events after the end credit nothing; the C09 window survives a restart). Still open: spec deviations (C01 M2 alternative, C03 single key, C07 M1, C08 M2 pairing) to be settled against the real catalogue of Sahil (T-30), and FR-TIM-04 events never emitted. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-22. Attempt state machine and server clock**
   - Closed 2026-10-17 after local proof: attempt engine and rules in packages/py-attempts (clock from instance ready, D-80 confirmed by the developer 2026-10-17), reachable over the demo routes. NOT met: the SQL store, the scheduler job and the real API adapter (H-346).
@@ -302,7 +302,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Waits on: L-18. Clock start (OI-22) needs your decision first.
   - Done when: An attempt moves through its states without skipping, expiry auto-submits and freezes, and a lost connection never stops the clock.
   - Status 2026-10-17 (earlier status, superseded by the Closed line): attempt rules library and attempt engine are built in `packages/py-attempts` and tested with a fake clock, store and instance control, 254 tests passed (stories 7.1, 7.2). Not done: the OI-22 confirmation (D-80 is a proposal), the API adapter, the SQL store, the scheduler job, the live check. H-327, H-328.
-  - Audit 2026-10-18: OPEN. Engine verified; milestones after expiry still credit (B5); template rules never reach the attempt (with Akshay); scheduler scans every row. Details: docs/audit/2026-10-18-lab-stream-audit.md
+  - Audit 2026-10-19: OPEN. Engine verified; blocker B5 fixed (a paste or event after the deadline scores nothing even before the tick). Still open: template rules (time limit, resets, hint mode) never reach the attempt (with Akshay); the scheduler scans every row. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-23. Scoring engine**
   - Closed 2026-10-17 after local proof: scoring reproduces all six PRD Appendix A examples; held captures stay out of the score (test_lab_loop.py, score 147 by hand). NOT met: the real ReportPort over tables (H-346), the recruiter screen.
@@ -349,7 +349,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Done when: Both are recorded in the event log and handled as FR-SES-09 and FR-SES-10 require.
   - Audit 2026-10-18: WAITING ON Akshay (H-346): no HTTP withdraw, cancel or undo route. Reset limit, withdrawal, undo and erase (key shred, purge, retry) are verified. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
-- [ ] **L-27. Anti-cheat signals and held-capture review**
+- [x] **L-27. Anti-cheat signals and held-capture review**
   - Closed 2026-10-17 after local proof: held captures stay out of the score until a named recruiter or admin of the owning organisation decides, the decision is audited and final, nobody is zeroed (library and runtime tests). The idle and too-fast numbers are placeholders (OI-25). NOT met: FR-ACH-01 and 02 (submission limit coverage, the real activity gate), the review screen, D-92 (OI-38) confirmed 2026-10-17.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
@@ -357,7 +357,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Covers: FR-ACH-01 to 07
   - Waits on: L-21, L-23. Reviewer for held captures (OI-38) needs a decision.
   - Done when: Held captures stay out of the score until a named reviewer decides, the decision is audited and nobody is auto-zeroed.
-  - Audit 2026-10-18: OPEN. No activity gate in production and integrity.py (timing, idle, similarity) is never imported by the API (B6). Details: docs/audit/2026-10-18-lab-stream-audit.md
+  - Audit 2026-10-19: VERIFIED in code and tests. Blocker B6 fixed: pasted flags are checked against recorded activity (held for a named reviewer, mode flag counts with a flag, a too-fast capture raises a timing flag); review is audited and final; nobody is zeroed. Not wired: write-up similarity (needs write-ups) and the idle-gap signal. Not run live (a live paste needs a held capture and a recruiter session). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-28. Cohort board and ranking aid**
   - Closed 2026-10-17 after local proof: ranking aid and private, scoped cohort rules, board off by default (D-93 confirmed by the developer 2026-10-17, OI-26 answered). NOT met: the platform port and recruiter screen.
