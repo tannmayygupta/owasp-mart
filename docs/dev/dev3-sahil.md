@@ -235,7 +235,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one.
   - Handoffs: H-48 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-23. C05 Security Misconfiguration (unauthenticated diagnostics page)**
+- [x] **T-23. C05 Security Misconfiguration (unauthenticated diagnostics page)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C05 with a diagnostics page that shows only a synthetic object.

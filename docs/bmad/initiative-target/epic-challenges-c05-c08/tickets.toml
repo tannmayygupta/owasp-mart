@@ -1,0 +1,65 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-18 from the T-stream task file (docs/dev/dev3-sahil.md); one
+# story per task (T-23..T-26 = C05..C08) plus a refactor sweep. C05 and C06 are
+# Sprint 3; C07 and C08 are later sprints. Each challenge is one isolated
+# vulnerable path with an exploit test (pass on the vulnerable build, fail on the
+# fixed build).
+
+[[entry]]
+id = 1
+type = "story"
+title = "C05 Security Misconfiguration (unauthenticated diagnostics page)"
+description = "An ops console (/_ops/, /_ops/diagnostics) left on with no login, plus a verbose error handler that leaks a stack trace, in the vulnerable build; the fix 404s the debug routes and returns a generic error with a correlation id. Flag in a hand-built synthetic diagnostics object (no real secrets). CWE-489/209."
+verify = "The exploit test passes (broken JSON leaks a _ops trace; /_ops/diagnostics serves the flag) and fails on the fixed build; no real data is exposed."
+covers = ["FR-CHL-06"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-15 (staff/admin flows) — done.
+
+[[entry]]
+id = 2
+type = "story"
+title = "C06 Vulnerable Components (prototype pollution in the import service)"
+description = "The import service's product-preview merge uses an unsafe recursive merge in the vulnerable build (prototype pollution, CWE-1321); the fix is the safe merge (keys __proto__/constructor/prototype dropped). Contained in a fresh per-job process with no network or database — pollution only, no code execution."
+verify = "The exploit test pollutes Object.prototype on the vulnerable build and fails on the fixed build; the import service has no network or database."
+covers = ["FR-CHL-07"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-12 (import service) — done. Spike S-9.
+
+[[entry]]
+id = 3
+type = "story"
+title = "C07 Authentication Failures (weak password-reset code)"
+description = "A short, guessable password-reset code with no attempt limit in the vulnerable build; the fix uses a 128-bit single-use token, attempt limits and generic responses. CWE-640. (Sprint 4.)"
+verify = "The exploit test brute-forces the reset code on the vulnerable build and fails on the fixed build."
+covers = ["FR-CHL-08"]
+after = []
+hitl = false
+risk = "high"
+# Waits on T-15 and the P-stream account/reset model.
+
+[[entry]]
+id = 4
+type = "story"
+title = "C08 Software or Data Integrity Failures (unsigned payment webhook)"
+description = "A payment webhook accepted without verifying its signature in the vulnerable build; the fix verifies the gateway signature. CWE-345. (Sprint 4.)"
+verify = "The exploit test forges a paid webhook on the vulnerable build and fails on the fixed build."
+covers = ["FR-CHL-09"]
+after = []
+hitl = false
+risk = "high"
+# Waits on T-11 (mock gateway).
+
+[[entry]]
+id = 5
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what this epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3, 4]
+hitl = false
+risk = "low"
