@@ -353,5 +353,20 @@
     "schema": "Problem",
     "path": "/retry_after_seconds",
     "rule": "the schema is closed: no extension member"
+  },
+  "activity-bad-time.json": {
+    "schema": "ActivityRequest",
+    "path": "/at",
+    "rule": "at is an RFC 3339 time"
+  },
+  "activity-no-time-zone.json": {
+    "schema": "ActivityRequest",
+    "path": "/at",
+    "rule": "at carries a time zone"
+  },
+  "activity-extra-field.json": {
+    "schema": "ActivityRequest",
+    "path": "/note",
+    "rule": "the body is closed: no unknown field"
   }
 }

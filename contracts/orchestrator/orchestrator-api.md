@@ -17,6 +17,7 @@ What this contract does not cover: the browser API (IF-1, IF-2), the other inter
 | `GET /v1/instances/{id}` | platform to orchestrator | 200 | Current state, health, error code; no secrets |
 | `POST /v1/instances/{id}/reset` | platform to orchestrator | 202 new, 200 repeat | Destroy and recreate with the next epoch and new flag material |
 | `POST /v1/instances/{id}/access` | platform to orchestrator | 200 | Set `open`, `frozen` or `closed` with an access epoch |
+| `POST /v1/instances/{id}/activity` | platform to orchestrator | 200 | A player did something at `at`: the idle limit counts from the last activity |
 | `POST /v1/instances/{id}/destroy` | platform to orchestrator | 202 new, 200 repeat | Remove everything |
 | `GET /v1/instances` | platform to orchestrator | 200 | List by label (cursor-paged) for the reconciler and the Admin view |
 | `GET /v1/host` | platform to orchestrator | 200 | Capacity and health |

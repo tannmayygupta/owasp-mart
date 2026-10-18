@@ -231,6 +231,13 @@ export function validateReset(b) {
   return checkMaterial(b);
 }
 
+export function validateActivity(b) {
+  const e = checkKeys(b, ['at']);
+  if (e) return e;
+  if (typeof b.at !== 'string' || b.at.length > 40 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/.test(b.at) || Number.isNaN(Date.parse(b.at))) return bad('/at', 'at is an RFC 3339 time with a time zone');
+  return null;
+}
+
 export function validateAccess(b) {
   const e = checkKeys(b, ['access', 'access_epoch']);
   if (e) return e;
@@ -452,6 +459,14 @@ export function createFakeOrchestrator(options = {}) {
     send(res, 202, answer);
   }
 
+  function activity(res, r, body) {
+    if (!RESETTABLE.has(r.state)) return problem(res, 409, 'ORCH-INVALID-STATE', 'activity is not allowed in this state');
+    const at = Math.min(Date.parse(body.at), Date.now());
+    r.lastActivity = Math.max(r.lastActivity ?? 0, at);
+    if (r.state !== 'active') transition(r, 'active', 'player activity');
+    return send(res, 200, view(r));
+  }
+
   function access(res, r, body) {
     if (r.state === 'destroyed') return problem(res, 409, 'ORCH-INVALID-STATE', 'the instance is destroyed');
     if (body.access_epoch < r.accessEpoch || (body.access_epoch === r.accessEpoch && body.access !== r.access)) {
@@ -545,11 +560,11 @@ export function createFakeOrchestrator(options = {}) {
     const isList = route('GET', /^\/v1\/instances$/);
     const isHost = route('GET', /^\/v1\/host$/);
     const isGet = route('GET', /^\/v1\/instances\/([^/]+)$/);
-    const isAct = route('POST', /^\/v1\/instances\/([^/]+)\/(reset|access|destroy)$/);
+    const isAct = route('POST', /^\/v1\/instances\/([^/]+)\/(reset|access|destroy|activity)$/);
     if (!(isCreate || isList || isHost || isGet || isAct)) {
       const known = [
         [/^\/v1\/instances$/, 'GET, POST'], [/^\/v1\/host$/, 'GET'], [/^\/v1\/instances\/[^/]+$/, 'GET'],
-        [/^\/v1\/instances\/[^/]+\/(reset|access|destroy)$/, 'POST'],
+        [/^\/v1\/instances\/[^/]+\/(reset|access|destroy|activity)$/, 'POST'],
       ].find(([re]) => re.test(url.pathname));
       if (known) return problem(res, 405, 'ORCH-METHOD-NOT-ALLOWED', `${method.slice(0, 16)} is not allowed here`, undefined, { allow: known[1] });
       return problem(res, 404, 'ORCH-ROUTE-UNKNOWN', 'no such call (fake orchestrator)');
@@ -578,11 +593,11 @@ export function createFakeOrchestrator(options = {}) {
     }
     const [body, err] = parseJson(buf);
     if (err) return fail(res, 422, err);
-    const e = action === 'reset' ? validateReset(body) : validateAccess(body);
+    const e = action === 'reset' ? validateReset(body) : action === 'activity' ? validateActivity(body) : validateAccess(body);
     if (e) return fail(res, 422, e);
     const r = getRecord(res, id);
     if (!r) return undefined;
-    return action === 'reset' ? reset(res, r, body) : access(res, r, body);
+    return action === 'reset' ? reset(res, r, body) : action === 'activity' ? activity(res, r, body) : access(res, r, body);
   }
   const onRequest = (req, res) => {
     handle(req, res).catch((err) => {

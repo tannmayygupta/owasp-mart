@@ -172,6 +172,8 @@ CREATE_FIELDS = (
 )
 RESET_FIELDS = ("epoch", "flags", "decoys", "flag_digests", "event_key", "seed")
 ACCESS_FIELDS = ("access", "access_epoch")
+ACTIVITY_FIELDS = ("at",)
+_RFC3339 = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})")
 LIMIT_FIELDS = ("memory_mb", "cpu_limit", "pids_limit", "idle_minutes", "max_minutes")
 ACCESS_VALUES = ("open", "frozen", "closed")
 
@@ -245,6 +247,17 @@ def parse_access(body: object) -> tuple[str, int]:
     _need(isinstance(body["access"], str) and body["access"] in ACCESS_VALUES, "/access", "access is open, frozen or closed")
     _need(_is_int(body["access_epoch"], 0), "/access_epoch", "access_epoch is an integer of at least 0")
     return body["access"], body["access_epoch"]
+
+
+def parse_activity(body: object) -> datetime:
+    """The activity report of the platform: a player did something at `at` (RFC 3339, with a time zone)."""
+    body = _check_keys(body, ACTIVITY_FIELDS)
+    at = body["at"]
+    _need(isinstance(at, str) and len(at) <= 40 and _RFC3339.fullmatch(at) is not None, "/at", "at is an RFC 3339 time with a time zone")
+    try:
+        return datetime.fromisoformat(at)
+    except ValueError:
+        raise ValidationFailed("at is an RFC 3339 time with a time zone", field="/at") from None
 
 
 @dataclass(frozen=True, slots=True)

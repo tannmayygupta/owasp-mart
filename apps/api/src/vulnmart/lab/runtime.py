@@ -32,6 +32,7 @@ from vulnmart.ingest.bots import BotRecorder
 from vulnmart.ingest.engine import MilestoneEngine
 from vulnmart.ingest.evidence import EvidenceReader, EvidenceRecorder
 from vulnmart.ingest.handler import IngestHandler
+from vulnmart.ingest.gate import RecordedActivityGate
 from vulnmart.ingest.stores import ActivityGate, InstanceInfo, MilestoneStore
 from vulnmart.lab.catalog import Catalog, default_catalog_dir, load_catalog
 from vulnmart.lab.clock import OffsetClock
@@ -45,10 +46,11 @@ from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, Instan
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
 from vulnmart.ports.fakes import FakeKeyPort
 from vulnmart.ports.http_instance_host import HttpInstanceHost
-from vulnmart.ports.instance_host import Access, CreateRequest, InstanceHost, InstanceNotFound, InstanceState, Limits, ResetRequest
+from vulnmart.ports.instance_host import Access, CreateRequest, InstanceHost, InstanceNotFound, InstanceState, InvalidState, Limits, ResetRequest
 from vulnmart.ports.reports import Milestone as PortMilestone, Score
 
 log = logging.getLogger("vulnmart.lab")
+ACTIVITY_REPORT_EVERY_S = 60.0  # at most one activity report per instance per minute (the idle limits are counted in minutes)
 
 READY_TIMEOUT_S = 120.0
 READY_POLL_S = 1.0
@@ -132,17 +134,28 @@ class LabRuntime:
         self.evidence = EvidenceRecorder(keys=self.keys, store=self.evidence_store, directory=self.directory, checker=self.checker,
                                          milestones=self.milestones, integrity=self.integrity)
         self.flag_log = s.flag_log
+        # FR-ACH-02 (audit blocker B6): a pasted flag is checked against the activity the sidecar recorded; an explicit `gate` (tests) replaces the check
+        paste_gate = gate if gate is not None else RecordedActivityGate(activity=s.activity, directory=self.directory, record_of=self._record_or_none,
+                                                                        integrity=self.integrity)
         self.submit_service = FlagSubmitService(attempts=self.attempts, directory=self.directory, checker=self.checker,
                                                 milestones=self.milestones, integrity=self.integrity, log=self.flag_log,
-                                                clock=self.clock, **gate_kw)
+                                                clock=self.clock, gate=paste_gate)
         self.handler = IngestHandler(keys=self.keys, epochs=self.epochs, store=s.event_store, security=s.security,
                                      sink=self._on_event, now=self.clock)
         self._starting: dict[str, str] = {}  # attempt id -> the instance whose start is under way (one start per attempt)
+        self._activity_sent: dict[str, float] = {}  # instance id -> monotonic time of the last activity report to the orchestrator
+        self._activity_every = ACTIVITY_REPORT_EVERY_S
         self._resetting: set[str] = set()
         self.org_of_attempt = OrgOf(s.attempts)
         self.held_store, self.audit = s.held, s.audit
         self.review = HeldCaptureReview(self.held_store, self.audit, self.clock, default_may_review(self.org_of_attempt),
                                         events=self.attempt_log.append)
+    def _record_or_none(self, attempt_id: str) -> Any | None:
+        try:
+            return self.engine.get(attempt_id)
+        except Exception:  # an unknown attempt has no rules: the gate uses the defaults
+            return None
+
     def _engine_event(self, payload: Mapping[str, Any]) -> None:
         """The engine's events go to the ids-only log; a withdrawn attempt that reaches `deleted` is erased at once. The engine swallows an error of this
         sink, so a failed erase is not lost: `tick` erases every `deleted` attempt that is not yet marked purged."""
@@ -213,6 +226,30 @@ class LabRuntime:
         self.evidence.observe(event, at, result)
         self.activity.record(event, at)
         self.bots.observe(event, at)
+        if event.get("session_kind") == "player":
+            self._note_activity(event["instance_id"], at)
+
+    def _note_activity(self, instance_id: str, at: datetime | None = None) -> None:
+        """Tell the orchestrator that a player is active (audit blocker B1: without it the idle limit ran from `ready` and cut players off mid-attempt).
+        Throttled per instance and sent from a short-lived thread, so the answer to the sidecar or the player never waits for the orchestrator. Best effort:
+        a failure is logged; the next event tries again."""
+        now = time.monotonic()
+        with self._lock:
+            last = self._activity_sent.get(instance_id)
+            if last is not None and now - last < self._activity_every:
+                return
+            self._activity_sent[instance_id] = now
+            if len(self._activity_sent) > 2000:  # forget instances that have been quiet for a long time
+                self._activity_sent = {k: v for k, v in self._activity_sent.items() if now - v < 600}
+        threading.Thread(target=self._send_activity, args=(instance_id, at or self.clock()), name=f"lab-activity-{instance_id[:8]}", daemon=True).start()
+
+    def _send_activity(self, instance_id: str, at: datetime) -> None:
+        try:
+            self.host.record_activity(instance_id, at)
+        except (InstanceNotFound, InvalidState):
+            pass  # the instance is gone or not in a state that counts activity: nothing to do
+        except Exception:
+            log.warning("reporting activity of instance %s failed", instance_id[:10], exc_info=True)
 
     # ---- calls ----
 
@@ -329,6 +366,8 @@ class LabRuntime:
         result = self.submit_service.submit_flag(attempt_id, challenge_key, text)
         info = self.directory.for_attempt(attempt_id)
         extra = {"instance_id": info.instance_id} if info else {}
+        if info:
+            self._note_activity(info.instance_id)  # a flag paste is a player action even when the shop shows nothing
         self._journal("flag_submitted", attempt_id, challenge_key=challenge_key, result=result.result, **extra)
         if result.credit == "credited":
             self._journal("milestone_reached", attempt_id, challenge_key=challenge_key, level="M3", **extra)

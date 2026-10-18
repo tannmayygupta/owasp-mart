@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 import pytest
 from vulnmart_attempts import FakeClock
 
+from support import play
 from vulnmart.ingest.verify import sign_body
 from vulnmart.lab.runtime import LabRuntime, RuntimeFacts, build_lab_runtime, new_instance_id
 from vulnmart.ports.errors import AttemptStateInvalid
@@ -94,6 +95,7 @@ def test_a_replayed_event_changes_nothing_and_a_forged_signature_is_refused():
 def test_a_pasted_flag_credits_and_a_wrong_one_does_not():
     rt, _, _ = make_runtime()
     started = rt.start_attempt("u-1")
+    play(rt, started.instance_id)
     wrong = rt.submit_flag(started.attempt_id, "C02", "VM{AAAAAAAAAAAAAAAAAAAAAAAA}")
     assert (wrong.result, wrong.credit) == ("incorrect", "none")
     right = rt.submit_flag(started.attempt_id, "C02", rt.keys.flag(started.instance_id, "C02", 1))
@@ -105,6 +107,7 @@ def test_a_pasted_flag_credits_and_a_wrong_one_does_not():
 def test_a_hint_costs_ten_percent_of_the_challenge_and_levels_unlock_in_order():
     rt, _, _ = make_runtime()
     started = rt.start_attempt("u-1")
+    play(rt, started.instance_id)
     rt.submit_flag(started.attempt_id, "C01", rt.keys.flag(started.instance_id, "C01", 1))
     with pytest.raises(AttemptStateInvalid):
         rt.unlock_hint(started.attempt_id, "C01", 2)  # level 1 first
@@ -116,6 +119,7 @@ def test_a_hint_costs_ten_percent_of_the_challenge_and_levels_unlock_in_order():
 def test_the_clock_runs_out_submits_freezes_destroys_and_reports():
     rt, clock, host = make_runtime()
     started = rt.start_attempt("u-1")
+    play(rt, started.instance_id)
     rt.submit_flag(started.attempt_id, "C01", rt.keys.flag(started.instance_id, "C01", 1))
     clock.advance(minutes=121)  # past the 120-minute deadline
     rt.tick()
@@ -254,6 +258,7 @@ def test_two_resets_of_one_attempt_cannot_overlap_and_one_epoch_is_taken_once():
 def test_the_log_gets_flag_hint_and_milestone_lines_the_metrics_and_timeline_read():
     rt, clock, _host = make_runtime()
     s = rt.start_attempt("u-1")
+    play(rt, s.instance_id)
     rt.unlock_hint(s.attempt_id, "C01", 1)
     assert rt.unlock_hint(s.attempt_id, "C01", 1) == 1, "the same level again costs nothing and logs nothing more"
     assert rt.submit_flag(s.attempt_id, "C02", "VM{ZZZZZZZZZZZZZZZZZZZZZZZZ}").result == "incorrect"
@@ -303,3 +308,59 @@ def test_a_start_that_died_midway_leaves_no_instance_behind():
     assert started.instance_id != abandoned
     assert host.get(abandoned).state is InstanceState.DESTROYED
     assert rt.directory.get(abandoned) is None and rt.directory.get(started.instance_id) is not None
+
+
+def _wait_for(check, seconds=3.0):
+    import time
+
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if check():
+            return True
+        time.sleep(0.02)
+    return check()
+
+
+def test_a_player_event_tells_the_orchestrator_the_player_is_active_but_a_bot_event_does_not():
+    """Audit blocker B1: without the report the idle limit ran from `ready` and cut players off while they played."""
+    rt, clock, host = make_runtime()
+    rt._activity_every = 0.0
+    started = rt.start_attempt("u-1001")
+    iid = started.instance_id
+    assert host.last_activity(iid) is None
+    bot = flag_event(rt, iid, "C01", "not a flag", 1, clock)
+    bot["session_kind"] = "bot"
+    assert post(rt, bot).status in (200, 202)
+    assert not _wait_for(lambda: host.last_activity(iid) is not None, 0.3), "a bot is not a player"
+    assert post(rt, flag_event(rt, iid, "C01", "browsing", 2, clock)).status in (200, 202)
+    assert _wait_for(lambda: host.last_activity(iid) is not None)
+    assert host.get(iid).state is InstanceState.ACTIVE
+
+
+def test_activity_reports_are_throttled_per_instance_and_a_failing_orchestrator_never_breaks_the_event():
+    rt, clock, host = make_runtime()
+    started = rt.start_attempt("u-1001")
+    iid = started.instance_id
+    calls = []
+    real = host.record_activity
+
+    def counting(instance_id, at=None):
+        calls.append(instance_id)
+        return real(instance_id, at)
+
+    host.record_activity = counting
+    for seq in range(2, 8):
+        assert post(rt, flag_event(rt, iid, "C01", f"page {seq}", seq, clock)).status in (200, 202)
+    assert _wait_for(lambda: len(calls) >= 1)
+    import time
+
+    time.sleep(0.2)
+    assert len(calls) == 1, "six events inside the throttle window make one report"
+
+    def broken(instance_id, at=None):
+        raise RuntimeError("orchestrator unreachable")
+
+    host.record_activity = broken
+    rt._activity_sent.clear()
+    assert post(rt, flag_event(rt, iid, "C01", "after the outage", 20, clock)).status in (200, 202)
+    time.sleep(0.2)  # the event was accepted; the failed report is only logged

@@ -155,7 +155,7 @@ test('parseArgs and redaction', () => {
 });
 
 test('labs chain (finding D1): the jump alone is not enough, the content must hold the drops and end in a DROP', () => {
-  const good = readFileSync(path.join(FIX, 'good', FILES.labsChain), 'utf8');
+  const good = readFileSync(path.join(FIX, 'good', FILES.labsChain), 'utf8').replace(/\r\n/g, '\n'); // a Windows checkout may hold CRLF
   assert.equal(auditLabsChain(good)[0].status, 'PASS');
   assert.equal(auditLabsChain('-N VULNMART-LABS\n')[0].status, 'FAIL');
   assert.equal(auditLabsChain('')[0].status, 'FAIL');

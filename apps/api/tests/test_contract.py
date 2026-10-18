@@ -33,7 +33,7 @@ def test_the_openapi_file_is_valid_openapi_3_1():
 def test_the_contract_check_passes_on_the_repository():
     errors, counts = contract.run(CONTRACT_DIR)
     assert errors == []
-    assert counts["operations"] == 8 and counts["valid"] >= 18 and counts["invalid"] >= 60
+    assert counts["operations"] == 9 and counts["valid"] >= 18 and counts["invalid"] >= 60
 
 
 def test_the_contract_check_command_exits_0_and_prints_pass():

@@ -164,6 +164,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
 
+### 1.1.0 (2026-10-19, Tanmay, audit blocker B1)
+- Additive: `POST /v1/instances/{id}/activity` (`reportActivity`, body `{ "at": <RFC 3339> }`, signed like the other calls, 200 with the instance status, 409 ORCH-INVALID-STATE when the instance is not ready, active or idle). Without it the real service never learned that a player was active, so the idle limit ran from `ready` and cut off players mid-attempt. Examples: `activity.request.json` and three invalid ones.
+- Mock changed with it: `contracts/mocks/fake-orchestrator/server.mjs` (route, validation, `active` transition).
+- registry change: none.
+
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.

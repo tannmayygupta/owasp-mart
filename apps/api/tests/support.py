@@ -409,3 +409,9 @@ def _poll(host: InstanceHost, instance_id: str, state: InstanceState, timeout: f
         if time.monotonic() > deadline:
             raise AssertionError(f"{instance_id} did not reach {state.value}, last state {st.state.value}")
         time.sleep(0.005)
+
+
+def play(runtime, instance_id, epoch=1, requests=8):
+    """The player used the shop: the sidecar reported requests, which the activity check of FR-ACH-02 (a pasted flag is held without them) reads."""
+    runtime.activity.record({"type": "proxy.request", "instance_id": instance_id, "epoch": epoch, "session_kind": "player",
+                             "data": {"route_template": "/api/x", "method": "GET", "status": 200, "count": requests}}, runtime.clock())
