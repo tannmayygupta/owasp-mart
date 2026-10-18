@@ -1,0 +1,27 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-18: one story per task of docs/dev/dev2-akshay.md that names this epic (P-22, P-23), as START-HERE.md section 5 asks (the developer chose
+# "continue automatically"). No open question of the PRD blocks either story; the numbers the requirements leave to the hub (replay buffer size, connection caps, the
+# latency target after spike S-2) are placeholders decided in ADR 0052 and listed in the deferred work. The browser client (the EventSource and its polling fallback) is
+# the dashboards' (epic 8); this epic is the server side.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Live updates hub: SSE stream, replay buffer, heartbeat, snapshot and the fan-out from events to streams"
+description = "A published domain event (IF-3) is stored in the database in the transaction of its cause, the relay moves it to the Valkey stream of each audience it resolves from the attempt, and an open GET /api/v1/live connection receives it as an SSE message with an id; Last-Event-ID replays what was missed, an unknown, too old or reset id gets one stream.resync; a heartbeat comment every 15 seconds and no proxy buffering keep the connection open through the real path; the snapshot endpoint is the way back after a resync and the polling fallback."
+verify = "On the local stack a row in the event outbox appears on an open stream through the web origin within a few seconds, a heartbeat arrives, another user's event never does, a reconnect after the API was stopped gets the missed events once and in order, an unknown id gets one resync, and the snapshot answers."
+covers = ["FR-LIV-01", "FR-LIV-02", "FR-LIV-04", "FR-LIV-06"]
+after = ["3.2"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Stream authorisation and HTTP/2"
+description = "Every stream is authorised per user and company: the streams a connection reads come from the session and nothing the client sends, a learner cannot subscribe to another user's or a company's stream, a recruiter only to their own company's, the connection ends when the session ends or its audiences change; HTTP/2 as far as the spike allows."
+verify = "A user cannot subscribe to another user's or company's stream, in tests with each role; the stream runs over HTTP/2 on the real path where the spike allows."
+covers = ["FR-LIV-03", "FR-LIV-05"]
+after = [1, "5.2"]
+hitl = false
+risk = "high"

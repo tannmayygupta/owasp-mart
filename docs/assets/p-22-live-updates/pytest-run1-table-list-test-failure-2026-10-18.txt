@@ -1,0 +1,69 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+........................................................................ [  8%]
+........................................................................ [ 11%]
+........................................................................ [ 14%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+...............................................F........................ [ 43%]
+........................................................................ [ 46%]
+........................................................................ [ 49%]
+........................................................................ [ 52%]
+........................................................................ [ 54%]
+...............................s........................................ [ 57%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 72%]
+........................................................................ [ 75%]
+........................................................................ [ 78%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 86%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 98%]
+............................................                             [100%]
+================================== FAILURES ===================================
+________ test_every_table_of_the_metadata_is_in_the_table_owners_file _________
+
+    def test_every_table_of_the_metadata_is_in_the_table_owners_file():
+        import yaml
+    
+        owners = {row["table"] for row in yaml.safe_load((ROOT / "contracts" / "db" / "table-owners.yaml").read_text(encoding="utf-8"))["tables"]}
+        assert set(Base.metadata.tables) <= owners
+        import vulnmart.accounts.models  # noqa: F401 - registers the account tables whichever test ran first
+        import vulnmart.lab.models  # noqa: F401 - registers the lab tables (migration 0005) whichever test ran first
+        import vulnmart.notifications.models  # noqa: F401 - registers email_outbox whichever test ran first
+        import vulnmart.privacy.models  # noqa: F401 - registers consent_records whichever test ran first
+        import vulnmart.assessments.models  # noqa: F401 - registers the templates and invites whichever test ran first
+    
+>       assert json.dumps(sorted(Base.metadata.tables)) == json.dumps(
+            sorted(["email_outbox", "email_tokens", "job_runs", "org_members", "organizations", "quotas", "sessions", "settings", "user_roles", "users",
+                    "activity_buckets", "attempt_events", "attempts", "bot_visits", "evidence", "events", "flag_submissions", "held_captures",
+                    "hint_unlocks", "instance_epochs", "instances", "integrity_flags", "milestones", "review_audit", "security_events",
+                    "audit_anchor", "audit_checkpoint", "audit_log", "consent_records", "mfa_credentials", "recovery_codes", "subject_map",
+                    "dpa_acceptances", "join_requests", "assessment_templates", "invites", "template_challenges"]))
+E       assert '["activity_b...es", "users"]' == '["activity_b...es", "users"]'
+E         
+E         Skipping 149 identical leading characters in diff, use -v to show
+E         - cords", "dpa_acceptances", "email_outbox", "email_tokens", "events", "evidence", "flag_submissions", "held_captures", "hint_unlocks", "instance_epochs", "instances", "integrity_flags", "invites", "job_runs", "join_requests", "mfa_credentials", "milestones", "org_members", "organizations", "quotas", "recovery_codes", "review_audit", "security_events", "sessions", "settings", "subject_map", "template_challenges", "user_roles", "users"]
+E         ?           ^^^^^^^^^^^^^^^^
+E         + cords", "domain_events", "dpa_acceptances"...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+apps\api\tests\test_kernel_settings.py:138: AssertionError
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+FAILED apps/api/tests/test_kernel_settings.py::test_every_table_of_the_metadata_is_in_the_table_owners_file
+1 failed, 2490 passed, 1 skipped in 497.04s (0:08:17)

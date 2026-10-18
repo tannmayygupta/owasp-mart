@@ -184,3 +184,16 @@
 - The invite keeps `user_id`, `attempt_id` and `email_ci` after it closes; the retention sweep (P-24) and deletion (P-25) decide when they go. `consent_records` stay append-only (H-136).
 - Binding is by the verified address only; a candidate who registered with another address needs a new invite. A bulk list is capped at 500 addresses (a placeholder, OI-25).
 - The scheduler that calls `expire_all` and `purge_closed_tokens` is P-24.
+
+
+## Deferred from: story-live-updates-hub-sse-stream-replay-buffer-heartbeat-snapshot-and-the-fan-out-from-events-to-streams-plan (2026-10-18)
+
+- Nothing in the lab or the platform publishes domain events yet (stream L, H-142); the hub and relay are proven with rows written by the test and by the API port.
+- The browser client (EventSource, resync handling, the polling fallback) is the dashboards' (P-26, P-27); this story is the server side and the snapshot.
+- Streams are authorised from the session only; the per-role cross-user tests and HTTP/2 are story 7.2 (P-23). `POST /api/v1/live/ticket` stays pending spike S-14.
+- The snapshot of a recruiter is empty (no attempts of their own); the company's attempts are P-27. The snapshot reads the lab runtime in the same process and is empty without one.
+- Placeholders (OI-25): relay interval 250 ms, heartbeat 15 s, session check 30 s, maximum stream age 15 min, 6 streams per user, 2000 per process, 600 connects an hour per user, 1000 entries and one hour per stream, 20 relay passes before an event is dropped. The latency target of NFR-PRF-03 waits for spike S-2.
+- The caps are per API process. An idle stream is trimmed only when it is next appended to, so its entries (ids and states) outlive an hour until then; retention (P-24) and deletion (P-25) must clear them.
+- SSE through the real Vercel and Caddy path, and HTTP/2, are not verified (S-2, S-14). The web proxy of the local stack needed `compress: false`; Caddy's `encode` in front of production has not been checked.
+- A client that held exactly the newest id before a Valkey reset is told to resync (the evidence that it was up to date goes with the reset).
+- Old rows of `domain_events` are not purged yet (P-24).
