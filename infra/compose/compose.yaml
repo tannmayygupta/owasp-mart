@@ -195,6 +195,8 @@ services:
       VULNMART_EVENT_MASTER: dnVsbm1hcnQtZGV2LWV2dC1ub3QtYS1zZWNyZXQtMDA=
       VULNMART_FLAG_KEY: dnVsbm1hcnQtZGV2LWZsZy1ub3QtYS1zZWNyZXQtMDA=
       VULNMART_OWNER_KEY: dnVsbm1hcnQtZGV2LW93bi1ub3QtYS1zZWNyZXQtMDA=
+      # Story P-24: the retention scheduler runs in this process (several API processes may run it: a lease lets one run each job).
+      VULNMART_SCHEDULER_ENABLED: "true"
     cap_drop:
       - ALL
     security_opt:

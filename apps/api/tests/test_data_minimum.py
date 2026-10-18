@@ -12,6 +12,7 @@ import pytest
 
 import vulnmart.accounts.models  # noqa: F401
 import vulnmart.assessments.models  # noqa: F401
+import vulnmart.lab.models  # noqa: F401
 import vulnmart.kernel.models  # noqa: F401
 import vulnmart.notifications.models  # noqa: F401
 import vulnmart.orgs.models  # noqa: F401
@@ -23,7 +24,7 @@ from vulnmart.kernel.db import Base
 INVENTORY = {
     "users": ("Account data: name, email, password hash, age declaration, status, sign-in time",
               {"id", "account_type", "email", "email_ci", "email_verified_at", "password_hash", "display_name", "status", "age_declared_at",
-               "last_login_at", "deleted_at", "created_at", "updated_at"}),
+               "last_login_at", "retention_warned_at", "deleted_at", "created_at", "updated_at"}),
     "user_roles": ("Account data: the roles of a participant", {"user_id", "role", "account_type", "created_at"}),
     "sessions": ("Session data: hashed session value, coarse network prefix, browser class, times",
                  {"id_hash", "user_id", "created_at", "last_seen_at", "absolute_expires_at", "revoked_at", "ip_trunc", "ua_class", "mfa_at"}),
@@ -32,7 +33,7 @@ INVENTORY = {
     "recovery_codes": ("Account data: keyed hashes of recovery codes", {"code_hash", "user_id", "used_at", "created_at"}),
     "consent_records": ("Consent records: notice version, text snapshot and hash, retention and company shown, hashed address and browser, audit link",
                         {"id", "user_id", "attempt_id", "org_id", "template_id", "notice_version", "notice_text_sha256", "notice_text_snapshot",
-                         "retention_days_shown", "controller_name_shown", "action", "at", "ip_hash", "ua_hash", "method", "audit_seq"}),
+                         "retention_days_shown", "controller_name_shown", "action", "at", "ip_hash", "ua_hash", "method", "audit_seq", "erase_after"}),
     "subject_map": ("Audit log: the identity behind a pseudonymous subject id, deleted with the person", {"subject_id", "user_id", "created_at"}),
     "audit_log": ("Audit log: pseudonymous actor and subject, action, details without secrets, hash chain",
                   {"seq", "at", "actor", "action", "subject", "details", "prev_hash", "row_hash"}),

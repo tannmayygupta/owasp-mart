@@ -172,6 +172,18 @@ class InviteView:
 
 
 @dataclass(frozen=True, slots=True)
+class RetentionInvite:
+    """What the retention job needs to know about an invite: whose record it is, which attempt, how long the template said to keep it, and since when."""
+    invite_id: str
+    org_id: str
+    state: str
+    attempt_id: str | None
+    user_id: str | None
+    created_at: datetime
+    retention_days: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class BulkResult:
     """What a bulk invite did, address by address (FR-ASM-06). `skipped` pairs an address with why: `invalid`, `duplicate` (twice in the list), `exists` (a live invite
     for it), `started` (it already has an attempt: use a re-invite). `remaining` is what was not tried because the company's daily cap ran out, in the order given, so
@@ -716,6 +728,32 @@ class AssessmentService:
                     total += session.execute(update(Invite).where(Invite.org_id == org, Invite.state.in_(CLOSED_STATES), Invite.token_hash.is_not(None),
                                                                   Invite.closed_at <= before).values(token_hash=None)).rowcount
         return total
+
+    def retention_invites(self, created_before: datetime, *, limit: int = 500) -> list[RetentionInvite]:
+        """The invites of every company made at or before `created_before`, oldest first (the retention job of story P-24 decides which are due: that depends on the
+        attempt). The companies are read through the admin-visible directory, each one's invites in its own scope."""
+        with self._scope.acting_as(Scope(user_id="system:invites", roles=frozenset({Role.ADMIN}))):
+            with self._sessions() as session:
+                orgs = [o for o in session.scalars(select(Organization.id))]
+        found: list[RetentionInvite] = []
+        for org in orgs:
+            with self._scope.acting_as(self._system(org)):
+                with self._sessions() as session:
+                    rows = session.scalars(select(Invite).where(Invite.org_id == org, Invite.created_at <= created_before).order_by(Invite.created_at).limit(limit)).all()
+                    for r in rows:
+                        days = (r.rules or {}).get("retention_days")
+                        found.append(RetentionInvite(r.id, str(org), r.state, r.attempt_id, r.user_id, _aware(r.created_at), int(days) if isinstance(days, int) else None))
+        found.sort(key=lambda i: i.created_at)
+        return found[:limit]
+
+    def delete_invites(self, org_id: str, invite_ids: list[str]) -> int:
+        """Delete invites of one company (the retention job: the candidate's record is gone). Returns how many were deleted."""
+        oid = self._uuid(org_id, InviteNotFound)
+        if not invite_ids:
+            return 0
+        with self._scope.acting_as(self._system(oid)):
+            with self._sessions.begin() as session:
+                return session.execute(delete(Invite).where(Invite.org_id == oid, Invite.id.in_(invite_ids))).rowcount
 
     def expire_due(self, org_id: str) -> int:
         """Close the live invites of one company that are past their expiry. Returns how many."""

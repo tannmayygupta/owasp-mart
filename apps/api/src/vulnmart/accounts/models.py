@@ -43,6 +43,7 @@ class User(Timestamps, Base):
     status: Mapped[str] = mapped_column(String(10), nullable=False, server_default="active")
     age_declared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retention_warned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # the learner's retention warning was queued (story P-24); a login clears it
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     brevo_api_key: str | None = Field(default=None, repr=False)
     brevo_api_key_file: str | None = None  # production reads secrets from files (architecture 06 s3); the file wins
     email_relay_interval_seconds: float = Field(default=5.0, gt=0, le=600)
+    # The retention scheduler (story P-24) runs in the API process when this is on (Compose turns it on); several processes may run it, one runs each job.
+    scheduler_enabled: bool = False
+    scheduler_interval_seconds: float = Field(default=60.0, gt=0, le=3600)
     live_relay_interval_seconds: float = Field(default=0.25, gt=0, le=60)  # how often the worker moves domain events to the live streams (story P-22)
     # Accounts (story P-11). `public_origin` is the dashboards' address that links in mail point to (https in staging and production).
     public_origin: str = "http://127.0.0.1:3000"

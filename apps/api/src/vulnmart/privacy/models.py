@@ -29,6 +29,7 @@ class ConsentRecord(Base):
         Index("uq_consent_records_decision", "attempt_id", unique=True, postgresql_where=text("action IN ('granted', 'declined')"),
               sqlite_where=text("action IN ('granted', 'declined')")),  # sqlite: the in-memory databases of the fast tests
         Index("ix_consent_records_user_id_at", "user_id", "at"),
+        Index("ix_consent_records_erase_after", "erase_after", postgresql_where=text("erase_after IS NOT NULL"), sqlite_where=text("erase_after IS NOT NULL")),
     )
 
     id: Mapped[str] = mapped_column(String(18), primary_key=True)  # `k-` and 16 Base32 characters (contracts ConsentId)
@@ -47,6 +48,7 @@ class ConsentRecord(Base):
     ua_hash: Mapped[str | None] = mapped_column(String(64))
     method: Mapped[str] = mapped_column(String(8), nullable=False, server_default="web")
     audit_seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    erase_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # set when the assessment record is deleted: the record goes this long after (OI-37, story P-24)
 
 class SubjectMap(Base):
     """The identity behind a pseudonymous subject id of the audit log (FR-PRV-10). Deleting the row (deletion workflow, story P-25) leaves the audit

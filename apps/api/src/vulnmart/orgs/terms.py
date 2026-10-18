@@ -11,9 +11,9 @@ import hashlib
 from dataclasses import dataclass
 from importlib import resources
 
-TERMS_VERSION = "2026-10-18.1"
+TERMS_VERSION = "2026-10-19.1"  # 2026-10-19.1 (story P-24): a line says VulnMart is the controller of a learner's practice data (FR-PRV-07)
 TEMPLATE_HASHES = {
-    "2026-10-18.1": "3422968480270adf19a0a4d56f8be89fdfdc34470dbcbd64bd2953d9518f132b",
+    "2026-10-19.1": "ad9cfdca001dcb71ea202fcb9a362e301dc6f2f107b1401f616f3b5616c5c34a",
 }
 MAX_COMPANY = 120
 

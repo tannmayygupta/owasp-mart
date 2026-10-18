@@ -179,7 +179,8 @@ class SessionService:
         """A new session for an account whose login is complete. `mfa=True` records that a second factor was proved in it."""
         now = self._now()
         with self._sessions.begin() as session:
-            session.get(User, user_id).last_login_at = now
+            account = session.get(User, user_id)
+            account.last_login_at, account.retention_warned_at = now, None  # logging in before the date cancels a learner's deletion (FR-PRV-05)
             token = self._create(session, user_id, now, now + self._absolute(), ip_trunc, ua_class, mfa_at=now if mfa else None)
         resolved = self.resolve(token)
         assert resolved is not None  # created a moment ago
