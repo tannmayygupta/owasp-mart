@@ -266,7 +266,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The exploit test passes and fails as required.
   - Handoffs: H-51 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-26. C08 Software or Data Integrity Failures (unsigned payment webhook)**
+- [x] **T-26. C08 Software or Data Integrity Failures (unsigned payment webhook)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C08 with an unsigned payment webhook that releases a sentinel flag only on an unsigned sandbox event.

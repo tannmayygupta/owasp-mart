@@ -17,6 +17,7 @@ import { registerSellerRoutes } from './web/routes-seller.mjs';
 import { buildCatalogStore } from './challenges/c03a-catalog-search.mjs';
 import { registerOpsRoutes } from './challenges/c05-ops-console.mjs';
 import { registerAuthResetRoutes } from './challenges/c07-password-reset.mjs';
+import { registerWebhookRoutes } from './challenges/c08-payment-webhook.mjs';
 
 // Build id and catalogue version are supplied by the environment at run time.
 // They default to "dev" so the skeleton answers even outside an instance.
@@ -83,6 +84,9 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
     // C07 (Authentication Failures): the anonymous password-reset endpoints and
     // the test-only mailbox, also before checkCsrf (pre-auth API).
     registerAuthResetRoutes(app, db, { challenges, emit });
+    // C08 (Integrity Failures): the anonymous payment webhook (raw body for HMAC),
+    // also before checkCsrf (the gateway/attacker posts a signed JSON body).
+    registerWebhookRoutes(app, db, express, { challenges, emit });
     app.use(checkCsrf);
     // C03 part A searches a SEPARATE read-only catalog store (no users/orders),
     // so even a successful injection cannot reach anything but merchandising data.

@@ -8,6 +8,7 @@ import * as giftcards from '../challenges/c02-gift-card-codes.mjs';
 import { searchCatalog } from '../challenges/c03a-catalog-search.mjs';
 import { noteTicketMarkup } from '../challenges/c03b-ticket-xss.mjs';
 import { quickRefund, refundStatement } from '../challenges/c04-quick-refund.mjs';
+import { createPendingOrder } from '../challenges/c08-payment-webhook.mjs';
 
 // Map a service error to an HTTP response; rethrow anything unexpected.
 function handleError(err, res) {
@@ -71,6 +72,12 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
   }));
   app.get('/api/orders/:id/refund-statement', requireCustomer, hj((req, res) => {
     res.json(refundStatement(db, req.user, req.params.id));
+  }));
+
+  // C08 (Integrity Failures): create a pending-payment order and stop at "Pay"
+  // (the webhook confirms it). The signature-bypass weakness is in the webhook.
+  app.post('/api/orders/pending', requireCustomer, hj((req, res) => {
+    res.json(createPendingOrder(db, req.user, { ship: { line1: req.body?.line1, city: req.body?.city, country: req.body?.country } }));
   }));
 
   // Catalogue
