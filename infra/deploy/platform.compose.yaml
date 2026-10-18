@@ -17,6 +17,7 @@ x-api-env: &api-env
   VULNMART_PUBLIC_ORIGIN: https://${VULNMART_PLATFORM_HOST}
   VULNMART_ORIGIN_SECRET_FILE: /run/secrets/origin_secret
   VULNMART_CSRF_SECRET_FILE: /run/secrets/csrf_secret
+  VULNMART_FIELD_SECRET_FILE: /run/secrets/field_secret  # seals second-factor secrets (story P-15); production does not start without it
   VULNMART_TRUSTED_PROXY_HOPS: "1"
   VULNMART_EMAIL_PROVIDER: smtp
   VULNMART_SMTP_HOST: mailpit
@@ -130,6 +131,7 @@ services:
     volumes:
       - ./secrets/origin_secret:/run/secrets/origin_secret:ro
       - ./secrets/csrf_secret:/run/secrets/csrf_secret:ro
+      - ./secrets/field_secret:/run/secrets/field_secret:ro
       - ./secrets/kek:/run/secrets/kek:ro
       - ./secrets/event_master:/run/secrets/event_master:ro
       - ./secrets/flag_key:/run/secrets/flag_key:ro
@@ -162,6 +164,7 @@ services:
     volumes:
       - ./secrets/origin_secret:/run/secrets/origin_secret:ro
       - ./secrets/csrf_secret:/run/secrets/csrf_secret:ro
+      - ./secrets/field_secret:/run/secrets/field_secret:ro
     mem_limit: 256m
     pids_limit: 128
     tmpfs:

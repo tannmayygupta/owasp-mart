@@ -26,7 +26,12 @@ A pull request that merges two migration histories with the same id, or two key 
 ## Problems met and how they were fixed
 Two migrations with revision id 0005 (renamed mine). The privacy inventory test failing on attempts (added). A first guess at the test database user failed; the real credentials come from the container's environment.
 
+## Deployed result (same day, after the developer approved stopping vm-p and recreating its database)
+- vm-p stopped, its Postgres volume removed, the new build started: migrate job created the schema to head 0008 and the keystore database vm_keystore (own role); the data database holds no key table (0 of deks and shredded), vm_keystore holds deks, keystore_schema and shredded.
+- First start failed: VULNMART_ENV=production needs a field key since Akshay's MFA code (P-15) was merged. Added field_secret (64 hex, made by deploy-secrets, mounted in api and worker). Second start healthy.
+- Deployed journey (scripts/e2e-live.mjs): 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run6-new-key-service.json).
+- Suites after the key switch: npm test 1030 passed, 2 skipped; orchestrator 467 passed; py-attempts 357 passed; apps/api run with Postgres enabled (see the pull request).
+
 ## Limitations and follow-ups
-- The deployed vm-p still runs the OLD build with the old key class and the old migration ids. The new build is on vm-p as an image and the new secret files exist locally, but the platform was not restarted: stopping the live service and removing its database volume was denied by the permission classifier and waits for the developer. The database must be recreated (the stored revision id 0005 means something else on main now).
-- Flags and event keys change with the new masters; no live attempt survives the switch (test data only).
-- Full npm test, orchestrator and py-attempts suites were not re-run after the key switch (the run was blocked); they were green before it and the switch touches only the API and deploy scripts.
+- The backup script and runbook dump only the vulnmart database. The wrapped keys live in vm_keystore: a backup of data without the keys cannot be decrypted, and a backup that keeps the keys defeats shredding. This needs a decision by the team (runbook keystore-and-audit-anchor.md is Akshay's); not decided here.
+- Flags and event keys changed with the new masters; the old test attempts are gone with the old database.

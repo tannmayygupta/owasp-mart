@@ -38,7 +38,7 @@ test('the certificates chain to one CA, carry the addresses and the right usages
     const keys = path.join(dir, 'o', 'keys');
     const values = fs.readdirSync(keys).filter((n) => n !== 'gate_key_previous').map((n) => fs.readFileSync(path.join(keys, n), 'utf8'));
     assert.equal(new Set(values).size, values.length, 'no two secrets are equal');
-    for (const n of ['platform_key', 'report_key', 'gate_key_current', 'gate_admin_secret', 'origin_secret', 'csrf_secret']) assert.match(fs.readFileSync(path.join(keys, n), 'utf8'), /^[0-9a-f]{64}$/, n);
+    for (const n of ['platform_key', 'report_key', 'gate_key_current', 'gate_admin_secret', 'origin_secret', 'csrf_secret', 'field_secret']) assert.match(fs.readFileSync(path.join(keys, n), 'utf8'), /^[0-9a-f]{64}$/, n);
 for (const n of ['event_master', 'flag_key', 'owner_key']) assert.equal(Buffer.from(fs.readFileSync(path.join(keys, n), 'utf8'), 'base64url').length, 32, n);
 assert.match(fs.readFileSync(path.join(keys, 'kek'), 'utf8'), /^1:[A-Za-z0-9_-]{43}$/);
 assert.match(fs.readFileSync(path.join(keys, 'keystore_password'), 'utf8'), /^[0-9a-f]{48}$/);
