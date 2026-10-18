@@ -1,0 +1,476 @@
+▶ platform and web profiles on a real Docker engine
+  ✖ up: exits 0, the migrations ran first, and all five services are healthy (5.8877ms)
+  ✖ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (60415.1088ms)
+  ✖ the page is served and the API is also reachable directly on its own port (2.4213ms)
+  ✖ API errors follow the IF-8 format through the web origin: unknown route and wrong method (6.3674ms)
+  ✖ origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (2.5192ms)
+  ✖ page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (1.7285ms)
+  ✖ caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (1.7751ms)
+  ✖ mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (40924.1342ms)
+  ✔ mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost) (6671.8908ms)
+  ✖ accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (3.7891ms)
+  ✖ sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good (2.7255ms)
+  ✖ password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work (2.1693ms)
+  ✖ admins (P-13): the seed command makes an admin with no learner role who signs in without admin powers, a second seed changes nothing, signup cannot make an admin (64.1081ms)
+  ✖ mfa (P-15): an admin enrols an authenticator app, then needs the code (or a recovery code, once) to sign in; a code cannot be replayed (59.6011ms)
+  ✖ consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record (12.8047ms)
+  ✖ audit and keys (P-17): a login is logged under a pseudonym, the chain verifies and anchors; a key is created, used and shredded in vm_keystore (1.9275ms)
+  ✖ companies (P-18): a recruiter signs up, verifies the address, the admin queue lists the company, the approval activates it and mails the owner (57.4267ms)
+  ✖ company members (P-19): a colleague joins through the owner, the terms gate invites, the cap applies, a suspended recruiter is out at once (74.136ms)
+  ✖ invites (P-20): a template, an invite by email to a person with no account, the mail arrives, the token is only a hash, resend kills the old link (66.5944ms)
+  ✖ accepting invites (P-21): open the link, register, address must match, consent first, attempt and role after it, re-invite, bulk, purge (59.2661ms)
+  ✖ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (296.443ms)
+  ✔ hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (330.6089ms)
+  ✔ web has no secrets or flags in its environment (57.0188ms)
+  ✖ Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (61057.1562ms)
+  ✖ Valkey down: public health 503 degraded, /readyz names valkey; recovers (60910.0574ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (4211.2138ms)
+✖ platform and web profiles on a real Docker engine (265060.3208ms)
+ℹ tests 26
+ℹ suites 1
+ℹ pass 4
+ℹ fail 22
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 265200.941
+
+✖ failing tests:
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:70:3
+✖ up: exits 0, the migrations ran first, and all five services are healthy (5.8877ms)
+  AssertionError [ERR_ASSERTION]:  Network vulnmart_default  Creating
+   Network vulnmart_default  Created
+   Container vulnmart-postgres  Creating
+   Container vulnmart-mailpit  Creating
+   Container vulnmart-valkey  Creating
+   Container vulnmart-postgres  Created
+   Container vulnmart-mailpit  Created
+   Container vulnmart-migrate  Creating
+   Container vulnmart-valkey  Created
+   Container vulnmart-migrate  Created
+   Container vulnmart-api  Creating
+   Container vulnmart-api  Created
+   Container vulnmart-web  Creating
+   Container vulnmart-worker  Creating
+   Container vulnmart-worker  Created
+   Container vulnmart-web  Created
+   Container vulnmart-valkey  Starting
+   Container vulnmart-postgres  Starting
+   Container vulnmart-mailpit  Starting
+   Container vulnmart-mailpit  Started
+   Container vulnmart-valkey  Started
+   Container vulnmart-postgres  Started
+   Container vulnmart-postgres  Waiting
+   Container vulnmart-postgres  Healthy
+   Container vulnmart-migrate  Starting
+   Container vulnmart-migrate  Started
+   Container vulnmart-migrate  Waiting
+   Container vulnmart-postgres  Waiting
+   Container vulnmart-valkey  Waiting
+   Container vulnmart-valkey  Healthy
+   Container vulnmart-postgres  Healthy
+   Container vulnmart-migrate  service "migrate" didn't complete successfully: exit 1
+  service "migrate" didn't complete successfully: exit 1
+  
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:71:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1516:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:83:3
+✖ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (60415.1088ms)
+  AssertionError [ERR_ASSERTION]: health never returned 200; last: {"error":"fetch failed"}
+      at waitForHealth (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:52:10)
+      at async TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:84:15)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:88:3
+✖ the page is served and the API is also reachable directly on its own port (2.4213ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:89:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:102:3
+✖ API errors follow the IF-8 format through the web origin: unknown route and wrong method (6.3674ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:103:21)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:122:3
+✖ origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (2.5192ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:123:20)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:8000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 8000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:136:3
+✖ page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (1.7285ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:139:20)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:163:3
+✖ caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (1.7751ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:169:21)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:198:3
+✖ mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (40924.1342ms)
+  AssertionError [ERR_ASSERTION]: exactly one message arrived
+  
+  0 !== 1
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:201:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:251:3
+✖ accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (3.7891ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async call (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:243:14)
+      at async test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:254:19)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:295:3
+✖ sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good (2.7255ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async call (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:243:14)
+      at async test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:299:19)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:365:3
+✖ password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work (2.1693ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async call (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:243:14)
+      at async test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:372:19)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:441:3
+✖ admins (P-13): the seed command makes an admin with no learner role who signs in without admin powers, a second seed changes nothing, signup cannot make an admin (64.1081ms)
+  AssertionError [ERR_ASSERTION]: Error response from daemon: container e5b39de6342db0cce03c490f5014609f738e2a4061a9600cf203ca9fa3194959 is not running
+  
+  
+  1 !== 0
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:448:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:497:3
+✖ mfa (P-15): an admin enrols an authenticator app, then needs the code (or a recovery code, once) to sign in; a code cannot be replayed (59.6011ms)
+  AssertionError [ERR_ASSERTION]: Error response from daemon: container e5b39de6342db0cce03c490f5014609f738e2a4061a9600cf203ca9fa3194959 is not running
+  
+  
+  1 !== 0
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:502:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:571:3
+✖ consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record (12.8047ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async call (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:243:14)
+      at async test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:576:19)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:624:3
+✖ audit and keys (P-17): a login is logged under a pseudonym, the chain verifies and anchors; a key is created, used and shredded in vm_keystore (1.9275ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async call (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:243:14)
+      at async test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:629:19)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect ECONNREFUSED 127.0.0.1:3000
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:698:3
+✖ companies (P-18): a recruiter signs up, verifies the address, the admin queue lists the company, the approval activates it and mails the owner (57.4267ms)
+  AssertionError [ERR_ASSERTION]: Error response from daemon: container e5b39de6342db0cce03c490f5014609f738e2a4061a9600cf203ca9fa3194959 is not running
+  
+  
+  1 !== 0
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:710:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:752:3
+✖ company members (P-19): a colleague joins through the owner, the terms gate invites, the cap applies, a suspended recruiter is out at once (74.136ms)
+  AssertionError [ERR_ASSERTION]: Error response from daemon: container e5b39de6342db0cce03c490f5014609f738e2a4061a9600cf203ca9fa3194959 is not running
+  
+  
+  1 !== 0
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:766:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:828:3
+✖ invites (P-20): a template, an invite by email to a person with no account, the mail arrives, the token is only a hash, resend kills the old link (66.5944ms)
+  AssertionError [ERR_ASSERTION]: Error response from daemon: container e5b39de6342db0cce03c490f5014609f738e2a4061a9600cf203ca9fa3194959 is not running
+  
+  
+  1 !== 0
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:841:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:907:3
+✖ accepting invites (P-21): open the link, register, address must match, consent first, attempt and role after it, re-invite, bulk, purge (59.2661ms)
+  AssertionError [ERR_ASSERTION]: Error response from daemon: container e5b39de6342db0cce03c490f5014609f738e2a4061a9600cf203ca9fa3194959 is not running
+  
+  
+  1 !== 0
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:931:12)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:1024:3
+✖ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (296.443ms)
+  AssertionError [ERR_ASSERTION]: web should publish a port
+      at TestContext.<anonymous> (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:1030:14)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:1054:3
+✖ Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (61057.1562ms)
+  AssertionError [ERR_ASSERTION]: health never returned 503; last: {"error":"fetch failed"}
+      at waitForHealth (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:52:10)
+      at async test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:1057:17)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:1069:3
+✖ Valkey down: public health 503 degraded, /readyz names valkey; recovers (60910.0574ms)
+  AssertionError [ERR_ASSERTION]: health never returned 503; last: {"error":"fetch failed"}
+      at waitForHealth (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:52:10)
+      at async test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:1072:17)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

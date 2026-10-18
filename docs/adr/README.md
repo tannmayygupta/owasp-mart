@@ -48,5 +48,6 @@
 | 0048 | [Recruiter signup, company states derived from the company, and two read-only exceptions to the organisation scope](0048-recruiter-signup-company-states-and-two-read-only-scope-exceptions.md) | Proposed (the builder's design for the developer to confirm) |
 | 0049 | [Colleagues join by a domain claim, pinned data-processing terms, an invite cap, and the company in the session scope](0049-colleagues-join-by-domain-claim-pinned-terms-invite-cap-and-the-company-in-the-session.md) | Proposed (the builder's design for the developer to confirm) |
 | 0050 | [Invites: a sealed recipient address, a company-prefixed token, rules copied onto the invite, and `sent` read from the mail](0050-invites-sealed-recipient-company-prefixed-token-and-lazy-sent-state.md) | Proposed (the builder's design for the developer to confirm) |
+| 0051 | [Accepting invites: binding by verified address, the attempt id given out at binding, consent before the attempt, and generations for a re-invite](0051-accepting-invites-binding-by-verified-address-attempt-id-at-binding-and-generations.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

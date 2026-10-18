@@ -73,7 +73,8 @@ class ConsentService:
     # ---- the notice ----
 
     def _notice_for(self, target: ConsentTarget) -> Notice:
-        return render(company_name=target.company_name, retention_days=int(self._settings.get("candidate_retention_days")),
+        days = target.retention_days if target.retention_days is not None else int(self._settings.get("candidate_retention_days"))
+        return render(company_name=target.company_name, retention_days=days,
                       record_months=int(self._settings.get("consent_record_extra_months")))
 
     def _own_target(self, user_id: str, attempt_id: str) -> ConsentTarget:

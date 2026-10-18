@@ -218,14 +218,14 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Done when: A recruiter creates an assessment and sends an invite and the invite email arrives.
   - Handoffs: H-139, H-140 (see docs/dev/HANDOFFS.md; read them when you plan P-21)
 
-- [ ] **P-21. Accepting invites, re-invite after a fault and bulk invites**
+- [x] **P-21. Accepting invites, re-invite after a fault and bulk invites**  (service level, no routes (story 5.3); `create_app` takes the lab runtime's attempt port when the lab runs in the same process (tests give an engine port); the first way of FR-ASM-04: a different verified address cannot use the link)
   - Epic: `epic-assessments-and-invites`
-  - BMAD story: not planned yet; created when you incept `epic-assessments-and-invites` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `6.2` in `epic-assessments-and-invites` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: A candidate accepts an invite with consent, a re-invite after a fault, and bulk invite handling.
   - Covers: FR-ASM-04, 05, 06
   - Waits on: P-16, P-20.
   - Done when: Accept, re-invite and bulk work in tests and the invite purge job can see expired invites.
-  - Handoffs: H-133, H-136 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-133, H-136, H-141 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-22. Live updates hub: SSE, heartbeat, snapshot with polling fallback, fan-out**
   - Epic: `epic-live-updates`

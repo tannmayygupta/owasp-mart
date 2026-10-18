@@ -11,6 +11,7 @@ import re
 import pytest
 
 import vulnmart.accounts.models  # noqa: F401
+import vulnmart.assessments.models  # noqa: F401
 import vulnmart.kernel.models  # noqa: F401
 import vulnmart.notifications.models  # noqa: F401
 import vulnmart.orgs.models  # noqa: F401
@@ -49,9 +50,10 @@ INVENTORY = {
                              {"id", "org_id", "title", "time_limit_min", "hints_mode", "hint_cost_pct", "reset_limit", "invite_expiry_days", "retention_days", "settings",
                               "version", "created_by", "created_at", "updated_at"}),
     "template_challenges": ("Company data: the challenges of a template", {"template_id", "challenge_key", "org_id"}),
-    "invites": ("Invite data: the address of the invited candidate (needed to send and to match), the hash of the token, the lifecycle times, a copy of the rules",
+    "invites": ("Invite data: the address of the invited candidate (needed to send and to match), the account and attempt it was bound to (P-21), the hash of the token, "
+                "the lifecycle times, a copy of the rules",
                 {"id", "org_id", "template_id", "template_version", "rules", "email_ci", "token_hash", "state", "expires_at", "superseded_by", "outbox_id", "created_by",
-                 "created_at", "sent_at", "opened_at", "consented_at", "started_at", "closed_at"}),
+                 "created_at", "sent_at", "opened_at", "consented_at", "started_at", "closed_at", "user_id", "attempt_id", "generation", "supersedes_attempt_id"}),
     "organizations": ("Company data: name, email domain, status, reasons", {"id", "name", "email_domain", "status", "owner_user_id", "rejected_reason",
                                                                              "suspended_reason", "domain_claim", "invite_cap", "created_at", "updated_at"}),
     "org_members": ("Company data: who belongs to a company", {"org_id", "user_id", "role", "status", "created_at", "updated_at"}),
