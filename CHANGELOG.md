@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Changed (Sprint 3 close, 2026-10-18, Sahil)
+- Developer confirmed the Sprint 3 stories done after PR #28 merged (CLAUDE.md task-cycle step 4): T-17, T-18 (seller flows, money model) and T-19 to T-24 (challenges C01–C06) — the story plans under `docs/bmad/initiative-target/` move from `built` to `done`. Excel tracker to be set Done = Yes by hand.
+
 ### Fixed (Sprint 3, Sahil, stream T)
 - CI `exploit runner` job now installs the workspace dependencies (`pnpm/action-setup` + `pnpm install --frozen-lockfile`). The challenge self-tests boot the real shop app (express/nunjucks), unlike the earlier `_example` test which used only node built-ins, so the job previously errored on import.
 
