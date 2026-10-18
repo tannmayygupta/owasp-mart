@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import Field
 from vulnmart_attempts import AttemptRecord, InvalidTransition
+from vulnmart_attempts.review import NotHeld, ReviewFinal, ReviewForbidden
 from vulnmart_models.error_codes import ErrorCode
 
 from vulnmart.accounts.http import Authenticated, Strict, authenticated, authenticated_with_csrf, read_json
@@ -138,6 +139,10 @@ def call(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         raise ProblemError(exc.code) from None
     except InvalidTransition:
         raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
+    except ReviewFinal:  # the held capture was already decided (two reviewers, opposite answers): the same answer as a decided integrity flag
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
+    except (ReviewForbidden, NotHeld):  # not allowed to decide it, or nothing is held: the same 404 as for anyone else
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND) from None
     except InstanceNotFound:
         raise ProblemError(ErrorCode.INST_NOT_FOUND) from None
     except Busy:

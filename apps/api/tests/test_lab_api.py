@@ -516,3 +516,22 @@ def test_a_host_with_no_capacity_answers_429_with_a_retry_and_a_later_start_work
     world.host.create = real_create
     iid, aid = start(world, ada)  # the same attempt starts when there is room again
     assert world.lab.engine.get(aid).state.value == "running" and iid.startswith("i-")
+
+
+def test_reviewer_refusals_become_registry_answers_not_a_500():
+    """Review finding: ReviewFinal, ReviewForbidden and NotHeld used to escape `call` as unmapped exceptions."""
+    from vulnmart_attempts.review import NotHeld, ReviewFinal, ReviewForbidden
+    from vulnmart_models.error_codes import ErrorCode
+
+    from vulnmart.lab.api import call
+    from vulnmart.problem import ProblemError
+
+    def refuse(exc):
+        def go():
+            raise exc
+        return go
+
+    for exc, code in ((ReviewFinal(), ErrorCode.ATT_INVALID_STATE), (ReviewForbidden(), ErrorCode.ATT_NOT_FOUND), (NotHeld("C01"), ErrorCode.ATT_NOT_FOUND)):
+        with pytest.raises(ProblemError) as hit:
+            call(refuse(exc))
+        assert hit.value.code == code

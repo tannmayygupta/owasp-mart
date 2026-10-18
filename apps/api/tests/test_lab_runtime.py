@@ -289,3 +289,17 @@ def test_the_postgres_store_needs_the_platform_key_service_and_never_makes_its_o
         build_lab_runtime({"VULNMART_LAB_STORE": "postgres", "VULNMART_POSTGRES_DSN": "postgresql://x:y@localhost/z"})
     with pytest.raises(ValueError, match="VULNMART_POSTGRES_DSN"):
         build_lab_runtime({"VULNMART_LAB_STORE": "postgres", "VULNMART_KEYSTORE_DSN": "postgresql://x:y@localhost/z"})
+
+
+def test_a_start_that_died_midway_leaves_no_instance_behind():
+    """Review finding: the process stops after the orchestrator created the instance but before the attempt learned it; the retry must destroy it."""
+    from vulnmart.ports.instance_host import InstanceState
+
+    rt, clock, host = make_runtime()
+    begun = rt._begin("u-midway", rt.template_id, None)
+    abandoned = begun[1]
+    rt._starting.clear()  # the process died here: the in-memory guard is gone, the directory row and the orchestrator's instance remain
+    started = rt.start_attempt("u-midway")
+    assert started.instance_id != abandoned
+    assert host.get(abandoned).state is InstanceState.DESTROYED
+    assert rt.directory.get(abandoned) is None and rt.directory.get(started.instance_id) is not None

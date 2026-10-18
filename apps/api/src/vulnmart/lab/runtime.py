@@ -1,7 +1,8 @@
 """LabRuntime: the attempt engine, scoring, flag checking, milestone engine and the event receiver in one process (D-95, D-96).
 
-All state is in memory; a restart loses attempts (the real tables are Akshay's, H-330). Keys are random per process, so no
-flag or event key of one run is valid in another. Answers of this class hold ids, states, numbers and result words, never
+With `VULNMART_LAB_STORE=postgres` (the deployed mode) the state is in Postgres (`vulnmart.lab.pg`) and the keys come from the platform key
+service (`DbKeyPort`), so a restart loses nothing. Without it (tests, the laptop demo) all state is in memory and the keys are random per
+process, so no flag or event key of one run is valid in another. Answers of this class hold ids, states, numbers and result words, never
 a flag, a digest, a key or a pasted text.
 """
 from __future__ import annotations
@@ -143,14 +144,33 @@ class LabRuntime:
         self.review = HeldCaptureReview(self.held_store, self.audit, self.clock, default_may_review(self.org_of_attempt),
                                         events=self.attempt_log.append)
     def _engine_event(self, payload: Mapping[str, Any]) -> None:
-        """The engine's events go to the ids-only log; a withdrawn attempt that reaches `deleted` also has its data purged."""
+        """The engine's events go to the ids-only log; a withdrawn attempt that reaches `deleted` is erased at once. The engine swallows an error of this
+        sink, so a failed erase is not lost: `tick` erases every `deleted` attempt that is not yet marked purged."""
         self.attempt_log.from_engine(payload)
         if self.stores.purge and payload.get("event") == "attempt.state_changed" and payload.get("to") == "deleted":
             try:
-                self.stores.purge(payload["attempt_id"])
-            except Exception:  # the next tick finds the attempt `deleted` again only through a new event, so say it loudly
-                log.exception("purge of attempt %s failed", payload["attempt_id"])
-                raise
+                self._erase(payload["attempt_id"])
+            except Exception:
+                log.exception("erasing attempt %s failed; the next tick tries again", payload["attempt_id"])
+
+    def _erase(self, attempt_id: str) -> None:
+        """FR-SES-10: the key is shredded first (the sealed rows are unreadable even if the next step fails), then the rows go, then the attempt is
+        marked purged. Every step is safe to repeat, so a failure anywhere is finished by a later call."""
+        self.keys.shred(attempt_id)
+        if self.stores.purge:
+            self.stores.purge(attempt_id)
+        self.engine.mark_purged(attempt_id)
+
+    def _erase_pending(self) -> None:
+        """A `deleted` attempt whose erase did not finish (the database was away, the process stopped): finish it. Never raises."""
+        if not self.stores.purge:
+            return
+        for rec in self.engine.in_states(AttemptState_.DELETED):
+            if rec.purged_at is None:
+                try:
+                    self._erase(rec.id)
+                except Exception:
+                    log.exception("erasing attempt %s failed; the next tick tries again", rec.id)
 
     @property
     def instance_states(self) -> dict[str, str]:
@@ -228,6 +248,14 @@ class LabRuntime:
             if self.instance_alive(rec.instance_id):
                 return StartedAttempt(rec.id, rec.instance_id, rec.state.value)
             self.keys.create_attempt_key(rec.id)  # the data key that seals this attempt's evidence (without it every capture is dropped)
+            stale = self.directory.for_attempt(rec.id)
+            if stale is not None:
+                # a start that died midway (the process stopped between the orchestrator's create and the attempt learning the instance), or an
+                # instance that was lost: the directory is about to replace it, so the orchestrator must not keep it either (review finding)
+                try:
+                    self.host.destroy(stale.instance_id)
+                except Exception:
+                    log.exception("destroying the stale instance %s failed; the orchestrator's idle timer remains", stale.instance_id[:10])
             instance_id = new_instance_id()
             material = build_material(self.keys, instance_id, 1, self.challenge_keys)
             request = CreateRequest(instance_id=instance_id, template_id=template, epoch=1, material=material,
@@ -429,6 +457,7 @@ class LabRuntime:
                 if self.engine.mark_reported(rec.id, held_open).state.value == "reported":
                     changed.append(rec.id)
         self._heal_access()
+        self._erase_pending()
         return tuple(dict.fromkeys(changed))
 
     def _heal_access(self) -> None:

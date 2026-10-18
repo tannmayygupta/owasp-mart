@@ -1,5 +1,5 @@
 // Makes every secret and certificate the two hosts need for the demo deployment (docs/runbooks/live-deploy.md). Writes OUTSIDE the repository, never prints a value.
-//   node scripts/deploy-secrets.mjs --out <folder> --vmi-ip <vm-i private address> --vmp-ip <vm-p private address> [--days 60] [--force]
+//   node scripts/deploy-secrets.mjs --out <folder> --vmi-ip <vm-i private address> --vmp-ip <vm-p private address> [--days 60] [--force [--destroy-keys]]
 // What it makes (file names are what the compose files and `scripts/live-deploy.mjs` expect):
 //   pki/ca.pem ca.key          one private CA (the link between the two hosts is private; its certificates are checked all the same)
 //   pki/orch.pem orch.key      server certificate of the orchestrator listener (subject alternative name: the private address of vm-i)
@@ -11,6 +11,8 @@
 //   keys/kek                                                           one line `1:<base64 of 32 random bytes>`: the key-encryption key of the key service
 //   keys/pg_owner_password pg_app_password keystore_password           48 hex characters each
 // The extensions are the ones Python 3.14 requires (a CA needs keyUsage keyCertSign). Run again with --force to replace everything (a new CA means new certificates everywhere).
+// --force alone refuses when the folder holds a key-encryption key (`keys/kek`): replacing it makes every wrapped attempt key, every sealed evidence row and every
+// second-factor secret unreadable, and changes every flag. Add --destroy-keys only when that is the intention (a fresh deployment with no data worth keeping).
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -21,10 +23,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IPV4 = /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 
 export function parseArgs(argv) {
-  const o = { days: 60, force: false };
+  const o = { days: 60, force: false, destroyKeys: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--force') o.force = true;
+    else if (a === '--destroy-keys') o.destroyKeys = true;
     else if (['--out', '--vmi-ip', '--vmp-ip', '--days'].includes(a)) {
       const v = argv[++i];
       if (v === undefined) return { error: `${a} needs a value` };
@@ -49,6 +52,7 @@ function openssl(args, cwd) {
 export function make(o) {
   const out = path.resolve(o.out);
   if (fs.existsSync(out) && fs.readdirSync(out).length && !o.force) throw new Error(`${out} is not empty; use --force to replace it`);
+  if (fs.existsSync(path.join(out, 'keys', 'kek')) && !o.destroyKeys) throw new Error(`${out} holds the key-encryption key; replacing it makes all sealed data unreadable. Add --destroy-keys if that is the intention`);
   fs.rmSync(out, { recursive: true, force: true });
   const pki = path.join(out, 'pki');
   const keys = path.join(out, 'keys');

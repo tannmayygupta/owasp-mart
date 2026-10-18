@@ -34,6 +34,7 @@ from vulnmart.lab.runtime import LabRuntime
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
 from vulnmart.kernel.keys import DbKeyPort, KekRing
 from vulnmart.kernel.keystore import ensure_keystore, with_database
+from vulnmart.ports.errors import AttemptGone
 from vulnmart.ports.fakes import FakeKeyPort
 from vulnmart.ports.instance_host import InstanceState
 from vulnmart.ports.reports import IntegrityType, Milestone
@@ -360,13 +361,15 @@ def test_a_withdrawn_attempt_is_purged_by_the_tick_after_the_undo_window(engine)
     assert rt.milestones.best(s.attempt_id, "C01") is Milestone.M3, "inside the undo window nothing is deleted"
     clock.advance(days=2)
     rt.tick()
-    assert rt.state(s.attempt_id)["state"] == "deleted"
+    assert rt.engine.get(s.attempt_id).state is AttemptState.DELETED and rt.engine.get(s.attempt_id).purged_at is not None
+    with pytest.raises(AttemptGone):
+        rt.state(s.attempt_id)  # purged: the attempt is gone for every reader
     assert rt.milestones.best(s.attempt_id, "C01") is Milestone.NONE and rt.directory.get(s.instance_id) is None
     assert rt.attempt_log.read(s.attempt_id) == ()
 
 
 def test_the_flag_rate_limit_survives_a_restart_because_it_reads_the_stored_log(engine, keystore_engine):
-    from vulnmart.ports.errors import FlagRateLimited
+    from vulnmart.ports.errors import AttemptGone, FlagRateLimited
 
     clock, host = FakeClock(T0), FakeInstanceHost()
     keys = make_keys(keystore_engine)
@@ -380,3 +383,96 @@ def test_the_flag_rate_limit_survives_a_restart_because_it_reads_the_stored_log(
     assert hit.value.retry_after > 0
     clock.advance(minutes=11)
     assert rt2.submit_flag(s.attempt_id, "C04", keys.flag(s.instance_id, "C04", 1)).result == "correct"
+
+
+def test_a_deleted_attempt_loses_its_key_and_a_failed_purge_is_finished_by_the_next_tick(engine, keystore_engine):
+    """Review finding: withdrawal must shred the attempt key (FR-SES-10) and must not depend on one lucky call."""
+    from vulnmart.ports.errors import KeyShredded
+
+    clock, host = FakeClock(T0), FakeInstanceHost()
+    keys = make_keys(keystore_engine)
+    rt = make_runtime(engine, clock, host, keys)
+    s = rt.start_attempt(f"u-shred-{uuid.uuid4().hex[:8]}")
+    sealed = keys.encrypt(s.attempt_id, b"captured request", b"aad")
+    assert keys.decrypt(s.attempt_id, sealed, b"aad") == b"captured request"
+    rt.withdraw(s.attempt_id)
+    real_purge, calls = rt.stores.purge, {"n": 0}
+
+    def flaky(attempt_id):
+        calls["n"] += 1
+        if calls["n"] <= 2:  # the engine sink and the sweep of the same tick both fail
+            raise RuntimeError("database away")
+        return real_purge(attempt_id)
+
+    rt.stores.purge = flaky
+    clock.advance(days=8)
+    rt.tick()  # the engine reaches `deleted`; the purge fails in the engine sink and again in the sweep, and nothing is raised
+    assert rt.engine.get(s.attempt_id).state is AttemptState.DELETED and rt.engine.get(s.attempt_id).purged_at is None
+    with pytest.raises(KeyShredded):
+        keys.decrypt(s.attempt_id, sealed, b"aad")  # the key went first, so the sealed rows are unreadable even now
+    rt.tick()  # the next tick finishes the job
+    rec = rt.engine.get(s.attempt_id)
+    assert rec.purged_at is not None and calls["n"] == 3
+    assert rt.directory.get(s.instance_id) is None
+    rt.tick()
+    assert calls["n"] == 3, "a purged attempt is not erased again"
+
+
+def test_the_rows_of_a_replaced_instance_do_not_outlive_it(engine):
+    """Review finding: events, activity, bot visits and epochs of an instance that was replaced (or removed after a failed start) are deleted with it."""
+    attempt = pg.PgAttemptStore(engine).add(new_record(user=f"u-repl-{uuid.uuid4().hex[:8]}")).id
+    old, new = f"i-old{uuid.uuid4().hex[:10]}", f"i-new{uuid.uuid4().hex[:10]}"
+    directory = pg.PgInstanceDirectory(engine)
+    directory.add(InstanceInfo(old, attempt, "shop-v0", 1, ("C01",)))
+    with engine.begin() as c:
+        c.execute(text("INSERT INTO instance_epochs (instance_id, epoch) VALUES (:i, 1) ON CONFLICT DO NOTHING"), {"i": old})
+    directory.add(InstanceInfo(new, attempt, "shop-v0", 1, ("C01",)))
+    with engine.connect() as c:
+        left = c.execute(text("SELECT count(*) FROM instance_epochs WHERE instance_id = :i"), {"i": old}).scalar_one()
+        kept = c.execute(text("SELECT count(*) FROM instances WHERE attempt_id = :a"), {"a": attempt}).scalar_one()
+    assert left == 0 and kept == 1
+    directory.remove(new)
+    assert directory.for_attempt(attempt) is None
+
+
+def test_a_capture_body_is_never_kept_in_the_events_table(engine):
+    """Review finding: the request body and headers are sealed in `evidence` only; the event row keeps metadata (FR-DET-03)."""
+    iid = f"i-cap{uuid.uuid4().hex[:10]}"
+    secret_text = "GET /search?q=plain-text-typed-by-the-learner"
+    event = {"schema_version": "0.1", "instance_id": iid, "epoch": 1, "seq": 1, "type": "evidence.capture", "source": "sidecar",
+             "session_kind": "player", "user_id": "u-1", "ts": "2026-10-17T10:00:00Z", "challenge_key": "C01",
+             "data": {"request_ref": "req-1", "body": secret_text, "headers_redacted": {"user-agent": "x-agent-marker"}}}
+    assert pg.PgEventStore(engine).put(event, "d" * 64, T0) is PutResult.ACCEPTED
+    with engine.connect() as c:
+        stored = c.execute(text("SELECT event::text FROM events WHERE instance_id = :i"), {"i": iid}).scalar_one()
+    assert "plain-text-typed" not in stored and "x-agent-marker" not in stored
+    assert '"body_bytes"' in stored and '"request_ref"' in stored
+    log = pg.PgEventLog(engine)
+    event2 = {**event, "seq": 2}
+    assert log.append(event2, T0) is True
+    (read,) = [e for e in log.read(iid) if e.event["seq"] == 2]
+    assert "body" not in read.event["data"] and read.event["data"]["body_bytes"] == len(secret_text)
+
+
+@pytest.mark.parametrize("statement", [
+    "UPDATE evidence SET size = 1",  # sealed rows cannot be rewritten
+    "UPDATE instance_epochs SET epoch = 2",
+    "DELETE FROM attempts",  # the attempt row stays after a purge
+    "UPDATE events SET event = '{}'::jsonb",  # an event is only stamped with its digest and the engine's mark
+    "UPDATE flag_submissions SET result = 'correct'",
+    "UPDATE review_audit SET note = 'x'",
+    "DELETE FROM security_events",
+])
+def test_the_app_role_cannot_do_more_than_the_code_needs(engine, statement):
+    """Review finding: least privilege on the lab tables. The role may only do what `vulnmart.lab.pg` does."""
+    from sqlalchemy.exc import ProgrammingError
+
+    with pytest.raises(ProgrammingError, match="permission denied"), engine.begin() as c:
+        c.execute(text(statement))
+
+
+def test_the_app_role_keeps_what_the_code_needs(engine):
+    with engine.begin() as c:
+        c.execute(text("UPDATE events SET engine_seen = engine_seen WHERE false"))
+        c.execute(text("UPDATE attempts SET version = version WHERE false"))
+        c.execute(text("DELETE FROM evidence WHERE false"))

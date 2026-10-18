@@ -135,7 +135,7 @@ function render() {
   const a = state.attempt; const i = state.instance;
   const live = a && ['ready', 'running'].includes(a.state);
   // the start button shows when there is no attempt, or the attempt can still run but has no live instance (stopped or failed)
-  const canStart = !a || (['ready', 'running'].includes(a.state) && (!i || ['destroyed', 'failed'].includes(i.state))) || ['cancelled', 'withdrawn'].includes(a.state);
+  const canStart = !a || (['ready', 'running'].includes(a.state) && (!i || ['destroyed', 'failed'].includes(i.state)));  // a cancelled, withdrawn, submitted or reported attempt cannot start again: the API answers ATT-INVALID-STATE (one attempt per challenge set)
   $('no-instance').hidden = !canStart;
   $('instance').hidden = !a; $('instance-actions').hidden = !live || !i;
   if (a) {
@@ -194,6 +194,7 @@ async function onStart() {
 }
 async function onOpen() {
   const w = window.open('about:blank', '_blank'); // opened first so the browser allows it, filled after the ticket arrives
+  if (w) w.opener = null; // the lab shop is vulnerable on purpose (XSS challenges): it must not reach this tab through window.opener
   try { const t = await api('POST', `/api/v1/instances/${state.instance.instance_id}/open`); if (w) w.location.href = t.url; else banner('Allow pop-ups for this site, then press Open again.', 'bad'); }
   catch (e) { if (w) w.close(); banner(say(e.code), 'bad'); }
 }

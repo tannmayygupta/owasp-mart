@@ -54,7 +54,9 @@
 	}
 }
 
-# Only the two internal routes, only POST, only with a certificate of the private CA on the other side of the link (the security group is the first line).
+# Only the two internal routes and only POST. This is server TLS (the callers check this certificate against the private CA), not mutual TLS: the callers do not present a
+# certificate. What protects the listener is (1) the network: only the labs subnet reaches this port (security group and network ACL, tested in
+# infra/terraform/aws/tests) and (2) the signature of every request (event key per instance, report key for state reports). Mutual TLS is a recorded follow-up.
 :9444 {
 	tls /run/pki/ingest.pem /run/pki/ingest.key
 	@internal {

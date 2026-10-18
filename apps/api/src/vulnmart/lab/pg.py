@@ -358,6 +358,15 @@ class PgFlagSubmissionLog(_Base):
 
 # ---- instances and epochs ----
 
+def _drop_instances(c: Any, instance_ids: list[str]) -> None:
+    """Delete instance rows and the rows kept per instance (events, activity, bot visits, epochs): nothing may outlive the instance row, or the purge of
+    the attempt (which finds instances through this table) could never reach it."""
+    if not instance_ids:
+        return
+    for model in (m.ActivityBucket, m.Event, m.BotVisit, m.InstanceEpoch):
+        c.execute(delete(model).where(model.instance_id.in_(instance_ids)))
+    c.execute(delete(m.Instance).where(m.Instance.id.in_(instance_ids)))
+
 class PgInstanceDirectory(_Base):
     def add(self, info: InstanceInfo) -> InstanceInfo:
         stmt = pg_insert(m.Instance).values(id=info.instance_id, attempt_id=info.attempt_id, template_id=info.template_id,
@@ -365,8 +374,9 @@ class PgInstanceDirectory(_Base):
         stmt = stmt.on_conflict_do_update(index_elements=["id"], set_={"epoch": stmt.excluded.epoch, "updated_at": func.now(),
                                                                        "challenge_keys": stmt.excluded.challenge_keys})
         with self._engine.begin() as c:
-            # one instance per attempt: a replacement for a lost instance takes the place of the old one
-            c.execute(delete(m.Instance).where(m.Instance.attempt_id == info.attempt_id, m.Instance.id != info.instance_id))
+            # one instance per attempt: a replacement for a lost instance takes the place of the old one, and what the old one left goes with it
+            old = list(c.execute(select(m.Instance.id).where(m.Instance.attempt_id == info.attempt_id, m.Instance.id != info.instance_id)).scalars())
+            _drop_instances(c, old)
             c.execute(stmt)
         return info
 
@@ -381,7 +391,7 @@ class PgInstanceDirectory(_Base):
 
     def remove(self, instance_id: str) -> None:
         with self._engine.begin() as c:
-            c.execute(delete(m.Instance).where(m.Instance.id == instance_id))
+            _drop_instances(c, [instance_id])
 
     def for_attempt(self, attempt_id: str) -> InstanceInfo | None:
         with self._engine.connect() as c:
@@ -415,13 +425,28 @@ class PgInstanceEpochs(_Base):
 
 # ---- events ----
 
+def _stored(event: Mapping[str, Any]) -> dict[str, Any]:
+    """The event as the `events` table keeps it (FR-DET-03: metadata only). A capture's request body and headers are sealed under the attempt key in
+    `evidence`; they must not also sit here in clear, where a shredded key and a purge would not reach them."""
+    out = dict(event)
+    data = out.get("data")
+    if out.get("type") == "evidence.capture" and isinstance(data, Mapping):
+        data = dict(data)
+        body = data.pop("body", None)
+        data.pop("headers_redacted", None)
+        if isinstance(body, str):
+            data["body_bytes"] = len(body.encode("utf-8", errors="surrogatepass"))
+        out["data"] = data
+    return out
+
+
 class PgEventStore(_Base):
     """The receiver's idempotent store (`IngestHandler`): one row per `(instance_id, epoch, seq)` with the body's digest."""
 
     def put(self, event: Mapping[str, Any], digest: str, received_at: datetime) -> PutResult:
         key = dict(instance_id=event["instance_id"], epoch=event["epoch"], seq=event["seq"])
         with self._engine.begin() as c:
-            row = c.execute(pg_insert(m.Event).values(**key, digest=digest, event=dict(event), received_at=received_at)
+            row = c.execute(pg_insert(m.Event).values(**key, digest=digest, event=_stored(event), received_at=received_at)
                             .on_conflict_do_nothing(index_elements=["instance_id", "epoch", "seq"]).returning(m.Event.id)).one_or_none()
             if row is not None:
                 return PutResult.ACCEPTED
@@ -437,7 +462,7 @@ class PgEventLog(_Base):
     """The milestone engine's log. A row the receiver already stored counts as new until the engine has seen it (`engine_seen`)."""
 
     def append(self, event: Mapping[str, Any], received_at: datetime) -> bool:
-        stmt = pg_insert(m.Event).values(instance_id=event["instance_id"], epoch=event["epoch"], seq=event["seq"], event=dict(event),
+        stmt = pg_insert(m.Event).values(instance_id=event["instance_id"], epoch=event["epoch"], seq=event["seq"], event=_stored(event),
                                          received_at=received_at, engine_seen=True)
         stmt = stmt.on_conflict_do_update(index_elements=["instance_id", "epoch", "seq"], set_={"engine_seen": True},
                                           where=m.Event.engine_seen.is_(False))

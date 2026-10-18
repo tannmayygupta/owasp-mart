@@ -23,7 +23,11 @@ down_revision = "0007"
 branch_labels = None
 depends_on = None
 
-READ_WRITE = ("attempts", "instances", "instance_epochs", "milestones", "held_captures", "activity_buckets", "events", "evidence")
+# Least privilege (review finding): what the code does to each table, and no more.
+READ_WRITE = ("instances", "milestones", "held_captures", "activity_buckets")  # rows are added, changed and purged
+NO_DELETE = ("attempts",)  # changed (compare-and-set on the version) but never deleted: the attempt row stays after a purge
+INSERT_DELETE = ("instance_epochs", "evidence")  # added and purged, never changed (sealed rows cannot be rewritten)
+EVENTS_UPDATE = "UPDATE (digest, engine_seen) ON events"  # an event row is only ever stamped with its digest and the engine's mark
 APPEND_ONLY = ("hint_unlocks", "flag_submissions", "integrity_flags", "attempt_events", "bot_visits")  # purged with an attempt's data
 RECORD_ONLY = ("review_audit", "security_events")  # never changed, never deleted
 SEQUENCED = ("events", "review_audit", "integrity_flags", "flag_submissions", "attempt_events", "bot_visits", "security_events")
@@ -229,6 +233,9 @@ def upgrade() -> None:
             RAISE EXCEPTION 'role {role} does not exist: see migration 0001';
           END IF;
           EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON {", ".join(READ_WRITE)} TO {role}';
+          EXECUTE 'GRANT SELECT, INSERT, UPDATE ON {", ".join(NO_DELETE)} TO {role}';
+          EXECUTE 'GRANT SELECT, INSERT, DELETE ON {", ".join(INSERT_DELETE)}, events TO {role}';
+          EXECUTE 'GRANT {EVENTS_UPDATE} TO {role}';
           EXECUTE 'GRANT SELECT, INSERT, DELETE ON {", ".join(APPEND_ONLY)} TO {role}';
           EXECUTE 'GRANT SELECT, INSERT ON {", ".join(RECORD_ONLY)} TO {role}';
           EXECUTE 'GRANT UPDATE (status, decided_at, decision_note, decided_by) ON integrity_flags TO {role}';
