@@ -69,7 +69,7 @@ export function demoTemplate(example) {
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
   const o = { cmd, dryRun: false };
-  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--dry-run]' };
+  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--dry-run]' };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--dry-run') o.dryRun = true;
@@ -267,6 +267,17 @@ sudo docker ps --format '{{.Names}} {{.Status}}' | sort
   log('PASS platform stack started on vm-p');
 }
 
+/** The certificate renewal hook on both running hosts (cloud-init is not re-run on a host that exists): the script that restarts this host's Caddy when its certificate files changed, and the service unit that calls it. */
+function hooks(H) {
+  for (const [label, h] of [['vm-p', H.p], ['vm-i', H.i]]) {
+    log(`hooks on ${label}`);
+    stage(h.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-reload-caddy.sh'), name: 'vulnmart-reload-caddy.sh' }], '/usr/local/sbin', 'root:root', '755', '755');
+    stage(h.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-certs.service'), name: 'vulnmart-certs.service' }], '/etc/systemd/system', 'root:root', '644', '755');
+    sshScript(h.pub, 'hooks.sh', 'set -eu\nsudo systemctl daemon-reload\nsudo /usr/local/sbin/vulnmart-reload-caddy.sh\nsudo systemctl cat vulnmart-certs.service | grep ExecStartPost\n');
+  }
+  log('PASS the renewal hook is installed on both hosts');
+}
+
 function status(H) {
   for (const w of ['i', 'p']) {
     log(`=== vm-${w}`);
@@ -287,6 +298,7 @@ export function main(argv = process.argv.slice(2)) {
     else if (o.cmd === 'lab') lab(o, H);
     else if (o.cmd === 'platform') platform(o, H);
     else if (o.cmd === 'status') status(H);
+    else if (o.cmd === 'hooks') hooks(H);
     else if (o.cmd === 'down-lab') must(ssh(H.i.pub, 'cd /opt/vulnmart/lab/repo && sudo docker compose -f infra/compose/compose.yaml -f infra/compose/lab.reports.yaml --profile lab down'), 'down lab');
     else if (o.cmd === 'down-platform') must(ssh(H.p.pub, 'cd /opt/vulnmart/platform && sudo docker compose -f compose.yaml --env-file .env down'), 'down platform');
     return 0;

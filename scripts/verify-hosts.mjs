@@ -29,6 +29,7 @@ export const BASELINE_FILES = [
   { local: 'infra/hosts/vulnmart-keepalive.service', remote: '/etc/systemd/system/vulnmart-keepalive.service' },
   { local: 'infra/hosts/vulnmart-certs.sh', remote: '/usr/local/sbin/vulnmart-certs.sh' },
   { local: 'infra/hosts/vulnmart-certs.service', remote: '/etc/systemd/system/vulnmart-certs.service' },
+  { local: 'infra/hosts/vulnmart-reload-caddy.sh', remote: '/usr/local/sbin/vulnmart-reload-caddy.sh' },
   { local: 'infra/hosts/vulnmart-certs.timer', remote: '/etc/systemd/system/vulnmart-certs.timer' },
   { local: 'infra/hosts/lego.pin.json', remote: '/etc/vulnmart/lego.pin.json' },
   { local: 'infra/hosts/vulnmart-install-lego.sh', remote: '/usr/local/sbin/vulnmart-install-lego.sh' },
