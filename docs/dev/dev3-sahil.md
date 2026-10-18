@@ -284,7 +284,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The proof of "attack happened, zero events recorded" comes from the shop's own events and the exploit test passes and fails as required.
   - Handoffs: H-53 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-28. C10 Server-Side Request Forgery (seller image import)**
+- [x] **T-28. C10 Server-Side Request Forgery (seller image import)**
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C10 with a seller image import that can reach only the fake metadata service.

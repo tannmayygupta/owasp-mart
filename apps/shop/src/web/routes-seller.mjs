@@ -7,6 +7,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../domain/shop-s
 import * as seller from '../domain/seller-service.mjs';
 import * as money from '../domain/money-service.mjs';
 import { getSellerOrderByNo } from '../challenges/c01-cross-store-order.mjs';
+import { importImageFromUrl } from '../challenges/c10-ssrf-import.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -44,6 +45,18 @@ export function registerSellerRoutes(app, db, { emit = () => {}, challenges = {}
     res.redirect('/seller');
   }));
   app.post('/seller/refunds/:id/reject', SELLER, h((req, res) => { money.rejectRefund(db, req.user, req.params.id); res.redirect('/seller'); }));
+
+  // C10 (SSRF). The product editor's "Import image from URL". The URL screening
+  // (string blocklist vs resolve-and-check) is in the challenge module.
+  app.post('/seller/import-image', SELLER, async (req, res, next) => {
+    try {
+      const out = await importImageFromUrl(req.body?.url, { challenges, emit });
+      res.json(out);
+    } catch (e) {
+      if (e instanceof ValidationError) return res.status(400).json({ error: e.message });
+      next(e);
+    }
+  });
 
   // C01 (Broken Access Control). Seller order detail by order number, as JSON.
   // The fix (default build) scopes the lookup to the caller's store; the
