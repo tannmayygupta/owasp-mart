@@ -1,0 +1,17 @@
+$ node scripts/live-smoke.mjs   (SMOKE_BASE_URL = a local test server)
+STATUS  STEP       DETAIL
+------  ---------  ----------------------------------------
+PASS    site-root  HTTP 200, headers ok
+PASS    health     HTTP 200, headers ok
+
+live-smoke: PASS (read-only GET checks)
+exit 0
+
+$ same, with SMOKE_HEALTH_PATH=/bad (the answer carries x-powered-by)
+STATUS  STEP       DETAIL
+------  ---------  ----------------------------------------
+PASS    site-root  HTTP 200, headers ok
+FAIL    health     forbidden header x-powered-by is present
+
+live-smoke: FAIL
+exit 1

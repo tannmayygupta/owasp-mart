@@ -248,6 +248,21 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  services/bot: {}
+
+  services/import-service: {}
+
+  services/mock-services: {}
+
+  services/sidecar:
+    dependencies:
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
+
 packages:
 
   '@babel/code-frame@7.29.7':

@@ -1,0 +1,19 @@
+VulnMart load check (node scripts/load-check.mjs): LAPTOP numbers on Docker Desktop, not the VM-I concurrency target
+Date: 2026-10-17
+Machine: 12 logical CPUs (AMD Ryzen 5 5600H with Radeon Graphics), 15.3 GiB RAM; Docker engine sees 12 CPUs and 7.8 GiB
+Instances started at once: 6 (stub instance image, real orchestrator, Docker backend, reduced two-component template)
+Target for every instance to be ready: 60 s (placeholder, OI-25 style, not a decision)
+
+Instance  Seconds to ready
+       1  8.1
+       2  8.1
+       3  9.1
+       4  8.1
+       5  15.7
+       6  15.6
+
+Ready: 6 of 6   p50: 8.1 s   max: 15.7 s   min: 8.1 s
+Memory of the instance containers (docker stats, no-stream): 12 containers, total 243.2 MiB, average 20.3 MiB, largest 33.3 MiB
+After destroy: containers 0, networks 0, volumes 0
+
+Result: PASS

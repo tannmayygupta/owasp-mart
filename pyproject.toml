@@ -11,7 +11,7 @@ dependencies = []
 package = false
 
 [tool.uv.workspace]
-members = ["apps/api", "apps/orchestrator", "packages/py-models"]
+members = ["apps/api", "apps/orchestrator", "packages/py-attempts", "packages/py-models"]
 
 # Plain `pytest` from the repository root runs the platform API tests only (the BMAD skills tests are not ours).
 [tool.pytest.ini_options]

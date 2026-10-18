@@ -160,43 +160,45 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: A reset link works once and expires, weak passwords are refused and a user can change their details.
   - Handoffs: H-127, H-130, H-132 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-15. Multi-factor login**
+- [x] **P-15. Multi-factor login**  (API level: no enrolment or sign-in page, those are dashboards work; OI-13 stays open)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: not planned yet; created when you incept `epic-accounts-and-sessions` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `3.5` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Multi-factor login as the requirement specifies.
   - Covers: FR-ACC-07
   - Waits on: P-12.
   - Done when: MFA enrolment and login work in tests, and recovery is covered.
-  - Handoffs: H-130, H-134 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-130, H-134 (answered here), H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-16. Consent screen, consent record, minimum data and 18-and-over**
+- [x] **P-16. Consent screen, consent record, minimum data and 18-and-over**  (API level: the notice text and the three routes; no consent page, and no attempt in state consent exists until P-21; OI-37 answered, wording is a draft until legal review OI-33)
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: not planned yet; created when you incept `epic-privacy-audit-and-keys` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `4.1` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Consent screen, stored consent record, collect only the minimum data, 18-and-over check.
   - Covers: FR-PRV-01, 02, 03, 13
   - Waits on: P-12. Open in part: OI-37.
   - Done when: A new user cannot proceed without consent and the consent record is stored.
+  - Handoffs: H-136 (see docs/dev/HANDOFFS.md; read them when you plan P-21, P-24 and P-25)
 
 ## Sprint 3 (22 Oct to 28 Oct 2026)
 
 Goal: Audit and keys, companies, assessments and invites, live updates, retention.
 
-- [ ] **P-17. Audit log and key service**
+- [x] **P-17. Audit log and key service**  (the mechanism and the entries that exist today: logins, failed logins, logouts, roles, admins, second factor, consent; every other sensitive action writes its entry in the story that creates it; OI-28 answered, anchor schedule and purge are P-24, snapshot and anchor shipping are operator steps)
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: not planned yet; created when you incept `epic-privacy-audit-and-keys` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `4.2` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Append-only audit log, encryption at rest and the key service with a KeyPort.
   - Covers: FR-PRV-10, 12
   - Waits on: P-12. Open in part: OI-28. Tanmay's flag and evidence tasks use your KeyPort.
   - Done when: Every sensitive action writes an audit entry and the key service encrypts and decrypts in a test.
-  - Handoffs: H-08, H-09, H-10, H-21, H-132 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-08, H-09, H-10, H-21, H-132, H-135 (answered here), H-137 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-18. Recruiter signup and company approval**
+- [x] **P-18. Recruiter signup and company approval**  (service level: IF-1 has no recruiter or admin route, they are story 5.3 and a contract change; OI-10 and OI-11 answered: free webmail allowed, re-apply any time)
   - Epic: `epic-companies-and-approval`
-  - BMAD story: not planned yet; created when you incept `epic-companies-and-approval` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `5.1` in `epic-companies-and-approval` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Recruiter signup, the company state machine from signup to active, rejected and suspended, and the approve and reject API.
   - Covers: FR-ORG-01, 02, 04
   - Waits on: P-13, P-17. Open: free-email recruiters (OI-10).
   - Done when: A company moves from signup to approved or rejected with reasons and audit entries.
+  - Handoffs: H-138 (see docs/dev/HANDOFFS.md; read them when you plan P-19, P-20 and P-28)
 
 - [ ] **P-19. Company members, admin controls, data scoping, terms and invite caps**
   - Epic: `epic-companies-and-approval`
@@ -221,7 +223,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Covers: FR-ASM-04, 05, 06
   - Waits on: P-16, P-20.
   - Done when: Accept, re-invite and bulk work in tests and the invite purge job can see expired invites.
-  - Handoffs: H-133 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-133, H-136 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-22. Live updates hub: SSE, heartbeat, snapshot with polling fallback, fan-out**
   - Epic: `epic-live-updates`
@@ -266,7 +268,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Covers: FR-DSH-01, 04, FR-HNT-01, 02
   - Waits on: P-22, Tanmay's scoring (L-23) and the catalogue (T-30). Open in part: OI-15.
   - Done when: Both dashboards show live data on the deployed site and candidate hints are off by default.
-  - Handoffs: H-134 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-134, H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-27. Recruiter dashboard, live monitor and hints used**
   - Epic: `epic-dashboards-and-exports`

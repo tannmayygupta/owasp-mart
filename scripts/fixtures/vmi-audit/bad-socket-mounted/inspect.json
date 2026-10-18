@@ -1,0 +1,80 @@
+[
+  {
+    "Name": "/vulnmart-docker-proxy",
+    "HostConfig": {
+      "Privileged": false,
+      "NetworkMode": "bridge",
+      "PidMode": "",
+      "CapDrop": [
+        "ALL"
+      ],
+      "SecurityOpt": [
+        "no-new-privileges:true"
+      ]
+    },
+    "Config": {
+      "Labels": {}
+    },
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/var/run/docker.sock",
+        "Destination": "/var/run/docker.sock",
+        "RW": false
+      }
+    ]
+  },
+  {
+    "Name": "/vm-i-abc123-shop",
+    "HostConfig": {
+      "Privileged": false,
+      "NetworkMode": "bridge",
+      "PidMode": "",
+      "CapDrop": [
+        "ALL"
+      ],
+      "SecurityOpt": [
+        "no-new-privileges:true"
+      ]
+    },
+    "Config": {
+      "Labels": {
+        "vm.instance": "abc123"
+      }
+    },
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Source": "/var/lib/docker/volumes/x/_data",
+        "Destination": "/data",
+        "RW": true
+      },
+      {
+        "Type": "bind",
+        "Source": "/var/run/docker.sock",
+        "Destination": "/var/run/docker.sock",
+        "RW": true
+      }
+    ]
+  },
+  {
+    "Name": "/vm-i-abc123-sidecar",
+    "HostConfig": {
+      "Privileged": false,
+      "NetworkMode": "bridge",
+      "PidMode": "",
+      "CapDrop": [
+        "ALL"
+      ],
+      "SecurityOpt": [
+        "no-new-privileges:true"
+      ]
+    },
+    "Config": {
+      "Labels": {
+        "vm.instance": "abc123"
+      }
+    },
+    "Mounts": []
+  }
+]

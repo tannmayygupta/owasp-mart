@@ -68,6 +68,11 @@ class Backend(Protocol):
     def remove_container(self, name: str) -> None: ...
     def remove_network(self, name: str) -> None: ...
     def remove_volume(self, name: str) -> None: ...
+    def connect_edge(self, network: str) -> None:
+        """Attach the configured edge container to the network (no alias: the edge is addressed by its container name)."""
+    def disconnect_edge(self, network: str) -> None:
+        """Detach the configured edge container from the network; nothing happens when it is not attached (a network with an endpoint
+        cannot be removed, so the engine calls this before `remove_network`)."""
 
 
 # ---------------------------------------------------------------- fake
@@ -94,6 +99,8 @@ class FakeBackend:
     healths: dict[str, str | None] = dc_field(default_factory=dict)
     _started: set[str] = dc_field(default_factory=set)
     _polls: dict[str, int] = dc_field(default_factory=dict)
+    edge_container: str | None = None  # set by the engine when an edge is configured
+    edge_attached: set[str] = dc_field(default_factory=set)  # the networks the fake edge is connected to
 
     def _call(self, op: str, name: str) -> None:
         self.calls.append((op, name))
@@ -184,11 +191,23 @@ class FakeBackend:
 
     def remove_network(self, name: str) -> None:
         self._call("remove_network", name)
+        if name in self.edge_attached:  # like Docker: a network with an endpoint cannot be removed
+            raise BackendError("fake: network has an active endpoint")
         self.networks.pop(name, None)
 
     def remove_volume(self, name: str) -> None:
         self._call("remove_volume", name)
         self.volumes.pop(name, None)
+
+    def connect_edge(self, network: str) -> None:
+        self._call("connect_edge", network)
+        if network not in self.networks:
+            raise BackendError("fake: no such network")
+        self.edge_attached.add(network)
+
+    def disconnect_edge(self, network: str) -> None:
+        self._call("disconnect_edge", network)
+        self.edge_attached.discard(network)
 
 
 # ---------------------------------------------------------------- test backend of the service
@@ -226,7 +245,7 @@ def _locked(name: str):
 
 
 for _name in ("create_network", "create_volume", "create_container", "start", "start_with_stdin", "wait_exit", "find", "scan",
-              "remove_container", "remove_network", "remove_volume"):
+              "remove_container", "remove_network", "remove_volume", "connect_edge", "disconnect_edge"):
     setattr(ServiceFakeBackend, _name, _locked(_name))
 del _name
 
@@ -235,9 +254,10 @@ del _name
 class SdkBackend:
     """Docker SDK backend. Images are used as given (no pull): the release manifest pins them by digest."""
 
-    def __init__(self, client=None, *, base_url: str | None = None) -> None:
+    def __init__(self, client=None, *, base_url: str | None = None, edge_container: str | None = None) -> None:
         import docker
 
+        self.edge_container = edge_container  # the one container connect_edge may attach (the engine sets it from --edge-container)
         self._docker = docker
         self.client = client or (docker.DockerClient(base_url=base_url) if base_url else docker.from_env())
         self.api = self.client.api
@@ -360,3 +380,26 @@ class SdkBackend:
     def remove_volume(self, name: str) -> None:
         with contextlib.suppress(self._docker.errors.NotFound):
             self._wrap(self.api.remove_volume, name, force=True)
+
+    def _edge(self) -> str:
+        if not self.edge_container:
+            raise BackendError("no edge container is configured")
+        return self.edge_container
+
+    def connect_edge(self, network: str) -> None:
+        # Docker API POST /networks/{network}/connect, no aliases. The network is given by name (`vm-...`), which the socket proxy checks.
+        try:
+            self._wrap(self.api.connect_container_to_network, self._edge(), network)
+        except self._docker.errors.NotFound:
+            raise BackendError("the edge container or the network does not exist") from None
+
+    def disconnect_edge(self, network: str) -> None:
+        edge = self._edge()
+        try:
+            info = self._wrap(self.api.inspect_network, network)
+        except self._docker.errors.NotFound:
+            return  # the network is gone already
+        if not any((c or {}).get("Name") == edge for c in (info.get("Containers") or {}).values()):
+            return  # not attached: nothing to do (a disconnect of an unattached container is an error in Docker)
+        with contextlib.suppress(self._docker.errors.NotFound):
+            self._wrap(self.api.disconnect_container_from_network, edge, network, force=True)

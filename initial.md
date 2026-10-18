@@ -642,8 +642,127 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 - **Decision (developer's delegation, 2026-10-16; ADR 0039 Accepted, confirmed 2026-10-17):** the engine runs at most `max_parallel_builds` builds together (setting, default 4, 1 to 64); the others wait in `requested` and are never failed by the cap. A failed start (`INST-START-FAILED`, `INST-HEALTH-TIMEOUT`) is tried again `start_retries` times (setting, default 1, 0 to 2) inside the build worker with the same plan and secrets: the try is swept, reported `failed`, then `provisioning` again; `INST-INJECT-FAILED`, a destroy and an unclean sweep are never retried. Quotas live above `InstanceHost`, in the lab `InstancePort` layer: the fake `QuotaPort` has per-user 1, per-company 5 and global 20 (provisional numbers, all settings of the fake), any limit reached refuses with `INST-QUOTA-REACHED` before anything is created, only live instances count (not `destroyed` or `failed`), a repeat of an accepted request is never refused. No warm pool for the first release; revisit when the vm-i cold start of the shop template is above 30 s at the 95th percentile or any start is refused for capacity (`ready_after_s.p95` and `busy` of `measure.py --concurrent N`). A `failed` instance frees its quota place although a retry may bring it back (the real port should count a failed instance with a pending retry, H-126). No contract file changed.
 - **Open:** the vm-i numbers (runbook `docs/runbooks/measure-instances.md`, the `--concurrent` step, the developer's); the real quota numbers and the platform's `QuotaPort` (OI-21, handoff H-126 for Akshay); the warm-pool triggers are not measured.
 
+### D-60 - Instance access gate: ADR 0004 Option 1 with refinements (edge story 1, ADR 0004 updated, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED, to be confirmed by the developer):** a one-time signed ticket in a URL is exchanged for the host-only cookie `__Host-vm_gate`, checked by an own gate service. The ticket lives at most 60 s and is single use; the cookie carries the instance, an owner hash (derived by the platform, never an account id) and the access epoch; the orchestrator pushes access state (open, frozen, closed) and epoch. The gate fails closed: an unknown instance behaves as closed. Two keys (current and previous) are accepted for rotation. Built as `apps/edge/` and the contract `contracts/edge/gate-ticket.md` (id `GATE`, 0.1.0).
+- **Open:** the developer's confirmation; the gate restart loses the used-ticket set and the state (everything closed until the orchestrator syncs, a replay inside 60 s is the accepted residual); the contract at 0.1.0 versus tag precondition 5; not live.
+
+### D-61 - One internal network per instance with the edge attached; two-network split deferred (planned, edge story 3 not built, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY, nothing built):** the two-network design of ADR 0005 is deferred. The edge is attached to the single network of each instance. Residual risk written down: the shop of an instance can reach the edge's player and relay listeners on its own network; it has no cookie and no event key, and the ingest refuses unsigned events.
+- **Open:** the story that attaches the edge (orchestrator `connect_edge`) is not built; the developer's confirmation.
+
+### D-62 - Edge is stock Caddy in front of an own gate service (edge story 2, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** Caddy does TLS (certificate files) and host matching only and adds no security header to shop responses; the own gate service is the single decision point, because Caddy has no ticket or epoch logic and `forward_auth` would add a second hop while the cookie exchange needs a redirect. The gate proxies to the unique container name `vm-<id lower>-e<epoch>-sidecar:8080` (the alias `sidecar` is ambiguous across networks). Listeners are separated by bind alias (`edge-gate-admin` on labs-core only, `edge-gate-player` on edge-public only; only the relay is on every leg).
+- **Open:** `edge-caddy` runs as root with `cap_drop ALL` plus `NET_BIND_SERVICE` (the lego key is root-only); the orchestrator must keep the aliases; local proof only.
+
+### D-63 - Gate push API, secrets in files, contract location (edge story 1, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** the orchestrator pushes state with `PUT` and `DELETE /internal/v1/gate/instances/{id}` and `PUT /internal/v1/gate/sync`, checked by the header `X-VM-Gate-Admin` against a secret read from a file (at least 16 characters, constant time). Bodies are validated strictly; the access epoch only grows and an equal epoch with another value is 409, like IF-5. Contract `contracts/edge/gate-ticket.md`, registered as `GATE`. Planned in a later story: push before record, and the orchestrator is the only writer of gate state.
+- **Open:** the gate key file format (at least 64 hex characters, handoff H-337); Akshay as consumer of `GATE` (H-339); the admin JSON parser does not detect duplicate member names.
+
+### D-64 - The event relay holds no keys (edge story 2, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** the relay on port 8081 accepts only `POST /internal/v1/events`, one JSON object of at most 16 KiB with content type `application/json`, a per-peer limit (120 per 10 s), a 10 s timeout, and forwards the same bytes and the same `X-VM-Signature` header to the ingest URL. It checks the signature header shape only; the ingest verifies signatures.
+- **Open:** the rate limit default is a guess; `http` ingest URLs only (private link); the real ingest verifier is not built.
+
+### D-65 - The access epoch is the only session-binding mechanism (planned, edge story 5 not built, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY):** the platform raises the access epoch on every open and every login of the account; the gate refuses any ticket or cookie with an older epoch; the gate never learns about platform sessions or accounts.
+- **Open:** nothing of it is built on the platform side (handoff H-336); not proved end to end.
+
+### D-66 - Docker proxy rules for network connect and disconnect (planned, edge story 3 not built, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY):** the socket proxy gets rules for connect and disconnect; the request body cannot be restricted by the proxy.
+- **Open:** not built; the developer's confirmation.
+
+### D-67 - Local proof boundary of the edge (edge story 2, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** local proof means loopback plain HTTP, a throwaway self-signed certificate and Docker Desktop. The wildcard certificate, DuckDNS resolution (S-16), vm-i firewall behaviour, the private link and a real browser are runbook steps and stay open until the developer runs them.
+- **Open:** the vm-i runbook of the epic is not written.
+
+### D-68 - Strict hostname rule and unique-name routing (edge stories 1 and 2, ADR 0040)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** only `^i-[a-z2-7]{16}\.<zone>$` is accepted, already lower case, with no port, no trailing dot, no userinfo; only the `Host` header counts, never `X-Forwarded-Host`. Anything else is refused before any lookup with the same answer as an unknown instance. Caddy matches the same pattern and answers 404 for everything else.
+- **Open:** the plan said "after lower-casing", the build refuses upper case (to confirm).
+
+### D-70 - Sidecar form: Node program, small Go helper for Coraza only (spike S-7, story 6.2, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** the product sidecar is a Node program for everything the contracts need, because its behaviour already exists and is tested in the stub and Node 24 is the runtime of the rest of the instance; a small Go helper is for Coraza only. A Caddy plugin is rejected (maintenance risk R-6; matching, signing and `seq` would still need a Go module); a full Go rewrite is rejected (about two days of work, no Go toolchain on the dev PC).
+- **Open:** the Coraza helper and classifier accuracy (S-6) are not built.
+
+### D-71 - Where platform-side detection code lives (story 6.1, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** no new package; flag code in `apps/api/src/vulnmart/flags/`, milestone, evidence and activity code in `apps/api/src/vulnmart/ingest/` (both are stream L's by docstring and by `contracts/db/table-owners.yaml`). Pure functions and Protocols with no database import.
+- **Open:** none known.
+
+### D-72 - Flag rules (story 6.1, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** format unchanged (`VM{` plus 24 Base32 characters plus `}`); two decoys per challenge by default; digests of real flags only in IF-5; classification order correct, decoy, stale epoch, other instance, wrong; verification is always a recompute and the key never enters an instance.
+- **Open:** decoy placement has no field in IF-5 or the catalogue (handoff H-331).
+
+### D-73 - Flag matching in responses (story 6.2, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** the sidecar scans a bounded copy (1 MiB) after decoding gzip, deflate, brotli, JSON escapes, HTML entities and percent encoding, looks up SHA-256 digests, reports once per candidate and sends only `candidate_sha256`. What it cannot see (base64, hex, reversed or split strings, responses above the cap, undecodable encodings) is covered by the paste channel.
+- **Open:** the S-9 table is local only; a run with a real shop on vm-i is T-32.
+
+### D-74 - Milestone rules are data (story 6.3, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** one JSON rules file (`apps/api/src/vulnmart/ingest/milestone_rules.json`, 33 rules, five kinds plus `any`) validated against the event schema in tests; the catalogue `signal` text is never read as a rule (a rule id may be added by Sahil, T-30). Best milestone once per attempt and challenge, kept across resets; bot and internal events never count; M3 only from a platform-recomputed flag or a correct paste; C09 M2 uses a negative window on the platform arrival time with a 30 s grace.
+- **Open:** H-43 (catalogue mapping) is not settled; pending C09 windows are in engine memory; held captures have no reviewer (OI-38).
+
+### D-75 - C03 has one flag key (story 6.3, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED, needs the developer's confirmation):** IF-6 allows one flag per challenge key, so the real C03 flag is the part A flag (union injection); part B (stored XSS) gives M1 and M2; the spec's "both parts for M3" waits for a second key, an IF-6 change.
+- **Open:** the whole decision; C03 part A M2 has no event today.
+
+### D-76 - Who the player is at the sidecar (story 6.2, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** everything on the player port is the owning player (the gate admits only the owner): `session_kind` `player`, `user_id` null; the platform maps the instance to the attempt and user. The bot and the mock services reach the shop on the instance network and never use the player port.
+- **Open:** how the bot reaches the shop (handoff H-332); if bot traffic arrived on the player port it would be classed as a player.
+
+### D-77 - Evidence sealed through KeyPort (planned, story not built, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY):** the sidecar builds the capture; the platform seals it per attempt with `KeyPort.encrypt` (AAD binds instance, epoch, challenge and request) only when the flag was credited or held; everything else is dropped; stores are Protocols with fakes until Akshay's tables exist.
+- **Open:** not built.
+
+### D-78 - Local versus live proof labels (planned, story not built, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED, PLANNED ONLY):** everything measured on Docker Desktop is labelled local; live runs are runbook steps for the developer; per-challenge active time is shown as estimated and assessment-level only until classifier accuracy (S-6) is verified and the developer accepts it.
+- **Open:** S-6 is not run.
+
+### D-79 - Fake KeyPort only through the composition root (story 6.1, ADR 0042)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** until Akshay's real KeyPort lands (P-17) the composition root passes `FakeKeyPort`; library code takes the Protocol only; a test fails if library code imports the fake.
+- **Open:** the real KeyPort (handoff H-330).
+
+### D-80 - The assessment clock starts when the instance is ready (OI-22, story 7.1, ADR 0041)
+- **Decision (CONFIRMED by the developer 2026-10-17, answers OI-22):** the server stamps `ready_at`; the attempt moves `ready` to `running` at that moment; `started_at` = `ready_at`; `deadline_at` = `started_at` plus the time limit. The candidate's Start button only asks for the instance and has no effect on the clock, so cold start never counts (FR-TIM-05). If the instance never becomes ready the clock never starts.
+- **Open:** the start route stays pending (H-87, H-327): with this decision the Start button has no effect on the clock, so the route may be removed.
+
+### D-81 - Attempt rules and engine are one dependency-free package (story 7.1, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** `packages/py-attempts` (`vulnmart-attempts`, module `vulnmart_attempts`, Python 3.14, standard library only). Akshay's API imports it and supplies the database store; thin port adapters will live in `apps/api/src/vulnmart/ports/`.
+- **Open:** the API dependency and Dockerfile lines (handoff H-328); the adapters are not built.
+
+### D-82 - Absolute UTC instants, grace and warnings (story 7.1, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** all timing is absolute UTC from an injected clock; the deadline is stored once; browser clock and connection are never inputs. Grace 60 s after the deadline for submissions only; warnings at 15 and 5 minutes left; all numbers are placeholders held in `Rules` (OI-25).
+- **Open:** the numbers are not confirmed (OI-25).
+
+### D-83 - Expiry, freeze and destroy sequence (story 7.2, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** `running` to `expired` to `submitted` in one tick with `submitted_at` = `deadline_at`, then access `frozen`, `frozen_until` = `submitted_at` plus 15 minutes, then destroy once it has passed; after a scheduler outage freeze and destroy happen in the same tick; a manual submit uses `submitted_at` = now. The freeze is a column and the access value, not a state.
+- **Open:** never run against the real orchestrator or the gate.
+
+### D-84 - The engine is the only writer of attempt state (story 7.2, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** every step is idempotent and uses compare-and-set on a version; a failed `freeze` or `destroy` leaves the record unchanged for the next tick; destroy uses a 60 s claim so two engines make one call; the scheduler runs `tick()` every 15 s (placeholder). One attempt per `(user_id, template_id)`.
+- **Open:** the plan said one attempt per invite and consent (to confirm); the SQL store and the scheduler are Akshay's (H-328).
+
+### D-85 - The score is a pure function of three facts (story 7.3, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** per challenge the best milestone, the hint levels unlocked and a held flag, plus the weight table. Time, wrong or decoy submissions, technique labels and other players are not parameters.
+- **Open:** none known.
+
+### D-86 - Exact half-up rounding, cumulative hint cost, floor per challenge (story 7.3, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** integer arithmetic, `shown = (2000 x S + T) // (2 x T)`; hint cost is the sum of the levels unlocked (10, 20, 30 percent), floored at zero per challenge; weights come from the catalogue table (3 Easy x 60, 6 Medium x 90, 2 Hard x 120, C03 as Medium, sum 960; shares 20, 40, 100).
+- **Open:** all numbers are placeholders; the percentages live in `ScoringRules`, a template override is later.
+
+### D-87 - Held captures and learner mode (story 7.3, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** a held capture is computed as if the held milestone had not been reached (the best non-held milestone), flagged `held`, never zeroed; accepting it changes the fact and the score is recomputed from facts every time. Learner mode shows stars, tick and badge, never a hint penalty.
+- **Open:** none for the reviewer: decided in D-92 (OI-38).
+
+### D-88 - `reported` only through `mark_reported` (story 7.2, ADR 0041)
+- **Decision (developer's delegation, 2026-10-17; PROPOSED):** `submitted` becomes `reported` only after the final score snapshot and only when no held capture is open (FR-SCR-10).
+- **Open:** the caller must supply `held_open`; no live wiring.
+
 ---
 
+### D-92 - Reviewer of a held capture (OI-38, story L-27)
+- **Decision (CONFIRMED by the developer 2026-10-17, answers OI-38):** the reviewer is the recruiter of the organisation that owns the assessment, and an organisation admin may review as well; nobody outside the organisation. The decision (accept or reject) is audited with the reviewer id and a note, and it is final. Nothing is auto-zeroed: a rejected capture stays out of the score. After 7 days an open held capture raises a reminder event (`held_review_overdue`, ids only) and the attempt stays `submitted` (D-88). `may_review` is supplied by the platform (RBAC is Akshay's); the library default allows `recruiter` or `admin` of the owning organisation.
+- **Built:** `packages/py-attempts/src/vulnmart_attempts/review.py`, wired in the lab runtime (`decide_held`). The idle and too-fast thresholds are placeholders (OI-25).
+
+### D-93 - Cohort view and ranking aid (OI-26, story L-28)
+- **Decision (CONFIRMED by the developer 2026-10-17, answers OI-26):** a private cohort view, scoped to one organisation and one assessment, off unless the assessment turns it on (`cohort_board`, default false). The ranking aid uses the tie-break order score, more full captures, lower hint cost, lower estimated active time, earlier last capture; it is labelled "ranking aid, the recruiter decides" and never ranks anyone out. No global or public leaderboard exists anywhere.
+- **Built:** `packages/py-attempts/src/vulnmart_attempts/ranking.py`, `cohort.py`. Open: the platform port and recruiter screen (Akshay, H-346).
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.

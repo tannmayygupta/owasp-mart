@@ -102,7 +102,7 @@ const parse = (r) => { try { return JSON.parse(r.stdout); } catch { return null;
 
 /** Runs the whole probe. `docker(args)` is injectable. Returns { exitCode, report }. */
 export const abort = { flag: false }; // set by SIGINT/SIGTERM (main) or when a docker call was ended by a signal
-export function runProbe({ docker: rawDocker = cliDocker, image, timeoutMs = 3000, log = () => {}, nonce = randomBytes(4).toString('hex') } = {}) {
+export function runProbe({ docker: rawDocker = cliDocker, image, timeoutMs = 3000, log = () => {}, nonce = randomBytes(4).toString('hex'), probeSubnet, peerSubnet, runtime } = {}) {
   let cleaning = false;
   const docker = (args, o) => {
     if (abort.flag && !cleaning) throw new Error('aborted by a signal');
@@ -123,12 +123,14 @@ export function runProbe({ docker: rawDocker = cliDocker, image, timeoutMs = 300
   try {
     const stale = removeLabelled(docker); // leftovers of a killed run
     if (stale) log(`note: ${stale} labelled object(s) could not be removed before the run`);
-    for (const n of [netA, netB]) {
-      const r = docker(['network', 'create', '--internal', '--label', label, n]);
+    // Optional fixed subnets (S-3 variant, story 4.3): a subnet outside the sets the host rules cover shows what the internal network alone blocks, without touching a firewall rule.
+    for (const [n, subnet] of [[netA, probeSubnet], [netB, peerSubnet]]) {
+      const r = docker(['network', 'create', '--internal', ...(subnet ? ['--subnet', subnet] : []), '--label', label, n]);
       if (r.code !== 0) throw new Error(`network create failed: ${r.stderr.trim().split('\n').pop()}`);
     }
     const start = (name, net, js, extra) => {
-      const r = docker([...hardenedArgs(name, net, chosen, label, extra), '-e', js]);
+      // Optional container runtime (S-8, story 4.4): the same probe under another runtime, for example gVisor's runsc.
+      const r = docker([...hardenedArgs(name, net, chosen, label, [...(runtime ? ['--runtime', runtime] : []), ...extra]), '-e', js]);
       if (r.code !== 0) throw new Error(`container start failed (${name}): ${r.stderr.trim().split('\n').pop()}`);
     };
     // host.docker.internal does not resolve on Linux without this mapping; with it the target is meaningful there too.
@@ -176,7 +178,7 @@ export function runProbe({ docker: rawDocker = cliDocker, image, timeoutMs = 300
     if (!Array.isArray(answers) || answers.length !== all.length) throw new Error(`the probe program gave no complete answer (expected ${all.length} entries)`);
     const verdict = evaluate(targets, answers, { profileFailures });
     exitCode = verdict.ok ? 0 : 1;
-    report = { ok: verdict.ok, image: chosen, profile: { user: RUN_USER, internal: netInfo?.Internal === true, failures: profileFailures }, subnets: { probe: probeSubnets, peer: peerSubnets }, host_docker_internal: 'mapped with --add-host host.docker.internal:host-gateway', control: verdict.control, targets: verdict.rows.map(({ name, state, open }) => ({ name, state, open })), problems: verdict.problems };
+    report = { ok: verdict.ok, image: chosen, ...(runtime ? { runtime } : {}), profile: { user: RUN_USER, internal: netInfo?.Internal === true, failures: profileFailures }, subnets: { probe: probeSubnets, peer: peerSubnets, ...(probeSubnet || peerSubnet ? { custom: true } : {}) }, host_docker_internal: 'mapped with --add-host host.docker.internal:host-gateway', control: verdict.control, targets: verdict.rows.map(({ name, state, open }) => ({ name, state, open })), problems: verdict.problems };
   } catch (e) {
     report = { ok: false, error: e.message };
     exitCode = 1;
@@ -189,10 +191,32 @@ export function runProbe({ docker: rawDocker = cliDocker, image, timeoutMs = 300
   return { exitCode, report };
 }
 
+/** A strict IPv4 network: four octets 0-255, prefix 16 to 29, host bits zero (the value goes to docker network create --subnet). */
+export function validSubnet(s) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{2})$/.exec(String(s));
+  if (!m) return false;
+  const o = m.slice(1, 5).map(Number); const p = Number(m[5]);
+  if (o.some((x) => x > 255) || p < 16 || p > 29) return false;
+  const n = ((o[0] << 24) >>> 0) + (o[1] << 16) + (o[2] << 8) + o[3];
+  const mask = (0xffffffff << (32 - p)) >>> 0;
+  return (n & ~mask) >>> 0 === 0;
+}
+
 export function main(argv = process.argv.slice(2), { log = console.log, err = console.error, docker = cliDocker } = {}) {
-  let image; let timeoutMs = 3000; let out;
+  let image; let timeoutMs = 3000; let out; let probeSubnet; let peerSubnet; let runtime;
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--help' || argv[i] === '-h') { log('Usage: node scripts/isolation-probe.mjs [--image <image>] [--timeout-ms <n>] [--out <report.json>]'); return 0; }
+    if (argv[i] === '--help' || argv[i] === '-h') { log('Usage: node scripts/isolation-probe.mjs [--image <image>] [--timeout-ms <n>] [--out <report.json>] [--probe-subnet <cidr> --peer-subnet <cidr>] [--runtime <name>]'); return 0; }
+    if ((argv[i] === '--probe-subnet' || argv[i] === '--peer-subnet') && argv[i + 1]) {
+      const flag = argv[i]; const v = argv[++i];
+      if (!validSubnet(v)) { err(flag + ' must be an IPv4 network such as 172.31.200.0/24 (prefix 16 to 29, host bits zero)'); return 2; }
+      if (flag === '--probe-subnet') probeSubnet = v; else peerSubnet = v;
+      continue;
+    }
+    if (argv[i] === '--runtime' && argv[i + 1]) {
+      runtime = argv[++i];
+      if (!/^[a-z][a-z0-9-]{1,30}$/.test(runtime)) { err('--runtime must be a runtime name such as runsc (lower-case letters, digits and -)'); return 2; }
+      continue;
+    }
     if (argv[i] === '--image' && argv[i + 1]) {
       image = argv[++i];
       if (!/^[\w./:@-]+$/.test(image) || image.startsWith('-')) { err('--image must be an image name (letters, digits, . / : @ _ -) and must not start with "-"'); return 2; }
@@ -207,11 +231,12 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
     err(`Unknown argument: ${argv[i]}`);
     return 2;
   }
+  if (probeSubnet && peerSubnet && probeSubnet === peerSubnet) { err('--probe-subnet and --peer-subnet must differ'); return 2; }
   abort.flag = false;
   const onSignal = () => { abort.flag = true; };
   process.once('SIGINT', onSignal); process.once('SIGTERM', onSignal);
   let result;
-  try { result = runProbe({ docker, image, timeoutMs, log: err }); } finally { process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal); }
+  try { result = runProbe({ docker, image, timeoutMs, log: err, probeSubnet, peerSubnet, runtime }); } finally { process.off('SIGINT', onSignal); process.off('SIGTERM', onSignal); }
   const { exitCode, report } = result;
   if (exitCode === 2) { err(report.error); return 2; }
   const text = JSON.stringify(report, null, 2);

@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 import vulnmart.accounts.models  # noqa: F401
 from vulnmart.accounts import security
 from vulnmart.accounts.models import User, UserRole, UserSession
-from vulnmart.accounts.sessions import EmailNotVerified, InvalidCredentials, MfaUnavailable, SessionService
+from vulnmart.accounts.sessions import EmailNotVerified, InvalidCredentials, SessionService
 from vulnmart.kernel.db import Base
 from vulnmart.ports.fakes import FakeSettingsPort
 from vulnmart.ports.scope import Role
@@ -118,11 +118,12 @@ def test_an_unverified_address_is_told_so_only_after_the_password_was_right(serv
     assert rows(sessions) == []
 
 
-def test_an_admin_cannot_get_a_session_with_the_password_alone(service, sessions):
+def test_an_admin_with_only_the_password_gets_a_session_that_carries_no_admin_role(service, sessions):
     add_user(sessions, account_type="admin")
-    with pytest.raises(MfaUnavailable):
-        login(service)
-    assert rows(sessions) == [], "no session is created until the second factor exists (story P-15)"
+    result = login(service)
+    assert result.session.roles == frozenset() and result.session.mfa_verified is False and result.session.user.mfa_enabled is False
+    assert result.session.scope.is_admin is False, "an admin without a second factor reaches no admin function (FR-ACC-07)"
+    assert service.resolve(result.token).roles == frozenset(), "and it stays that way on every request"
 
 
 def test_an_old_password_hash_is_upgraded_at_login(service, sessions):

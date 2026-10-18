@@ -142,10 +142,12 @@ services:
     image: vulnmart-api:local
     container_name: vulnmart-migrate
     read_only: true
-    command: ["alembic", "-c", "/app/alembic.ini", "upgrade", "head"]
+    # Story P-17: the Alembic history of `vulnmart`, then the keystore database `vm_keystore` with its own role (idempotent, so it runs at every start).
+    command: ["python", "-m", "vulnmart.kernel.migrate"]
     environment:
       VULNMART_MIGRATE_DSN: postgresql://vulnmart:${VULNMART_DEV_DB_PASSWORD:-vulnmart-dev-only-not-a-secret}@postgres:5432/vulnmart
       VULNMART_APP_ROLE: vulnmart_app
+      VULNMART_KEYSTORE_PASSWORD: ${VULNMART_DEV_KEYSTORE_PASSWORD:-vulnmart-keys-dev-only-not-a-secret}
     cap_drop:
       - ALL
     security_opt:
@@ -184,6 +186,15 @@ services:
       # origin the browser may call from (the Origin check): the dashboards of the web service below.
       VULNMART_CSRF_SECRET: ${VULNMART_DEV_CSRF_SECRET:-vulnmart-dev-csrf-secret-not-a-secret}
       VULNMART_PUBLIC_ORIGIN: http://127.0.0.1:3000
+      # Story P-15: the field key that seals second-factor secrets (a development value; production reads a secret file, architecture 06 s3).
+      VULNMART_FIELD_SECRET: ${VULNMART_DEV_FIELD_SECRET:-vulnmart-dev-field-secret-not-a-secret-0123456789}
+      # Story P-17: the key service. The wrapped per-attempt keys live in the separate database vm_keystore (own role); the KEK and the three masters
+      # are development values (production reads secret files, architecture 06 s3; never reuse these).
+      VULNMART_KEYSTORE_DSN: postgresql://vulnmart_keys:${VULNMART_DEV_KEYSTORE_PASSWORD:-vulnmart-keys-dev-only-not-a-secret}@postgres:5432/vm_keystore
+      VULNMART_KEK: "1:dnVsbm1hcnQtZGV2LWtlay1ub3QtYS1zZWNyZXQtMDA="
+      VULNMART_EVENT_MASTER: dnVsbm1hcnQtZGV2LWV2dC1ub3QtYS1zZWNyZXQtMDA=
+      VULNMART_FLAG_KEY: dnVsbm1hcnQtZGV2LWZsZy1ub3QtYS1zZWNyZXQtMDA=
+      VULNMART_OWNER_KEY: dnVsbm1hcnQtZGV2LW93bi1ub3QtYS1zZWNyZXQtMDA=
     cap_drop:
       - ALL
     security_opt:
@@ -285,11 +296,13 @@ services:
   # includes /containers/{id}/exec, which cannot be switched off with the EXEC variable (found in the story 4.2 test).
   # So the proxy runs its own HAProxy file (file docker-proxy/rules.cfg, loaded as the config `docker-proxy-rules`): a deny-by-default list of the exact method and
   # path pairs SdkBackend uses (read from backend.py): _ping and version, container list/inspect/create/start/attach/remove,
-  # network list/inspect/create/remove, volume list/inspect/create/remove. Start, attach and every remove work only for objects named vm-*, and a container create only with name=vm-*. exec, images, build, commit, info, swarm, secrets, services, plugins,
+  # network list/inspect/create/remove and POST connect/disconnect (story edge-3, D-66: only for networks named vm-*; the body, which container, cannot be
+  # restricted here, so the orchestrator connects only the configured edge name), volume list/inspect/create/remove. Start, attach and every remove work only for objects named vm-*, and a container create only with name=vm-*. exec, images, build, commit, info, swarm, secrets, services, plugins,
   # system, events, auth, stop, restart, kill and the archive calls answer 403. The request body is not filtered, so the
   # orchestrator's template-id-only rule and the host rule stay the second line (ADR 0010).
   # The process runs as root inside the container because the socket file is root-owned; everything else is dropped.
-  # The orchestrator uses it with: --docker-host tcp://127.0.0.1:2375
+  # A host-run orchestrator uses it with: --docker-host tcp://127.0.0.1:2375. The orchestrator CONTAINER (service `orchestrator` below) uses tcp://docker-proxy:2375 over labs-core;
+# that needs no published port, the 127.0.0.1 publication is only for the host.
   docker-proxy:
     profiles: ["lab"]
     image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
@@ -322,16 +335,197 @@ services:
       start_period: 1s
     restart: "no"
 
+  # ---- Lab profile (story edge-2, D-62, D-64): the edge = stock Caddy for TLS + the gate service with the event relay ---------------
+  # Only edge-caddy publishes a port, and only 443 (80 is not published, D-28); scripts/check-lab-compose-rules.mjs enforces it. 8080, 8081 and 9090 are never published.
+  # Instance containers publish nothing; the orchestrator (story 3) attaches edge-gate to each instance network with `docker network connect`.
+  # Files the lab needs on the host (the runbook of story 5 creates them; Docker would make a FOLDER of a missing bind source and the edge would not start):
+  #   VULNMART_EDGE_CERTS (default /opt/vulnmart/lab/certs/live): fullchain.pem and privkey.pem of the wildcard certificate
+  #   VULNMART_EDGE_SECRETS (default /opt/vulnmart/lab/secrets): gate_key_current (64+ hex), gate_key_previous (optional), gate_admin_secret (16+ characters)
+  # edge-gate binds the player listener to its address on edge-public (alias edge-gate-player) and the admin listener to its address on labs-core
+  # (alias edge-gate-admin), so an instance network (where only the relay answers) cannot reach either; see apps/edge/src/server.mjs.
+  edge-gate:
+    profiles: ["lab"]
+    build:
+      context: ../..
+      dockerfile: apps/edge/Dockerfile
+    image: vulnmart-edge:local
+    container_name: vulnmart-edge-gate
+    user: "65532:65532"
+    read_only: true
+    environment:
+      EDGE_ZONE: ${VULNMART_LABS_ZONE:-labs.invalid}
+      EDGE_KEY_CURRENT_FILE: /run/secrets/gate_key_current
+      EDGE_KEY_PREVIOUS_FILE: /run/secrets/gate_key_previous
+      EDGE_ADMIN_SECRET_FILE: /run/secrets/gate_admin_secret
+      EDGE_INGEST_URL: ${VULNMART_EDGE_INGEST_URL:-http://ingest.invalid:8081}
+      EDGE_PLAYER_BIND_HOST: edge-gate-player
+      EDGE_ADMIN_BIND_HOST: edge-gate-admin
+    volumes:
+      - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_key_current:/run/secrets/gate_key_current:ro
+      - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_key_previous:/run/secrets/gate_key_previous:ro
+      - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_admin_secret:/run/secrets/gate_admin_secret:ro
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=4m,uid=65532,gid=65532
+    networks:
+      edge-public:
+        aliases: [edge-gate, edge-gate-player]
+      labs-core:
+        aliases: [edge-gate-admin]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(8081,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+    restart: unless-stopped
+
+  # Caddy 2.10.2, the same image (tag plus index digest) as infra/caddy/compose.p.yaml. Stock image, no plugin. Root with every capability dropped but
+  # NET_BIND_SERVICE, like vm-p: the private key written by lego is root-only (H-115), so a non-root user could not read it.
+  edge-caddy:
+    profiles: ["lab"]
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    container_name: vulnmart-edge-caddy
+    ports:
+      - "443:443"
+    environment:
+      EDGE_ZONE: ${VULNMART_LABS_ZONE:-labs.invalid}
+      EDGE_GATE_UPSTREAM: edge-gate:8080
+    volumes:
+      - ../caddy/Caddyfile.l:/etc/caddy/Caddyfile:ro
+      - ${VULNMART_EDGE_CERTS:-/opt/vulnmart/lab/certs/live}:/certs:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 128
+    tmpfs:
+      - /tmp
+      - /data
+      - /config
+    networks:
+      - edge-public
+    depends_on:
+      edge-gate:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---- Lab profile (edge story 6, H-343 option (a), D-58, D-62): the orchestrator as a container on labs-core -----------------------------------
+  # Why a container: the gate admin listener answers only on labs-core (alias edge-gate-admin:9090, never published), and the Docker API is reached through the
+  # socket proxy; a host process could do neither without publishing more. On labs-core it reaches both by name and nothing is published for them.
+  # NO Docker socket here: --docker-host tcp://docker-proxy:2375 is the proxy's address on labs-core (the proxy still also publishes 127.0.0.1:2375, for a
+  # host-run orchestrator or for the checks of Part E; the container does not use that publication). It attaches the edge named vulnmart-edge-gate to every
+  # instance network and pushes access state to the gate (story edge-3).
+  # Listener (IF-5): the process listens on 0.0.0.0:8443 INSIDE the container with mutual TLS (the service refuses a non-loopback address without TLS); the host side is
+  # published as ${VULNMART_ORCH_BIND}:9443, default 127.0.0.1. On vm-i set VULNMART_ORCH_BIND to the private VPC address of vm-i (never a public one, never 0.0.0.0): the security
+  # group (vm-p to vm-i on 9443 only) is the real boundary, mutual TLS is the second line. scripts/check-lab-compose-rules.mjs enforces this exact form.
+  # Files the operator provides under VULNMART_ORCH_DIR (default /opt/vulnmart/lab/orchestrator; docs/runbooks/edge-vm-i.md step 3 creates them):
+  #   secrets/platform_key (the platform signing key, 32+ chars), secrets/tls_cert.pem, secrets/tls_key.pem, secrets/tls_ca.pem (server certificate, its key, the CA that signs the vm-p client certificate),
+  #   templates/*.json (the instance templates), images.json (the release manifest of image digests). The gate admin secret is the same file the gate reads
+  #   (VULNMART_EDGE_SECRETS/gate_admin_secret). Secrets reach the container as files under /run/secrets. Compose mounts a file secret as a bind mount (it ignores uid, gid and mode, and warns),
+  # so on vm-i the HOST files must be owned by 65532:65532 with mode 0400: the service refuses a key file readable by group or others (docker-compose limit, found in the story edge-6 proof). Never mode 0644.
+  # State reports to the platform (edge story 7, H-347 point 1) are OFF by default: the service takes --report-url and --report-key-file from VM_ORCH_REPORT_URL and
+  # VM_ORCH_REPORT_KEY_FILE when no flag is given (compose cannot omit a flag conditionally). To turn them on set VULNMART_ORCH_REPORT_URL (https, the vm-p ingest address) AND add the
+  # override file: docker compose -f compose.yaml -f lab.reports.yaml --profile lab up -d orchestrator (it mounts secrets/report_key and sets the key file path). With the URL empty nothing changes.
+  # Image: built from apps/orchestrator/Dockerfile. --backend is the default, docker; --allow-fake-backend and --allow-local-images are never set here.
+  orchestrator:
+    profiles: ["lab"]
+    build:
+      context: ../..
+      dockerfile: apps/orchestrator/Dockerfile
+    image: vulnmart-orchestrator:local
+    container_name: vulnmart-orchestrator
+    user: "65532:65532"
+    read_only: true
+    command:
+      - --templates-dir
+      - /etc/vulnmart/templates
+      - --images-manifest
+      - /etc/vulnmart/images.json
+      - --state-dir
+      - /var/lib/vulnmart/orchestrator
+      - --docker-host
+      - tcp://docker-proxy:2375
+      - --edge-container
+      - vulnmart-edge-gate
+      - --gate-url
+      - http://edge-gate-admin:9090
+      - --gate-admin-key-file
+      - /run/secrets/gate_admin_secret
+      - --key-file
+      - /run/secrets/platform_key
+      - --tls-cert
+      - /run/secrets/tls_cert
+      - --tls-key
+      - /run/secrets/tls_key
+      - --tls-ca
+      - /run/secrets/tls_ca
+    environment:
+      VM_ORCH_REPORT_URL: ${VULNMART_ORCH_REPORT_URL:-}
+    secrets:
+      - { source: orch-platform-key, target: platform_key }
+      - { source: orch-gate-admin, target: gate_admin_secret }
+      - { source: orch-tls-cert, target: tls_cert }
+      - { source: orch-tls-key, target: tls_key }
+      - { source: orch-tls-ca, target: tls_ca }
+    volumes:
+      - ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/templates:/etc/vulnmart/templates:ro
+      - ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/images.json:/etc/vulnmart/images.json:ro
+      - orch-state:/var/lib/vulnmart/orchestrator
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m,uid=65532,gid=65532
+    networks:
+      - labs-core
+    ports:
+      - "${VULNMART_ORCH_BIND:-127.0.0.1}:9443:8443"
+    depends_on:
+      docker-proxy:
+        condition: service_healthy
+      edge-gate:
+        condition: service_healthy
+    restart: unless-stopped
+
 networks:
-  # Only the orchestrator joins this network; no instance network is ever attached to it.
+  # The orchestrator and the edge-gate admin listener join this network; no instance network is ever attached to it.
   labs-core:
     name: vulnmart-labs-core
+  # Caddy and the edge-gate player listener only. It is an ordinary (outbound-capable) network because Caddy publishes 443 through it.
+  edge-public:
+    name: vulnmart-edge-public
 
 configs:
   docker-proxy-rules:
     file: ./docker-proxy/rules.cfg
 
+secrets:
+  orch-platform-key:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/platform_key
+  orch-gate-admin:
+    file: ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_admin_secret
+  orch-tls-cert:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/tls_cert.pem
+  orch-tls-key:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/tls_key.pem
+  orch-tls-ca:
+    file: ${VULNMART_ORCH_DIR:-/opt/vulnmart/lab/orchestrator}/secrets/tls_ca.pem
+
 volumes:
+  orch-state:
   pg-data:
   web-node-modules:
   web-next:

@@ -1,0 +1,49 @@
+$ node scripts/fallback.mjs check
+PASS api-healthz: HTTP 200
+PASS api-readyz: HTTP 200
+PASS mailpit: HTTP 200
+PASS api-refuses-without-origin-secret: HTTP 403 (want 403)
+exit 0
+
+$ node scripts/backup.mjs backup (migrated platform schema plus one seeded test table)
+PASS backup written: vulnmart-20261017T095432Z.dump.enc (14784 bytes encrypted, 7 tables, 41 rows counted)
+     files: vulnmart-20261017T095432Z.dump.enc, vulnmart-20261017T095432Z.dump.enc.sha256, vulnmart-20261017T095432Z.dump.enc.manifest.json
+exit 0
+
+$ node scripts/backup.mjs verify
+PASS verify: checksum and manifest agree
+exit 0
+
+$ node scripts/backup.mjs restore-test (right pass phrase)
+PASS verify: checksum and manifest agree
+PASS decrypt: plain dump matches the manifest hash
+PASS restore: pg_restore into scratch database vulnmart_restore_test
+PASS compare: 7 tables, every row count equal to the manifest
+PASS cleanup: scratch database vulnmart_restore_test dropped, temporary file removed
+exit 0
+
+$ restore-test with a wrong pass phrase
+PASS verify: checksum and manifest agree
+FAIL decryption failed (wrong pass phrase?); no scratch database was created
+exit 1
+
+$ restore-test after one byte of the encrypted file was flipped
+FAIL verify: checksum mismatch: the file was changed or damaged (nothing was decrypted)
+exit 1
+
+$ verify with the manifest removed
+FAIL verify: manifest missing
+exit 1
+
+scratch databases left:
+0
+temp plain dump files left:
+0
+
+$ node scripts/fallback.mjs down
+PASS down: project vulnmart-fallback removed (no container, network or volume left), temporary files removed
+exit 0
+containers of project after down:
+0
+volumes of project after down:
+0

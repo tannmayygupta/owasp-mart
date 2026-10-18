@@ -1,0 +1,18 @@
+[project]
+name = "vulnmart-attempts"
+version = "0.0.0"
+description = "VulnMart attempt rules (stream L): the attempt state machine, the server-clock deadline, grace, warning and freeze rules. Pure functions, standard library only, no I/O."
+requires-python = "==3.14.*"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+]
+
+[build-system]
+requires = ["uv_build==0.12.23"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "vulnmart_attempts"

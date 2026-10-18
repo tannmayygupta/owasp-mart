@@ -114,3 +114,5 @@ Why lego and not Caddy's plugin: the token stays out of the internet-facing edge
 - `node --test scripts/certs-host.test.mjs scripts/cloud-hosts.test.mjs scripts/infra-isolation.test.mjs` -- expected: all pass
 - `node --test "scripts/*.test.mjs"`, `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs` -- expected: pass
 - Terraform fmt, validate and test on a clean copy (as in story 1.15) -- expected: pass
+
+Follow-up 2026-10-17: proven live on vm-p and vm-i; lego v5 syntax fixed; dev-log 2026-10-17-tannmayygupta-l-10-certificates-live.md.

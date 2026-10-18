@@ -1,0 +1,81 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-17 from the tasks L-22 and L-23 of docs/dev/dev1-tanmay.md (stories 1 to 3, planned in detail) and L-25 to L-28 (stories 4 to 7, listed only; each is planned when it is started). Approved on the developer's delegation (run through on recorded decisions D-80 to D-88, proposed).
+# Stories 4 to 7 planned in detail 2026-10-17 on the developer's delegation (D-90 to D-94, Proposed). For the 19 Oct demo only story 4 (time beside the score) and story 5 are worth doing if time remains; 6 and 7 are not needed live.
+# L-22 = stories 1 and 2, L-23 = story 3. The live-demo target of 19 Oct 2026 shapes the order: rules and scoring are pure code with local proof first.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Attempt rules library: state machine, server clock, deadline and warning rules (pure, injectable clock)"
+description = "Adds the uv workspace package packages/py-attempts (module vulnmart_attempts, standard library only, no I/O): the attempt states and the allowed transitions of architecture 04 section 10.1 without skipping, the rules copied at start (time limit, grace, warnings, freeze, reset limit), the deadline from the server clock starting at instance ready (OI-22, D-80), one attempt per invite, and pure functions that say what is due at a given instant. Table and exhaustive tests; a lost connection or a browser clock cannot change any result."
+verify = "Every pair of states is tested against the transition table; deadline, grace, warnings at 15 and 5 minutes and the freeze end are computed from an injected clock; the same instant always gives the same answer; the package has no dependency."
+covers = ["FR-SES-01", "FR-SES-02", "FR-SES-03", "FR-SES-06", "FR-SES-08", "FR-TIM-05"]
+after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Attempt engine: start at instance ready, expiry with auto-submit, 15-minute freeze, destroy, manual submit, cancel, and the port adapter"
+description = "Builds AttemptEngine on the rules of story 1 with an AttemptStore Protocol (an in-memory store and a compare-and-set version check) and an InstanceControl Protocol (freeze = IF-5 access frozen, destroy). A tick() driven by the platform's scheduler is idempotent and catches up after an outage: warnings, running to expired to submitted, access frozen, destroy after frozen_until, submitted to reported once scoring is final. Adds EngineAttemptPort in apps/api/src/vulnmart/ports (implements AttemptPort and the new start, submit and tick calls) and its conformance tests against FakeInstancePort."
+verify = "With a fake clock an attempt expires exactly at its deadline, is auto-submitted, its instance goes frozen and is destroyed 15 minutes later; a tick repeated or run late gives the same result; manual submit and cancel follow the same freeze and destroy; EngineAttemptPort passes the AttemptPort protocol test of the fake."
+covers = ["FR-SES-02", "FR-SES-04", "FR-SES-05", "FR-SES-06", "FR-SES-07", "FR-SES-08", "FR-TIM-05"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Scoring engine: hiring formula, milestone credit, hint floor, held captures, learner progress, Appendix A reproduced"
+description = "Adds vulnmart_attempts.scoring, a pure function from per-challenge facts (best milestone on any valid path, hint levels unlocked, held flag) and a weight table to the shown score 0 to 1000 with exact half-up rounding, per-challenge points with the floor at zero, learner stars, solved tick and no-hints badge, and the tie-break facts. Time and wrong or decoy submissions are not inputs. Adds EngineReportPort score and challenge calls in apps/api/src/vulnmart/ports. Tests reproduce every PRD Appendix A example and exhaust the milestone and hint combinations."
+verify = "Every row of PRD Appendix A gives the stated result (90, 36, 84, 6, 0 and 1000 shown); a held capture is excluded and the score returns when the reviewer accepts it; changing time or wrong submissions cannot change a score; the adapter returns a ReportPort Score."
+covers = ["FR-SCR-01", "FR-SCR-02", "FR-SCR-03", "FR-SCR-04", "FR-SCR-05", "FR-SCR-06", "FR-SCR-09", "FR-SCR-10"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Time metrics and event log (L-25): headline time, estimated active time, resets and retries, ids-only attempt log"
+description = "Pure metrics and an ids-only attempt log in packages/py-attempts (metrics.py, attempt_log.py): headline time from instance ready to each capture, estimated active time with the 5-minute gap rule, reset and retry counts, the FR-TIM-04 event allow-list with UTC timestamps and ids only, hooked to the engine events callable; EngineReportPort.time in apps/api ports. Planned 2026-10-17 (D-90, Proposed)."
+verify = "Headline 754 s for a capture 754 s after ready; a 299 s gap counts and a 300 s gap does not; reset and retry counts rise without moving started_at; an unknown event name or field is refused; every event the engine emits passes the allow-list."
+covers = ["FR-TIM-01", "FR-TIM-02", "FR-TIM-03", "FR-TIM-04"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Reset and withdrawal during an assessment (L-26)"
+description = "Engine calls can_reset and record_reset (limit from the rules, counted only while running, milestones and clock untouched) and withdraw with undo_withdrawal (instance destroyed, attempt locked, recruiter notice event, deletion after the 7-day window, undo cancels the deletion only). Adapter additions and AttemptResetLimit in apps/api ports. Planned 2026-10-17 (D-91, Proposed)."
+verify = "Three resets pass and the fourth is refused with deadline and milestones unchanged; a withdrawal destroys the instance once and schedules deletion 7 days later; an undo inside the window stops the deletion; the tick after day 7 moves it to deleted."
+covers = ["FR-SES-09", "FR-SES-10"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Anti-cheat signals and held-capture review (L-27)"
+description = "Fills what stories 6.x did not: timing-anomaly and write-up similarity detectors (integrity.py, standard library), the missing ACH-01 cap and log, and HeldCaptureReview in apps/api/ingest (named reviewer, accept or reject with a note, audited, never zeroes anyone). Reviewer: recruiter or admin of the owning organisation, no deadline that changes a score (D-92, OI-38 Proposed). Only the activity check holds; all other signals are flags (D-94, Proposed)."
+verify = "A held capture is excluded until a permitted reviewer accepts it and the decision is audited with reviewer, decision and time; a rejection never zeroes; the score is identical with every flag kind present and with none; no proctoring words exist in the package."
+covers = ["FR-ACH-01", "FR-ACH-02", "FR-ACH-03", "FR-ACH-04", "FR-ACH-05", "FR-ACH-06", "FR-ACH-07"]
+after = [3]
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Cohort board and ranking aid (L-28)"
+description = "Pure ranking aid (ranking.py: score, then more full captures, lower hint cost, lower active time, earlier last capture, stable by id, with a reason per row) and EngineCohortPort in apps/api ports scoped to one organisation and one assessment, off unless the template turns it on. No global leaderboard. OI-26 decided on delegation as Proposed (D-93), pilot only."
+verify = "Ties follow the research order and each row says why; another organisation gets nothing; no row is dropped; no cross-organisation listing function exists."
+covers = ["FR-SCR-07", "FR-SCR-08"]
+after = [3]
+hitl = true
+risk = "low"

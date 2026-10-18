@@ -1,0 +1,21 @@
+$ node --test scripts/backup.test.mjs scripts/fallback.test.mjs
+✔ parseArgs: commands, defaults and errors (2.2707ms)
+✔ utcStamp and file name (1.902ms)
+✔ insideRepo (0.4094ms)
+✔ opensslArgs: AES-256, PBKDF2, 600000 iterations, pass phrase only from a file (2.2676ms)
+✔ docker command construction (0.668ms)
+✔ parseCounts (1.0373ms)
+✔ compareCounts (0.5444ms)
+✔ checkIntegrity: good, flipped byte, missing parts, mismatching manifest (2.5292ms)
+✔ parseShaFile and sidecarPaths (0.4997ms)
+✔ openssl: round trip works, wrong pass phrase fails (2136.1133ms)
+✔ parseArgs (2.9183ms)
+✔ profiles, ports and urls follow the options (0.9571ms)
+✔ composeArgs always names the fallback project (0.3475ms)
+✔ labEnv carries the token and the lab switches; labArgs binds loopback (0.3159ms)
+✔ collisions finds only fixed-name platform containers (0.8178ms)
+✔ formatCheck and checkExit (0.3141ms)
+ℹ tests 16
+ℹ pass 16
+ℹ fail 0
+ℹ duration_ms 2344.5405

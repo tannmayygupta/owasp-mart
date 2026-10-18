@@ -5,7 +5,7 @@
   "description": "VulnMart monorepo root (no application code yet)",
   "packageManager": "pnpm@12.10.1",
   "scripts": {
-    "test": "node --test \"scripts/*.test.mjs\" \"contracts/mocks/stub-instance/**/*.test.mjs\"",
+    "test": "node --test \"scripts/*.test.mjs\" \"contracts/mocks/stub-instance/**/*.test.mjs\" \"apps/edge/test/*.test.mjs\"",
     "test:e2e": "node --test --test-concurrency=1 \"scripts/e2e/*.test.mjs\"",
     "dev": "node scripts/dev.mjs",
     "progress": "node scripts/progress-page.mjs --serve",

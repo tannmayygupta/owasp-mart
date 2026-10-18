@@ -1,0 +1,13 @@
+vm-i (AWS Sydney, m7i-flex.large), 2026-10-17, run by Claude over SSH on the developer's authorisation, stub image vulnmart-stub-instance:local, Node 24.21.0 installed in the home folder (checksum verified).
+step 3, host INPUT rule ON: isolation probe: PASS (16 forbidden targets blocked, control reached); exit 0; leftovers: containers 0, networks 0.
+gateway rows (ports 22, 80, 443, 2375): all timeout (the host INPUT rule drops the packet); every other target unreachable or timeout; control open.
+subnet check: probe and peer subnets are two different /24 networks; LABS_DOCKER_SUBNETS holds two /16 sets; the python containment check of the S-3 comparison script was NOT run (that step was blocked, see below), so step 3b is not yet answered.
+steps 5 to 7 (S-3, host rule off) were NOT run: the Claude Code auto-mode safety check refused the script that deletes the two INPUT DROP rules; nothing on the host changed (two lab INPUT rules intact, no restore timer, egress unit active). Steps 8 to 12 not run.
+
+--- 2026-10-18 (story 4.3, Claude over SSH on the developer's authorisation) ---
+S-3 uncovered-subnet variant (probe subnet 10.250.250.0/24, peer 10.250.251.0/24, outside LABS_DOCKER_SUBNETS, no firewall rule changed): isolation probe: FAIL open: network-gateway:22 (expected: this is the variant's finding). Rows: gateway:22 OPEN, gateway:80 refused, gateway:443 refused, gateway:2375 timeout; docker0 and host.docker.internal unreachable; control reached.
+Baseline (covered subnets, host rule on): gateway 22, 80, 443, 2375 all timeout.
+After systemctl restart docker (vm-i empty): docker active, egress unit active, 2 lab INPUT rules, isolation probe: PASS (16 forbidden targets blocked, control reached), exit 0.
+After systemctl reboot (back in about 45 s): docker active, egress unit active, 2 lab INPUT rules, certificate timer enabled, isolation probe: PASS (16 forbidden targets blocked, control reached), exit 0.
+read-only audit on the real command bundle: 8 PASS, 0 FAIL, 0 SKIP (docs/assets/story-8-5-vmi-audit/vm-i-audit.txt).
+Steps 5 to 7 as written (delete the INPUT rules, restore) were NOT run: refused by the auto-mode safety check earlier; the uncovered-subnet variant answers the same question without touching a rule.

@@ -2,7 +2,9 @@
 // Usage: node contracts/mocks/fake-ingest/server.mjs (--key <test key> | --master <64 hex>) [--instance <id>] [--epoch <n>] [--port <n>] [--host <addr>]
 //   POST /internal/v1/events      one signed event per request (answers 202, 200, 401, 409, 413, 422, 503)
 //   GET  /_fake/events            what was stored so far, ordered by (epoch, seq): [{ instance_id, epoch, seq, type }] (not part of IF-4)
-//   POST /_fake/epoch             { "instance_id", "epoch" } sets the current epoch of an instance (test API, not part of IF-4)
+//   GET  /_fake/events/full       the stored wire events with their arrival time, ordered by (epoch, seq): [{ received_at, event }] (test API, not part of IF-4;
+//                                 the local detection loop of story 6.4 reads it, the events hold no flag, only digests)
+//   POST /_fake/epoch            { "instance_id", "epoch" } sets the current epoch of an instance (test API, not part of IF-4)
 // It stops reading a body once the cap is passed, answers 413 and drops the connection; a request that takes longer than
 // 10 seconds is closed. It prints one line per answered event with type and seq only, never event data. Node built-ins only.
 import http from 'node:http';
@@ -61,6 +63,9 @@ export function startServer({ key, master, instance = TEST_INSTANCE, epoch = 1, 
     const url = (req.url || '').split('?')[0];
     if (req.method === 'GET' && url === '/_fake/events') {
       return send({ status: 200, headers: { 'content-type': 'application/json' }, body: ingest.ordered().map(({ event }) => ({ instance_id: event.instance_id, epoch: event.epoch, seq: event.seq, type: event.type })) });
+    }
+    if (req.method === 'GET' && url === '/_fake/events/full') {
+      return send({ status: 200, headers: { 'content-type': 'application/json' }, body: ingest.ordered().map(({ received_at, event }) => ({ received_at, event })) });
     }
     if (req.method === 'POST' && url === '/_fake/epoch') {
       const c = [];

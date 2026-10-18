@@ -72,6 +72,15 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Streams L and T move their error bodies to this shape in their own stories: see `docs/reviews/2026-10-11-if8-change-request-for-stream-l.md`.
 - Status: awaiting review by Tanmay (statuses, titles, the body shape change for IF-2, IF-4 and IF-5).
 
+## Edge gate (GATE), `contracts/edge/`
+
+### 0.1.0 (2026-10-17, Tanmay, story L-17 gate core, ADR 0004 decided on delegation, D-60 D-63 D-68)
+- registry change: GATE is registered in `contracts/registry.json` (new contract in its own folder `contracts/edge/`, owner L, no mock by design, conformance tests under `apps/edge/test/`), and `contracts/COMPAT.md` gets its Versions row and its owner row in Approvals (`pending`).
+- First draft: `gate-ticket.md` (HMAC ticket valid 60 s and single use, host-only `__Host-vm_gate` cookie bound to instance, owner hash and access epoch, strict hostname rule `^i-[a-z2-7]{16}\.<zone>$`, access state pushed by the orchestrator with the IF-5 epoch rule, admin API under `/internal/v1/gate/`, decision order, open points) and `examples/ticket-vectors.json` (31 ticket and 12 cookie vectors with fixed throwaway keys and a fixed time).
+- Checked by `apps/edge/test/vectors.test.mjs` and `apps/edge/test/gate.test.mjs` (`node --test apps/edge/test/*.test.mjs`).
+- no mock change: new contract; the vectors and the library are the reference (`noMock` in the registry).
+- Status: awaiting review by Tanmay (decisions of delegation) and Akshay (the API signs the ticket with this format; the platform handoff is in story 5).
+
 ## Instance contract (IF-6), `contracts/instance/`
 
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)

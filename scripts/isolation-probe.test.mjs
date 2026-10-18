@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { runProbe, evaluate, buildTargets, main, cliDocker, PROBE_LABEL } from './isolation-probe.mjs';
+import { runProbe, evaluate, buildTargets, main, cliDocker, PROBE_LABEL, validSubnet, abort } from './isolation-probe.mjs';
 import { checkInspect } from './check-instance-conformance.mjs';
 
 const GOOD_PROBE = (net) => ({
@@ -193,7 +193,8 @@ test('a signal during the run cleans up and exits 130', () => {
   assert.equal(exitCode, 130);
   assert.equal(report.aborted, true);
   assert.ok(d.calls.filter((c) => c[0] === 'rm').length >= 1);
-  assert.equal(main(['--help'], { log: () => {} }), 0); // main resets the flag
+  abort.flag = false; // the signal left the module flag set: reset it so later tests start clean (the --help path of main returns before its own reset)
+  assert.equal(main(['--help'], { log: () => {} }), 0);
 });
 
 test('--image and --timeout-ms are validated (exit 2, plain message)', () => {
@@ -217,4 +218,50 @@ test('conformance: unconfined profiles, socket variants and parent directory bin
   }
   assert.ok(rules((c) => { c.Mounts = [{ Type: 'npipe', Source: '\\\\.\\pipe\\x' }]; }).includes('no-docker-socket'));
   assert.deepEqual(rules((c) => { c.Mounts = [{ Type: 'volume', Name: 'vm-run', Source: '/var/lib/docker/volumes/vm-run/_data', Destination: '/run/vm' }]; }), []);
+});
+
+test('fixed subnets (S-3 variant): --subnet reaches docker network create, the report says custom, a bad value is refused', () => {
+  const d = stubDocker({ answer: allBlocked });
+  const { exitCode, report } = runProbe({ docker: d, image: 'img', nonce: 'c1', probeSubnet: '172.31.200.0/24', peerSubnet: '172.31.201.0/24' });
+  assert.equal(exitCode, 0, JSON.stringify(report));
+  const creates = d.calls.filter((c) => c[0] === 'network' && c[1] === 'create');
+  assert.deepEqual(creates.map((c) => c[c.indexOf('--subnet') + 1]), ['172.31.200.0/24', '172.31.201.0/24']);
+  assert.equal(report.subnets.custom, true);
+  // default run: no --subnet and no "custom" key
+  const plain = stubDocker({ answer: allBlocked });
+  const r = runProbe({ docker: plain, image: 'img', nonce: 'c2' });
+  assert.ok(plain.calls.filter((c) => c[0] === 'network' && c[1] === 'create').every((c) => !c.includes('--subnet')));
+  assert.ok(!('custom' in r.report.subnets));
+});
+
+test('validSubnet accepts a network address and refuses everything else', () => {
+  for (const ok of ['172.31.200.0/24', '10.99.0.0/16', '192.168.7.64/26']) assert.equal(validSubnet(ok), true, ok);
+  for (const bad of ['172.31.200.5/24', '172.31.200.0/8', '172.31.200.0/30', '300.1.1.0/24', '172.31.200.0', '172.31.200.0/24; rm', '--subnet', '', 'a.b.c.d/24', '172.31.200.0/024x']) assert.equal(validSubnet(bad), false, bad);
+});
+
+test('--probe-subnet and --peer-subnet are validated and must differ (exit 2)', () => {
+  for (const argv of [['--probe-subnet', '1.2.3.4/24'], ['--peer-subnet', 'nonsense'], ['--probe-subnet', '172.31.200.0/24', '--peer-subnet', '172.31.200.0/24']]) {
+    const err = [];
+    assert.equal(main(argv, { log: () => {}, err: (x) => err.push(x), docker: stubDocker({ answer: allBlocked }) }), 2, argv.join(' '));
+    assert.match(err.join(''), /subnet/);
+  }
+});
+
+test('--runtime (S-8): every probe container gets it, the report says which, a bad name is refused, the default has none', () => {
+  const d = stubDocker({ answer: allBlocked });
+  const { exitCode, report } = runProbe({ docker: d, image: 'img', nonce: 'r1', runtime: 'runsc' });
+  assert.equal(exitCode, 0, JSON.stringify(report));
+  const runs = d.calls.filter((c) => c[0] === 'run');
+  assert.equal(runs.length, 3);
+  for (const run of runs) assert.equal(run[run.indexOf('--runtime') + 1], 'runsc');
+  assert.equal(report.runtime, 'runsc');
+  const plain = stubDocker({ answer: allBlocked });
+  const r = runProbe({ docker: plain, image: 'img', nonce: 'r2' });
+  assert.ok(plain.calls.filter((c) => c[0] === 'run').every((c) => !c.includes('--runtime')));
+  assert.ok(!('runtime' in r.report));
+  for (const bad of ['RUNSC', 'runsc;rm', '-x', 'a', 'runsc --privileged', '../x']) {
+    const err = [];
+    assert.equal(main(['--runtime', bad], { log: () => {}, err: (e) => err.push(e), docker: stubDocker({ answer: allBlocked }) }), 2, bad);
+    assert.match(err.join(''), /--runtime/);
+  }
 });

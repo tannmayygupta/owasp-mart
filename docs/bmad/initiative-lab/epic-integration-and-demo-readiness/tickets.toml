@@ -1,0 +1,104 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-17 from the tasks L-24, L-29, L-30 and L-31 of docs/dev/dev1-tanmay.md, cut lean for the live demo of 19 Oct 2026 (about 1.5 days of work). Approved on the developer's delegation (decisions D-95 to D-99, Proposed).
+# Local proof means Docker Desktop on a developer PC; everything on vm-i, vm-p, AWS or the deployed site is a developer runbook step and is never claimed as a result in a plan or a dev-log until the developer reports it.
+# L-24 is already listed as story 5 of epic-environments-and-deployment; story 4 here is the lean version that supersedes it for the demo (mark that entry dropped or done with story 4 when this one closes). L-29 is also listed under epic-isolation-and-hardening; story 5 here is its checker and runbook part.
+# Demo order if time runs short: 1, 2, 6 (rehearsal and pack), then 3, then 4 and 5.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Lab runtime wiring: attempts, scoring and ingest connected to apps/api, demo routes and demo clock"
+description = "The real integration. A minimal additive edit of Akshay's apps/api (vulnmart-attempts workspace dependency, jsonschema as a runtime dependency, Dockerfile and dockerignore lines, the event schema file in the image) plus an L-owned folder apps/api/src/vulnmart/lab: LabRuntime builds the AttemptEngine, EngineAttemptPort, EngineReportPort, FlagSubmitService, MilestoneEngine and IngestHandler on in-memory stores and a real or fake InstanceHost; the ingest entrypoint mounts it when VULNMART_LAB_RUNTIME=1; token-guarded demo routes (start attempt, submit flag, score, tick, advance the demo clock) exist only when VULNMART_LAB_DEMO=1."
+verify = "The api image builds and starts with the runtime switched on and off; with it off the entrypoints behave as before; the demo routes answer 404 when not enabled and 401 without the token; unit tests of the wiring pass; the platform-contract and table-owner checks still pass."
+covers = ["FR-SES-02", "FR-SES-04", "FR-SCR-01", "FR-FLG-04", "FR-DET-01", "NFR-OBS-02"]
+after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "In-process loop test: instance, signed events, milestones, attempt clock and score in one pytest"
+description = "One pytest file (no Docker) that runs the whole loop through LabRuntime on a fake clock and FakeInstanceHost: start an attempt, instance ready starts the clock, a signed IF-4 event over the real ingest handler credits a milestone, a flag submission credits M3, a hint is unlocked, a held capture is held, time passes to the deadline, the attempt is auto-submitted, access frozen, instance destroyed, the score matches a hand-computed value. CI-safe and the demo's fast proof."
+verify = "The loop test passes in under 10 seconds; its expected score is written in the test as a number computed from PRD Appendix A weights, not from the code under test; a replayed event and a forged signature change nothing."
+covers = ["LX-1", "FR-SES-02", "FR-SES-04", "FR-SES-05", "FR-SCR-01", "FR-SCR-02", "FR-SCR-03", "FR-DET-01"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Local end-to-end loop on Docker Desktop: orchestrator, edge, gate, sidecar, ingest, score, and a small load check"
+description = "scripts/e2e/loop.e2e.test.mjs and scripts/load-check.mjs on Docker Desktop. The real orchestrator (Docker backend, temporary key) creates an instance through the lab runtime's demo route; stock Caddy and the edge gate front it; the instance's sidecar sends signed events through the edge relay to the real ingest handler; a milestone and a flag are credited and the score is read; the demo clock is advanced to expiry and the instance is frozen and destroyed; nothing is left behind. The load check starts N stub instances at once and records time to ready and memory on the laptop (laptop numbers, labelled as such)."
+verify = "The loop file passes with Docker running and is skipped with a message without Docker; every container and network it made is gone at the end; the load check prints real numbers and a pass or fail against a stated target; both files record their output under docs/assets."
+covers = ["LX-1", "LX-2", "FR-INS-10", "FR-SES-11", "FR-DET-01", "FR-SCR-01"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Backups and laptop fallback: encrypted dump and restore test, one-command fallback start"
+description = "L-24, lean. scripts/backup.mjs takes a pg_dump of the platform database, encrypts it with openssl AES-256 (PBKDF2, passphrase from a file outside the repository), writes a SHA-256 manifest and restores into a scratch database to compare table counts (tested on the local Compose stack). scripts/fallback.mjs starts, checks and stops the laptop fallback (platform stack, lab runtime, orchestrator with stub instances). Runbooks docs/runbooks/backup-restore.md and docs/runbooks/laptop-fallback.md hold the developer steps for the VMs and S3."
+verify = "Locally a dump is encrypted, its checksum verified, restored into a scratch database with equal row counts and the scratch database dropped; a wrong passphrase or a changed byte fails; fallback up, check and down work on Tanmay's PC; the live backup to S3 and a restore on a VM are runbook steps, not results."
+covers = ["LE-5", "LE-7"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "VM-I isolation proof and extra hardening checklist: runbook and checker script"
+description = "L-29, lean and read-only. scripts/vmi-audit.mjs turns the outputs of fixed read-only commands (docker info, daemon.json, iptables rule listing, container inspect, listening ports) into PASS or FAIL lines with pure parsers tested on fixtures and runnable in --local mode on Docker Desktop. docs/runbooks/vmi-hardening.md lists the developer steps on VM-I (run the existing isolation probe, run the audit, save evidence) and an optional, clearly separated part for user namespaces, rootless Docker and gVisor that is NOT done before the demo (S-8 stays open)."
+verify = "The parsers pass on good and bad fixtures (socket mounted, privileged container, missing rule, wide address pool, public port); --local runs on Docker Desktop without changing anything; no live result is claimed."
+covers = ["NFR-ISO-05", "NFR-ISO-06", "NFR-ISO-07", "NFR-SEC-04"]
+after = []
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Demo rehearsal runbook, live suite steps and submission pack list"
+description = "L-30 live part and L-31. docs/runbooks/demo-19-oct.md: timeline from T-24 h, pre-flight checklist, the demo script with talk track, the failure table with the fallback switch, and the two rehearsal passes to record. scripts/live-smoke.mjs: read-only HTTP checks of the deployed URLs given by environment variables (health, version, headers), tested against a local server. docs/runbooks/submission-pack.md and scripts/check-submission-pack.mjs: the list of what the college report needs from docs (decision log, ADRs, dev-logs, traceability, changelog, evidence, runbooks, PRD, architecture) and a checker that finds missing or empty items and secret-looking content."
+verify = "The checker lists every required document as present or missing and passes on the repository; live-smoke passes against a local server and fails on a bad header; the runbook has every command the developer needs and names what to record; rehearsal results are recorded only after the developer runs them."
+covers = ["LX-1", "LX-3", "LX-4"]
+after = [2]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Live lab loop on the deployed hosts: platform receiver on vm-p, orchestrator and edge on vm-i, real certificate and DuckDNS hostname, one captured flag and a score (L-30, lab side)"
+description = "The lab half of the end-to-end loop on the real hosts: the lab runtime on vm-p creates an attempt through the vm-i orchestrator over mutual TLS, the instance (stub image) is opened through the real edge and the wildcard certificate at its DuckDNS hostname from the developer's PC, the sidecar's signed events reach the vm-p receiver, a flag is submitted and the score is read, the deadline is advanced, the instance is frozen and destroyed, and nothing is left behind."
+verify = "A scripted run from the developer's PC prints one PASS line per step with real status codes (ticket accepted, no cookie refused, shop answers through the real certificate, milestone credited, score equals the hand number, frozen page, destroyed), the vm-i containers and networks are empty afterwards, and the evidence has no flag, key or address."
+covers = ["LX-1", "FR-INS-10", "FR-SES-11", "FR-DET-01", "FR-SCR-01"]
+after = [3]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Platform-wide end-to-end suite on the deployed system: signup, instance start, a captured flag, an attempt, scoring and a recruiter report (L-30, rest)"
+description = "The part of L-30 that needs the platform and the shop on the deployed hosts: signup and login, starting a lab from the dashboard, a captured flag, an assessment attempt, the score and the recruiter report. It cannot start until Akshay's deployed platform (P-32) and Sahil's deployed shop (T-32) are merged and running; this entry records the wait and the acceptance criteria so the suite can be written the day they land."
+verify = "The suite is green on the deployed system and the load numbers are recorded (the lab-side load numbers already exist for the stub image)."
+covers = ["LX-1", "LX-2"]
+after = [7]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Demo rehearsal on the laptop and online, including the fallback, and the submission pack check (L-31)"
+description = "Two recorded rehearsal passes of docs/runbooks/demo-19-oct.md (laptop with the fallback, and online on the deployed hosts), the failures found written into its failure table, and a final run of scripts/check-submission-pack.mjs. Part of this needs a person, so it is hitl: the steps that can run unattended are run, the rest is a checklist for the developer."
+verify = "docs/runbooks/demo-19-oct.md holds two filled rehearsal records with real timings and the problems found; check-submission-pack passes; a step nobody could run is marked not run."
+covers = ["LX-3", "LX-4"]
+after = [7]
+hitl = true
+risk = "medium"

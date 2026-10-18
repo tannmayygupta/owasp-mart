@@ -1,0 +1,27 @@
+$ node --test scripts/vmi-audit.test.mjs
+✔ good fixtures: every line is PASS (10.9247ms)
+✔ every bad fixture folder exists in the table and the table has no stale entry (0.7296ms)
+✔ bad-socket-mounted: exactly container-hardening fails (3.2408ms)
+✔ bad-privileged: exactly container-hardening fails (3.4703ms)
+✔ bad-no-capdrop: exactly container-hardening fails (2.3592ms)
+✔ bad-rule-missing: exactly host-rule-docker-user fails (2.5578ms)
+✔ bad-input-rule-not-first: exactly host-rule-input fails (2.683ms)
+✔ bad-narrow-pools: exactly daemon-pools fails (2.5179ms)
+✔ bad-public-port: exactly listening-ports fails (2.7001ms)
+✔ bad-imds-optional: exactly imds-v2-required fails (2.69ms)
+✔ bad-empty-info: exactly docker-info fails (2.173ms)
+✔ socket: names the container; proxy read-only passes; proxy read-write fails (0.4735ms)
+✔ inspect: host network, host pid, writable bind outside allow-list, sensitive read-only bind (0.6494ms)
+✔ inspect: zero containers is a valid empty list; garbled and empty text fail closed (0.3742ms)
+✔ docker info: seccomp present passes, absent or unconfined fails, junk fails closed (0.3195ms)
+✔ daemon: pool arithmetic, missing pools, bad pool, live-restore (0.3867ms)
+✔ iptables: poolBases must be covered; garbled and empty fail closed (0.4484ms)
+✔ listeners: ss formats, loopback, public ports, junk (0.3643ms)
+✔ imds: required passes, optional fails, junk fails closed (0.1699ms)
+✔ auditAll: missing required file is FAIL, missing imds is SKIP, skip map gives SKIP (1.9521ms)
+✔ cidr helpers (0.1462ms)
+✔ parseArgs and redaction (0.6532ms)
+ℹ tests 22
+ℹ pass 22
+ℹ fail 0
+ℹ duration_ms 260.4114

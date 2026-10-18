@@ -1,0 +1,54 @@
+VulnMart edge story 7: state reports from the orchestrator container to the platform receiver (run vmrep0db61b)
+Date: 2026-10-17; machine: laptop with Docker Desktop (29.6.2)
+Setup: receiver = the real ingest app (uvicorn, TLS, VULNMART_LAB_RUNTIME=1 + report key file) as a HOST process on <addr>; orchestrator = the COMPOSE CONTAINER (compose.yaml + lab.reports.yaml) reaching it as https://host.docker.internal.
+Why the container and not a host process: it is the deployed shape (H-343) and it must trust the private CA through SSL_CERT_FILE from a file secret, which a host process would not exercise.
+
+--- before: objects of the project already on the machine (not started by this run)
+(none)
+PASS no vm-* container or network before the run (a volume vm-gomod of another project may exist and is left alone): volumes already there: 'vm-gomod'
+PASS the stub instance image is present locally
+PASS the receiver port is free on the host: port 18444
+PASS the api virtual environment python is found
+test-only differences from the committed files (temp override outside the repository): --allow-local-images, --template-schema (relaxed, mounted), --rate-per-s 0, labels, secrets from a volume
+PASS receiver (process 1) listens with TLS on <addr>: port 18444
+PASS the route is mounted and an unsigned post is 401 ORCH-BAD-SIGNATURE: status 401
+compose -f compose.yaml -f lab.reports.yaml up -d --build --wait orchestrator: exit 0
+PASS orchestrator container is running and healthy: healthy
+report-related environment of the container: SSL_CERT_FILE=/run/secrets/report_ca VM_ORCH_REPORT_KEY_FILE=/run/secrets/report_key VM_ORCH_REPORT_URL=https://host.docker.internal:<port>
+PASS the container has the report URL, the key FILE path and the CA file path (paths only)
+PASS docker inspect of the container holds no key or secret
+PASS create answers 202: state requested
+PASS the instance reaches ready in the orchestrator: state ready, error null
+receiver process 1 recorded: #1 none->requested, #2 requested->provisioning, #3 provisioning->starting, #4 starting->ready
+PASS receiver 1 has transitions 1..k in order and the recorded state is ready: k = 4
+PASS receiver process 1 is stopped (the port no longer accepts)
+PASS destroy answers 200 or 202 while the receiver is down: status 202
+PASS the instance is destroyed in the orchestrator although the receiver is down: state destroyed
+orchestrator container log lines about failed pushes: 6 (first: state report failed: URLError)
+PASS the pusher logged failed attempts while the receiver was down and keeps the reports queued
+PASS receiver (process 2) listens again
+receiver process 2 recorded: #5 ready->stopping, #6 stopping->destroyed
+PASS the two receiver histories join: numbers 1..n with no gap and no duplicate: n = 6: 4 before the restart, 2 after
+PASS the chain is consistent: each from_state is the previous to_state, first is requested, last is destroyed: requested > provisioning > starting > ready > stopping > destroyed
+PASS every report is epoch 1 (one life of the instance)
+PASS receiver 2 recorded state is destroyed
+PASS the pusher was never refused by the receiver (no "state report refused" line): 0 lines
+PASS a new report is 204, the identical repeat is 200, the same identity with another body is 409: 204 200 409
+PASS an impossible transition (requested -> destroyed) is 204, kept as history, and does not move the recorded state: status 204, state requested
+PASS exactly one impossible-transition warning in the receiver 2 log, and none came from the real orchestrator reports
+PASS no key or secret in the orchestrator log, the receiver logs or the evidence
+PASS after destroy: no vm-* container or network, volumes as before the run: containers '', networks '', volumes 'vm-gomod'
+
+Result: all 27 checks PASS
+--- teardown
+compose rm orchestrator edge-gate docker-proxy: exit 0
+--- after teardown: leftovers of this run and of vm-*
+docker ps -a --filter label=vm.run=vmrep0db61b: (empty)
+docker network ls --filter label=vm.run=vmrep0db61b: (empty)
+docker volume ls --filter label=vm.run=vmrep0db61b: (empty)
+vm-* containers '', networks '', volumes 'vm-gomod' (any volume listed here was already there before the run)
+docker ps -a (all containers now):
+(none)
+networks named vulnmart*: (none)
+volumes named vulnmart*: (none)
+receiver port 18444 still accepting: false; temp folder present: false

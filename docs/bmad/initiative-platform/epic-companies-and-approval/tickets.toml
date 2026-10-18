@@ -1,0 +1,38 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-18: one story per task of docs/dev/dev2-akshay.md that names this epic (P-18, P-19), as START-HERE.md section 5 asks (the developer chose
+# "continue automatically"), plus one story added during story 5.1: IF-1 has no recruiter or admin route, and a route is a contract change (bundle, generated
+# clients, COMPAT.md, the contract owner's look), so it is a story of its own (like story 3.6 of the accounts epic). OI-10 and OI-11 answered by the developer
+# on 2026-10-18: free webmail allowed with no extra check; a rejected company may apply again at any time; not yet recorded in initial.md.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Recruiter signup and company approval"
+description = "Recruiter signup with a work email (a disposable address cannot start it), the company created pending with the person as its owner, the recruiter and company states from signup to active, rejected and suspended, the admin queue and the approve, reject, suspend and reinstate decisions with reasons, mail and audit entries, and applying again after a rejection."
+verify = "A company moves from signup to approved or rejected with reasons and audit entries, the queue lists pending companies with the owner's name and email domain, and only an active recruiter of an active company passes the invite gate."
+covers = ["FR-ORG-01", "FR-ORG-02", "FR-ORG-04", "FR-ACC-10"]
+after = ["4.2", "3.3"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Company members, admin controls, data scoping, terms and invite caps"
+description = "Colleagues join through a request the owner approves, the admin controls (suspend, delete, caps), the organisation scope set from the session for recruiters, the data-processing terms accepted before inviting, and the invite cap per company."
+verify = "A recruiter of company A cannot read, change or guess company B's rows, a company cannot invite before accepting the terms, and an admin can set the invite cap."
+covers = ["FR-ORG-03", "FR-ORG-05", "FR-ORG-06", "FR-ORG-07", "FR-ORG-08"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Recruiter and company routes (IF-1 contract change)"
+description = "Adds the routes of IF-1 for recruiter signup, the recruiter's own standing and re-applying, and the admin's queue and decisions over the existing CompanyService, with the contract change, regenerated bundle and clients, mock, COMPAT entry and the contract owner's look."
+verify = "A recruiter signs up and an admin approves through the routes in a test, and the contract rules and generated clients are current."
+covers = ["FR-ORG-01", "FR-ORG-02"]
+after = [1]
+hitl = false
+risk = "medium"

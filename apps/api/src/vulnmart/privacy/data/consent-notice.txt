@@ -1,0 +1,36 @@
+# Consent notice text (story P-16, FR-PRV-01). Lines that start with "#" are not shown. Changing any shown line changes the hash, so the
+# version in notice.py must change with it (a test checks this). DRAFT wording: a lawyer has not reviewed it (OI-33); do not publish it as final.
+# The markers {{company}}, {{retention_days}} and {{record_months}} are filled in per attempt before the text is hashed and shown.
+
+Before you start: what this assessment records
+
+{{company}} has invited you to take this assessment on VulnMart. {{company}} decides how the results are used. VulnMart runs the test shop and keeps the records for them.
+
+What is recorded
+- Your name and email address.
+- Your answers and write-ups.
+- The requests you send inside the test shop that capture a flag.
+- Times: when you started, when you submitted and when each answer came in.
+- Which hints you opened.
+- Your IP address and browser type.
+
+What is not recorded
+- Your screen, your webcam or your microphone.
+- Anything you do outside the test shop: other tabs, other programs, other websites.
+
+Why
+The records let {{company}} judge your work and let us check that the assessment ran fairly and that nobody tampered with it.
+
+Who sees it
+- The recruiters of {{company}} that invited you.
+- Platform administrators, only when needed to run the service, and every such access is logged.
+
+How long it is kept
+Your assessment data is deleted {{retention_days}} days after the assessment. A short record of this decision (which text you saw, when you decided, and a scrambled fingerprint of your address and browser) is kept for {{record_months}} months longer, so that we can show that you were asked.
+
+Your choices
+You can see your data, download it, ask for it to be deleted and withdraw your consent. Withdrawing takes one click.
+
+Please do not use a real password or real personal data inside the test shop. Use made-up values.
+
+You must be 18 or over to use VulnMart. Starting the assessment means you agree to this notice. Declining ends the invitation and nothing is started.

@@ -1,0 +1,170 @@
+Date: 2026-10-17, Windows 11, Docker Desktop (server 29.6.2), node v24.11.0, openssl 3.2.1
+
+$ docker build -f apps/edge/Dockerfile -t vulnmart-edge:local . (last lines)
+sha256:94b9023ada960ba7efe76fc9a8d1517c68312367fe5a95265808968114008d8a
+exit code: 0
+
+$ node --test apps/edge/test/*.test.mjs
+✔ no secret, a wrong secret, a near-miss secret: 401 for every call and the state does not change (12.4339ms)
+✔ the secret is read from the file: a missing, empty or short file refuses every call; a rotated file takes effect (13.4335ms)
+✔ PUT stores a record the gate then uses; DELETE makes the instance unknown (410) (10.1626ms)
+✔ strict bodies: unknown, missing and badly typed members are refused (422) and the state is unchanged (10.8166ms)
+✔ transport rules: media type, size, JSON syntax, paths, methods (16.3132ms)
+✔ epoch rule: lower access epoch, lower container epoch, equal epoch with another value: 409 and the old state remains (6.0385ms)
+✔ sync: replaces the whole list, removes the rest, all or nothing (11.8297ms)
+✔ the answers carry no secret and no stored value (3.6698ms)
+✔ constant-time hygiene: signatures, keys and secrets are compared with timingSafeEqual, never with === (5.4775ms)
+✔ safeEqual: equal, different, different length, non-strings (1.4597ms)
+✔ good ticket: 302 to /, host-only cookie with the right attributes, no-referrer, then the cookie opens the shop (10.6684ms)
+✔ reused ticket: the second use is refused with the generic 403 page (2.3697ms)
+✔ refused tickets: expired, forged, other instance, other owner, old epoch (and newer epoch): 403, nothing forwarded, same page (4.9226ms)
+✔ cookie of instance A on host B: refused (1.3525ms)
+✔ cookie signed for instance A, owner and epoch of B, sent to host B: refused (instance differs) (0.9219ms)
+✔ old cookie after a new open (state access epoch raised): refused until a new ticket (1.6269ms)
+✔ cookie of another owner (state owner changed): refused (1.0267ms)
+✔ frozen: a cookie that was valid gets the 423 page and nothing is forwarded; thawing needs a new ticket (the epoch rises, as in IF-5) (2.239ms)
+✔ closed or unknown: 410 page, nothing forwarded, the same page for both (1.2539ms)
+✔ crafted Host values: refused as unknown (410, same page), before any state lookup (1.4698ms)
+✔ other /_vm/ paths: 404 for any method, nothing forwarded (4.3437ms)
+✔ cookie: absent, empty, garbage, duplicated, forged and ticket-as-cookie are all the same 403 (1.5024ms)
+✔ key rotation: the previous key is accepted, an unknown key is not, and new cookies are signed with the current key (1.0407ms)
+✔ forward: the gate cookie is stripped, other cookies stay, the upstream name comes from the record, no header is added (1.3454ms)
+✔ the used-ticket set is bounded: when it is full a new ticket is refused, and ids are forgotten only after their expiry (1185.3757ms)
+✔ a stale ticket id is not accepted again after a purge only when the ticket itself is expired (0.7557ms)
+✔ decide never throws and refuses garbage requests (0.4248ms)
+✔ an unknown instance with a ticket gets 410, like any unknown host (no state is created by a ticket) (0.4812ms)
+✔ createGate refuses weak keys and bad zones (1.4133ms)
+✔ a zone with several labels works and a host of another zone is refused (0.5457ms)
+✔ one good event is forwarded byte for byte with its signature, and the ingest answer comes back (34.0015ms)
+✔ an answer of the ingest (409, 401, 413) is passed on unchanged so the sidecar can drop or retry (14.4989ms)
+✔ refusals never reach the ingest: path, method, content type, signature header, size, shape (21.1811ms)
+✔ the size limit is exact: 16384 bytes pass, 16385 are refused; a chunked body is counted too (11.0901ms)
+✔ the ingest cannot be reached: 500 problem body, and a slow ingest ends at the time limit (312.7727ms)
+✔ rate limit per peer: the fourth call in the window is 429 with Retry-After and never forwarded; a new window resets it (9.9948ms)
+✔ rate limiter: bounded table, windows are per key (4.3727ms)
+✔ the ingest URL must be an http origin; https and paths are refused (1.0009ms)
+✔ the problem titles equal the IF-8 registry (contracts/errors/error-codes.yaml) (7.507ms)
+✔ the relay holds no key and reads no environment (0.7301ms)
+✔ admin push, ticket exchange, cookie, proxy: the owner reaches the shop and the gate cookie is not passed on (43.4032ms)
+✔ refusals do not touch the sidecar: no cookie, other owner, other host, replayed ticket, bad host (16.1466ms)
+✔ frozen is 423 and closed is 410 at once, and the sidecar is not touched (9.3902ms)
+✔ the admin listener refuses a call without the secret and a wrong content type (3.6642ms)
+✔ the relay listener forwards one event and nothing else (7.9612ms)
+✔ a sidecar that is down gives a 502 page, not a hang (11.6431ms)
+✔ key files: hex of at least 64 characters; the previous key may be missing, a folder or empty; a bad current key ends the start (5.0535ms)
+✔ bind host: an address is used as is; a name that does not resolve fails after the tries (118.8739ms)
+✔ the vectors file has the expected shape and covers every verdict (1.3767ms)
+✔ ticket vector: valid, current key -> ok (2.1086ms)
+✔ ticket vector: valid, previous key (rotation) -> ok (0.5111ms)
+✔ ticket vector: valid, exp exactly 60 s ahead -> ok (0.3464ms)
+✔ ticket vector: valid, ae 0 -> ok (0.3542ms)
+✔ ticket vector: forged, last signature character changed -> signature (0.308ms)
+✔ ticket vector: forged, payload changed under the old signature -> signature (0.2518ms)
+✔ ticket vector: signed with an unknown key -> signature (0.1587ms)
+✔ ticket vector: signed with the cookie prefix (domain separation) -> signature (0.2823ms)
+✔ ticket vector: expired, exp equals now -> expired (0.4029ms)
+✔ ticket vector: expired, exp in the past -> expired (0.2604ms)
+✔ ticket vector: exp more than 60 s ahead -> too-far (0.1722ms)
+✔ ticket vector: wrong version -> claims (0.1472ms)
+✔ ticket vector: extra field -> claims (0.1552ms)
+✔ ticket vector: missing jti -> claims (0.148ms)
+✔ ticket vector: instance id in lower case -> claims (0.1251ms)
+✔ ticket vector: owner hash in upper case -> claims (0.1293ms)
+✔ ticket vector: owner hash too short -> claims (0.0969ms)
+✔ ticket vector: ae negative -> claims (0.0941ms)
+✔ ticket vector: ae a string -> claims (0.1166ms)
+✔ ticket vector: ae a fraction -> claims (0.0911ms)
+✔ ticket vector: exp a string -> claims (0.1044ms)
+✔ ticket vector: jti of the wrong length -> claims (0.1083ms)
+✔ ticket vector: payload is not JSON -> claims (0.1467ms)
+✔ ticket vector: payload is a JSON array -> claims (0.0929ms)
+✔ ticket vector: no dot -> malformed (0.0622ms)
+✔ ticket vector: two dots -> malformed (0.0538ms)
+✔ ticket vector: empty string -> malformed (0.0574ms)
+✔ ticket vector: padding in the payload part -> malformed (0.122ms)
+✔ ticket vector: standard base64 characters in the signature -> malformed (0.1295ms)
+✔ ticket vector: signature of the wrong length -> malformed (0.1276ms)
+✔ ticket vector: whitespace around the token -> malformed (0.0774ms)
+✔ cookie vector: valid, current key -> ok (0.2227ms)
+✔ cookie vector: valid, previous key (rotation) -> ok (0.1031ms)
+✔ cookie vector: forged, signature changed -> signature (0.1073ms)
+✔ cookie vector: forged, ae raised under the old signature -> signature (0.1953ms)
+✔ cookie vector: signed with the ticket prefix (domain separation) -> signature (0.1475ms)
+✔ cookie vector: a ticket used as a cookie -> signature (0.1423ms)
+✔ cookie vector: signed with an unknown key -> signature (0.1934ms)
+✔ cookie vector: wrong version -> claims (0.1202ms)
+✔ cookie vector: extra field (exp) -> claims (0.1233ms)
+✔ cookie vector: missing own -> claims (0.1304ms)
+✔ cookie vector: no dot -> malformed (0.0719ms)
+✔ cookie vector: empty string -> malformed (0.0843ms)
+✔ signing the claims of the valid vectors gives the vector bytes (current key) (0.3812ms)
+✔ a ticket is not a cookie and a cookie is not a ticket (domain separation) (0.3962ms)
+✔ the same ticket changes verdict with the clock only (0.4423ms)
+ℹ tests 95
+ℹ suites 0
+ℹ pass 95
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1521.3468
+exit code: 0
+
+$ node --test scripts/check-lab-compose-rules.test.mjs
+✔ the committed compose file passes, and docker-proxy is the only service with the socket (13.7651ms)
+✔ exception, allowed side: docker-proxy as written passes, short and long volume form (1.0079ms)
+✔ exception, refused side: every other service is refused the socket in every spelling (1.2721ms)
+✔ a service name that is quoted, anchored or written in flow style is not taken for docker-proxy and stays checked (1.0837ms)
+✔ docker-proxy with a second volume, a flow-style bind or a port on every interface fails (1.0276ms)
+✔ volumes_from, extends, include and devices are refused (0.5458ms)
+✔ docker-proxy is pinned: image, command, user, privileges, capabilities (1.1313ms)
+✔ privileged and host network stay refused in any service, in block or flow style (0.3547ms)
+✔ lab ports: edge-caddy may publish 443:443 only, in every spelling of that (0.6137ms)
+✔ lab ports: a lab service that publishes 8080, 8081 or 9090 fails (host side or container side, loopback or not, short or long form) (1.9204ms)
+✔ lab ports: edge-caddy publishing 80, 8443, or 443 on another host port fails; any other lab service publishing anything fails (0.5232ms)
+✔ lab ports: services outside the lab profile and the docker-proxy loopback port are not touched by this rule (0.277ms)
+✔ lab ports: the committed compose file has edge-caddy as its only lab service with a ports entry, and it is 443:443 (4.1833ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 202.7242
+exit code: 0
+
+$ node scripts/check-lab-compose-rules.mjs
+PASS lab compose rules: 3 file(s) checked, none uses privileged, host network or pid, the Docker socket, or a dangerous capability
+exit code: 0
+
+$ node --test scripts/e2e/edge.e2e.test.mjs  (EDGE_E2E_NETWORKS default 20)
+✔ production shape: the edge runs with the hardening of compose; only Caddy has a published port, and it is 443 on loopback (17094.9387ms)
+ℹ edge-gate is attached to 22 networks (edge-public, labs-core and 20 instance networks)
+✔ owner path on 20 internal networks: each hostname reaches its own instance (unique marker per instance), nothing else (316.8332ms)
+ℹ 20 instances on 20 separate --internal networks, 20 hostnames, 20 distinct markers reached through Caddy and the gate
+✔ second account, forged owner, edited hostname: refused with the gate page, the other instance is not touched (939.4739ms)
+✔ foreign Host or IP: Caddy answers 404 and the gate is not reached; a well-formed unknown instance reaches the gate and gets 410 (633.4241ms)
+✔ Caddy adds no security header to the answers (D-62); the gate sets only its own page headers (28.7424ms)
+✔ frozen then closed: 423 then 410 at once, the shop sees no request; unknown admin calls are refused (2030.6827ms)
+✔ relay good: one signed event of the stub sidecar goes through the relay and the fake ingest stores it (the signature covers the exact bytes) (694.5655ms)
+✔ relay bad: wrong path, GET, two events, 16 KiB + 1, wrong content type, no signature, not JSON: refused by the relay, the ingest never sees them (1578.4213ms)
+ℹ 8 refused relay requests: 404, 404, 405, 422, 413, 415, 401, 422
+✔ an instance cannot reach the edge's other legs, other networks or other instances (recorded as results) (26089.3188ms)
+ℹ own leg 8081 (the relay, by design): connected | own leg 8081 by IP: connected | own leg 8080 (player listener): ECONNREFUSED | own leg 9090 (admin listener): ECONNREFUSED | own leg by name 9090: ECONNREFUSED | edge IP on the labs-core network 9090: ENETUNREACH | edge IP on the labs-core network 8081: ENETUNREACH | edge IP on the edge-public network 8080: ENETUNREACH | edge IP on the network of instance 1, 8081: ENETUNREACH | edge IP on the network of instance 1, 9090: ENETUNREACH | the sidecar of instance 1 by IP, 8080: ENETUNREACH | the sidecar of instance 1 by name: EAI_AGAIN | the alias edge-gate of the Caddy network: EAI_AGAIN | the alias edge-gate-admin: EAI_AGAIN | the ingest alias: EAI_AGAIN | Caddy by name: EAI_AGAIN
+✔ no instance container publishes a host port (inspect shows none); the edge is the only one with a binding (3625.3817ms)
+ℹ 43 containers checked (40 instance containers, the gate, the ingest, Caddy): only Caddy 443/tcp is bound
+✔ logs: neither a ticket, a cookie value nor an admin secret appears in the Caddy or gate log; the ticket query is redacted (151.1414ms)
+cleanup: containers left 0, networks left 0, temp folder present false
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66087.9847
+exit code: 0
+
+$ docker ps -a --filter label=vm.kind=edge-test -q  ->  []
+$ docker network ls -q --filter label=vm.kind=edge-test  ->  []

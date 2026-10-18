@@ -1,0 +1,22 @@
+Real results of 2026-10-17, branch sprint-3-tanmay, Docker Desktop running (summary lines copied from the runs).
+
+uv run --locked --package vulnmart-orchestrator pytest apps/orchestrator -q
+  458 passed, 4 warnings in 193.50s (0:03:13)
+  (457 before this story's test_edge_attach.py; the 4 warnings are the existing "I/O operation on closed file" unraisable warnings)
+  new tests of the story: test_edge_fake.py (17), test_gate_port.py (11), test_edge_attach.py (1, real Docker),
+  the proxy connect/disconnect test and the edge lifecycle through the proxy in test_docker_integration.py (2)
+
+node --test apps/edge/test/*.test.mjs
+  tests 103, pass 103, fail 0   (96 before story 5 added session-epoch.test.mjs with 7)
+
+node --test scripts/check-lab-compose-rules.test.mjs
+  tests 13, pass 13, fail 0
+
+node --test --test-concurrency=1 scripts/e2e/edge.e2e.test.mjs   (Docker Desktop)
+  tests 11, pass 11, fail 0
+
+node scripts/scan-secrets.mjs
+  first run: FAIL scripts/vmi-audit.test.mjs:152 (another agent's file); later rerun: PASS
+
+node scripts/check-text-files.mjs
+  one FAIL in another agent's file (apps/api/src/vulnmart/lab/runtime.py:1, byte order mark) and docs/assets/story-8-1-lab-runtime/pytest-lab.txt; none in the files of these stories

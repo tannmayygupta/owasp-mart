@@ -84,7 +84,7 @@ test('staging issue: lego runs against the staging server with the token as a fi
     assert.match(calls[0], /--server https:\/\/acme-staging-v02\.api\.letsencrypt\.org\/directory/);
     assert.match(calls[0], /--dns duckdns/);
     assert.match(calls[0], /--domains demo\.duckdns\.org/);
-    assert.match(calls[0], / run$/);
+    assert.match(calls[0], /^lego run /); // lego v5: one command, `run`, flags after it (checked against lego run --help, 2026-10-17)
     assert.ok(s.log().some((l) => l.includes('token_file=') && !l.includes('token_file=unset') && l.includes('token_var=unset')), 'token passed as a file only');
     assert.ok(existsSync(path.join(s.dir, 'certs', 'staging', 'fullchain.pem')) && existsSync(path.join(s.dir, 'certs', 'staging', 'privkey.pem')));
     assert.ok(!existsSync(path.join(s.dir, 'certs', 'live')), 'staging never writes the live folder');
@@ -156,7 +156,7 @@ test('renew when not due: no-op, exit 0, lego not called', { skip }, () => {
   } finally { s.clean(); }
 });
 
-test('renew when due: lego renew runs against production with --days; the clock stub decides', { skip }, () => {
+test('renew when due: lego run --renew-days runs against production; the clock stub decides', { skip }, () => {
   const s = setup({ STUB_NOTAFTER: 'Jan 20 00:00:00 2030 GMT' }); // 19 days left
   try {
     production(s);
@@ -164,7 +164,7 @@ test('renew when due: lego renew runs against production with --days; the clock 
     assert.equal(r.status, 0, r.stderr);
     const last = legoCalls(s).at(-1);
     assert.match(last, /acme-v02\.api\.letsencrypt\.org/);
-    assert.match(last, / renew --days 30$/);
+    assert.match(last, /^lego run .* --renew-days 30$/);
     assert.ok(s.mark('certs-ok') && !s.mark('certs-failed'));
   } finally { s.clean(); }
 });
@@ -381,7 +381,7 @@ test('certs.env is read as KEY=value lines only: values, environment wins, RENEW
     const marker = path.join(s.dir, 'executed');
     const envFile = path.join(s.dir, 'certs.env');
     writeFileSync(envFile, [
-      '# a comment', '', 'CERT_NAME="file.duckdns.org"', "CERT_EMAIL='ops@example.invalid'", 'RENEW_DAYS=70', 'LEGO_EXTRA_ARGS=--dns.propagation-wait 60s',
+      '# a comment', '', 'CERT_NAME="file.duckdns.org"', "CERT_EMAIL='ops@example.invalid'", 'RENEW_DAYS=70', 'LEGO_EXTRA_ARGS=--dns.propagation.wait 60s',
       'EVIL=$(touch ' + fwd(marker) + ')', 'touch ' + fwd(marker), 'CERT_DIR=' + fwd(path.join(s.dir, 'certs')), 'TOKEN_FILE=' + fwd(path.join(s.dir, 'duckdns.token')), 'UNKNOWN=1', '',
     ].join('\r\n'));
     const base = { VULNMART_CERTS_ENV: fwd(envFile) };
@@ -391,7 +391,7 @@ test('certs.env is read as KEY=value lines only: values, environment wins, RENEW
     const call = legoCalls(s)[0];
     assert.match(call, /--domains file\.duckdns\.org/);
     assert.match(call, /--email ops@example\.invalid/);
-    assert.match(call, /--dns\.propagation-wait 60s run$/);
+    assert.match(call, /^lego run .* --dns\.propagation\.wait 60s$/);
     // the environment wins over the file
     const s2 = s.runWith({ ...base, CERT_NAME: 'env.duckdns.org' }, 'vulnmart-certs.sh', 'issue');
     assert.equal(s2.status, 0, s2.stderr);
@@ -406,7 +406,7 @@ test('certs.env is read as KEY=value lines only: values, environment wins, RENEW
     const before = legoCalls(r).length;
     const run = r.runWith({ VULNMART_CERTS_ENV: fwd(envFile), CERT_NAME: undefined, CERT_EMAIL: undefined }, 'vulnmart-certs.sh', 'renew');
     assert.equal(run.status, 0, run.stderr);
-    assert.match(legoCalls(r).at(-1), / renew --days 70$/);
+    assert.match(legoCalls(r).at(-1), /^lego run .* --renew-days 70$/);
     assert.equal(legoCalls(r).length, before + 1);
   } finally { r.clean(); }
   const bad = setup({ RENEW_DAYS: 'soon' });

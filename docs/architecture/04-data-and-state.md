@@ -24,9 +24,8 @@ Two databases in one PostgreSQL 18 cluster: `vulnmart` (everything below) and `v
 | `user_roles` | `user_id`, `role` (`learner`, `candidate`) | Participants only (D-05) |
 | `mfa_credentials` | `user_id`, `type` (`totp`), `secret_enc`, `enabled_at`, `last_used_step` | Secret encrypted with an application field key; required for admin (FR-ACC-07) |
 | `recovery_codes` | `user_id`, `code_hash`, `used_at` | Hashes only |
-| `sessions` | `id_hash`, `user_id`, `created_at`, `last_seen_at`, `absolute_expires_at`, `ip_trunc`, `ua_class`, `revoked_at` | Server-side sessions (D-21). Opaque ID stored hashed. Valkey caches active sessions |
-| `email_tokens` | `token_hash`, `user_id`, `purpose` (`verify`, `reset`), `expires_at`, `used_at` | Single-use, stored as a hash (FR-ACC-02, FR-ACC-08) |
-
+| `sessions` | `id_hash`, `user_id`, `created_at`, `last_seen_at`, `absolute_expires_at`, `ip_trunc`, `ua_class`, `revoked_at`, `mfa_at` | Server-side sessions (D-21). Opaque ID stored hashed. `mfa_at` is when a second factor was proved in the session: an admin session without it carries no admin role (story P-15, ADR 0045). Valkey caching of active sessions is not built |
+| `email_tokens` | `token_hash`, `user_id`, `purpose` (`verify`, `reset`, `mfa`), `expires_at`, `used_at`, `attempts` | Single-use, stored as a hash (FR-ACC-02, FR-ACC-08). `mfa` is the 5-minute ticket between the password and the second factor, with at most five tries counted in `attempts` (FR-ACC-07, story P-15). `recovery_codes.code_hash` is a keyed hash (HMAC under the field key) |
 ### 2.2 Organizations (stream P)
 
 | Table | Key columns | Notes |
@@ -54,7 +53,7 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 | `assessment_templates` | `id`, `org_id`, `title`, `time_limit_min`, `hints_mode`, `hint_cost_pct`, `reset_limit`, `invite_expiry_days`, `retention_days`, `settings jsonb` | A template used by started attempts is frozen: attempts copy the rules at start (FR-ASM-01) |
 | `template_challenges` | `template_id`, `challenge_key` | |
 | `invites` | `id`, `org_id`, `template_id`, `email_ci`, `token_hash`, `state`, `expires_at`, `superseded_by` | State machine below. Token is at least 128 bits, stored as a hash (FR-ASM-02) |
-| `consent_records` | `id`, `user_id`, `org_id`, `template_id`, `notice_version`, `notice_text_sha256`, `notice_text_snapshot`, `retention_days_shown`, `controller_name_shown`, `action` (`granted`, `declined`, `withdrawn`), `at`, `ip_hash`, `ua_hash`, `method`, `audit_seq` | **Append-only** (no UPDATE or DELETE grant). `audit_seq` links into the audit chain (FR-PRV-02) |
+| `consent_records` | `id`, `user_id`, `attempt_id`, `org_id`, `template_id`, `notice_version`, `notice_text_sha256`, `notice_text_snapshot`, `retention_days_shown`, `controller_name_shown`, `action` (`granted`, `declined`, `withdrawn`), `at`, `ip_hash`, `ua_hash`, `method`, `audit_seq` | **Append-only** (no UPDATE or DELETE grant). `audit_seq` links into the audit chain (FR-PRV-02) |
 
 ### 2.5 Attempts and instances (stream L)
 
@@ -96,9 +95,10 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 
 | Table | Key columns |
 |---|---|
-| `audit_log` | `seq bigserial`, `at`, `actor_subject`, `actor_type`, `action`, `target_type`, `target_id`, `org_id`, `result`, `ip_trunc`, `meta jsonb`, `prev_hash`, `row_hash` |
-| `audit_checkpoint` | `seq`, `hash`, `reason` (written when old rows are purged) |
-| `audit_anchor` | `anchor_date`, `head_seq`, `head_hash`, `anchored_at`, `witness` |
+| `audit_log` | `seq` (set by the writer under the chain lock, no gap), `at` (whole seconds UTC), `actor`, `action`, `subject`, `details` (the canonical JSON text the hash covers), `prev_hash`, `row_hash`. **As built (story P-17):** the IF-9 `AuditPort` carries only actor, action, subject and details, so the columns `actor_type`, `target_type`, `target_id`, `org_id`, `result`, `ip_trunc` and `meta` of the first sketch are not columns; an org or a result goes in `details`, and an indexed column is added by a migration if a screen needs one (handoff H-137) |
+| `audit_checkpoint` | `seq`, `hash`, `reason`, `created_at` (written when old rows are purged) |
+| `audit_anchor` | `anchor_date`, `head_seq`, `head_hash`, `anchored_at`, `witness` (`file` when the line was also written outside the database, else `db`) |
+| `subject_map` (owner `privacy`) | `subject_id` (`s-` and 16 Base32 characters, the pseudonym in the audit log), `user_id` (unique), `created_at`. No foreign key; deleting the row is how a person is forgotten by the log (FR-PRV-10) |
 
 ## 3. Organization filtering in one place
 
@@ -106,6 +106,8 @@ Rule (FR-ORG-06, NFR-EXT-01): every recruiter-owned row has `org_id`, and **one 
 
 1. **Application layer.** A single database-session class applies an organization filter to every query on tables that carry `org_id`. If a query touches such a table and the session has no organization scope, it **raises an error** instead of returning rows (the "missing filter fails a test" criterion).
 2. **Database layer.** PostgreSQL Row-Level Security on the same tables with a policy comparing `org_id` to a per-transaction setting. By default a table owner and any role with BYPASSRLS skip RLS, and a table with RLS enabled and no policy shows no rows `[EF-25]`, so the application connects as a role that is **not** the table owner and has no BYPASSRLS, and the tables use `FORCE ROW LEVEL SECURITY`. Setting the variable per transaction is a common pattern, not in the page read `[EF-25]`.
+
+**As built (story P-18, ADR 0048): two read-only exceptions.** A session whose scope is an admin with no company reads `organizations` across companies (policy `admin_read`, the setting `vulnmart.admin`, and `org_scoped(admin_visible=True)` in Python), which the approval queue needs; and a person with no company in scope reads only the `org_members` rows that name them (policy `own_membership`, the setting `vulnmart.user_id`, and `org_scoped(self_column="user_id")`), which answers "which company am I in". Writes still need the company in scope; no table with candidate data is opted in.
 
 A second scope exists for participants: rows owned by a person are filtered by `user_id`. Tests (FR-DSH-06, NFR-SEC-08) try cross-user and cross-company reads for every role against every list and detail route; the 404-versus-403 choice is the same for "missing" and "not yours" so identifiers cannot be probed.
 
@@ -115,7 +117,7 @@ A second scope exists for participants: rows owned by a person are filtered by `
 
 **Writers.** One function `append_audit(...)` inserts a row inside a transaction holding an advisory lock on the chain, so rows are strictly ordered with no gaps and the chain stays correct under concurrent writes. Volume is low (logins, views, admin actions), so serialisation is fine. This is tested in spike S-10.
 
-**Database roles.** `audit_writer` may only INSERT. The application's normal role has no UPDATE or DELETE on the audit tables. A separate `audit_purger` role may delete rows older than 12 months only through a function that writes an `audit_checkpoint` row with the hash that precedes the new first row, so the chain verifies from the checkpoint.
+**Database roles.** `audit_writer` may only INSERT. The application's normal role has no UPDATE or DELETE on the audit tables. **As built (story P-17):** there is no separate `audit_writer` role: the writer has to read the head, and the application is the only writer, so the application role has SELECT and INSERT on the three audit tables and nothing else; the `audit_purger` path is story P-24. A separate `audit_purger` role may delete rows older than 12 months only through a function that writes an `audit_checkpoint` row with the hash that precedes the new first row, so the chain verifies from the checkpoint.
 
 **Deleting a person.** The `subject_map` row is deleted. Audit rows stay and identify nobody (FR-PRV-10); the chain is unaffected because hashes cover pseudonymous values only.
 
@@ -131,7 +133,7 @@ A second scope exists for participants: rows owned by a person are filtered by `
 ### 5.2 Keys
 - One **DEK per attempt** (random 256-bit), used with AES-256-GCM to encrypt that attempt's evidence and answers. PRD wording says "per-assessment key" (D-25, FR-PRV-12); deleting **one** candidate while others in the same assessment remain needs a key per candidate attempt, so the architecture uses a per-attempt key (listed as PRD issue P-9 in README for the user to confirm).
 - A **KEK** (key-encryption key, versioned) wraps DEKs. The KEK is a file secret on VM-P (ADR 0009).
-- Wrapped DEKs live in the separate `vm_keystore` database, **not** in `vulnmart`. The `vulnmart` database and the keystore are backed up under **different rules**.
+- Wrapped DEKs live in the separate `vm_keystore` database, **not** in `vulnmart`. The `vulnmart` database and the keystore are backed up under **different rules**. **As built (story P-17):** `vm_keystore` has `deks` (`attempt_id`, `dek_id`, `kek_version`, `nonce`, `wrapped`, `created_at`) and `shredded` (`attempt_id`, `shredded_at`, ids only), is reached only by the role `vulnmart_keys` (the application role cannot connect), and is created by `python -m vulnmart.kernel.migrate`; see `docs/runbooks/keystore-and-audit-anchor.md`.
 
 ### 5.3 Shredding rule that survives backups
 Problem: if the wrapped DEK sat in the same rolling backups as the ciphertext, restoring any backup within 14 days would bring the data back, so deleting the key would not erase it (the goal of FR-PRV-12 and spike S-10).

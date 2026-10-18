@@ -19,7 +19,7 @@ from vulnmart.accounts.models import EmailToken, User, UserRole, UserSession
 from vulnmart.accounts.passwords import CommonPasswordList, PasswordPolicy, _common_passwords
 from vulnmart.accounts.self_service import SelfService
 from vulnmart.accounts.service import AccountService, InvalidInput, TokenInvalid
-from vulnmart.accounts.sessions import MfaUnavailable, SessionService
+from vulnmart.accounts.sessions import SessionService
 from vulnmart.kernel.db import Base
 from vulnmart.kernel.ratelimit import InMemoryRateLimiter
 from vulnmart.kernel.settings import Settings
@@ -196,8 +196,8 @@ def test_the_link_of_an_admin_made_by_an_admin_is_a_reset_link(sessions, clock):
     assert to == new_id and "/reset-password?token=" in params["link"]
     service(sessions, clock).confirm_reset(token=token_of(params), new_password=NEW)
     assert security.verify_password(stored_hash(sessions, new_id), NEW)
-    with pytest.raises(MfaUnavailable):  # and the admin still cannot sign in before the second factor exists (story P-15)
-        SessionService(sessions, FakeSettingsPort(), b"k" * 32, now=clock).login(email="second@example.com", password=NEW)
+    first = SessionService(sessions, FakeSettingsPort(), b"k" * 32, now=clock).login(email="second@example.com", password=NEW)
+    assert first.session.roles == frozenset(), "the new admin signs in, but holds no admin role until a second factor is set up (story P-15)"
 
 
 # ---- over HTTP -------------------------------------------------------------------------------------------------------

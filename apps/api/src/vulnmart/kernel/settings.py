@@ -63,9 +63,59 @@ class Settings(BaseSettings):
     # file wins; staging and production do not start without one. dev and test make a random key per process (tokens then end with it).
     csrf_secret: str | None = Field(default=None, repr=False)
     csrf_secret_file: str | None = None
+    # The field key (story P-15, architecture 06 `K_field`): seals TOTP secrets and keys the hash of recovery codes. A secret of at least 32 bytes;
+    # production reads a file and the file wins; staging and production do not start without one; dev and test make a random one per process
+    # (second-factor secrets then do not survive a restart).
+    field_secret: str | None = Field(default=None, repr=False)
+    field_secret_file: str | None = None
     # Password quality (story P-14): `local` checks the bundled list of common passwords; `hibp` also asks the Pwned Passwords range API (it
     # sees only the first 5 characters of a SHA-1); `off` is for dev and test only.
     breach_check: Literal["local", "hibp", "off"] = "local"
+
+    # The key service (story P-17, architecture 04 section 5, ADR 0009): the wrapped per-attempt keys live in their own database `vm_keystore`, reached
+    # with their own role. `kek` is the versioned key-encryption keys, one `version:base64` per line (the highest version wraps new keys); the three
+    # masters are base64 of at least 32 bytes. Production reads files and the file wins; staging and production do not start with a keystore address
+    # but without them; dev and test make random masters per process (flags and event keys then change on restart).
+    keystore_dsn: str | None = Field(default=None, repr=False)
+    keystore_database: str = "vm_keystore"
+    keystore_role: str = "vulnmart_keys"
+    keystore_password: str | None = Field(default=None, repr=False)  # only the migrate job needs it (it creates the role)
+    keystore_password_file: str | None = None
+    kek: str | None = Field(default=None, repr=False)
+    kek_file: str | None = None
+    event_master: str | None = Field(default=None, repr=False)
+    event_master_file: str | None = None
+    flag_key: str | None = Field(default=None, repr=False)
+    flag_key_file: str | None = None
+    owner_key: str | None = Field(default=None, repr=False)
+    owner_key_file: str | None = None
+    # Where the daily audit anchor line is also written (a file on VM-P that an operator ships off the machine, OI-28); unset: the database row only.
+    audit_anchor_file: str | None = None
+    def _secret_text(self, value: str | None, path: str | None) -> str | None:
+        if path:
+            with open(path, encoding="utf-8") as f:
+                value = f.read().strip()
+        return value or None
+
+    def kek_text(self) -> str | None:
+        return self._secret_text(self.kek, self.kek_file)
+
+    def master_text(self, name: Literal["event", "flag", "owner"]) -> str | None:
+        """The base64 text of one master key (`event`, `flag` or `owner`), from its file when one is named, else the environment."""
+        value, path = {"event": (self.event_master, self.event_master_file), "flag": (self.flag_key, self.flag_key_file),
+                       "owner": (self.owner_key, self.owner_key_file)}[name]
+        return self._secret_text(value, path)
+
+    def keystore_password_value(self) -> str | None:
+        return self._secret_text(self.keystore_password, self.keystore_password_file)
+    def field_key_secret(self) -> bytes | None:
+        """The configured field key secret as bytes, or None when none is set."""
+        if self.field_secret_file:
+            with open(self.field_secret_file, encoding="utf-8") as f:
+                value = f.read().strip()
+        else:
+            value = self.field_secret
+        return value.encode("utf-8") if value else None
 
     def csrf_key(self) -> bytes | None:
         """The configured CSRF key as bytes, or None when none is set."""

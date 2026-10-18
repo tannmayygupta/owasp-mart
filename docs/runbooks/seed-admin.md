@@ -11,11 +11,19 @@ docker exec -e VULNMART_SEED_ADMIN_PASSWORD='<at least 16 characters>' vulnmart-
 
 - The password is never put on the command line. It comes from `VULNMART_SEED_ADMIN_PASSWORD`, or from one line on standard input with `--password-stdin`, or (neither given) the command makes a random 24-character one and prints it once.
 - Exit code 0: created. 2: a value is not acceptable (address, name, or a password outside 16 to 128 characters). 3: an account with that address exists already, nothing changed. 1: no database address.
-- The account exists at once, with the address already marked verified, and holds no learner or candidate role. **It cannot sign in until the second factor exists (story P-15)**: a login answers a generic error and the log says why.
+- The account exists at once, with the address already marked verified, and holds no learner or candidate role. **It signs in with the password, but a session without a proved second factor holds no admin role**, so nothing admin-only works until an authenticator app is set up (see "First sign-in" below).
 - The audit entry `admin.created` (actor `system:seed`) is written to the in-memory audit port and also to the log as a warning line. The durable audit log is story P-17, so until then keep the log line if you need the trace.
 
+## First sign-in: set up the authenticator app (FR-ACC-07)
+Every admin needs a second factor. There is no admin page yet (dashboards), so through the API, with the browser's own cookie and the CSRF token of the session:
+1. `POST /api/v1/session` with the email and password. The answer is a session (`mfa_enabled` is false); the cookie works but carries no admin role.
+2. `POST /api/v1/me/mfa` (header `X-CSRF-Token`) returns an `otpauth://` address. Put it in an authenticator app (for example as a QR code made from the address, or type the `secret` by hand). **Treat the address as a secret: it is shown once.**
+3. `POST /api/v1/me/mfa/confirm` with `{"code": "<the 6 digits the app shows>"}` turns the factor on and returns **ten recovery codes, shown only this once**: store them offline. The session cookie changes and now carries the admin role.
+4. From then on a sign-in is two steps: `POST /api/v1/session` answers `mfa_required` with a ticket (valid 5 minutes, five tries), then `POST /api/v1/session/mfa` with the ticket and a code. A recovery code works in place of a code, once each.
+5. An admin cannot turn the second factor off. If the phone is lost and the recovery codes are gone, an operator has to intervene in the database (there is no self-service path by design).
+
 ## Staging and production
-Same command, run on VM-P in the API container with its own environment (`VULNMART_POSTGRES_DSN` from the secret files). Do not leave the password in shell history: use `--password-stdin` and pipe it from a password manager, or let the command generate one. Change it at the first sign-in once the password-reset story (P-14) is in.
+Same command, run on VM-P in the API container with its own environment (`VULNMART_POSTGRES_DSN` from the secret files). Do not leave the password in shell history: use `--password-stdin` and pipe it from a password manager, or let the command generate one. Change it at the first sign-in (`POST /api/v1/me/password`). Set `VULNMART_FIELD_SECRET_FILE` (at least 32 bytes) on the API: it seals the second-factor secrets, and the API does not start in staging or production without it.
 
 ## Another admin from an admin
 `AdminService.create_admin` (an active admin only) makes the account with a random password nobody knows and mails the new admin a single-use link to choose their own (template `account.admin_created`, a `reset` token, consumed by story P-14). There is no route for it yet (story P-28).

@@ -375,13 +375,14 @@ def test_the_ports_package_holds_only_the_three_modules():
     names = sorted(p.name for p in ports.glob("*.py"))
     # InstanceHost (stream L) and, since story P-05, the IF-9 ports with their fakes (stream P's six, stream L's three as P's proposal)
     assert names == [
-        "__init__.py", "attempts.py", "audit.py", "errors.py", "fake_instance_host.py", "fakes.py", "http_instance_host.py",
-        "instance_host.py", "instances.py", "keys.py", "lab_fakes.py", "outbox.py", "quota.py", "reports.py", "scope.py", "settings.py",
+        "__init__.py", "attempts.py", "audit.py", "engine_attempts.py", "engine_reports.py", "errors.py", "fake_instance_host.py",
+        "fakes.py", "http_instance_host.py", "instance_host.py", "instances.py", "keys.py", "lab_fakes.py", "outbox.py", "quota.py",
+        "reports.py", "scope.py", "settings.py",
     ]
     # The package holds the ports, the platform API modules (stream P: main.py, problem.py) and, since story P-05, the module folders
     # named in contracts/db/table-owners.yaml (P: kernel ... live; L: attempts, instances, scoring, ingest, flags); a new module is added here on purpose.
     assert sorted(p.name for p in (ROOT / "apps" / "api" / "src" / "vulnmart").iterdir() if p.name != "__pycache__") == [
-        "__init__.py", "accounts", "admin", "assessments", "attempts", "flags", "ingest", "instances", "kernel", "live", "main.py",
+        "__init__.py", "accounts", "admin", "assessments", "attempts", "flags", "ingest", "instances", "kernel", "lab", "live", "main.py",
         "notifications", "orgs", "ports", "privacy", "problem.py", "py.typed", "scoring",
     ]
 

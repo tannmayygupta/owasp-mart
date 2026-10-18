@@ -42,5 +42,9 @@
 | 0042 | [Sessions: hashed cookie value, HMAC CSRF token, origin check, login throttle](0042-sessions-hashed-cookie-hmac-csrf-and-login-throttle.md) | Proposed (the builder's design for the developer to confirm) |
 | 0043 | [Roles, admin creation and role-gated routes](0043-roles-admin-creation-and-role-gated-routes.md) | Proposed (the builder's design for the developer to confirm) |
 | 0044 | [Password policy: rules, a bundled common-password list, an optional breach range check](0044-password-policy-bundled-list-and-optional-range-check.md) | Proposed (the builder's design for the developer to confirm) |
+| 0045 | [TOTP second factor: sealed secret, keyed recovery codes, a restricted session for an admin without one](0045-totp-second-factor-sealed-secret-and-restricted-admin-session.md) | Proposed (the builder's design for the developer to confirm) |
+| 0046 | [Append-only consent record, a notice text pinned to its version, a ConsentTargets port](0046-append-only-consent-record-pinned-notice-text-and-consent-targets-port.md) | Proposed (the builder's design for the developer to confirm) |
+| 0047 | [The audit log on Postgres with pseudonymised subjects, and the key service over a separate keystore database](0047-audit-log-on-postgres-and-key-service-over-a-separate-keystore.md) | Proposed (the builder's design for the developer to confirm) |
+| 0048 | [Recruiter signup, company states derived from the company, and two read-only exceptions to the organisation scope](0048-recruiter-signup-company-states-and-two-read-only-scope-exceptions.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

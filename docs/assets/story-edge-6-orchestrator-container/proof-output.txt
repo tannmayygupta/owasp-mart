@@ -1,0 +1,61 @@
+VulnMart edge story 6: the orchestrator as a container on labs-core (run vmorchc1e9f34)
+Date: 2026-10-17; machine: laptop with Docker Desktop (29.6.2)
+
+--- before: objects of the project already on the machine (not started by this run)
+vulnmart-docker-proxy Up 3 hours (healthy)
+networks: vulnmart-labs-core
+volumes: (none)
+PASS no vm-* container or network before the run (a volume vm-gomod of another project may exist and is left alone): volumes already there: 'vm-gomod'
+PASS the stub instance image is present locally
+test-only differences from the committed service (temp override outside the repository): --allow-local-images, --template-schema (relaxed, mounted), --rate-per-s 0, labels
+compose up -d --build --wait orchestrator: exit 0
+vulnmart-docker-proxy docker-proxy Up 3 hours (healthy)
+vulnmart-edge-gate edge-gate Up 12 seconds (healthy)
+vulnmart-orchestrator orchestrator Up 6 seconds (healthy)
+PASS orchestrator container is running and healthy: healthy
+PASS no Docker socket and no bind of a docker path in its mounts: bind:/etc/vulnmart/template.schema.json:ro, volume:/run/secrets:ro, bind:/etc/vulnmart/templates:ro, bind:/etc/vulnmart/images.json:ro, volume:/var/lib/vulnmart/orchestrator:rw
+PASS not privileged, read-only root, cap_drop ALL, no-new-privileges, non-root: user 65532:65532, caps added null, pid mode ''
+PASS on labs-core only (not host network): vulnmart-labs-core
+PASS the only published port is <addr>:9443 -> 8443: 8443/tcp-><addr>:9443
+/run/secrets/gate_admin_secret 400 65532:65532
+/run/secrets/platform_key 400 65532:65532
+/run/secrets/tls_ca 400 65532:65532
+/run/secrets/tls_cert 400 65532:65532
+/run/secrets/tls_key 400 65532:65532
+PASS secret files are mode 400 owned by 65532 under /run/secrets (names only here)
+PASS Docker host is the proxy over labs-core, edge flags set, no TLS bypass
+PASS docker inspect of the container holds no key or secret (no secret in environment or command)
+PASS the container log holds no key or secret
+PASS from inside the container docker-proxy:2375 and edge-gate-admin:9090 accept a connection
+PASS without a client certificate the TLS handshake is refused
+PASS with the client certificate and a signed request GET /v1/host answers 200: host_id orch-host-1, instances 0
+PASS (repeat) a second signed call is accepted (fresh nonce)
+PASS create answers 202: state requested
+PASS the instance reaches ready: state ready, error null, access closed
+PASS the edge gate container is attached to the instance network (docker network inspect): members: vulnmart-edge-gate, vm-<id>-e1-shop, vm-<id>-e1-sidecar
+PASS docker inspect of the edge gate lists the instance network: 3 networks
+PASS the instance network is internal (no outbound)
+PASS gate has the record closed after create: player request answers 410 (ended page): status 410
+PASS POST access open (epoch 1) answers 200: access open, epoch 1
+PASS gate got the open state: player request without a ticket answers 403 (denied, not 410 ended): status 403
+PASS gate got the frozen state: 423 (paused page): status 423
+PASS no key or secret in the orchestrator log after the run of the instance
+PASS destroy answers 200 or 202: status 202
+PASS the instance is destroyed: state destroyed
+PASS after destroy: no vm-* container or network, volumes as before the run: containers '', networks '', volumes 'vm-gomod'
+PASS the edge gate has no instance network any more: vulnmart-edge-public, vulnmart-labs-core
+PASS gate record removed: 410 again: status 410
+
+Result: all 30 checks PASS
+--- teardown
+compose rm orchestrator edge-gate: exit 0
+--- after teardown: leftovers of this run and of vm-*
+docker ps -a --filter label=vm.run=vmorchc1e9f34: (empty)
+docker network ls --filter label=vm.run=vmorchc1e9f34: (empty)
+docker volume ls --filter label=vm.run=vmorchc1e9f34: (empty)
+vm-* containers '', networks '', volumes 'vm-gomod' (any volume listed here was already there before the run, see the check at the top)
+docker ps -a (project vulnmart):
+vulnmart-docker-proxy Up 3 hours (healthy)
+networks named vulnmart*: vulnmart-labs-core
+volumes named vulnmart*: (none)
+temp folder present: false

@@ -72,6 +72,16 @@ class ChallengeNotFound(PortError):
     code = ErrorCode.ATT_CHALLENGE_NOT_FOUND
 
 
+class FlagRateLimited(PortError):
+    """Too many incorrect flag pastes for one challenge (story 6.3): the API answers 429 with `Retry-After: retry_after`."""
+
+    code = ErrorCode.ATT_FLAG_RATE_LIMITED
+
+    def __init__(self, message: str = "", *, field: str | None = None, retry_after: int = 1):
+        super().__init__(message, field=field)
+        self.retry_after = max(1, int(retry_after))
+
+
 # ---- instance errors (IF-2 vocabulary; the orchestrator's own are in instance_host.py) ----
 
 class InstanceMissing(PortError):
@@ -97,6 +107,6 @@ class KeyShredded(AttemptGone):
 # One class per code (subclasses such as ScopeMissing or KeyShredded are caught by their code's class).
 ERRORS_BY_CODE: dict[ErrorCode, type[PortError]] = {
     cls.code: cls
-    for cls in (PortMisuse, EventInvalid, AttemptNotFound, AttemptStateInvalid, AttemptGone, ChallengeNotFound, InstanceMissing,
-                InstanceStateInvalid, InstanceNotReady, InstanceQuotaReached)
+    for cls in (PortMisuse, EventInvalid, AttemptNotFound, AttemptStateInvalid, AttemptGone, ChallengeNotFound, FlagRateLimited,
+                InstanceMissing, InstanceStateInvalid, InstanceNotReady, InstanceQuotaReached)
 }

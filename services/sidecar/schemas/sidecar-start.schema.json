@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vulnmart.invalid/contracts/instance/sidecar-start.schema.json",
+  "title": "Sidecar start document (instance contract v0, IF-6, open point 35)",
+  "description": "PROPOSAL (2026-10-10, story L-06, handoff H-59). The one JSON document the orchestrator writes on the standard input of the sidecar at start. The document ends at the end of the input or as soon as one complete JSON object has arrived (a container made by Compose has no stdin-once flag, so Docker does not close its input; see instance-contract.md section 6). Anything after that object is a bad document. The sidecar reads it once and never again. Contains secrets (the event key): never put it in an environment variable, a label, a log, an event or a file outside memory. Rules a schema cannot express (a repeated digest, a repeated challenge key and kind) are checked by scripts/validate-contracts.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "instance_id", "epoch", "event_key", "flag_digests"],
+  "properties": {
+    "schema_version": {
+      "description": "Contract version this document follows, 0.x until v1.0.0.",
+      "const": "0.1"
+    },
+    "instance_id": {
+      "description": "Proposal: i- plus 16 Base32 characters (instance contract open point 1).",
+      "type": "string",
+      "pattern": "^i-[A-Z2-7]{16}$"
+    },
+    "epoch": {
+      "description": "Flag epoch of this instance, starts at 1 and grows by one on every reset. The sidecar stamps it on every event it signs; it restarts its seq counter at 1 in every epoch (IF-4 section 6, decision D-42).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "event_key": {
+      "description": "Per-instance event key used to sign events (IF-4 section 4), derived by the platform for this (instance, epoch) with HKDF-SHA256 (43 base64url characters; 32 to 128 printable ASCII characters are accepted). A secret: the sidecar keeps it in memory only.",
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128,
+      "pattern": "^[!-~]+$"
+    },
+    "flag_digests": {
+      "description": "SHA-256 digests of the real flags and the decoys of this epoch, so the sidecar can recognise a flag-shaped string in a response without ever holding a flag (architecture 04 section 11.3).",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["challenge_key", "kind", "sha256"],
+        "properties": {
+          "challenge_key": { "type": "string", "pattern": "^C(0[1-9]|10|11)$" },
+          "kind": { "enum": ["real", "decoy"] },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  }
+}

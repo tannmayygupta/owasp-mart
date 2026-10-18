@@ -11,6 +11,7 @@ import vulnmart.accounts.models  # noqa: F401 - registers the account tables
 import vulnmart.kernel.models  # noqa: F401 - registers the kernel tables
 import vulnmart.notifications.models  # noqa: F401 - registers the email outbox
 import vulnmart.orgs.models  # noqa: F401 - registers the organisation tables
+import vulnmart.privacy.models  # noqa: F401 - registers the consent record
 from vulnmart.kernel.db import Base
 from vulnmart.kernel.settings import sqlalchemy_url
 

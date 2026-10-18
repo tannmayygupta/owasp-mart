@@ -45,6 +45,16 @@ The run saves a redacted copy of the table in `docs/assets/local-demo/demo-outpu
 5. **Stream T, the shop (60 s).** Show `shop-image-build` and `shop-role`. Say: the real shop image builds and runs in the shop role: the instance reaches `ready` after the injector. The distroless shop image has no `wget`, so the image manifest's per-role `healthchecks` entry gives the shop a node check (the same as its own HEALTHCHECK). The demo falls back to the stub only if the shop image fails to build or does not reach ready, and then says so. Sahil's import service, mock services and bot controller are on branch `origin/sprint-2-sahil` and are not in `main` yet, so the demo uses a reduced two-component template (injector and shop).
 6. **Close (30 s).** Every step PASS, cleanup PASS, nothing left running, evidence file saved.
 
+## Full loop (story 8.3, LX-1 and LX-2)
+
+One candidate through the real pieces on Docker Desktop: lab runtime, real orchestrator, stub instance, edge gate and Caddy, signed event, milestone, flag, score, deadline freeze and destroy. Needs Docker Desktop running, `uv` and `openssl`. It is the demo's "real containers" proof and is never a CI gate. Run it before the demo.
+
+- `node --test --test-concurrency=1 scripts/e2e/loop.e2e.test.mjs` runs the ten steps (about 30 seconds once the images are built) and writes `docs/assets/story-8-3-loop-and-load/loop-output.txt`. Without Docker, `uv` or `openssl` the file skips with a message. After an interrupted run, `LOOP_CLEAN=1` first removes leftovers labelled `vm.kind=loop-test` (only those).
+- `node scripts/load-check.mjs --n 6` starts six stub instances at once and writes the ready times, memory and the machine's CPU and RAM to `docs/assets/story-8-3-loop-and-load/load-check.txt`. These are laptop numbers. The concurrency target on the deployed VM-I is not proven here; it is the runbook step of `docs/runbooks/measure-instances.md`.
+- The test publishes a small forwarder on `127.0.0.1` for the gate admin listener, because the orchestrator runs on the host (the open point H-343 in `docs/runbooks/edge-vm-i.md`). Compose is unchanged.
+- Fallback if the loop is not green on the day: the in-process loop (story 8.2), `node scripts/dev.mjs demo` and `scripts/e2e/edge.e2e.test.mjs`, each shown separately.
+- Check afterwards: `docker ps -a --filter label=vm.kind=loop-test` and `docker ps -a --filter label=vm.instance` print nothing.
+
 ## Troubleshooting
 - **"Docker is not running"**: start Docker Desktop, wait for "Engine running", run again.
 - **"containers already exist" or "port(s) in use"**: an earlier stack is running. Run `node scripts/dev.mjs down` (or `node scripts/dev.mjs demo down` after a `--keep` run), or stop whatever uses the port. The demo will not remove containers it did not start in this run.

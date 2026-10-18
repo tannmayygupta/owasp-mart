@@ -1,0 +1,14 @@
+Live run on vm-i (AWS Sydney), 2026-10-17, developer's paste, private address shown as <private>. TEST SETUP: throwaway test CA (2 days), fake image digests (000...0) in the release manifest, no real instance created (images not published, L-12).
+
+=== 2a: platform_key mode 644 (secrets folder owned 65532:65532)
+vulnmart_orchestrator: key (platform signing key) file /run/secrets/platform_key has mode 644: it must be 0600 or stricter (chmod 600)
+
+=== 2b: after chmod 400, test templates dir with shop-v0.json, test release manifest, matching TLS cert and key
+vulnmart-orchestrator Up 20 seconds (healthy)
+{"listening": true, "port": 8443}
+
+=== 3: bind
+LISTEN 0      4096      <private>:9443      0.0.0.0:*
+vulnmart-orchestrator <private>:9443->8443/tcp
+
+Dead ends of the first attempts (all fixed in the runbook): chmod globs run by a user that cannot read a mode-700 folder do nothing (use sudo bash -c); docker needs sudo -E docker on this host; an empty templates folder stops the container ("no template (*.json) found"); infra/images.json is the CI build list, not the release manifest ("release manifest needs an `images` object"); running the certificate block twice gave KEY_VALUES_MISMATCH.

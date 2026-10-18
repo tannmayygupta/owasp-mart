@@ -1,0 +1,4 @@
+From the developer's PC (an address that the security groups allow), TCP connect with a 3 s timeout, 2026-10-18, after the reboot test.
+vm-i, ports 22 80 443 2375 2376 3000 5432 6379 8080 8081 8443 9000 9090 9100 9443 9444: open = 22 only; every other port timed out (nothing listens or the packet is dropped).
+vm-p, ports 22 80 443 2375 9443 9444: open = 22 and 443 (443 is the Caddy origin gate and the S-14 probe that were left running; it answers 403 without the secret).
+This is the view of an allowed source address only; the security groups open nothing else to the internet (checked in AWS: no ingress rule for 0.0.0.0/0 except ICMP type 3 code 4).

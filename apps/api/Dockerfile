@@ -21,9 +21,11 @@ WORKDIR /src
 COPY pyproject.toml uv.lock .python-version ./
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
 COPY packages/py-models/pyproject.toml packages/py-models/pyproject.toml
+COPY packages/py-attempts/pyproject.toml packages/py-attempts/pyproject.toml
 RUN uv sync --frozen --no-dev --no-editable --package vulnmart-api --no-install-workspace
 # Then the application code.
 COPY packages/py-models/src packages/py-models/src
+COPY packages/py-attempts/src packages/py-attempts/src
 COPY apps/api/src apps/api/src
 RUN uv sync --frozen --no-dev --no-editable --package vulnmart-api
 
@@ -43,6 +45,9 @@ ENV VULNMART_VERSION=$VULNMART_VERSION \
 # The one Alembic history: the Compose `migrate` service runs `alembic -c /app/alembic.ini upgrade head`.
 COPY apps/api/alembic.ini /app/alembic.ini
 COPY apps/api/migrations /app/migrations
+# The IF-4 event schema the ingest handler validates against (the default path points at the repository root, absent here).
+COPY contracts/events/instance-events.schema.json /app/contracts/events/instance-events.schema.json
+ENV VULNMART_EVENT_SCHEMA=/app/contracts/events/instance-events.schema.json
 USER 65532:65532
 EXPOSE 8000
 

@@ -1,0 +1,12 @@
+# Keep the build context small: only what the Dockerfile copies (package.json, pnpm-lock.yaml, schemas, src).
+node_modules
+test
+scripts
+Dockerfile
+Dockerfile.dockerignore
+*.md
+npm-debug.log*
+.DS_Store
+crs/.out
+crs/*_test.go
+crs/corpus.json

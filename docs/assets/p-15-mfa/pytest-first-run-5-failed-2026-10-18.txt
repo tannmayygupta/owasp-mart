@@ -1,0 +1,192 @@
+................................................FF...................... [  4%]
+........................................................................ [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 16%]
+........................................................................ [ 20%]
+........................................................................ [ 24%]
+........................................................................ [ 28%]
+........................................................................ [ 32%]
+......................FF................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 44%]
+........................................................................ [ 48%]
+.......s................................................................ [ 52%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+........................................................................ [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 72%]
+........................................................................ [ 76%]
+........................................................................ [ 80%]
+........................................................................ [ 84%]
+........................................................................ [ 88%]
+........................................................................ [ 92%]
+F....................................................................... [ 96%]
+...................................................................      [100%]
+================================== FAILURES ===================================
+___ test_a_strict_environment_will_not_send_links_over_plain_http[staging] ____
+
+env = 'staging'
+
+    @pytest.mark.parametrize("env", ["staging", "production"])
+    def test_a_strict_environment_will_not_send_links_over_plain_http(env):
+        settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0", csrf_secret="k" * 32,
+                            postgres_dsn="postgresql://app@db.invalid/vulnmart", public_origin="http://vulnmart.example")
+        with pytest.raises(RuntimeError, match="https://"):
+            create_app({}, settings=settings)
+        https = settings.model_copy(update={"public_origin": "https://vulnmart.example"})
+>       create_app({}, settings=https)  # builds (nothing connects until a request needs the database)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+apps\api\tests\test_accounts_api.py:278: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+apps\api\src\vulnmart\main.py:112: in create_app
+    field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+settings = Settings(env='staging', service='api', version='0.0.0-dev', commit='unknown', log_level='INFO', check_timeout_seconds=...='https://vulnmart.example', trusted_proxy_hops=1, csrf_secret_file=None, field_secret_file=None, breach_check='local')
+
+    def field_keys_from(settings: Settings) -> FieldKeys:
+        """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
+        secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
+        secret = settings.field_key_secret()
+        if secret is None:
+            if settings.env in ("staging", "production"):
+>               raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
+E               RuntimeError: VULNMART_ENV=staging needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)
+
+apps\api\src\vulnmart\main.py:66: RuntimeError
+---------------------------- Captured stdout call -----------------------------
+{"ts": "2026-10-18T09:19:38.987Z", "level": "WARNING", "service": "api", "logger": "vulnmart.kernel", "message": "ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)", "request_id": null}
+{"ts": "2026-10-18T09:19:38.995Z", "level": "WARNING", "service": "api", "logger": "vulnmart.kernel", "message": "ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)", "request_id": null}
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+__ test_a_strict_environment_will_not_send_links_over_plain_http[production] __
+
+env = 'production'
+
+    @pytest.mark.parametrize("env", ["staging", "production"])
+    def test_a_strict_environment_will_not_send_links_over_plain_http(env):
+        settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0", csrf_secret="k" * 32,
+                            postgres_dsn="postgresql://app@db.invalid/vulnmart", public_origin="http://vulnmart.example")
+        with pytest.raises(RuntimeError, match="https://"):
+            create_app({}, settings=settings)
+        https = settings.model_copy(update={"public_origin": "https://vulnmart.example"})
+>       create_app({}, settings=https)  # builds (nothing connects until a request needs the database)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+apps\api\tests\test_accounts_api.py:278: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+apps\api\src\vulnmart\main.py:112: in create_app
+    field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+settings = Settings(env='production', service='api', version='0.0.0-dev', commit='unknown', log_level='INFO', check_timeout_secon...='https://vulnmart.example', trusted_proxy_hops=1, csrf_secret_file=None, field_secret_file=None, breach_check='local')
+
+    def field_keys_from(settings: Settings) -> FieldKeys:
+        """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
+        secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
+        secret = settings.field_key_secret()
+        if secret is None:
+            if settings.env in ("staging", "production"):
+>               raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
+E               RuntimeError: VULNMART_ENV=production needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)
+
+apps\api\src\vulnmart\main.py:66: RuntimeError
+---------------------------- Captured stdout call -----------------------------
+{"ts": "2026-10-18T09:19:40.839Z", "level": "WARNING", "service": "api", "logger": "vulnmart.kernel", "message": "ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)", "request_id": null}
+{"ts": "2026-10-18T09:19:40.843Z", "level": "WARNING", "service": "api", "logger": "vulnmart.kernel", "message": "ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)", "request_id": null}
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+____ test_a_strict_environment_with_a_secret_starts_and_checks_it[staging] ____
+
+env = 'staging'
+
+    @pytest.mark.parametrize("env", ["staging", "production"])
+    def test_a_strict_environment_with_a_secret_starts_and_checks_it(env):
+        # a strict environment also needs the Valkey address for the rate limits (story P-11); the client connects only when first used
+        settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0", csrf_secret="k" * 32)
+>       with TestClient(create_app({}, settings=settings)) as c:
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+apps\api\tests\test_kernel_origin.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+apps\api\src\vulnmart\main.py:112: in create_app
+    field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+settings = Settings(env='staging', service='api', version='0.0.0-dev', commit='unknown', log_level='INFO', check_timeout_seconds=...gin='http://127.0.0.1:3000', trusted_proxy_hops=1, csrf_secret_file=None, field_secret_file=None, breach_check='local')
+
+    def field_keys_from(settings: Settings) -> FieldKeys:
+        """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
+        secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
+        secret = settings.field_key_secret()
+        if secret is None:
+            if settings.env in ("staging", "production"):
+>               raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
+E               RuntimeError: VULNMART_ENV=staging needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)
+
+apps\api\src\vulnmart\main.py:66: RuntimeError
+---------------------------- Captured stderr call -----------------------------
+%(levelname)-5.5s [%(name)s] %(message)s
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+__ test_a_strict_environment_with_a_secret_starts_and_checks_it[production] ___
+
+env = 'production'
+
+    @pytest.mark.parametrize("env", ["staging", "production"])
+    def test_a_strict_environment_with_a_secret_starts_and_checks_it(env):
+        # a strict environment also needs the Valkey address for the rate limits (story P-11); the client connects only when first used
+        settings = Settings(env=env, origin_secret=SECRET, valkey_url="valkey://valkey.invalid:6379/0", csrf_secret="k" * 32)
+>       with TestClient(create_app({}, settings=settings)) as c:
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+apps\api\tests\test_kernel_origin.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+apps\api\src\vulnmart\main.py:112: in create_app
+    field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+settings = Settings(env='production', service='api', version='0.0.0-dev', commit='unknown', log_level='INFO', check_timeout_secon...gin='http://127.0.0.1:3000', trusted_proxy_hops=1, csrf_secret_file=None, field_secret_file=None, breach_check='local')
+
+    def field_keys_from(settings: Settings) -> FieldKeys:
+        """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
+        secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
+        secret = settings.field_key_secret()
+        if secret is None:
+            if settings.env in ("staging", "production"):
+>               raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
+E               RuntimeError: VULNMART_ENV=production needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)
+
+apps\api\src\vulnmart\main.py:66: RuntimeError
+---------------------------- Captured stderr call -----------------------------
+%(levelname)-5.5s [%(name)s] %(message)s
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+_ test_every_table_of_architecture_04_is_listed_once_and_nothing_else_except_the_keystore _
+
+    def test_every_table_of_architecture_04_is_listed_once_and_nothing_else_except_the_keystore():
+        listed = [t["table"] for t in OWNERS["tables"]]
+        assert len(listed) == len(set(listed))
+        arch = architecture_tables()
+        assert len(arch) >= 40, "the parser found the architecture tables"
+        assert arch - set(listed) == set(), "a table of the architecture has no owner"
+>       assert set(listed) - arch == {"deks"}, "only the keystore table is outside sections 2.1 to 2.8"
+E       AssertionError: only the keystore table is outside sections 2.1 to 2.8
+E       assert {'deks', 'mfa_tickets'} == {'deks'}
+E         
+E         Extra items in the left set:
+E         'mfa_tickets'
+E         Use -v to get more diff
+
+apps\api\tests\test_table_owners.py:56: AssertionError
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+5 failed, 1789 passed, 1 skipped in 792.39s (0:13:12)

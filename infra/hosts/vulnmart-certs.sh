@@ -108,10 +108,11 @@ run_lego() {
   DUCKDNS_TOKEN_FILE="$TOKEN_FILE"
   export DUCKDNS_TOKEN_FILE
   # shellcheck disable=SC2086
+  # lego v5 has one command, `run` ("get or renew"); every flag belongs after it (checked against `lego run --help` of v5.5.2 on 2026-10-17).
   if [ "$_cmd" = run ]; then
-    "$LEGO_BIN" --accept-tos --email "$CERT_EMAIL" --server "$_srv" --dns duckdns --domains "$CERT_NAME" --path "$_path" ${LEGO_EXTRA_ARGS:-} run
+    "$LEGO_BIN" run --accept-tos --email "$CERT_EMAIL" --server "$_srv" --dns duckdns --domains "$CERT_NAME" --path "$_path" ${LEGO_EXTRA_ARGS:-}
   else
-    "$LEGO_BIN" --accept-tos --email "$CERT_EMAIL" --server "$_srv" --dns duckdns --domains "$CERT_NAME" --path "$_path" ${LEGO_EXTRA_ARGS:-} renew --days "$RENEW_DAYS"
+    "$LEGO_BIN" run --accept-tos --email "$CERT_EMAIL" --server "$_srv" --dns duckdns --domains "$CERT_NAME" --path "$_path" --renew-days "$RENEW_DAYS" ${LEGO_EXTRA_ARGS:-}
   fi
 }
 

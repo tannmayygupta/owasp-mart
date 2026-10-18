@@ -27,6 +27,7 @@ import vulnmart.accounts.models  # noqa: F401
 import vulnmart.kernel.models  # noqa: F401
 import vulnmart.notifications.models  # noqa: F401
 import vulnmart.orgs.models  # noqa: F401
+import vulnmart.privacy.models  # noqa: F401
 from support import ROOT
 from vulnmart.kernel.db import Base, make_engine, make_sessions
 from vulnmart.kernel.scope import ContextScopePort, scope_or_none
@@ -156,7 +157,7 @@ def test_downgrade_to_empty_and_upgrade_again(db):
     assert left == []
     command.upgrade(db["config"], "head")
     with db["owner"].connect() as c:
-        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0004"
+        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0008"
 
 
 def test_the_migration_stops_when_the_app_role_does_not_exist(monkeypatch):

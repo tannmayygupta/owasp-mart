@@ -123,3 +123,5 @@ Activity: a recorded activity moves ready or idle to active. Quiet for the activ
 - `uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests` -- expected: all pass (the Docker test runs with a daemon)
 - `VM_ORCH_SERVICE=python` suites of `apps/api` with `--backend fake` (command as in ci.yml, job scripts) -- expected: pass, no `needs_reset` skip
 - `node scripts/check-contract-rules.mjs`, `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs`, `node --test "scripts/*.test.mjs"` -- expected: pass
+
+Follow-up 2026-10-17: live results on vm-i (stub image), dev-log 2026-10-17-tannmayygupta-live-measurements-vm-i.md.

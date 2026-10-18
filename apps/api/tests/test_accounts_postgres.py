@@ -26,6 +26,10 @@ from vulnmart.accounts.security import hash_password, token_hash
 from vulnmart.accounts.admins import AdminService
 from vulnmart.accounts.roles import NotAnAdmin, RoleNotAllowed, RoleService
 from vulnmart.accounts.service import AccountService, TokenInvalid
+from vulnmart.accounts import totp
+from vulnmart.accounts.fieldkeys import FieldKeys
+from vulnmart.accounts.mfa import MfaInvalid, MfaService
+from vulnmart.accounts.models import MfaCredential, RecoveryCode
 from vulnmart.accounts.passwords import CommonPasswordList, PasswordPolicy
 from vulnmart.accounts.self_service import SelfService
 from vulnmart.accounts.sessions import SessionService
@@ -370,3 +374,99 @@ def test_two_password_changes_at_once_do_not_both_succeed(sessions):
     assert outcomes.count("changed") >= 1 and set(outcomes) <= {"changed", "InvalidCredentials", "SessionEnded"}
     with sessions() as s:
         assert len([r for r in s.scalars(select(UserSession)) if r.revoked_at is None]) <= 1, "never two live sessions after changes"
+
+# ---- story P-15: the second factor ------------------------------------------------------------------------------------
+
+FIELD = FieldKeys.from_secret(b"a field key secret of at least 32 bytes!!")
+
+
+def enrolled(sessions, clock=None):
+    """A verified user with the second factor on: returns the services, the secret and the recovery codes."""
+    from datetime import UTC as _UTC
+    from urllib.parse import parse_qs, urlsplit
+
+    verified_user(sessions)
+    login = session_service(sessions)
+    mfa = MfaService(sessions, FIELD, FakeAuditPort(), login)
+    session = login.login(email="a@example.com", password=GOOD)
+    secret = parse_qs(urlsplit(mfa.start_enrolment("u-AAAAAAAAAAAAAAAA")).query)["secret"][0]
+    token, codes = mfa.confirm_enrolment(user_id="u-AAAAAAAAAAAAAAAA", token=session.token, code=totp.code_for(secret, totp.time_step(datetime.now(_UTC))))
+    return login, mfa, secret, codes, token
+
+
+def test_the_second_factor_tables_work_on_postgres_and_the_secret_is_sealed(sessions):
+    login, mfa, secret, codes, _ = enrolled(sessions)
+    with sessions() as s:
+        credential = s.get(MfaCredential, "u-AAAAAAAAAAAAAAAA")
+        hashes = [r.code_hash for r in s.scalars(select(RecoveryCode))]
+    assert credential.enabled_at is not None and secret not in credential.secret_enc and FIELD.open(credential.secret_enc, account="u-AAAAAAAAAAAAAAAA") == secret
+    assert len(hashes) == 10 and not set(codes) & set(hashes)
+
+
+def test_one_totp_code_used_at_once_opens_exactly_one_session(sessions):
+    login, mfa, secret, codes, _ = enrolled(sessions)
+    # the enrolment used the current step; take the next one by asking for a code from the step after it
+    step = totp.time_step(datetime.now(UTC)) + 1
+    good = totp.code_for(secret, step)
+    tickets = [mfa.issue_ticket("u-AAAAAAAAAAAAAAAA")[0] for _ in range(8)]
+    outcomes = iter(tickets)
+    lock = threading.Lock()
+
+    def attempt():
+        with lock:
+            ticket = next(outcomes)
+        try:
+            mfa.complete_login(ticket=ticket, code=good)
+            return "session"
+        except MfaInvalid:
+            return "refused"
+
+    results, errors = run_at_once(8, attempt)
+    assert errors == [] and results.count("session") == 1 and results.count("refused") == 7
+    with sessions() as s:
+        assert len([r for r in s.scalars(select(UserSession)) if r.mfa_at is not None]) == 2, "the enrolment session and the one login"
+
+
+def test_one_recovery_code_used_at_once_opens_exactly_one_session(sessions):
+    login, mfa, secret, codes, _ = enrolled(sessions)
+    tickets = iter([mfa.issue_ticket("u-AAAAAAAAAAAAAAAA")[0] for _ in range(8)])
+    lock = threading.Lock()
+
+    def attempt():
+        with lock:
+            ticket = next(tickets)
+        try:
+            mfa.complete_login(ticket=ticket, code=codes[0])
+            return "session"
+        except MfaInvalid:
+            return "refused"
+
+    results, errors = run_at_once(8, attempt)
+    assert errors == [] and results.count("session") == 1
+
+
+def test_one_ticket_used_by_many_requests_at_once_opens_one_session(sessions):
+    login, mfa, secret, codes, _ = enrolled(sessions)
+    ticket = mfa.issue_ticket("u-AAAAAAAAAAAAAAAA")[0]
+    codes_iter = iter(codes[:8])
+    lock = threading.Lock()
+
+    def attempt():
+        with lock:
+            recovery = next(codes_iter)
+        try:
+            mfa.complete_login(ticket=ticket, code=recovery)
+            return "session"
+        except MfaInvalid:
+            return "refused"
+
+    results, errors = run_at_once(8, attempt)
+    assert errors == [] and results.count("session") == 1
+
+
+def test_deleting_a_user_removes_the_second_factor_data(sessions):
+    enrolled(sessions)
+    with sessions.begin() as s:
+        s.execute(text("DELETE FROM users"))
+    with sessions() as s:
+        assert s.scalars(select(MfaCredential)).all() == [] and s.scalars(select(RecoveryCode)).all() == []

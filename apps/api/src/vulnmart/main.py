@@ -14,8 +14,12 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from vulnmart.accounts.api import router as accounts_router
+from vulnmart.accounts.directory import UserDirectory
 from vulnmart.accounts.admins import AdminService
+from vulnmart.accounts.fieldkeys import FieldKeys
 from vulnmart.accounts.me_api import router as me_router
+from vulnmart.accounts.mfa import MfaService
+from vulnmart.accounts.mfa_api import router as mfa_router
 from vulnmart.accounts.password_api import router as password_router
 from vulnmart.accounts.passwords import PasswordPolicy, make_policy
 from vulnmart.accounts.self_service import SelfService
@@ -23,10 +27,15 @@ from vulnmart.accounts.roles import RoleService
 from vulnmart.accounts.service import AccountService
 from vulnmart.accounts.session_api import router as session_router
 from vulnmart.accounts.sessions import SessionService
+from vulnmart.kernel.audit import AuditAnchors, FileAnchorSink
 from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRateLimiter
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
+from vulnmart.orgs.service import CompanyService
+from vulnmart.privacy.api import router as consent_router
+from vulnmart.privacy.consent import ConsentService
+from vulnmart.privacy.targets import ConsentTargets, FakeConsentTargets
 
 PUBLIC_HEALTH_REUSE_SECONDS = 2.0
 
@@ -51,7 +60,18 @@ def _sessions_from(settings: Settings, ports) -> SessionService | None:
         key = secrets.token_bytes(32)
     if ports.sessions is None:
         return None
-    return SessionService(ports.sessions, ports.settings, key)
+    return SessionService(ports.sessions, ports.settings, key, audit=ports.audit)
+
+
+def field_keys_from(settings: Settings) -> FieldKeys:
+    """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
+    secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
+    secret = settings.field_key_secret()
+    if secret is None:
+        if settings.env in ("staging", "production"):
+            raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
+        secret = secrets.token_bytes(32)
+    return FieldKeys.from_secret(secret)
 
 
 def _limiter_from(settings: Settings) -> RateLimiter:
@@ -76,6 +96,9 @@ def create_app(
     sessions: SessionService | None = None,
     policy: PasswordPolicy | None = None,
     self_service: SelfService | None = None,
+    mfa: MfaService | None = None,
+    consent: ConsentService | None = None,
+    consent_targets: ConsentTargets | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits)."""
@@ -90,14 +113,34 @@ def create_app(
     app.state.self_service = self_service or (SelfService(app.state.ports.sessions, app.state.session_service, policy)
                                               if app.state.ports.sessions is not None and app.state.session_service is not None else None)
     # The role and admin services have no route yet (the admin area is story P-28); later stories find them here. The audit port is the
-    # in-memory stand-in until story P-17.
+    # real log (DbAuditPort behind PseudonymisingAudit) when a database is configured, the in-memory stand-in otherwise (story P-17).
     ports = app.state.ports
     app.state.roles = RoleService(ports.sessions, ports.audit, app.state.session_service) if ports.sessions else None
     app.state.admins = AdminService(ports.sessions, ports.settings, ports.audit, public_origin=settings.public_origin, policy=policy) if ports.sessions else None
+    # Recruiter signup and company approval (story P-18): no route yet (IF-1 has none, handoff H-138); the admin area (P-28) and the invite stories call this.
+    app.state.companies = (CompanyService(ports.sessions, app.state.accounts, UserDirectory(ports.sessions), app.state.roles, ports.audit, ports.scope,
+                                          public_origin=settings.public_origin)
+                           if ports.sessions is not None and app.state.accounts is not None and app.state.roles is not None else None)
+    field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
+    app.state.mfa_service = mfa or (MfaService(ports.sessions, field_keys, ports.audit, app.state.session_service)
+                                    if ports.sessions is not None and app.state.session_service is not None else None)
+    # The consent routes need the invite and attempt side (story P-21): until it exists the targets are empty, so every attempt id is answered 404.
+    app.state.consent_service = consent or (ConsentService(ports.sessions, consent_targets or FakeConsentTargets(), ports.audit, ports.settings,
+                                                            field_keys or field_keys_from(settings))
+                                            if ports.sessions is not None else None)
+    # The daily anchor of the audit log (story P-17). No route and no schedule yet: the scheduler of story P-24 calls `app.state.audit_anchors.anchor()`.
+    if ports.audit_db is not None and ports.audit_sessions is not None:
+        anchor_keys = field_keys or field_keys_from(settings)
+        app.state.audit_anchors = AuditAnchors(ports.audit_db, ports.audit_sessions, lambda line: anchor_keys.context_hash("audit-anchor", line),
+                                               FileAnchorSink(settings.audit_anchor_file) if settings.audit_anchor_file else None)
+    else:
+        app.state.audit_anchors = None
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)
     app.include_router(me_router)
+    app.include_router(mfa_router)
+    app.include_router(consent_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs
     # one round of checks, not one per call (the answer itself is never cached by anyone else: no-store).

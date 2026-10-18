@@ -113,6 +113,18 @@
       "mocks": [],
       "noMock": "no mock by design: the fixtures in the contract folder and scripts/replay-domain-events.mjs (a local SSE hub and consumer) are the stub",
       "conformance": ["scripts/validate-domain-events.mjs", "scripts/replay-domain-events.mjs"]
+    },
+    {
+      "id": "GATE",
+      "name": "Edge gate: ticket, cookie, access state, hostname rule",
+      "owner": "L",
+      "folders": ["contracts/edge"],
+      "schemas": [],
+      "openapi": [],
+      "changelog": "Edge gate (GATE), `contracts/edge/`",
+      "mocks": [],
+      "noMock": "no mock by design: the test vectors in the contract folder and the dependency-free library in apps/edge are the reference; nothing runs against a mock of the gate",
+      "conformance": ["apps/edge/test/vectors.test.mjs", "apps/edge/test/gate.test.mjs"]
     }
   ]
 }

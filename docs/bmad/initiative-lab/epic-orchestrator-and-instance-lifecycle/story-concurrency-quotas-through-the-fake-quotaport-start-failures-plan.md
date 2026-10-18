@@ -101,3 +101,5 @@ Pass 1 (2026-10-16, one focused lens on the retry, the build cap and the quota c
 - `uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests` -- expected: pass
 - `uv run --locked --package vulnmart-api pytest -q` and the `VM_ORCH_SERVICE=python` suites -- expected: pass
 - `node scripts/check-contract-rules.mjs`, `node scripts/check-text-files.mjs`, `node scripts/scan-secrets.mjs` -- expected: pass
+
+Follow-up 2026-10-17: live results on vm-i (stub image), dev-log 2026-10-17-tannmayygupta-live-measurements-vm-i.md.

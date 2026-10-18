@@ -1,0 +1,18 @@
+$ node --test scripts/live-smoke.test.mjs scripts/check-submission-pack.test.mjs
+✔ a complete synthetic pack passes (104.5858ms)
+✔ missing, empty, too short and short folders are FAIL with the path named (83.3097ms)
+✔ an empty file inside a folder fails the folder; a missing folder fails (45.6973ms)
+✔ secret scan: finds real-looking secrets, ignores the fake development values (0.9625ms)
+✔ a secret in a scanned doc makes the pack fail (75.0458ms)
+✔ checkFile and arguments (4.0506ms)
+✔ configFromEnv: defaults, errors, extras (2.6448ms)
+✔ headerProblems (0.514ms)
+✔ local server: all good passes (49.6222ms)
+✔ local server: a bad header fails the run (14.9757ms)
+✔ local server: a 500, a missing version text and an empty version fail (12.3526ms)
+✔ nothing listening: FAIL with a reason, never PASS (7.1237ms)
+✔ only GET is sent (5.8037ms)
+ℹ tests 13
+ℹ pass 13
+ℹ fail 0
+ℹ duration_ms 583.1725
