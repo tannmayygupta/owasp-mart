@@ -461,6 +461,7 @@ def test_a_ticket_of_the_platform_is_accepted_by_the_edge_gate_verifier_with_the
     key_hex = "ab" * 32
     key_file = tmp_path / "gate_key_current"
     key_file.write_text(key_hex + "\n")
+    key_file.chmod(0o600)  # the reader refuses a group- or world-readable key file on POSIX (CI runs on Linux)
     minter = TicketMinter(read_gate_key(str(key_file)), ZONE)
     ticket = minter.mint("i-ABCDEFGHIJKLMNOP", "f" * 64, 3)
     token = ticket.url.split("?t=")[1]
@@ -486,10 +487,12 @@ def test_the_gate_key_file_must_be_hex_and_long_enough(tmp_path):
     for text in ("short", "g" * 64, "ab" * 31, ("ab" * 32) + "a"):
         f = tmp_path / "k"
         f.write_text(text)
+        f.chmod(0o600)  # so the content, not the mode, is what is refused
         with pytest.raises(ValueError, match="hex characters"):
             read_gate_key(str(f))
     f = tmp_path / "ok"
     f.write_text("AB" * 32)
+    f.chmod(0o600)
     assert read_gate_key(str(f)) == bytes.fromhex("AB" * 32)
     assert 0 < TicketMinter(b"k" * 32, ZONE).mint("i-AAAAAAAAAAAAAAAA", "0" * 64, 0).expires_at.timestamp() - time.time() <= 46
 

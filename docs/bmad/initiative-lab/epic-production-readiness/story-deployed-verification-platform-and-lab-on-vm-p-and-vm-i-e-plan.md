@@ -18,3 +18,6 @@ The journey after the API restart first hit the capacity limit (7 old test insta
 
 ## Final build (2026-10-18)
 vm-p was recreated on the final build of the pull request (key service, head 0010) and the journey passed 29 of 29 (e2e-run7-final-build.json).
+
+## CI of the pull request
+The first CI run of pull request 30 failed in five jobs; each is fixed (see the dev-log 2026-10-18-tannmayygupta-pr-review-merge-and-key-service.md). The Postgres service now runs the database tests in CI.

@@ -128,6 +128,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 1.0.1 (2026-10-18, Tanmay, story 9.2)
+- Fixed: the gate ticket in `openGateUrl` answers `...?t=<payload>.<signature>` (two base64url parts joined by a dot, as the API mints it and the edge gate verifies it); the `url` pattern of `Ticket`, `lab-api.md` and the valid and invalid examples now say so (the pattern had no dot, which no real ticket matches). No other schema change; nothing a client could send changed.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` mints the same two-part ticket. Generated code and bundle regenerated: `contracts/api/bundle/`, `packages/ts-client/src/api.d.ts`, `packages/py-models/src/vulnmart_models/api.py`.
+- registry change: none to `contracts/registry.json`. This pull request also changes `.github/workflows/ci.yml` (a Postgres service for the api tests job, so the database tests run in CI) and `scripts/check-contract-rules.mjs` (an added row in the table-owners list is additive, a removed row or another owner is breaking; before, any change to that file was reported breaking); both are stream L's, covered by `scripts/check-contract-rules.test.mjs`.
+
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -235,6 +240,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: names and open points await Sahil's review (optional under D-37) and Akshay's note on the `EVT-*` placeholders.
 
 ## Table owners (DB), `contracts/db/`
+
+### 1.1.0 (2026-10-18, Tanmay, story 9.1)
+- Additive: five rows in `table-owners.yaml` for tables the lab needs that architecture 04 did not list: `held_captures`, `review_audit` (owner scoring), `attempt_events` (attempts), `bot_visits`, `security_events` (ingest). Created by migration `0010` (stream L); to be confirmed by Akshay.
+- The schema is unchanged.
+- no mock change: nothing runs against the table-owners list (`noMock` in the registry).
 
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 

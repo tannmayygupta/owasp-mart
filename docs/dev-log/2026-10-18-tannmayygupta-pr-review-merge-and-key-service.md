@@ -66,6 +66,12 @@ Not fixed tonight, with the reason:
 - First start failed: VULNMART_ENV=production needs a field key since Akshay's MFA code (P-15) was merged. Added field_secret. Second start healthy.
 - Deployed journey (scripts/e2e-live.mjs): 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run6-new-key-service.json).
 
+## CI of the pull request (first run, https://github.com/tannmayygupta/owasp-mart/pull/30) and what it found
+Five jobs failed. The CI is stricter than my machine (Linux, a real Postgres, the contract rules), and `main` itself had been red for its last three merges (the sidecar image test and others), so some failures were not new.
+- api tests and script tests: two of my tests wrote the gate key file with mode 644; on Linux the reader refuses that (correct). Tests now chmod 600. With the new Postgres service the job ran 2186 tests and these two were the only failures: the database, grant, key and lab tests do run in CI now.
+- app tests: the sidecar image test bound the image to 120 MiB, measured on Docker Desktop (55.6 MiB); the Linux engine of CI reports 154.1 MiB. This failed on `main` too. The bound is now 250 MiB with both numbers in the comment.
+- end-to-end tests (lab): the test regex for the gate URL had no dot; the real ticket is `payload.signature`. Regex fixed (14 of 14 pass locally).
+- contract rules: (1) IF-2 changed (the ticket pattern) and needed a new entry in contracts/CHANGELOG.md: 1.0.1. (2) The table-owners list changed (five rows for lab tables): the checker reported any change to that YAML as breaking. The checker now compares the rows (a new row is additive, a removed row or another owner is breaking; tested), and the DB contract has an additive entry 1.1.0. (3) The pull request changes `.github/workflows/ci.yml` and the checker, which the rules guard: the entry declares them with a "registry change" line. Local run of the rules against origin/main: 20 PASS, 0 FAIL, 1 NOT-APPLICABLE (approvals start with the first contracts tag, L-09).
 ## Limitations and follow-ups
 - The backup script and runbook dump only the vulnmart database. The wrapped keys live in vm_keystore: a backup of data without the keys cannot be decrypted, and a backup that keeps the keys defeats shredding. The team must decide (the keystore runbook is Akshay's).
 - Flags and event keys changed with the new masters; the old test attempts are gone with the old database.
