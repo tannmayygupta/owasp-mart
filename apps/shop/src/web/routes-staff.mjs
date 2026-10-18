@@ -7,6 +7,7 @@ import * as staff from '../domain/staff-service.mjs';
 import * as money from '../domain/money-service.mjs';
 import { renderTicketMessageHtml } from '../challenges/c03b-ticket-xss.mjs';
 import { financeSettlementReference } from '../challenges/c07-password-reset.mjs';
+import { caseNoteReference } from '../challenges/c09-logging-failures.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -58,6 +59,11 @@ export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {} 
   // only to a finance session; its "settlement reference" is the C07 flag,
   // reachable only after taking over the finance account via the reset flow.
   app.get('/finance/settings/settlement', FINANCE, h((req, res) => res.render('staff/settlement', { reference: financeSettlementReference(db) })));
+
+  // C09 (Logging Failures): support case notes. The break-glass reference is the
+  // C09 flag, readable by a support session (or admin) — reachable after taking
+  // over the dormant support agent via the unlogged legacy login.
+  app.get('/support/cases/notes', SUPPORT, h((req, res) => res.render('staff/case-notes', { reference: caseNoteReference(db) })));
 
   // Finance: payouts + commissions, and payout accrual (T-18).
   app.get('/staff/payouts', FINANCE, h((req, res) => res.render('staff/payouts', { payouts: staff.listPayouts(db, req.user), commissions: staff.listCommissions(db, req.user) })));

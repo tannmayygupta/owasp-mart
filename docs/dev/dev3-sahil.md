@@ -275,7 +275,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The exploit test passes and fails as required.
   - Handoffs: H-52 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
+- [x] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C09 so that the attack leaves zero events in the shop's own events.
