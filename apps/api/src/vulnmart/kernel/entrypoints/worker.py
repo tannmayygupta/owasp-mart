@@ -50,15 +50,22 @@ def mail_lifespan(settings: Settings | None = None):
         actor = make_delivery_actor(broker, service)
         worker = Worker(broker, worker_threads=2)
         relay = RelayLoop(service, actor, settings.email_relay_interval_seconds)
+        from vulnmart.live.relay import AudienceResolver, EventRelay
+        from vulnmart.live.relay import RelayLoop as LiveRelayLoop
+        from vulnmart.live.store import ValkeyStreamStore
+
+        live_relay = LiveRelayLoop(EventRelay(ports.sessions, AudienceResolver(ports.sessions), ValkeyStreamStore(settings.valkey_url)), settings.live_relay_interval_seconds)
         app.state.email_service = service
         worker.start()
         relay.start()
+        live_relay.start()  # domain events to the live streams (story P-22)
         logger.info("worker started: mail relay every %ss, provider %s", settings.email_relay_interval_seconds, settings.email_provider)
         try:
             async with idle(app):
                 yield
         finally:
             relay.stop()
+            live_relay.stop()
             worker.stop()
             broker.close()
 

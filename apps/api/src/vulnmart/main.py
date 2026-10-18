@@ -36,6 +36,10 @@ from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
 from vulnmart.assessments.accept import InviteAcceptance, InviteConsentTargets
 from vulnmart.lab.runtime import LabRuntime
+from vulnmart.live.api import router as live_router
+from vulnmart.live.hub import HubConfig, LiveHub
+from vulnmart.live.snapshot import EmptySnapshot, LabSnapshotSource, SnapshotSource
+from vulnmart.live.store import StreamReader, ValkeyStreamStore
 from vulnmart.lab.tickets import TicketMinter, minter_from_environ
 from vulnmart.assessments.service import AssessmentService
 from vulnmart.orgs.service import CompanyService
@@ -130,6 +134,9 @@ def create_app(
     consent: ConsentService | None = None,
     consent_targets: ConsentTargets | None = None,
     attempts: AttemptPort | None = None,
+    live_store: StreamReader | None = None,
+    live_config: HubConfig | None = None,
+    live_snapshot: SnapshotSource | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits). `attempts` is the lab's attempt port (IF-9): with it
@@ -185,6 +192,10 @@ def create_app(
     app.state.consent_service = consent or (ConsentService(ports.sessions, consent_targets or FakeConsentTargets(), ports.audit, ports.settings,
                                                             field_keys or field_keys_from(settings))
                                             if ports.sessions is not None else None)
+    # Live updates (story P-22): the hub reads the streams the worker's relay fills; the snapshot is the lab's own state (nothing without a lab in this process).
+    store = live_store if live_store is not None else (ValkeyStreamStore(settings.valkey_url) if settings.valkey_url else None)
+    app.state.live_hub = LiveHub(store, live_config) if store is not None else None
+    app.state.live_snapshot = live_snapshot or (LabSnapshotSource(lab) if lab is not None else EmptySnapshot())
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)
@@ -193,6 +204,7 @@ def create_app(
         _mount_lab(app, lab, lab_tickets)
     app.include_router(mfa_router)
     app.include_router(consent_router)
+    app.include_router(live_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs
     # one round of checks, not one per call (the answer itself is never cached by anyone else: no-store).

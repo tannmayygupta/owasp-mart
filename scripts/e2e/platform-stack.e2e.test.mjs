@@ -1021,6 +1021,164 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(psql(`SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM audit_log WHERE action IN ('invite.bound', 'invite.superseded', 'consent.granted', 'invite.consented')`), 'consent.granted,invite.bound,invite.consented,invite.superseded');
   }, { timeout: 300000 });
 
+  // Story P-22: the live stream on the real stack, through the web origin (proxy, origin secret): an event row in `domain_events` is moved by the worker's relay to the
+  // user's Valkey stream and arrives on an open `GET /api/v1/live` connection without buffering; a heartbeat comes while nothing happens; another user's events never
+  // arrive; after the API is restarted a reconnect with `Last-Event-ID` gets what was missed, once and in order; an unknown id gets one `stream.resync`; the snapshot
+  // answers. There is no lab runtime in this stack, so the attempt rows are written directly (the lab publishes the real events, stream L).
+  test('live updates (P-22): events reach an open stream through the proxy, heartbeat, isolation, replay after an API restart, resync, snapshot', async () => {
+    const email = `e2e-live-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql).stdout.trim();
+    const upper = RUN.toUpperCase().replace(/[^A-Z2-7]/g, 'A');
+    const attemptId = `a-${('L' + upper).padEnd(16, 'A').slice(0, 16)}`;
+    const otherId = `a-${('O' + upper).padEnd(16, 'A').slice(0, 16)}`;
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Live', age_declaration: true })).status, 202);
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 200);
+    const cookie = /(__Host-vm_session=[^;]+)/.exec(login.headers.getSetCookie()[0])[1];
+    const userId = psql(`SELECT id FROM users WHERE email_ci = '${email}'`);
+    psql(`INSERT INTO attempts (id, user_id, template_id, org_id, state, version, record) VALUES ('${attemptId}', '${userId}', 't-live-${RUN}', NULL, 'running', 0, '{}'::jsonb), ('${otherId}', 'u-someone-else-${RUN}', 't-other-${RUN}', NULL, 'running', 0, '{}'::jsonb)`);
+
+    const event = (attempt, milestone) => JSON.stringify({ schema_version: 1, type: 'attempt.milestone_reached', occurred_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+      data: { attempt_id: attempt, mode: 'learner', challenge_key: 'C01', milestone } });
+    const publishRow = (attempt, milestone) => psql(`INSERT INTO domain_events (type, payload, created_at) VALUES ('attempt.milestone_reached', '${event(attempt, milestone)}'::jsonb, now())`);
+
+    // an unauthenticated stream is refused through the proxy
+    const refused = await call('GET', '/api/v1/live');
+    assert.equal(refused.status, 401);
+    assert.equal((await refused.json()).code, 'AUTH-SESSION-REQUIRED');
+
+    // a small SSE client: frames as they arrive, with the time each was read
+    const openStream = async (lastEventId) => {
+      const controller = new AbortController();
+      const res = await fetch(`${ORIGIN}/api/v1/live`, { headers: { cookie, ...(lastEventId ? { 'last-event-id': lastEventId } : {}) }, signal: controller.signal });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const seen = [];
+      let ended = false;
+      const pump = (async () => {
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let at;
+            while ((at = buffer.indexOf('\n\n')) >= 0) {
+              const block = buffer.slice(0, at);
+              buffer = buffer.slice(at + 2);
+              const item = { at: Date.now(), raw: block };
+              for (const line of block.split('\n')) {
+                if (line.startsWith(': ')) item.comment = line.slice(2);
+                else if (line.startsWith('id: ')) item.id = line.slice(4);
+                else if (line.startsWith('event: ')) item.event = line.slice(7);
+                else if (line.startsWith('data: ')) item.data = JSON.parse(line.slice(6));
+              }
+              seen.push(item);
+            }
+          }
+        } catch { /* aborted */ }
+        ended = true;
+      })();
+      const until = async (predicate, ms = 8000) => {
+        const stop = Date.now() + ms;
+        while (Date.now() < stop) {
+          const found = seen.find(predicate);
+          if (found) return found;
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        return null;
+      };
+      return { res, seen, until, isEnded: () => ended, close: () => { controller.abort(); return pump; } };
+    };
+
+    const stream = await openStream();
+    assert.equal(stream.res.status, 200);
+    assert.match(stream.res.headers.get('content-type'), /^text\/event-stream/);
+    assert.equal(stream.res.headers.get('cache-control'), 'private, no-store');
+    assert.equal(stream.res.headers.get('x-accel-buffering'), 'no');
+    assert.ok(await stream.until((f) => f.comment === 'stream open', 3000), 'the first frame arrived at once: the proxy does not hold the stream back');
+
+    // an event row becomes a frame on the open connection: through the worker's relay, Valkey and the hub, without buffering
+    const sentAt = Date.now();
+    publishRow(attemptId, 'M1');
+    const first = await stream.until((f) => f.event === 'attempt.milestone_reached', 8000);
+    assert.ok(first, 'the milestone arrived on the open stream');
+    const latency = first.at - sentAt;
+    console.log(`# live: event row to frame on the open stream ${latency} ms (relay every 250 ms)`);
+    assert.ok(latency < 3000, `arrived in ${latency} ms`);
+    assert.match(first.id, /^\d{1,15}-\d{1,9}$/);
+    assert.equal(first.data.data.attempt_id, attemptId);
+    assert.deepEqual(Object.keys(first.data).sort(), ['data', 'occurred_at', 'schema_version', 'type']);
+
+    // the API's own port writes the same kind of row (an event published from inside the API process)
+    const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app',
+      `e = json.loads('${event(attemptId, 'M2')}')`, 'entry = app.state.ports.outbox.publish(e)', 'print(json.dumps(entry.audiences))'].join('\n'));
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(JSON.parse(run.stdout.trim().split('\n').pop()), ['user']);
+    assert.ok(await stream.until((f) => f.data?.data?.milestone === 'M2', 8000), 'an event published through the API port arrived too');
+
+    // another user's attempt: its events reach no stream of this user
+    publishRow(otherId, 'M3');
+    publishRow(attemptId, 'M3');
+    assert.ok(await stream.until((f) => f.data?.data?.milestone === 'M3', 8000));
+    assert.ok(!stream.seen.some((f) => f.data?.data?.attempt_id === otherId), "another user's event never arrived");
+
+    // a heartbeat comment while nothing happens (the interval is 15 s)
+    const beat = await stream.until((f) => f.comment === 'heartbeat', 20000);
+    assert.ok(beat, 'a heartbeat came');
+
+    // the replay buffer is in Valkey: one stream per audience, holding the events as the browser reads them
+    const xlen = docker('exec', NAME('valkey'), 'valkey-cli', 'XLEN', `live:user:${userId}`).stdout.trim();
+    assert.equal(xlen, '3');
+    const ids = stream.seen.filter((f) => f.event).map((f) => f.id);
+    assert.equal(ids.length, 3);
+    await stream.close();
+
+    // killing the API loses nothing: events published while it is down wait in Valkey and a reconnect with Last-Event-ID gets them, once and in order
+    const last = ids[0]; // reconnect from the first one: the second and third are replayed, and the two published while the API is down
+    assert.equal(docker('stop', '--time', '2', NAME('api')).status, 0);
+    publishRow(attemptId, 'M1');
+    publishRow(attemptId, 'M2');
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.equal(docker('start', NAME('api')).status, 0);
+    await waitForHealth(200);
+    const again = await openStream(last);
+    assert.equal(again.res.status, 200);
+    for (let i = 0; i < 400 && again.seen.filter((f) => f.event).length < 4; i += 1) await new Promise((r) => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 500)); // and nothing more arrives
+    const got = again.seen.filter((f) => f.event);
+    assert.equal(got.length, 4, `second, third and the two missed ones, nothing twice: ${got.map((f) => f.id)}`);
+    assert.deepEqual(got.map((f) => f.id), [...got.map((f) => f.id)].sort((a, b) => { const [x, y] = a.split('-').map(Number); const [p, q] = b.split('-').map(Number); return x - p || y - q; }));
+    assert.deepEqual(got.slice(0, 2).map((f) => f.id), ids.slice(1));
+    assert.equal(new Set(got.map((f) => f.id)).size, 4);
+    await again.close();
+
+    // an id the hub does not know: one resync, no id, and the connection ends
+    const unknown = await openStream('99999999999999-1');
+    assert.ok(await unknown.until((f) => f.event === 'stream.resync', 5000));
+    await new Promise((r) => setTimeout(r, 500));
+    assert.equal(unknown.seen.length, 1);
+    assert.equal(unknown.seen[0].id, undefined);
+    assert.equal(unknown.seen[0].data.data.reason, 'id_unknown');
+    assert.ok(unknown.isEnded(), 'the connection ended after the resync');
+
+    // the snapshot is the way back after a resync (no lab in this stack: nothing to show, but the shape is the contract's)
+    const snapshot = await call('GET', '/api/v1/live/snapshot', { headers: { cookie } });
+    assert.equal(snapshot.status, 200);
+    assert.equal(snapshot.headers.get('cache-control'), 'private, no-store');
+    const body = await snapshot.json();
+    assert.deepEqual(Object.keys(body).sort(), ['attempts', 'instances', 'server_time']);
+    assert.deepEqual([body.attempts, body.instances], [[], []]);
+
+    // every event of this test was relayed: nothing waits in the outbox, nothing was dropped
+    assert.equal(psql(`SELECT count(*) FROM domain_events WHERE published_at IS NULL AND payload->'data'->>'attempt_id' IN ('${attemptId}', '${otherId}')`), '0');
+    assert.equal(psql(`SELECT count(*) FROM domain_events WHERE dropped AND payload->'data'->>'attempt_id' IN ('${attemptId}', '${otherId}')`), '0');
+    assert.equal(psql(`SELECT count(*) FROM domain_events WHERE payload->'data'->>'attempt_id' = '${otherId}' AND published_at IS NOT NULL`), '1');
+  }, { timeout: 240000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

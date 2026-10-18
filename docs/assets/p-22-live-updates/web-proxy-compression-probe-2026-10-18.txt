@@ -1,0 +1,12 @@
+Probe of GET /api/v1/live through the web origin (http://127.0.0.1:3000, the Next proxy), a signed-in learner, time to the first frame (": stream open").
+Run by hand on the local stack with a small node script (fetch, reading the body as it arrives), 2026-10-18.
+
+Before the change (apps/web/next.config.mjs without `compress: false`), node's default Accept-Encoding (gzip):
+{"acceptEncoding":"(node default)","status":200,"contentEncoding":"gzip","first":null}      <- nothing within 6 s, twice
+With Accept-Encoding: identity (first run after the stack started, then again):
+{"acceptEncoding":"identity","status":200,"contentEncoding":null,"first":{"ms":7279,...}}    <- cold start
+{"acceptEncoding":"identity","status":200,"contentEncoding":null,"first":{"ms":143,...}}
+
+After `compress: false` and a restart of the web container:
+{"acceptEncoding":"(node default)","status":200,"contentEncoding":null,"first":{"ms":61,"text":": stream open\n\n"}}
+{"acceptEncoding":"identity","status":200,"contentEncoding":null,"first":{"ms":37,"text":": stream open\n\n"}}
