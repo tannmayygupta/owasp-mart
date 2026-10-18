@@ -6,6 +6,7 @@ the browser routes of IF-1. Today that is the public `GET /api/v1/health` of `co
 """
 from __future__ import annotations
 
+import os
 import secrets
 import time
 from collections.abc import Mapping
@@ -27,6 +28,8 @@ from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRa
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
+from vulnmart.lab.runtime import LabRuntime
+from vulnmart.lab.tickets import TicketMinter, minter_from_environ
 
 PUBLIC_HEALTH_REUSE_SECONDS = 2.0
 
@@ -65,6 +68,32 @@ def _limiter_from(settings: Settings) -> RateLimiter:
     return InMemoryRateLimiter()
 
 
+def _lab_from_environ() -> LabRuntime | None:
+    """The lab runtime when `VULNMART_LAB_RUNTIME=1` (the platform process then serves the lab routes and the event receiver)."""
+    if os.environ.get("VULNMART_LAB_RUNTIME") != "1":
+        return None
+    from vulnmart.lab.runtime import build_lab_runtime
+
+    return build_lab_runtime(os.environ)
+
+
+def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> None:
+    """The IF-2 lab routes, the IF-4 event receiver, the orchestrator report receiver and, only on request, the token-guarded demo routes."""
+    from vulnmart.ingest.route import install_event_route
+    from vulnmart.lab.api import router as lab_router
+    from vulnmart.lab.state_reports import install_state_reports
+
+    app.state.lab = lab
+    app.state.lab_tickets = tickets or minter_from_environ(os.environ)
+    app.include_router(lab_router)
+    install_event_route(app, lab.handler)
+    install_state_reports(app, lab, os.environ)
+    if os.environ.get("VULNMART_LAB_DEMO") == "1":
+        from vulnmart.lab.demo_routes import install_demo_routes
+
+        install_demo_routes(app, lab, os.environ.get("VULNMART_LAB_DEMO_TOKEN", ""))
+
+
 def create_app(
     checks: Mapping[str, Check] | None = None,
     timeout: float | None = None,
@@ -76,11 +105,19 @@ def create_app(
     sessions: SessionService | None = None,
     policy: PasswordPolicy | None = None,
     self_service: SelfService | None = None,
+    lab: LabRuntime | None = None,
+    lab_tickets: TicketMinter | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits)."""
     settings = settings or get_settings()
-    app = create_service_app("api", checks=checks, settings=settings, timeout=timeout, configure_logs=configure_logs)
+    lab = lab if lab is not None else _lab_from_environ()
+    lifespan = None
+    if lab is not None:
+        from vulnmart.lab.background import lab_lifespan
+
+        lifespan = lab_lifespan(lab, float(os.environ.get("VULNMART_LAB_TICK_S", "10")))
+    app = create_service_app("api", checks=checks, settings=settings, timeout=timeout, configure_logs=configure_logs, lifespan=lifespan)
     app.state.settings = settings
     app.state.ports = build_ports(settings)
     policy = policy or make_policy(settings)  # fails to start in staging or production with the breach check off
@@ -98,6 +135,8 @@ def create_app(
     app.include_router(session_router)
     app.include_router(password_router)
     app.include_router(me_router)
+    if lab is not None:
+        _mount_lab(app, lab, lab_tickets)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs
     # one round of checks, not one per call (the answer itself is never cached by anyone else: no-store).

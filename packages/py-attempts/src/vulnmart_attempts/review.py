@@ -158,7 +158,6 @@ class HeldCaptureReview:
         self._clock = clock
         self._may_review = may_review
         self._events = events or (lambda _e: None)
-        self._decisions: dict[tuple[str, str], tuple[str, str]] = {}  # (attempt, key) -> (reviewer, decision)
         self._lock = _thread.allocate_lock()
 
     def held(self, attempt_id: str) -> tuple[HeldItem, ...]:
@@ -176,16 +175,15 @@ class HeldCaptureReview:
             item = self._store.get(attempt_id, challenge_key)
             if item is None:
                 raise NotHeld(key)
-            previous = self._decisions.get(key)
-            if previous is not None:
-                if previous[1] != decision:
+            if item.status != "open":
+                # finality comes from the stored status, so it survives a restart and a second worker (review finding B6)
+                if ("accept" if item.status == "accepted" else "reject") != decision:
                     raise ReviewFinal("a different decision is already recorded")
                 return item  # same decision again: no second audit row
             text = note[:NOTE_LIMIT]
             now = self._clock()
             self._audit.record(AuditRecord(reviewer_id, decision, now, attempt_id, challenge_key,
                                            hashlib.sha256(note.encode("utf-8")).hexdigest()[:16], text))
-            self._decisions[key] = (reviewer_id, decision)
             return self._store.release_held(*key) if decision == "accept" else self._store.keep_held(*key)
 
     def remind_overdue(self) -> tuple[HeldItem, ...]:
@@ -194,7 +192,10 @@ class HeldCaptureReview:
         out = []
         for item in self._store.open_items():
             if now - item.held_at >= OVERDUE_AFTER and self._store.mark_reminded(item.attempt_id, item.challenge_key):
-                self._events({"event": "held_review_overdue", "attempt_id": item.attempt_id,
-                              "at": now.isoformat(), "challenge_key": item.challenge_key})
+                try:
+                    self._events({"event": "held_review_overdue", "attempt_id": item.attempt_id,
+                                  "at": now.isoformat(), "challenge_key": item.challenge_key})
+                except Exception:  # a failing sink must not stop the other reminders (review finding B7)
+                    pass
                 out.append(item)
         return tuple(out)

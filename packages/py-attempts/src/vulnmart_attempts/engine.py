@@ -85,7 +85,7 @@ class AttemptEngine:
     # ------------------------------------------------------------------ public calls
 
     def create(self, user_id: str, template_id: str, consent_id: str, rules: Rules | None = None,
-               instance_id: str | None = None, attempt_id: str | None = None) -> AttemptRecord:
+               instance_id: str | None = None, attempt_id: str | None = None, org_id: str | None = None) -> AttemptRecord:
         """A `ready` attempt. One attempt per user per template: a second call returns the first."""
         existing = self._store.find(user_id, template_id)
         if existing is not None:
@@ -94,6 +94,7 @@ class AttemptEngine:
         rec = AttemptRecord(
             id=attempt_id or uuid.uuid4().hex, user_id=user_id, template_id=template_id, consent_id=consent_id,
             created_at=now, rules=rules or Rules(), state=AttemptState.READY, instance_id=instance_id, ready_at=now,
+            org_id=org_id,
         )
         try:
             return self._store.add(rec)
@@ -105,6 +106,55 @@ class AttemptEngine:
 
     def get(self, attempt_id: str) -> AttemptRecord:
         return self._load(attempt_id)
+
+    def ids(self) -> list[str]:
+        return self._store.ids()
+
+    def for_user(self, user_id: str) -> list[AttemptRecord]:
+        return self._store.for_user(user_id)
+
+    def in_states(self, *states: AttemptState) -> list[AttemptRecord]:
+        return self._store.in_states(*states)
+
+    def find(self, user_id: str, template_id: str) -> AttemptRecord | None:
+        """The one attempt of this user for this template, if any."""
+        return self._store.find(user_id, template_id)
+
+    def set_org(self, attempt_id: str, org_id: str) -> AttemptRecord:
+        """Record the organisation of a candidate attempt, once; a later call keeps the first."""
+        for _ in range(MAX_RETRIES):
+            rec = self._load(attempt_id)
+            if rec.org_id is not None:
+                return rec
+            try:
+                return self._save(rec, org_id=org_id)
+            except Conflict:
+                continue
+        raise Conflict("set_org: too many conflicts")
+
+    def set_instance(self, attempt_id: str, instance_id: str) -> AttemptRecord:
+        """Point the attempt at a new instance (the old one was lost and replaced). The clock and the reset count do not change."""
+        for _ in range(MAX_RETRIES):
+            rec = self._load(attempt_id)
+            if rec.instance_id == instance_id:
+                return rec
+            try:
+                return self._save(rec, instance_id=instance_id)
+            except Conflict:
+                continue
+        raise Conflict("set_instance: too many conflicts")
+
+    def mark_purged(self, attempt_id: str) -> AttemptRecord:
+        """The platform's deletion workflow purged the attempt's data: the attempt is gone for every reader."""
+        for _ in range(MAX_RETRIES):
+            rec = self._load(attempt_id)
+            if rec.purged_at is not None:
+                return rec
+            try:
+                return self._save(rec, purged_at=self._clock())
+            except Conflict:
+                continue
+        raise Conflict("mark_purged: too many conflicts")
 
     def instance_ready(self, attempt_id: str, at: datetime, instance_id: str | None = None) -> AttemptRecord:
         """D-80: the clock starts when the instance is ready. Repeated calls return the same record."""

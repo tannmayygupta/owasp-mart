@@ -295,7 +295,7 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     const r = ownInstance(res, user, params.instance_id);
     if (!r || take() === false) return;
     if (!['ready', 'active', 'idle'].includes(r.state) || r.access !== 'open') return problem(res, 409, 'INST-NOT-READY', 'the instance is not ready to open');
-    const ticket = crypto.randomBytes(32).toString('base64url');
+    const ticket = crypto.randomBytes(32).toString('base64url') + '.' + crypto.randomBytes(32).toString('base64url'); // payload.signature (gate-ticket.md)
     send(res, 200, { url: `https://${r.id.toLowerCase()}.labs.example.invalid/_vm/enter?t=${ticket}`, expires_at: stamp(Date.now() + 60 * 1000) });
   };
   const canChange = (r) => r.access !== 'frozen' && attempts.get(r.attemptId)?.state === 'running';

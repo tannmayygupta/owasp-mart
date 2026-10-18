@@ -8,7 +8,7 @@ from support import IID, OWNER, allowlist, body, template
 from test_engine_lifecycle import FakeNow, Ticks, reset_body
 
 from vulnmart_orchestrator.backend import BackendError, FakeBackend
-from vulnmart_orchestrator.engine import Orchestrator
+from vulnmart_orchestrator.engine import ADOPTED_TRANSITION_BASE, Orchestrator
 from vulnmart_orchestrator.gate import GateError
 from vulnmart_orchestrator.reconcile import FakeDesiredState
 from vulnmart_orchestrator.states import ErrorCode, InstanceState, StaleAccessEpoch
@@ -285,7 +285,9 @@ def test_a_restart_pushes_a_full_sync_closed_with_the_owner_from_the_label_and_o
     gate = RecordingGate()
     new, _, _ = make(backend=be, gate=gate, desired=FakeDesiredState({IID}), reconcile_gate=True)
     new.reconcile()
-    assert gate.calls == [("sync", ((IID, 1, "closed", 0, OWNER),))]  # a record adopted as ready is pushed closed, never open
+    epoch = new.get(IID).access_epoch
+    assert epoch > ADOPTED_TRANSITION_BASE  # above anything the gate holds: the gate does not refuse the sync as a lower epoch (review finding C1)
+    assert gate.calls == [("sync", ((IID, 1, "closed", epoch, OWNER),))]  # a record adopted as ready is pushed closed, never open
     new.reconcile()
     assert len(gate.calls) == 1  # nothing was repaired: no second push
     # an orphan appears and is repaired: the pass pushes again
@@ -294,7 +296,7 @@ def test_a_restart_pushes_a_full_sync_closed_with_the_owner_from_the_label_and_o
 
     half_built(be, iid=other)
     new.reconcile()
-    assert len(gate.calls) == 2 and gate.calls[1][1] == ((IID, 1, "closed", 0, OWNER),)
+    assert len(gate.calls) == 2 and gate.calls[1][1] == ((IID, 1, "closed", epoch, OWNER),)
 
 
 def test_a_sync_that_fails_is_logged_and_retried_on_the_next_pass(capsys):
