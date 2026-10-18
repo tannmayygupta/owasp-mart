@@ -17,8 +17,10 @@ There is no HTTP route yet (IF-1 has none for recruiters, story 5.3). Accepting 
 """
 from __future__ import annotations
 
+import base64
 import logging
 import re
+import secrets
 import unicodedata
 import uuid
 from collections.abc import Callable, Mapping
@@ -40,7 +42,9 @@ from vulnmart.notifications.service import DbOutboxPort
 from vulnmart.notifications.templates import validate_params
 from vulnmart.orgs.models import Organization
 from vulnmart.orgs.service import CompanyService, NotActiveRecruiter
+from vulnmart.ports.attempts import AttemptPort
 from vulnmart.ports.audit import AuditPort
+from vulnmart.ports.errors import AttemptGone, AttemptNotFound, AttemptStateInvalid
 from vulnmart.ports.scope import Role, Scope
 from vulnmart.ports.settings import SettingsPort
 
@@ -60,6 +64,9 @@ EDGES: dict[str, frozenset[str]] = {
     "opened": frozenset({"consented", "declined", "expired", "revoked"}),
     "consented": frozenset({"started", "expired", "revoked"}),
 }
+REINVITABLE = ("started", "consented")  # a re-invite (FR-ASM-05) replaces an attempt that is under way or ready: the fault is the recruiter's judgement call
+CLOSED_STATES = ("expired", "cancelled", "declined", "revoked")  # the invite purge empties the token hash of these (a closed invite never opens again)
+BULK_MAX = 500
 STAMPS = {"sent": "sent_at", "opened": "opened_at", "consented": "consented_at", "started": "started_at", "expired": "closed_at", "cancelled": "closed_at",
           "declined": "closed_at", "revoked": "closed_at"}
 # What a template can never switch off (FR-ASM-01): asking to is refused by name.
@@ -110,6 +117,14 @@ class TemplateInUse(Exception):
     """A template with invites cannot be deleted."""
 
 
+class AlreadyStarted(Exception):
+    """The candidate already started an attempt on this template: a new invite would be a second attempt, which only a re-invite may grant (FR-ASM-05)."""
+
+
+class InviteTaken(Exception):
+    """The invite is already bound to another account."""
+
+
 @dataclass(frozen=True, slots=True)
 class TemplateView:
     template_id: str
@@ -149,6 +164,22 @@ class InviteView:
     started_at: datetime | None
     closed_at: datetime | None
     rules: Mapping[str, Any]
+    user_id: str | None = None  # the candidate account the invite is bound to (story P-21)
+    attempt_id: str | None = None  # the id the attempt has or will have
+    generation: int = 1  # 2, 3 ... for each re-invite
+    supersedes_attempt_id: str | None = None
+    superseded_by: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BulkResult:
+    """What a bulk invite did, address by address (FR-ASM-06). `skipped` pairs an address with why: `invalid`, `duplicate` (twice in the list), `exists` (a live invite
+    for it), `started` (it already has an attempt: use a re-invite). `remaining` is what was not tried because the company's daily cap ran out, in the order given, so
+    nothing is lost: send it again tomorrow. `cap` is the cap that stopped it (None if nothing did)."""
+    created: tuple[InviteView, ...]
+    skipped: tuple[tuple[str, str], ...]
+    remaining: tuple[str, ...]
+    cap: int | None = None
 
 
 def _clean_title(raw: Any) -> str:
@@ -201,6 +232,11 @@ def validate_template(values: Mapping[str, Any], *, default_retention: int = 180
     }
 
 
+def new_attempt_id() -> str:
+    """The id an attempt will have (the lab's own ids look the same: `a-` and 16 Base32 characters), given out when an invite is bound so the consent record can name it."""
+    return "a-" + base64.b32encode(secrets.token_bytes(10)).decode("ascii")
+
+
 def new_invite_id() -> str:
     import base64
     import secrets
@@ -210,9 +246,9 @@ def new_invite_id() -> str:
 
 class AssessmentService:
     def __init__(self, sessions: sessionmaker[Session], companies: CompanyService, audit: AuditPort, scope: ContextScopePort, settings: SettingsPort,
-                 keys: FieldKeys, *, public_origin: str, now: Clock = utc_now):
+                 keys: FieldKeys, *, public_origin: str, now: Clock = utc_now, attempts: AttemptPort | None = None):
         self._sessions, self._companies, self._audit, self._scope, self._settings = sessions, companies, audit, scope, settings
-        self._keys, self._origin, self._now = keys, public_origin.rstrip("/"), now
+        self._keys, self._origin, self._now, self._attempts = keys, public_origin.rstrip("/"), now, attempts
 
     # ---- who is calling ----
 
@@ -313,7 +349,13 @@ class AssessmentService:
 
     def create_invite(self, actor: Scope, template_id: str, email: str) -> InviteView:
         """Invite a candidate by email. Needs an active recruiter of a company that accepted the terms, a free place under the daily cap and no live invite for the
-        same template and address. Raises InvalidInput (`/email`), TemplateNotFound, InviteExists, InviteCapReached, NotActiveRecruiter, TermsNotAccepted."""
+        same template and address. Raises InvalidInput (`/email`), TemplateNotFound, InviteExists, AlreadyStarted (use a re-invite), InviteCapReached,
+        NotActiveRecruiter, TermsNotAccepted."""
+        return self._create(actor, template_id, email)
+
+    def _create(self, actor: Scope, template_id: str, email: str, *, generation: int = 1, supersedes: str | None = None) -> InviteView:
+        """`supersedes` is the id of the invite a re-invite replaces: it is marked and (if consented) revoked in the same transaction as the new invite is made, so a
+        refusal (the cap, a duplicate) leaves the old one exactly as it was."""
         org = self._recruiter_org(actor, for_invites=True)
         tid = self._uuid(template_id, TemplateNotFound)
         email_ci = normalize_email(email)
@@ -338,11 +380,28 @@ class AssessmentService:
                     raise InviteCapReached(decision.cap, decision.remaining)
                 keys = list(session.scalars(select(TemplateChallenge.challenge_key).where(TemplateChallenge.template_id == tid)))
                 view = self._view(template, keys)
+                old_attempt: str | None = None
+                if supersedes is not None:
+                    old = session.get(Invite, supersedes)
+                    if old is None or old.org_id != org or old.template_id != tid or old.email_ci != email_ci:
+                        raise InviteNotFound
+                    if old.state not in REINVITABLE or old.attempt_id is None or old.superseded_by is not None:
+                        raise InviteClosed(old.state)
+                    values: dict[str, Any] = {"superseded_by": invite_id}
+                    if old.state == "consented":
+                        values.update(state="revoked", closed_at=now)  # the link of a consented invite must not start a second attempt next to the new one
+                    if session.execute(update(Invite).where(Invite.id == old.id, Invite.state == old.state, Invite.superseded_by.is_(None)).values(**values)).rowcount != 1:
+                        raise InviteClosed(session.scalar(select(Invite.state).where(Invite.id == old.id)) or old.state)
+                    old_attempt = old.attempt_id
+                    self._audit.append(actor=actor.user_id, action="invite.superseded", subject=None,
+                                       details={"org": str(org), "invite": old.id, "replaced_by": invite_id})
                 if session.scalar(select(Invite.id).where(Invite.template_id == tid, Invite.email_ci == email_ci, Invite.state.in_(LIVE_STATES))) is not None:
                     raise InviteExists
+                if supersedes is None and session.scalar(select(Invite.id).where(Invite.template_id == tid, Invite.email_ci == email_ci, Invite.state == "started")) is not None:
+                    raise AlreadyStarted
                 invite = Invite(id=invite_id, org_id=org, template_id=tid, template_version=template.version, rules=view.rules(), email_ci=email_ci,
                                 token_hash=hash_token(token), state="created", expires_at=now + timedelta(days=template.invite_expiry_days),
-                                created_by=actor.user_id, created_at=now)
+                                created_by=actor.user_id, created_at=now, generation=generation, supersedes_attempt_id=old_attempt)
                 try:
                     with session.begin_nested():
                         session.add(invite)
@@ -352,6 +411,63 @@ class AssessmentService:
                 invite.outbox_id = self._queue_mail(session, invite, company.name, template.title, token).id
                 self._audit.append(actor=actor.user_id, action="invite.created", subject=None, details={"org": str(org), "invite": invite_id, "template": str(tid)})
                 return self._invite_view(invite)
+
+    def create_invites(self, actor: Scope, template_id: str, emails: list[str]) -> BulkResult:
+        """Invite many candidates to one template (FR-ASM-06). Each address is its own invite with its own token, mail and place under the daily cap; a bad one does not stop
+        the rest. At the cap it stops and hands back the addresses it did not reach. The provider's daily sending cap is separate: it delays the mail (the outbox sends them in
+        order over the following days), the invites exist at once. Raises InvalidInput (`/emails`) for an empty list or more than 500, and what `create_invite` raises
+        for the caller or the template (NotActiveRecruiter, TermsNotAccepted, TemplateNotFound)."""
+        if not isinstance(emails, (list, tuple)) or not emails or len(emails) > BULK_MAX or not all(isinstance(e, str) for e in emails):
+            raise InvalidInput("/emails")
+        created: list[InviteView] = []
+        skipped: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for position, raw in enumerate(emails):
+            canonical = normalize_email(raw)
+            if canonical is None:
+                skipped.append((raw, "invalid"))
+                continue
+            if canonical in seen:
+                skipped.append((raw, "duplicate"))
+                continue
+            seen.add(canonical)
+            try:
+                created.append(self._create(actor, template_id, raw))
+            except InviteExists:
+                skipped.append((raw, "exists"))
+            except AlreadyStarted:
+                skipped.append((raw, "started"))
+            except InviteCapReached as stop:
+                rest: list[str] = []
+                later = seen - {canonical}  # what was already made or skipped is not "remaining"
+                for pending in emails[position:]:
+                    key = normalize_email(pending)
+                    if key is not None and key not in later:
+                        later.add(key)
+                        rest.append(pending)
+                return BulkResult(tuple(created), tuple(skipped), tuple(rest), stop.cap)
+        return BulkResult(tuple(created), tuple(skipped), ())
+
+    def reinvite(self, actor: Scope, invite_id: str) -> InviteView:
+        """A fault happened (FR-ASM-05): give the candidate a new attempt. Only for an invite that was consented to or started. The new invite has the next `generation`,
+        names the old attempt in `supersedes_attempt_id` and gets the template's rules as they are now; the old invite is marked `superseded_by` (and revoked if it was only
+        consented), and the old attempt is cancelled through the lab port when it can be (a running or ready attempt; one that cannot be cancelled is left, and logged).
+        The new invite counts against the daily cap. Raises InviteNotFound, InviteClosed(state), InviteCapReached, TermsNotAccepted, NotActiveRecruiter."""
+        org = self._recruiter_org(actor, for_invites=True)
+        with self._scope.acting_as(actor):
+            self._settle(invite_id)
+            with self._sessions() as session:
+                old = self._own_invite(session, org, invite_id)
+                if old.state not in REINVITABLE or old.attempt_id is None or old.superseded_by is not None:
+                    raise InviteClosed(old.state)
+                template_id, email, generation, old_attempt = str(old.template_id), old.email_ci, old.generation, old.attempt_id
+        fresh = self._create(actor, template_id, email, generation=generation + 1, supersedes=invite_id)
+        if self._attempts is not None:
+            try:
+                self._attempts.cancel(old_attempt, by=actor.user_id)
+            except (AttemptNotFound, AttemptGone, AttemptStateInvalid) as why:
+                logger.warning("re-invite %s: the old attempt %s was not cancelled (%s)", fresh.invite_id, old_attempt, type(why).__name__)
+        return fresh
 
     def _expire_duplicates(self, tid: uuid.UUID, email_ci: str, now: datetime) -> None:
         """Close the live invite for this template and address if it is already past its expiry, so that it does not block a new one."""
@@ -430,7 +546,8 @@ class AssessmentService:
             return None if value is None else _aware(value)
 
         return InviteView(invite.id, str(invite.template_id), invite.email_ci, invite.state, _aware(invite.expires_at), _aware(invite.created_at), when(invite.sent_at),
-                          when(invite.opened_at), when(invite.consented_at), when(invite.started_at), when(invite.closed_at), dict(invite.rules or {}))
+                          when(invite.opened_at), when(invite.consented_at), when(invite.started_at), when(invite.closed_at), dict(invite.rules or {}),
+                          invite.user_id, invite.attempt_id, invite.generation, invite.supersedes_attempt_id, invite.superseded_by)
 
     @staticmethod
     def _uuid(value: str, error: type[Exception]) -> uuid.UUID:
@@ -545,6 +662,60 @@ class AssessmentService:
                 self._audit.append(actor="system:invites", action=f"invite.{to_state}", subject=None, details={"org": str(oid), "invite": invite_id})
                 session.refresh(invite)
                 return self._invite_view(invite)
+
+    def bind_candidate(self, org_id: str, invite_id: str, user_id: str) -> InviteView:
+        """Bind an opened invite to the candidate whose verified address matched (the caller has checked that): sets `user_id` and gives out the `attempt_id` the consent
+        record will name. One conditional UPDATE, so two accounts cannot both bind. The same account again is a no-op returning the invite; another account is InviteTaken;
+        an invite that is not open (or consented) is InviteClosed(state)."""
+        oid = self._uuid(org_id, InviteNotFound)
+        with self._scope.acting_as(self._system(oid)):
+            self._settle(invite_id)
+            with self._sessions.begin() as session:
+                invite = session.get(Invite, invite_id)
+                if invite is None:
+                    raise InviteNotFound
+                if invite.state not in ("opened", "consented"):
+                    raise InviteClosed(invite.state)
+                if invite.user_id is not None:
+                    if invite.user_id != user_id:
+                        raise InviteTaken
+                    return self._invite_view(invite)
+                changed = session.execute(update(Invite).where(Invite.id == invite_id, Invite.user_id.is_(None), Invite.state.in_(("opened", "consented")))
+                                          .values(user_id=user_id, attempt_id=new_attempt_id())).rowcount
+                session.refresh(invite)
+                if changed != 1:
+                    if invite.user_id == user_id:
+                        return self._invite_view(invite)
+                    raise InviteTaken if invite.user_id is not None else InviteClosed(invite.state)
+                self._audit.append(actor=user_id, action="invite.bound", subject=user_id, details={"org": str(oid), "invite": invite_id, "attempt": invite.attempt_id})
+                return self._invite_view(invite)
+
+    def for_attempt(self, attempt_id: str) -> tuple[InviteView, str, str] | None:
+        """The invite that names this attempt, the id of its company and the company's name, read in the scope of the running request: a signed-in candidate sees only the invite bound to them
+        (policy `own_invite`), anyone else, and a request with no scope, gets None. The company name is read in the company's own scope."""
+        with self._sessions() as session:
+            invite = session.scalar(select(Invite).where(Invite.attempt_id == attempt_id))
+            if invite is None:
+                return None
+            view, org = self._invite_view(invite), invite.org_id
+        with self._scope.acting_as(self._system(org)):
+            with self._sessions() as session:
+                company = session.get(Organization, org)
+                return None if company is None else (view, str(org), company.name)
+
+    def purge_closed_tokens(self, before: datetime) -> int:
+        """Empty the token hash of every closed invite (expired, cancelled, declined, revoked) that closed at or before `before` (the invite purge of story P-24 calls
+        it; the retention rule decides `before`). The invite row stays, without a token nobody can open it. Returns how many."""
+        with self._scope.acting_as(Scope(user_id="system:invites", roles=frozenset({Role.ADMIN}))):
+            with self._sessions() as session:
+                orgs = [o for o in session.scalars(select(Organization.id))]
+        total = 0
+        for org in orgs:
+            with self._scope.acting_as(self._system(org)):
+                with self._sessions.begin() as session:
+                    total += session.execute(update(Invite).where(Invite.org_id == org, Invite.state.in_(CLOSED_STATES), Invite.token_hash.is_not(None),
+                                                                  Invite.closed_at <= before).values(token_hash=None)).rowcount
+        return total
 
     def expire_due(self, org_id: str) -> int:
         """Close the live invites of one company that are past their expiry. Returns how many."""

@@ -61,7 +61,7 @@ class TemplateChallenge(Base):
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
 
 
-@org_scoped("org_id")
+@org_scoped("org_id", self_column="user_id")  # the bound candidate reads their own invite with no company in scope (story P-21)
 class Invite(Base):
     __tablename__ = "invites"
     __table_args__ = (
@@ -70,6 +70,7 @@ class Invite(Base):
         Index("uq_invites_live_email", "template_id", "email_ci", unique=True,
               postgresql_where=text("state IN ('created', 'sent', 'opened', 'consented')"), sqlite_where=text("state IN ('created', 'sent', 'opened', 'consented')")),
         Index("ix_invites_org_state", "org_id", "state"),
+        Index("uq_invites_attempt_id", "attempt_id", unique=True, postgresql_where=text("attempt_id IS NOT NULL"), sqlite_where=text("attempt_id IS NOT NULL")),
     )
 
     id: Mapped[str] = mapped_column(String(18), primary_key=True)  # `i-` and 16 Base32 characters
@@ -81,7 +82,14 @@ class Invite(Base):
     token_hash: Mapped[str | None] = mapped_column(String(64))
     state: Mapped[str] = mapped_column(String(10), nullable=False, server_default="created")
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    superseded_by: Mapped[str | None] = mapped_column(String(18))
+    superseded_by: Mapped[str | None] = mapped_column(String(18))  # the invite that replaced this one (a re-invite, FR-ASM-05)
+    # Story P-21. `user_id`: the candidate account the invite is bound to once their verified address matched; `attempt_id`: the id the attempt will have, given out when the
+    # invite is bound and the id the consent record names; `generation`: 1, and 2, 3 ... for each re-invite (a re-invite is a new attempt); `supersedes_attempt_id`: the earlier
+    # attempt a re-invite replaces.
+    user_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    attempt_id: Mapped[str | None] = mapped_column(String(40))
+    generation: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    supersedes_attempt_id: Mapped[str | None] = mapped_column(String(40))
     outbox_id: Mapped[int | None] = mapped_column(BigInteger)  # the queued mail; `sent` is read from it
     created_by: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

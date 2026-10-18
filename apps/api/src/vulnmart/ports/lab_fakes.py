@@ -63,12 +63,13 @@ class FakeAttemptPort:
             self.store.items[a.attempt_id] = a
         return a
 
-    def create_from_consent(self, *, user_id: str, org_id: str, template_id: str, invite_id: str, consent_id: str) -> Attempt:
+    def create_from_consent(self, *, user_id: str, org_id: str, template_id: str, invite_id: str, consent_id: str,
+                            attempt_id: str | None = None) -> Attempt:
         with self.store.lock:
             for a in self.store.items.values():
                 if a.consent_id == consent_id:
                     return a
-            a = Attempt(new_id("a-"), user_id, org_id, AttemptMode.CANDIDATE, AttemptState.READY, template_id, consent_id)
+            a = Attempt(attempt_id or new_id("a-"), user_id, org_id, AttemptMode.CANDIDATE, AttemptState.READY, template_id, consent_id)
             self.store.items[a.attempt_id] = a
             return a
 

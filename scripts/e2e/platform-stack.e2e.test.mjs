@@ -604,7 +604,7 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(own.status, 200);
     assert.deepEqual(await own.json(), { items: [], has_more: false });
     assert.equal((await call('GET', '/api/v1/me/consents?limit=101', { headers: { cookie } })).status, 422);
-    assert.equal(psql(`SELECT count(*) FROM consent_records`), '0', 'nothing was written by the refused calls');
+    assert.equal(psql(`SELECT count(*) FROM consent_records WHERE user_id = (SELECT id FROM users WHERE email_ci = '${email}')`), '0', 'nothing was written by the refused calls');
 
     // the database itself: the application role has SELECT and INSERT only, and cannot change a record
     assert.equal(psql(`SELECT version_num FROM alembic_version`).length > 0, true);
@@ -896,9 +896,130 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.deepEqual(capped, ['cap', 1, 0], 'one invite a day for this company, and the refused one made nothing');
     assert.equal(py(`print(json.dumps(a.revoke(${owner}, "${created.invite}").state))`), 'revoked', 'the second mail had left, so the invite is revoked (a cancel is for an invite whose mail has not left)');
     assert.equal(py(`print(json.dumps(a.find_by_token("${second}").state))`), 'revoked', 'a closed invite stays closed');
-    assert.equal(psql(`SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM audit_log WHERE action LIKE 'invite.%' OR action LIKE 'template.%'`), 'invite.created,invite.resent,invite.revoked,invite.sent,template.created');
+    assert.equal(psql(`SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM audit_log WHERE (action LIKE 'invite.%' OR action LIKE 'template.%') AND details LIKE '%${orgId}%'`), 'invite.created,invite.resent,invite.revoked,invite.sent,template.created');
     assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%${ownerId}%'`), '0');
   }, { timeout: 240000 });
+
+  // Story P-21: a candidate with no account opens the invite link, registers (18 or over) and verifies the address, the verified address must match the invite, the consent
+  // comes first, a grant adds the candidate role and hands a consented attempt to the lab port; a re-invite replaces the attempt; bulk invites go through the outbox and
+  // the worker; the invite purge empties the token of a closed invite. The services are driven inside the API container as the application role (IF-1 has no recruiter or
+  // invite route yet, handoff H-138), and the lab port is the real attempt engine in that process (the production wiring of the lab port is stream L's, handoff H-141).
+  test('accepting invites (P-21): open the link, register, address must match, consent first, attempt and role after it, re-invite, bulk, purge', async () => {
+    const domain = `accept-${RUN}.example`;
+    const ownerEmail = `owner@${domain}`;
+    const candidate = `taker-${RUN}@example.org`;
+    const stranger = `stranger-${RUN}@example.org`;
+    const adminEmail = `e2e-accept-admin-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from sqlalchemy import text', 'from vulnmart.main import app', 'from vulnmart.ports.scope import Scope, Role',
+        'c, a, acc = app.state.companies, app.state.assessments, app.state.invite_acceptance', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const linkFrom = async (address, tries = 60) => {
+      for (let i = 0; i < tries; i += 1) {
+        const m = await mailFor(address, 'invited you to a security assessment', 1);
+        const found = m && /invite\?token=([a-z2-7]{26}\.[A-Za-z0-9_-]{43})/.exec(m.Text)?.[1];
+        if (found) return found;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      return null;
+    };
+    const seeded = docker('exec', '-e', 'VULNMART_SEED_ADMIN_PASSWORD=a long admin password 123', NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Accept Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    const admin = `Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN}))`;
+    py(`c.signup_recruiter(email="${ownerEmail}", password="${password}", display_name="E2E Acceptor", company_name="Accept Ltd")`, 'print(json.dumps(True))');
+    const ownerMail = await mailFor(ownerEmail, 'Confirm your email');
+    assert.ok(ownerMail, 'the verification mail of the recruiter arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(ownerMail.Text)[1] })).status, 200);
+    const ownerId = psql(`SELECT id FROM users WHERE email_ci = '${ownerEmail}'`);
+    const orgId = psql(`SELECT id FROM organizations WHERE domain_claim = '${domain}'`);
+    py(`c.approve(${admin}, "${orgId}")`, `t = c.terms_for("${ownerId}")`, `c.accept_terms("${ownerId}", t.version, t.sha256)`, 'print(json.dumps(True))');
+    const owner = `Scope(user_id="${ownerId}", org_id="${orgId}", roles=frozenset({Role.RECRUITER, Role.ORG_OWNER}))`;
+    const made = py(`t = a.create_template(${owner}, {"title": "E2E accept", "challenge_keys": ["C01", "C03"], "retention_days": 60})`,
+      `i = a.create_invite(${owner}, t.template_id, "${candidate}")`, 'print(json.dumps({"template": t.template_id, "invite": i.invite_id}))');
+    const token = await linkFrom(candidate);
+    assert.ok(token, 'the invitation arrived at an address with no account');
+
+    // the link is opened before any account exists: the invite is opened; no account, no binding
+    assert.deepEqual(py(`v = acc.open_link("${token}")`, 'print(json.dumps([v.state, v.user_id, v.attempt_id]))'), ['opened', null, null]);
+
+    // the candidate registers through the real API (18 or over) and verifies the address; a stranger registers too, with another address
+    for (const email of [candidate, stranger]) {
+      assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Taker', age_declaration: true })).status, 202);
+      const m = await mailFor(email, 'Confirm your email');
+      assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(m.Text)[1] })).status, 200);
+    }
+    const userId = psql(`SELECT id FROM users WHERE email_ci = '${candidate}'`);
+    const strangerId = psql(`SELECT id FROM users WHERE email_ci = '${stranger}'`);
+
+    // the verified address must match; the answer does not name the invited one; nothing is bound by the refusal
+    const refused = py('from vulnmart.assessments.accept import AddressMismatch', 'try:', `    acc.accept("${strangerId}", "${token}")`, '    print(json.dumps(["bound"]))', 'except AddressMismatch as e:', '    print(json.dumps(["mismatch", str(e)]))');
+    assert.deepEqual(refused, ['mismatch', '']);
+    assert.equal(psql(`SELECT coalesce(user_id, 'none') FROM invites WHERE id = '${made.invite}'`), 'none');
+
+    // the one flow in one process: accept, consent first (the notice shows the template's retention), the attempt and the role only after the grant; a repeat changes nothing
+    const flow = py(
+      'from vulnmart_attempts import AttemptEngine, FakeClock, InMemoryAttemptStore, InMemoryInstanceControl',
+      'from datetime import datetime, UTC',
+      'from vulnmart.ports.engine_attempts import EngineAttemptPort',
+      'from vulnmart.assessments.accept import InviteConsentTargets',
+      'from vulnmart.privacy.consent import ConsentService',
+      'from vulnmart.kernel.scope import ContextScopePort',
+      'from vulnmart.accounts.fieldkeys import from_settings',
+      'sc = ContextScopePort()',
+      'engine = AttemptEngine(InMemoryAttemptStore(), InMemoryInstanceControl(), FakeClock(datetime.now(UTC)))',
+      'port = EngineAttemptPort(engine)',
+      'targets = InviteConsentTargets(a, port, app.state.roles)',
+      'consent = ConsentService(app.state.ports.sessions, targets, app.state.ports.audit, app.state.ports.settings, from_settings(app.state.settings))',
+      `got = acc.accept("${userId}", "${token}")`,
+      `me = Scope(user_id="${userId}", roles=frozenset({Role.LEARNER}))`,
+      'with sc.acting_as(me):',
+      `    target, notice = consent.notice("${userId}", got.attempt_id)`,
+      'roles_before = sorted(app.state.roles.roles_of("' + userId + '"))',
+      'try:', '    port.get(got.attempt_id)', '    attempt_before = "exists"', 'except Exception as e:', '    attempt_before = type(e).__name__',
+      'with sc.acting_as(me):',
+      `    rec = consent.record(user_id="${userId}", attempt_id=got.attempt_id, notice_version=notice.version, notice_sha256=notice.sha256, decision="granted", ip="203.0.113.9", user_agent="e2e")`,
+      `    again = consent.record(user_id="${userId}", attempt_id=got.attempt_id, notice_version=notice.version, notice_sha256=notice.sha256, decision="granted", ip="203.0.113.9", user_agent="e2e")`,
+      'att = port.get(got.attempt_id)',
+      'print(json.dumps({"attempt": got.attempt_id, "state": target.state, "retention": notice.retention_days_shown, "roles_before": roles_before, "attempt_before": attempt_before,',
+      '  "same_record": rec.consent_id == again.consent_id, "attempt_state": att.state.value, "attempt_user": att.user_id, "consent": rec.consent_id, "roles_after": sorted(app.state.roles.roles_of("' + userId + '"))}))');
+    assert.match(flow.attempt, /^a-[A-Z2-7]{16}$/);
+    assert.deepEqual([flow.state, flow.retention, flow.roles_before, flow.attempt_before], ['consent', 60, ['learner'], 'AttemptNotFound']);
+    assert.deepEqual([flow.same_record, flow.attempt_state, flow.attempt_user, flow.roles_after], [true, 'ready', userId, ['candidate', 'learner']]);
+    assert.equal(psql(`SELECT state || ',' || user_id || ',' || attempt_id FROM invites WHERE id = '${made.invite}'`), `consented,${userId},${flow.attempt}`);
+    assert.equal(psql(`SELECT count(*) FROM consent_records WHERE attempt_id = '${flow.attempt}' AND retention_days_shown = 60`), '1');
+
+    // a re-invite after a fault: a new invite (generation 2) names the old attempt, the old invite is revoked and marked, and the new link works for the same account
+    const re = py(`n = a.reinvite(${owner}, "${made.invite}")`, 'print(json.dumps({"invite": n.invite_id, "generation": n.generation, "supersedes": n.supersedes_attempt_id}))');
+    assert.deepEqual([re.generation, re.supersedes], [2, flow.attempt]);
+    assert.equal(psql(`SELECT state || ',' || superseded_by FROM invites WHERE id = '${made.invite}'`), `revoked,${re.invite}`);
+    let second = null;
+    for (let i = 0; i < 60 && !second; i += 1) {
+      const m = await mailFor(candidate, 'invited you to a security assessment', 1);
+      const t = m && /invite\?token=([a-z2-7]{26}\.[A-Za-z0-9_-]{43})/.exec(m.Text)?.[1];
+      if (t && t !== token) second = t; else await new Promise((r) => setTimeout(r, 1000));
+    }
+    assert.ok(second, 'the new invite arrived');
+    assert.equal(py(`print(json.dumps(acc.accept("${userId}", "${second}").attempt_id != "${flow.attempt}"))`), true, 'the new link gives the same account a new attempt id');
+
+    // bulk invites: one invite and one mail each, bad and repeated addresses reported, at the cap the rest is handed back
+    py(`c.set_invite_cap(${admin}, "${orgId}", 4)`, 'print(json.dumps(True))');
+    const bulk = py(`r = a.create_invites(${owner}, "${made.template}", ["b1-${RUN}@example.org", "B1-${RUN}@example.org", "nonsense", "b2-${RUN}@example.org", "b3-${RUN}@example.org", "b4-${RUN}@example.org"])`,
+      'print(json.dumps({"created": len(r.created), "skipped": [list(s) for s in r.skipped], "remaining": list(r.remaining), "cap": r.cap}))');
+    assert.deepEqual([bulk.created, bulk.skipped, bulk.remaining.length, bulk.cap], [2, [[`B1-${RUN}@example.org`, 'duplicate'], ['nonsense', 'invalid']], 2, 4], JSON.stringify(bulk));
+    for (const who of ['b1', 'b2']) assert.ok(await linkFrom(`${who}-${RUN}@example.org`), `the bulk invite of ${who} arrived through the worker`);
+
+    // the invite purge sees the closed invite and empties its token; the purged link opens nothing
+    const purged = py('from datetime import datetime, timedelta, UTC', 'n = a.purge_closed_tokens(datetime.now(UTC) + timedelta(minutes=1))', `print(json.dumps([n, acc.open_link("${token}") is None]))`);
+    assert.ok(purged[0] >= 1 && purged[1], 'the revoked invite lost its token');
+    assert.equal(psql(`SELECT count(*) FROM invites WHERE id = '${made.invite}' AND token_hash IS NULL`), '1');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%${token.slice(30)}%' OR details LIKE '%${candidate}%'`), '0', 'no token and no address in the audit log');
+    assert.equal(psql(`SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM audit_log WHERE action IN ('invite.bound', 'invite.superseded', 'consent.granted', 'invite.consented')`), 'consent.granted,invite.bound,invite.consented,invite.superseded');
+  }, { timeout: 300000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {

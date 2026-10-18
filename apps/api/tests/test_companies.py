@@ -444,7 +444,7 @@ def test_a_stranger_cannot_apply_for_a_company_and_an_active_one_has_nothing_to_
 
 def test_the_admin_visible_and_self_visible_tables_are_exactly_the_ones_intended(companies):
     assert ORG_ADMIN_VISIBLE == {"organizations"}
-    assert ORG_SELF_VISIBLE == {"org_members": "user_id", "join_requests": "user_id"}
+    assert ORG_SELF_VISIBLE == {"org_members": "user_id", "join_requests": "user_id", "invites": "user_id"}  # invites since story P-21
 
 
 def test_the_guard_refuses_company_tables_without_a_scope_and_for_the_wrong_scope(companies, sessions):

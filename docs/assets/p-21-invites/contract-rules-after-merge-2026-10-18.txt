@@ -1,0 +1,25 @@
+PASS            registry: 10 contracts, 17 folders under contracts/ all registered
+PASS            base: compared with origin/main (merge base 3c6dcb8814); 176 file(s) differ
+                NOTICE: no tag contracts-v* exists, so the comparison with the latest tag did not run (only the pull request base is compared)
+PASS            contract[IF-6]: no file of this contract changed
+PASS            contract[IF-4]: no file of this contract changed
+PASS            contract[IF-5]: no file of this contract changed
+PASS            changelog[IF-2]: new entry for IF-2: 1.0.1 (2026-10-18, Tanmay, story 9.2)
+PASS            mock[IF-2]: a mock file changed with the contract
+PASS            breaking[IF-2]: no breaking change in the schema or OpenAPI files
+PASS            contract[IF-1]: no file of this contract changed
+PASS            changelog[DB]: new entry for DB: 2.0.0 (2026-10-18, Tanmay, story 9.1)
+PASS            mock[DB]: no schema or OpenAPI file changed, so no mock change is needed
+PASS            breaking[DB]: contracts/db/table-owners.yaml: 5 table(s) added (held_captures, review_audit, attempt_events, bot_visits, security_events); additive
+PASS            contract[IF-7]: no file of this contract changed
+PASS            contract[IF-8]: no file of this contract changed
+PASS            contract[IF-3]: no file of this contract changed
+PASS            contract[GATE]: no file of this contract changed
+PASS            compat: 10 row(s), every listed version exists; 20 approver row(s)
+NOT-APPLICABLE  approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+PASS            table-owners: 48 tables, every owner is a module in CODEOWNERS
+PASS            alembic: one head 0012 in 12 revisions
+PASS            bundle: contracts:bundle:check passed
+
+SUMMARY: 20 PASS, 0 FAIL, 1 NOT-APPLICABLE
+NOT-APPLICABLE: approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
