@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { makePassword, parseArgs } from './demo-accounts.mjs';
 
-const ok = ['--base', 'https://x.example', '--mailpit-ssh', 'ubuntu@10.0.0.1', '--out', 'C:\\Users\\someone\\demo.txt'];
+const ok = ['--base', 'https://x.example', '--mailpit-ssh', 'ubuntu@10.0.0.1', '--out', path.join(os.tmpdir(), 'demo-accounts.txt')];
 test('arguments: base, mailpit and an output file outside the repository are required', () => {
   assert.equal(parseArgs(ok).count, 3);
   assert.match(parseArgs(['--base', 'http://x']).error, /https/);
