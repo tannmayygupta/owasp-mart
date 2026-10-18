@@ -52,7 +52,34 @@ function safeMerge(base, patch, depth = 0) {
   return out;
 }
 
+// C06 — Vulnerable/Outdated Components (OWASP 2021 A06 / 2025 A03), CWE-1321.
+// The DELIBERATELY VULNERABLE merge: a naive recursive merge with NO dangerous-key
+// filter, so a product patch carrying `__proto__` pollutes Object.prototype. It is
+// contained in this fresh per-job process (no network, no database), so the only
+// effect is prototype pollution within a process that is about to exit — no code
+// execution. Active only when VM_CHALLENGE_C06=vulnerable (default: the safe merge).
+function unsafeMerge(base, patch) {
+  const out = base;
+  if (patch && typeof patch === 'object' && !Array.isArray(patch)) {
+    for (const k of Object.keys(patch)) {
+      const v = patch[k];
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        if (out[k] == null || typeof out[k] !== 'object') out[k] = {};
+        unsafeMerge(out[k], v); // recurses into out["__proto__"] -> pollutes the prototype
+      } else {
+        out[k] = v;
+      }
+    }
+  }
+  return out;
+}
+
+function isC06Vulnerable() {
+  return process.env.VM_CHALLENGE_C06 === 'vulnerable' || process.env.VM_CHALLENGE_MODE === 'vulnerable';
+}
+
 function preview(job) {
   const defaults = { title: '', description: '', price_cents: 0, tags: [] };
-  return safeMerge(defaults, job && typeof job.product === 'object' ? job.product : {});
+  const patch = job && typeof job.product === 'object' ? job.product : {};
+  return isC06Vulnerable() ? unsafeMerge({ ...defaults }, patch) : safeMerge(defaults, patch);
 }

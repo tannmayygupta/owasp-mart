@@ -244,7 +244,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes and fails as required and no real data is exposed.
   - Handoffs: H-49 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-24. C06 Vulnerable Components (prototype pollution in the import service)**
+- [x] **T-24. C06 Vulnerable Components (prototype pollution in the import service)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C06 with the old lodash in the isolated import service; confirm the pollution input works on Node 24.
