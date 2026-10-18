@@ -1,0 +1,35 @@
+---
+type: epic
+title: "The lab is persistent, served by the real API, runs real instances and its review findings are closed"
+parent: initiative-lab
+covers: []
+after: []
+assignee: "Tanmay Gupta"
+risk: high
+---
+
+# Production readiness of the lab
+
+## Description
+
+After the sprint 3 and 4 review the lab's engines worked only in memory, behind token-guarded demo routes, with the instances proven only on stub images. This epic makes the lab real: its state is in Postgres, the IF-2 routes are served by the real API, an instance is created by the orchestrator from the real shop image, the open review findings are closed, and the whole thing is verified on the deployed hosts.
+
+## Outcome
+
+A learner can sign up, start a real instance, capture a flag, see a score, and a restart of any process loses nothing; each of these is proven by a test or a recorded run on the deployed system.
+
+## Done when
+
+1. The lab state is stored in Postgres and survives a restart (tests on a real Postgres).
+2. The IF-2 lab routes and the catalogue are served by the API and checked against the contract.
+3. An instance created by the orchestrator from the real shop image passes the isolation probe and the flag loop on vm-i.
+4. Every confirmed review finding is fixed with a test or recorded as accepted with the reason.
+5. The end-to-end suite, the load check, the isolation audit and a backup and restore test pass on the deployed system.
+
+## Boundaries
+
+Stream L work. Where a part belongs to another stream (the invite and company flows of stream P, the shop challenges of stream T) this epic only supplies the lab side and says so.
+
+## References
+
+- parent, docs/bmad/initiative-lab/initiative-lab.md; review record docs/dev-log/2026-10-18-tannmayygupta-sprint-4-review-and-s-8.md

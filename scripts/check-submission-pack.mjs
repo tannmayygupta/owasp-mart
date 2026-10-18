@@ -37,9 +37,12 @@ export const REQUIRED = [
 ];
 
 // Folders whose text files are scanned for secret-looking content (the pack that goes into the report).
-export const SCAN_DIRS = ['docs/adr', 'docs/dev-log', 'docs/assets', 'docs/runbooks', 'docs/architecture', 'docs/prd'];
+export const SCAN_DIRS = ['docs/adr', 'docs/dev-log', 'docs/assets', 'docs/runbooks', 'docs/architecture', 'docs/prd', 'docs/design', 'docs/research', 'docs/report', 'docs/dev', 'docs/bmad'];
 export const SCAN_FILES = ['initial.md', 'CLAUDE.md', 'CHANGELOG.md', 'docs/traceability.md', 'docs/dev/HANDOFFS.md'];
-const TEXT = /\.(md|txt|json|toml|ya?ml|mjs|csv)$/i;
+// every kind of file that holds text: evidence is often a .log, a helper a .sh or .ps1 (review finding D9)
+const TEXT = /\.(md|txt|json|toml|ya?ml|mjs|js|py|sh|ps1|csv|log|conf|cfg|ini|env|sql|html)$/i;
+// a file that is a key or a secret by its name is a finding whatever it holds
+export const SECRET_FILE_NAME = /(^|\/)(\.env(\..*)?|.*\.(pem|key|p12|pfx|jks)|id_(rsa|ed25519|ecdsa)|.*\.(tfstate|tfstate\.backup))$/i;
 
 // Patterns are deliberately narrow: the repository uses fake development values on purpose ("...-not-a-secret") and test flags made of one repeated letter.
 export const SECRET_PATTERNS = [
@@ -90,6 +93,11 @@ export function scanPack(root, io) {
   const files = [...SCAN_FILES.map((f) => path.join(root, f)).filter((f) => io.exists(f)), ...SCAN_DIRS.flatMap((d) => (io.exists(path.join(root, d)) ? io.walk(path.join(root, d)) : []))].filter((f) => TEXT.test(f));
   const hits = [];
   for (const f of files) hits.push(...scanText(path.relative(root, f).replace(/\\/g, '/'), io.read(f)));
+  const everything = [...SCAN_DIRS.flatMap((d) => (io.exists(path.join(root, d)) ? io.walk(path.join(root, d)) : []))];
+  for (const f of everything) {
+    const rel = path.relative(root, f).replace(/\\/g, '/');
+    if (SECRET_FILE_NAME.test(rel)) hits.push({ file: rel, line: 0, kind: 'a key or secret file by its name' });
+  }
   return { files: files.length, hits };
 }
 

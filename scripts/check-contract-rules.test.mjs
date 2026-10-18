@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isBreakingMarker, REGISTRY_CHANGE_LINE, isGuarded, effectiveRegistry, runRules, formatResults, resolveBase, resolveTag, latestTag, spawn, runPythonCheck, validateRegistry, parseApprovers, loadReviews, newEntries, changelogSection, addedLines, sectionVersions, PASS, FAIL, NA, REPO_ROOT } from './check-contract-rules.mjs';
+import { diffTableOwners, isBreakingMarker, REGISTRY_CHANGE_LINE, isGuarded, effectiveRegistry, runRules, formatResults, resolveBase, resolveTag, latestTag, spawn, runPythonCheck, validateRegistry, parseApprovers, loadReviews, newEntries, changelogSection, addedLines, sectionVersions, PASS, FAIL, NA, REPO_ROOT } from './check-contract-rules.mjs';
 import { ensureOasdiff } from './oasdiff.mjs';
 
 const SCRIPT = path.join(REPO_ROOT, 'scripts', 'check-contract-rules.mjs');
@@ -1234,4 +1234,14 @@ test('D-46 b: contracts/COMPAT.md is guarded: a change needs a "registry change:
   assert.match(bad.by['trusted-base'].details[0], /contracts\/COMPAT\.md/);
   const declared = await scenario((root) => { edit(root); addChangelog(root, A, '### 0.1.1\n- registry change: new approver'); }, custom);
   assert.equal(declared.by['trusted-base'].status, PASS);
+});
+
+test('table owners: a new row is additive; a removed row or another owner is breaking', () => {
+  const base = 'tables:\n  - { table: users, owner: accounts }\n  - { table: attempts, owner: attempts, note: "x" }\n';
+  const added = base + '  - { table: held_captures, owner: scoring, note: "stream L" }\n';
+  assert.deepEqual(diffTableOwners(base, added), { removed: [], changed: [], added: ['held_captures'] });
+  assert.deepEqual(diffTableOwners(base, base), { removed: [], changed: [], added: [] });
+  assert.deepEqual(diffTableOwners(added, base).removed, ['held_captures']);
+  assert.deepEqual(diffTableOwners(base, base.replace('owner: accounts', 'owner: kernel')).changed, ['users: accounts to kernel']);
+  assert.deepEqual(diffTableOwners(base, base.replace('note: "x"', 'note: "a new note"')), { removed: [], changed: [], added: [] }, 'a note change is not a change of ownership');
 });

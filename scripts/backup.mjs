@@ -80,7 +80,7 @@ export function parseCounts(text) {
   const out = {};
   for (const line of String(text).split(/\r?\n/)) {
     if (!line.trim()) continue;
-    const m = /^([A-Za-z0-9_.]+)\|(\d+)$/.exec(line.trim());
+    const m = /^(.+)\|(\d+)$/.exec(line.trim()); // any table name (a dash, a dollar sign, non-ASCII letters), the count after the last bar
     if (!m) throw new Error(`unreadable count line: "${line.slice(0, 60)}"`);
     out[m[1]] = Number(m[2]);
   }
@@ -163,9 +163,22 @@ export function cmdBackup(o) {
   if (insideRepo(o.out)) return fail('--out must be outside the repository (a dump must never be committed)');
   if (!containerUp(o.container)) return fail(`container ${o.container} is not running; start the platform stack first (nothing was created)`);
   const now = new Date();
-  const counts = readCounts(o, o.db);
-  const d = docker(dumpArgs(o));
-  if (d.status !== 0 || !d.stdout?.length) return fail(`pg_dump failed: ${String(d.stderr).split(/\r?\n/)[0]}`);
+  // The row counts go into the manifest and the restore test compares them with the restored copy, so they must describe the dump: counted before
+  // and after it, and the backup is repeated (at most 3 times) when the database changed meanwhile (review finding D7).
+  let counts;
+  let d;
+  try {
+    for (let attempt = 1; ; attempt++) {
+      counts = readCounts(o, o.db);
+      d = docker(dumpArgs(o));
+      if (d.status !== 0 || !d.stdout?.length) return fail(`pg_dump failed: ${String(d.stderr).split(/\r?\n/)[0]}`);
+      const after = readCounts(o, o.db);
+      if (compareCounts(counts, after).ok) break;
+      if (attempt >= 3) return fail('the database changed during every attempt of the backup: nothing was written; try again when it is quiet');
+    }
+  } catch (err) {
+    return fail(`counting the rows failed: ${err.message}`);
+  }
   const e = openssl(opensslArgs('encrypt', o.passFile), d.stdout);
   if (e.status !== 0 || !e.stdout?.length) return fail('openssl encryption failed');
   mkdirSync(o.out, { recursive: true });

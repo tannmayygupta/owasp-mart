@@ -118,3 +118,9 @@ test('openssl: round trip works, wrong pass phrase fails', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('parseCounts takes any table name and still refuses a line without a count (review finding D7)', () => {
+  assert.deepEqual(parseCounts('public.my-table$1|7\npublic.t\u00e4ble|2\n'), { 'public.my-table$1': 7, 'public.t\u00e4ble': 2 });
+  assert.throws(() => parseCounts('public.a|x'), /unreadable/);
+  assert.throws(() => parseCounts('public.a'), /unreadable/);
+});

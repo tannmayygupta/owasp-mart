@@ -119,7 +119,7 @@ export async function liveChecks(ctx) {
   // The product sidecar also reports its own observations (flag sightings, requests), so with it only the shop event is counted.
   const product = process.env.HARNESS_PRODUCT_SIDECAR === '1';
   const shopEvents = (list) => (Array.isArray(list) ? list.filter((e) => e.type === 'shop.catalog_query_error') : []);
-  const oneShop = product ? shopEvents(stored).length === 1 && shopEvents(stored)[0].instance_id === v.instance_id && shopEvents(stored)[0].epoch === v.epoch : Array.isArray(stored) && stored.length === 1 && stored[0].instance_id === v.instance_id && stored[0].epoch === v.epoch && stored[0].seq === 1 && stored[0].type === 'shop.catalog_query_error';
+  const oneShop = product ? shopEvents(stored).length === 1 && shopEvents(stored)[0].instance_id === v.instance_id && shopEvents(stored)[0].epoch === v.epoch && shopEvents(stored)[0].seq === 1 : Array.isArray(stored) && stored.length === 1 && stored[0].instance_id === v.instance_id && stored[0].epoch === v.epoch && stored[0].seq === 1 && stored[0].type === 'shop.catalog_query_error';
   add('live-event-stored-and-verified', sent === 202 && oneShop,
     `one event must reach the fake ingest with (instance_id, epoch, seq=1); sidecar answered ${sent}, ingest holds ${stored ? stored.length : 'unknown'}`);
 
@@ -128,7 +128,9 @@ export async function liveChecks(ctx) {
   for (const [kind, want] of Object.entries(rows)) { const got = await emit(kind); if (got !== want) bad.push(`${kind}: want ${want}, got ${got}`); }
   await sleep(500);
   const after = eventsAtIngest();
-  if (!after || (product ? shopEvents(after).length !== 1 : after.length !== 1)) bad.push(`nothing else may be forwarded (ingest holds ${after ? after.length : 'unknown'})`);
+  // with the product sidecar the events it makes itself (source sidecar) are fine; nothing from the shop, the mock or the import lane besides the one valid event
+  const foreign = (list) => (Array.isArray(list) ? list.filter((e) => e.source !== 'sidecar') : []);
+  if (!after || (product ? shopEvents(after).length !== 1 || foreign(after).length !== 1 : after.length !== 1)) bad.push(`nothing else may be forwarded (ingest holds ${after ? after.length : 'unknown'})`);
   add('live-event-error-answers', bad.length === 0, bad.join('; '));
 
   // no secret in any log, answer, file or container setting

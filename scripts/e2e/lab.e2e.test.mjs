@@ -178,7 +178,7 @@ test('an instance goes requested to ready, opens with a ticket, resets with a ne
   assert.deepEqual(Object.keys(st).sort(), Object.keys(example('instance.ready.json')).sort());
   const t = seen(await post(`/api/v1/instances/${id}/open`, undefined, { user: 'EVE' }));
   assert.equal(t.status, 200);
-  assert.match(t.json.url, /^https:\/\/i-[a-z0-9]+\.labs\.example\.invalid\/_vm\/enter\?t=[A-Za-z0-9_-]{16,}$/);
+  assert.match(t.json.url, /^https:\/\/i-[a-z0-9]+\.labs\.example\.invalid\/_vm\/enter\?t=[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}$/);
   const reset = seen(await post(`/api/v1/instances/${id}/reset`, { confirm: true }, { user: 'EVE' }));
   assert.equal(reset.status, 202);
   assert.equal(reset.json.epoch, 2);

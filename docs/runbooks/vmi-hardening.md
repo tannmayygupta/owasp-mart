@@ -17,6 +17,7 @@ docker info --format '{{json .}}' > docker-info.json
 cp /etc/docker/daemon.json daemon.json
 sudo iptables -S DOCKER-USER > iptables-docker-user.txt
 sudo iptables -S INPUT > iptables-input.txt
+sudo iptables -S VULNMART-LABS > iptables-vulnmart-labs.txt
 docker inspect $(docker ps -q) > inspect.json
 ss -ltnH > ss.txt
 ```

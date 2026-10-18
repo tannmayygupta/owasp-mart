@@ -6,7 +6,7 @@
 //
 // Input files of --from (names fixed; see docs/runbooks/vmi-hardening.md for the commands that make them):
 //   docker-info.json (docker info --format '{{json .}}'), daemon.json, iptables-docker-user.txt (iptables -S DOCKER-USER),
-//   iptables-input.txt (iptables -S INPUT), inspect.json (docker inspect of every running container), ss.txt (ss -ltnH),
+//   iptables-input.txt (iptables -S INPUT), iptables-vulnmart-labs.txt (iptables -S VULNMART-LABS), inspect.json (docker inspect of every running container), ss.txt (ss -ltnH),
 //   imds.json (optional: the HttpTokens values from aws ec2 describe-instances).
 // Parsers fail closed: empty or unreadable text is FAIL ("unreadable"), never PASS. A missing required file is FAIL.
 // The pure parsers are exported and tested in scripts/vmi-audit.test.mjs on fixtures in scripts/fixtures/vmi-audit/.
@@ -21,6 +21,7 @@ export const FILES = {
   info: 'docker-info.json',
   daemon: 'daemon.json',
   dockerUser: 'iptables-docker-user.txt',
+  labsChain: 'iptables-vulnmart-labs.txt',
   input: 'iptables-input.txt',
   inspect: 'inspect.json',
   ss: 'ss.txt',
@@ -28,6 +29,8 @@ export const FILES = {
 };
 export const DEFAULT_INSTANCES = 50;
 export const PUBLIC_PORTS = [22, 80, 443];
+// Ports that may listen on a private (VPC) address but never on every address: the orchestrator's mutual-TLS listener (review finding D3).
+export const PRIVATE_ONLY_PORTS = [9443];
 export const BIND_ALLOW = ['/etc/vulnmart', '/opt/vulnmart', '/srv/vulnmart'];
 export const SOCKET_PATHS = ['/var/run/docker.sock', '/run/docker.sock'];
 export const SENSITIVE_BINDS = ['/', '/etc', '/proc', '/sys', '/root', '/home', '/var/lib/docker', '/var/run', '/run', '/boot', '/dev'];
@@ -150,12 +153,34 @@ export function auditIptables({ dockerUser, input, poolBases = [] }) {
   return out;
 }
 
+// iptables -S VULNMART-LABS: the chain the jump in DOCKER-USER leads to. The jump alone proves nothing (an empty or flushed chain lets everything
+// through), so the content is checked: it must keep the metadata and VPC drops, end in a DROP for everything else, and hold no blanket ACCEPT
+// or RETURN (review finding D1). A conntrack RETURN for replies and ACCEPTs that name a protocol or a destination are what the egress script writes.
+export function auditLabsChain(text) {
+  const name = 'host-rule-labs-chain';
+  if (text == null || !String(text).trim()) return [unreadable(name, 'empty')];
+  const rules = parseRules(text, 'VULNMART-LABS');
+  if (!rules.length) return [row('FAIL', name, 'the chain VULNMART-LABS has no rule: the jump leads nowhere (it lets everything through)')];
+  const problems = [];
+  if (!/^-A VULNMART-LABS -j DROP$/.test(rules[rules.length - 1])) problems.push('the last rule is not a DROP for everything else');
+  if (!rules.some((r) => /-d 169\.254\.0\.0\/16 -j DROP$/.test(r))) problems.push('no DROP for the metadata and link-local range 169.254.0.0/16');
+  const vpcDrop = rules.some((r) => {
+    const m = /-d (\d+\.\d+\.\d+\.\d+\/\d+) -j DROP$/.exec(r);
+    return m && /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(m[1]) && parseCidr(m[1])?.len <= 16;
+  });
+  if (!vpcDrop) problems.push('no DROP for the private network range of the VPC');
+  for (const r of rules) {
+    if (/-j (ACCEPT|RETURN)$/.test(r) && !/(-p |-d |--ctstate)/.test(r)) problems.push(`a blanket ${/ACCEPT/.test(r) ? 'ACCEPT' : 'RETURN'} rule: ${r.replace('-A VULNMART-LABS ', '')}`);
+  }
+  return [problems.length ? row('FAIL', name, problems.join('; ')) : row('PASS', name, `${rules.length} rules; metadata and VPC dropped, everything else ends in a DROP`)];
+}
+
 const cname = (c) => String(c?.Name ?? c?.Id ?? 'unknown').replace(/^\//, '');
 const isInstance = (c) => {
   const labels = c?.Config?.Labels ?? {};
   return Object.keys(labels).some((k) => k === 'vm.instance' || k === 'vm.kind' && String(labels[k]).startsWith('inst')) || /^vm-i-/.test(cname(c));
 };
-const isProxy = (c) => /docker-proxy/.test(cname(c));
+const isProxy = (c) => /^(vulnmart-)?docker-proxy$/.test(cname(c)); // the exact name: a container only named like it gets no exemption (finding D2)
 
 // docker inspect of every running container (JSON array).
 export function auditInspect(text) {
@@ -171,6 +196,15 @@ export function auditInspect(text) {
     if (hc.Privileged === true) findings.push(`${n}: privileged`);
     if (hc.NetworkMode === 'host') findings.push(`${n}: host network`);
     if (hc.PidMode === 'host') findings.push(`${n}: host PID namespace`);
+    // what a container may also be given besides `privileged` (review finding D2)
+    if (hc.IpcMode === 'host') findings.push(`${n}: host IPC namespace`);
+    if (hc.UsernsMode === 'host') findings.push(`${n}: host user namespace`);
+    // the one addition that is by design: the two Caddy containers bind 443 (NET_BIND_SERVICE); every other container may add nothing
+    const bindsPorts = /^vulnmart-(edge-)?caddy$/.test(n);
+    const extra = (hc.CapAdd ?? []).filter((x) => !(bindsPorts && String(x).replace(/^CAP_/i, '').toUpperCase() === 'NET_BIND_SERVICE'));
+    if (extra.length) findings.push(`${n}: adds capabilities (${extra.join(', ')})`);
+    if ((hc.Devices ?? []).length) findings.push(`${n}: maps host devices`);
+    if ((hc.SecurityOpt ?? []).some((s) => /unconfined/.test(String(s)))) findings.push(`${n}: runs unconfined (seccomp or AppArmor off)`);
     for (const m of c.Mounts ?? []) {
       const src = String(m.Source ?? '');
       const isSock = SOCKET_PATHS.includes(src) || String(m.Destination ?? '').endsWith('docker.sock');
@@ -179,8 +213,15 @@ export function auditInspect(text) {
         continue;
       }
       if (m.Type === 'bind' && m.RW !== false && !BIND_ALLOW.some((a) => src === a || src.startsWith(`${a}/`))) findings.push(`${n}: writable bind mount of ${src || 'unknown'} outside the allow-list`);
-      if (m.Type === 'bind' && SENSITIVE_BINDS.includes(src.replace(/\/+$/, '') || '/')) findings.push(`${n}: bind mount of the host path ${src}`);
+      const trimmed = src.replace(/\/+$/, '') || '/';
+      // the path itself or anything below it (a read-only bind of /root/.ssh is as bad as one of /root), except under the allow-list
+      const sensitive = SENSITIVE_BINDS.some((s) => trimmed === s || (s !== '/' && trimmed.startsWith(`${s}/`)));
+      if (m.Type === 'bind' && sensitive && !BIND_ALLOW.some((a) => trimmed === a || trimmed.startsWith(`${a}/`))) findings.push(`${n}: bind mount of the host path ${src}`);
     }
+    // The socket proxy lets the orchestrator attach containers to instance networks and does not filter which one (review finding D11, accepted
+    // risk); this is the compensating check: only the edge gate may sit on an instance network besides the instance's own containers.
+    const nets = Object.keys(c.NetworkSettings?.Networks ?? {});
+    if (!isInstance(c) && !/^(vulnmart-)?edge-gate$/.test(n) && nets.some((x) => /^vm-i-/.test(x))) findings.push(`${n}: attached to an instance network (${nets.filter((x) => /^vm-i-/.test(x)).join(', ')})`);
     if (isInstance(c)) {
       if (!(hc.CapDrop ?? []).map((s) => String(s).toUpperCase()).includes('ALL')) findings.push(`${n}: instance container does not drop ALL capabilities`);
       if (!(hc.SecurityOpt ?? []).some((s) => /^no-new-privileges(:true)?$/.test(s))) findings.push(`${n}: instance container lacks no-new-privileges`);
@@ -210,8 +251,10 @@ export function auditListeners(text, publicPorts = PUBLIC_PORTS) {
   if (!l) return [unreadable(name, 'a line is not an ss -ltnH listener line')];
   const loop = (a) => /^127\./.test(a) || a === '[::1]' || a === '::1';
   const wide = l.filter((x) => !loop(x.addr));
-  const bad = wide.filter((x) => !publicPorts.includes(x.port));
-  if (bad.length) return [row('FAIL', name, `non-loopback listener(s) on port ${[...new Set(bad.map((b) => b.port))].sort((a, b) => a - b).join(', ')} (allowed: ${publicPorts.join(', ')})`)];
+  const privateAddr = (a) => /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(a);
+  // a port of PRIVATE_ONLY_PORTS is fine on a private address and a failure on every address or a public one (finding D3)
+  const bad = wide.filter((x) => !publicPorts.includes(x.port) && !(PRIVATE_ONLY_PORTS.includes(x.port) && privateAddr(x.addr)));
+  if (bad.length) return [row('FAIL', name, `non-loopback listener(s) on port ${[...new Set(bad.map((b) => b.port))].sort((a, b) => a - b).join(', ')} (allowed: ${publicPorts.join(', ')}; ${PRIVATE_ONLY_PORTS.join(', ')} only on a private address)`)];
   return [row('PASS', name, `${l.length} listener(s); public ports: ${[...new Set(wide.map((w) => w.port))].sort((a, b) => a - b).join(', ') || 'none'}; the rest are loopback`)];
 }
 
@@ -250,6 +293,7 @@ export function auditAll(inputs, { instances = DEFAULT_INSTANCES, skip = {} } = 
   if (!skip.dockerUser && !skip.input && inputs.dockerUser != null && inputs.input != null) rows.push(...auditIptables({ dockerUser: inputs.dockerUser, input: inputs.input, poolBases: bases }));
   else if (!skip.dockerUser && inputs.dockerUser != null) rows.push(...auditIptables({ dockerUser: inputs.dockerUser, input: '', poolBases: bases }).slice(0, 1));
   else if (!skip.input && inputs.input != null) rows.push(...auditIptables({ dockerUser: '', input: inputs.input, poolBases: bases }).slice(1));
+  need('labsChain', ['host-rule-labs-chain'], auditLabsChain);
   need('inspect', ['container-hardening'], auditInspect);
   need('ss', ['listening-ports'], auditListeners);
   if (skip.imds) rows.push(row('SKIP', 'imds-v2-required', skip.imds));
@@ -326,7 +370,7 @@ export function main(argv = process.argv.slice(2)) {
     rows = auditAll(readFrom(o.from), { instances: o.instances });
   } else {
     const inputs = readLocal();
-    const skip = { dockerUser: 'Docker Desktop host has no iptables here (run on the VM)', input: 'Docker Desktop host has no iptables here (run on the VM)', ss: 'ss is not available here (run on the VM)', imds: 'AWS metadata check is a VM step' };
+    const skip = { dockerUser: 'Docker Desktop host has no iptables here (run on the VM)', labsChain: 'Docker Desktop host has no iptables here (run on the VM)', input: 'Docker Desktop host has no iptables here (run on the VM)', ss: 'ss is not available here (run on the VM)', imds: 'AWS metadata check is a VM step' };
     if (inputs.daemon === null) skip.daemon = "Docker Desktop keeps the daemon settings in its own settings, no daemon.json found in the user's .docker folder";
     rows = auditAll(inputs, { instances: o.instances, skip });
   }

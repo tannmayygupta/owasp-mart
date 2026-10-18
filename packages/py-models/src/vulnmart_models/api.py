@@ -669,9 +669,9 @@ class OpenTicket(BaseModel):
     url: Annotated[
         str,
         Field(
-            description='One-time URL on the instance host (architecture 03 section 3). Single use.',
+            description='One-time URL on the instance host (architecture 03 section 3). Single use. The ticket is payload.signature (two base64url parts joined by a dot, contracts/edge/gate-ticket.md section 2).',
             max_length=1024,
-            pattern='^https://[a-z0-9.-]+/_vm/enter\\?t=[A-Za-z0-9_-]{16,512}$',
+            pattern='^https://[a-z0-9.-]+/_vm/enter\\?t=[A-Za-z0-9_-]{16,512}\\.[A-Za-z0-9_-]{16,512}$',
         ),
     ]
     expires_at: Timestamp

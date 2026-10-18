@@ -19,6 +19,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
@@ -158,7 +159,7 @@ def test_downgrade_to_empty_and_upgrade_again(db):
     assert left == []
     command.upgrade(db["config"], "head")
     with db["owner"].connect() as c:
-        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0010"
+        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == ScriptDirectory.from_config(db["config"]).get_current_head()
 
 
 def test_the_migration_stops_when_the_app_role_does_not_exist(monkeypatch):

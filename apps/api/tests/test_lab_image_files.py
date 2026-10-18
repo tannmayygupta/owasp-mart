@@ -37,9 +37,14 @@ def test_the_event_schema_the_image_copies_exists():
     assert (ROOT / "contracts" / "events" / "instance-events.schema.json").is_file()
 
 
-def test_the_runtime_never_imports_yaml():
+def test_only_the_catalogue_reader_imports_yaml_and_only_with_safe_load():
+    # PyYAML is a runtime dependency since the lab serves the catalogue (IF-7 files are YAML); nothing else of the runtime needs it
     for path in (API / "src" / "vulnmart" / "lab").glob("*.py"):
-        assert not re.search(r"^\s*(import|from)\s+yaml\b", read(path), re.MULTILINE), path.name
+        uses = re.search(r"^\s*(import|from)\s+yaml\b", read(path), re.MULTILINE)
+        assert (uses is None) == (path.name != "catalog.py"), path.name
+    text = read(API / "src" / "vulnmart" / "lab" / "catalog.py")
+    assert "yaml.safe_load(" in text and "yaml.load(" not in text
+    assert '"pyyaml==6.0.3"' in read(API / "pyproject.toml").split("[dependency-groups]")[0]
 
 
 def test_the_milestone_rules_ship_beside_the_code():

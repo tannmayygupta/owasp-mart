@@ -1,6 +1,10 @@
+from datetime import timedelta
+
+import pytest
 from conftest_engine import Rig, at
 
 from vulnmart_attempts import AttemptState as S
+from vulnmart_attempts import InvalidTransition
 
 
 def test_expiry_sequence_freeze_then_destroy_once():
@@ -163,3 +167,70 @@ def test_fresh_destroy_claim_blocks_second_process():
     r.store.put_if_version(replace(rec, destroy_claim_at=at(136, -10)), rec.version)
     r.engine.tick()
     assert r.instances.destroy_calls == [] and not r.engine.get(run.id).destroyed
+
+
+def test_a_freeze_that_keeps_failing_does_not_keep_the_instance_for_ever():
+    # review finding B2: the destroy waits for the freeze, but only for a while after the first failure
+    r = Rig()
+    run = r.started()
+    r.instances.fail_freeze = 1000
+    r.clock.set(at(300))
+    r.engine.tick()
+    assert r.engine.get(run.id).freeze_failed_at == at(300) and not r.engine.get(run.id).destroyed
+    r.clock.set(at(303))
+    r.engine.tick()
+    assert not r.engine.get(run.id).destroyed, "still inside the patience"
+    r.clock.set(at(306))
+    r.engine.tick()
+    rec = r.engine.get(run.id)
+    assert rec.destroyed and r.instances.destroy_calls == ["i1"] and rec.access == "open"
+
+
+def test_a_submit_inside_the_grace_window_after_the_tick_already_submitted_gets_the_same_answer():
+    # review finding B3: the tick auto-submits at the deadline; the candidate's click a few seconds later is not an error
+    r = Rig()
+    run = r.started()
+    r.clock.set(at(120) + timedelta(seconds=30))
+    r.engine.tick()
+    assert r.engine.get(run.id).state == S.SUBMITTED
+    assert r.engine.submit(run.id).submitted_at == at(120)
+    r.clock.set(at(120) + timedelta(seconds=61))
+    with pytest.raises(InvalidTransition):
+        r.engine.submit(run.id)
+
+
+def test_a_withdrawal_after_an_undo_starts_a_new_window_and_deletes_later():
+    # review finding B5
+    r = Rig()
+    run = r.started()
+    r.engine.withdraw(run.id)
+    r.clock.set(at(0) + timedelta(days=2))
+    r.engine.undo_withdrawal(run.id)
+    r.clock.set(at(0) + timedelta(days=3))
+    again = r.engine.withdraw(run.id)
+    assert again.state == S.WITHDRAWN and again.undone_at is None and again.delete_after == at(0) + timedelta(days=10)
+    r.clock.set(at(0) + timedelta(days=9))
+    r.engine.tick()
+    assert r.engine.get(run.id).state == S.WITHDRAWN
+    r.clock.set(at(0) + timedelta(days=11))
+    r.engine.tick()
+    assert r.engine.get(run.id).state == S.DELETED
+
+
+def test_the_ready_instant_of_a_caller_cannot_move_the_deadline_far_from_the_server_clock():
+    # review finding B8
+    r = Rig()
+    a = r.engine.create("u1", "t1", "c1", instance_id="i1")
+    r.clock.set(at(10))
+    run = r.engine.instance_ready(a.id, at(10) - timedelta(hours=1))  # a retried callback an hour late
+    assert run.started_at == at(10) and run.deadline_at == at(130)
+
+
+def test_only_the_urgent_warning_is_sent_when_the_first_tick_is_late_and_all_are_recorded():
+    # review finding B10
+    r = Rig()
+    run = r.started()
+    r.clock.set(at(116))  # 4 minutes left: both the 15 and the 5 minute warnings are due
+    r.engine.tick()
+    assert [e["minutes_left"] for e in r.names("time_warning_sent")] == [5]
+    assert r.engine.get(run.id).warnings_sent == (15, 5)

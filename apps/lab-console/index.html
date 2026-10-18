@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VulnMart lab console</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>VulnMart lab console</h1>
+  <div id="who" hidden><span id="who-name"></span> <button id="logout" type="button">Sign out</button></div>
+</header>
+<main>
+  <p id="banner" role="status" hidden></p>
+
+  <section id="auth" hidden>
+    <div class="tabs"><button id="tab-login" type="button" class="on">Sign in</button><button id="tab-signup" type="button">Create account</button></div>
+    <form id="login-form" autocomplete="on">
+      <label>Email <input name="email" type="email" required autocomplete="username"></label>
+      <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+      <button type="submit">Sign in</button>
+    </form>
+    <form id="signup-form" hidden autocomplete="on">
+      <label>Display name <input name="display_name" required maxlength="60"></label>
+      <label>Email <input name="email" type="email" required autocomplete="username"></label>
+      <label>Password (12 characters or more) <input name="password" type="password" required minlength="12" autocomplete="new-password"></label>
+      <label class="check"><input name="age" type="checkbox" required> I am 18 or older and I will only attack the lab, never anything else.</label>
+      <button type="submit">Create account</button>
+    </form>
+  </section>
+
+  <section id="verify" hidden>
+    <h2>Confirm your email</h2>
+    <p id="verify-text">Checking the link...</p>
+    <p><a href="/">Back to sign in</a></p>
+  </section>
+
+  <section id="lab" hidden>
+    <div class="grid">
+      <div class="card">
+        <h2>Your instance</h2>
+        <div id="no-instance" hidden>
+          <p>Start a private copy of the shop to attack. It is yours alone and ends when you stop it or the time runs out.</p>
+          <button id="start" type="button">Start a practice instance</button>
+        </div>
+        <dl id="instance" hidden>
+          <dt>State</dt><dd id="i-state"></dd>
+          <dt>Flag round</dt><dd id="i-epoch"></dd>
+          <dt>Attempt</dt><dd id="a-state"></dd>
+          <dt>Time left</dt><dd id="a-left"></dd>
+        </dl>
+        <div id="instance-actions" class="row" hidden>
+          <button id="open" type="button">Open the shop</button>
+          <button id="reset" type="button">Reset</button>
+          <button id="stop" type="button">Stop</button>
+          <button id="submit" type="button">Finish and submit</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Score</h2>
+        <p class="big"><span id="score">0</span><small> / 1000</small></p>
+        <p id="score-note"></p>
+        <button id="report" type="button" hidden>Show my report</button>
+        <pre id="report-box" hidden></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Challenges</h2>
+      <p class="hint">Find a flag in the shop (it looks like <code>VM{...}</code>), paste it here, and the lab scores it. Hints cost nothing in practice mode.</p>
+      <table>
+        <thead><tr><th>Key</th><th>Challenge</th><th>Tier</th><th>Progress</th><th>Hints</th><th>Points</th><th>Flag</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p id="flag-answer" role="status"></p>
+    </div>
+
+    <div class="card">
+      <h2>What happened</h2>
+      <ol id="timeline" class="timeline"></ol>
+    </div>
+  </section>
+</main>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

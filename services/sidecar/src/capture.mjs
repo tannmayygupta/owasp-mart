@@ -56,7 +56,8 @@ export function buildCapture({ method, url, headers, bodyBuf }) {
   for (const name of HEADER_ALLOW) {
     const raw = headers?.[name];
     if (raw === undefined) continue;
-    let v = redactFlagLike(Array.isArray(raw) ? raw.join(', ') : String(raw)).slice(0, HEADER_VALUE_CAP);
+    // a Referer or Origin can carry a secret query value (review finding C9): the same blanking as the body and the request line
+    let v = redactFlagLike(blankSecrets(Array.isArray(raw) ? raw.join(', ') : String(raw))).slice(0, HEADER_VALUE_CAP);
     if (stillFlaggy(v)) v = MARKER;
     headers_redacted[name] = v;
   }

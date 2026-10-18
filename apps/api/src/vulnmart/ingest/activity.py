@@ -53,6 +53,24 @@ class _Bucket:
     crs_by_tag: dict[str, int] = field(default_factory=dict)
     routes: set[str] = field(default_factory=set)
 
+    def apply(self, etype: str, d: Mapping[str, Any]) -> None:
+        """Add one countable event (`proxy.request` or `proxy.crs_match`) to this bucket. Counts and fixed words only."""
+        route = d.get("route_template")
+        if isinstance(route, str) and (route in self.routes or len(self.routes) < MAX_ROUTES_PER_BUCKET):
+            self.routes.add(route)
+        if etype == "proxy.request":
+            n = d.get("count") if type(d.get("count")) is int and d.get("count") >= 1 else 1  # one aggregated event stands for `count`
+            self.requests += n
+            status = d.get("status")
+            sc = f"{status // 100}xx" if type(status) is int else "other"
+            self.by_status_class[sc] = self.by_status_class.get(sc, 0) + n
+            m = d.get("method") if d.get("method") in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"} else "other"
+            self.by_method[m] = self.by_method.get(m, 0) + n
+        else:
+            for tag in d.get("tags") or ():
+                if isinstance(tag, str):
+                    self.crs_by_tag[tag] = self.crs_by_tag.get(tag, 0) + 1
+
 
 @runtime_checkable
 class ActivityStore(Protocol):
@@ -79,22 +97,7 @@ class InMemoryActivityStore:
         d = event["data"]
         key = (event["instance_id"], event["epoch"], minute_of(received_at))
         with self._lock:
-            b = self._items.setdefault(key, _Bucket())
-            route = d.get("route_template")
-            if isinstance(route, str) and (route in b.routes or len(b.routes) < MAX_ROUTES_PER_BUCKET):
-                b.routes.add(route)
-            if etype == "proxy.request":
-                n = d.get("count") if type(d.get("count")) is int and d.get("count") >= 1 else 1  # one aggregated event stands for `count`
-                b.requests += n
-                status = d.get("status")
-                sc = f"{status // 100}xx" if type(status) is int else "other"
-                b.by_status_class[sc] = b.by_status_class.get(sc, 0) + n
-                m = d.get("method") if d.get("method") in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"} else "other"
-                b.by_method[m] = b.by_method.get(m, 0) + n
-            else:
-                for tag in d.get("tags") or ():
-                    if isinstance(tag, str):
-                        b.crs_by_tag[tag] = b.crs_by_tag.get(tag, 0) + 1
+            self._items.setdefault(key, _Bucket()).apply(etype, d)
         return True
 
     def buckets(self, instance_id: str, epoch: int | None = None) -> list[ActivityBucket]:

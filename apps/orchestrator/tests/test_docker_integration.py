@@ -268,7 +268,7 @@ def test_a_complete_running_instance_is_adopted_ready_by_a_second_engine_and_its
                           desired=FakeDesiredState({IID}), reconcile_gate=True)
     result = second.reconcile()
     rec = second.get(IID)
-    assert result.adopted == [IID] and not result.errors and rec.state is S.READY and (rec.access, rec.access_epoch) == ("closed", 0), result
+    assert result.adopted == [IID] and not result.errors and rec.state is S.READY and rec.access == "closed" and rec.access_epoch > 1_000_000, result
     assert [sorted(x) for x in leftovers(docker_client, IID)] == before and len(seen) == 1
     assert second.destroy(IID).state is S.DESTROYED and leftovers(docker_client, IID) == ([], [], [])
 

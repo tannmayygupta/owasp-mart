@@ -300,7 +300,8 @@ class Orchestrator:
         self, instance_id: str, epoch: int, template_id: str, hostname: str, *, expires: datetime | None, ready: bool, owner: str = "",
     ) -> InstanceRecord | None:
         """Record an instance found in Docker that this process does not know. `ready`: all components were found running, so it is
-        adopted as `ready` (access closed, access epoch 0; the platform opens it with its next `access` call). Otherwise it is
+        adopted as `ready` (access closed, access epoch ADOPTED_TRANSITION_BASE plus the seconds since 2026-01-01: above any value the gate holds,
+        so the gate's full sync is never refused as a lower epoch (review finding C1); the platform opens it with a higher `access` call). Otherwise it is
         recorded as `failed` (INST-START-FAILED) and the caller removes its objects. Returns None when a record exists already.
         Numbers start at 1,000,000 plus the seconds since 2026-01-01 (they grow across restarts), so the platform never drops a report
         as a repeat."""
@@ -319,6 +320,7 @@ class Orchestrator:
                 expires_dt=min(expires, now + timedelta(minutes=cfg.max_minutes_ceiling)) if expires is not None else now,
                 idle_minutes=cfg.default_idle_minutes,
                 transition_offset=ADOPTED_TRANSITION_BASE + int((now - ADOPTION_EPOCH).total_seconds()), owner=owner,
+                access_epoch=ADOPTED_TRANSITION_BASE + int((now - ADOPTION_EPOCH).total_seconds()),
             )
             self.records[instance_id] = rec
             if ready:
