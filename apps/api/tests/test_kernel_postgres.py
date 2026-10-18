@@ -156,7 +156,7 @@ def test_downgrade_to_empty_and_upgrade_again(db):
     assert left == []
     command.upgrade(db["config"], "head")
     with db["owner"].connect() as c:
-        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0004"
+        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0005"
 
 
 def test_the_migration_stops_when_the_app_role_does_not_exist(monkeypatch):

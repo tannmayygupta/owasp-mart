@@ -42,6 +42,17 @@
 
 - Decision on paging (open point 15): no cursor for the sprint-2 slice; add additively with the dashboards story that needs it.
 
+## Deferred from: story-multi-factor-login-plan (2026-10-18)
+
+- OI-13 stays open: whether recruiter MFA becomes mandatory and whether passkeys replace or add to TOTP. Only TOTP exists.
+- The field key is a setting until the key service (P-17, handoff H-135); changing it makes every sealed TOTP secret unreadable and every recovery code unmatched, so it needs a migration plan before the first real use.
+- An admin who loses the phone and all recovery codes can be recovered only by an operator in the database; no runbook step exists for that yet (the runbook says it must be done by hand).
+- No mail tells a person that a recovery code was used or that the second factor was turned on or off (not in the list of FR-NTF-01); the audit entries exist (in memory until P-17).
+- The enrolment and sign-in pages (dashboards): the otpauth address and the recovery codes are shown once by the API and a page must not store them (handoff H-135).
+- An account can start enrolment again and again before confirming (each replaces the pending secret); only the per-address login limit bounds it.
+- Learners and candidates may also turn the factor on; no page offers it and no requirement asks for it.
+- ASVS 5.0 and NIST SP 800-63B were not re-read; RFC 6238 was checked by its published test vectors and by an independent Node implementation, not by reading the RFC.
+
 ## Deferred from: story-password-reset-quality-and-account-self-service-plan (2026-10-17)
 
 - The forgot-password, reset-password, account and signup pages (dashboards, handoff H-134); an email change (needs its own verification step).

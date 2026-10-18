@@ -4,8 +4,8 @@ There is no public route and no signup field that can make an admin (`SignupBody
 always creates a participant). The two ways in:
 
 - `seed_admin`: the first admin of a platform, made by an operator on the server (`python -m vulnmart.accounts.seed_admin`). It sets the
-  password the operator supplies, so the operator must hand it over safely; the account cannot log in until the second factor exists
-  (FR-ACC-07, story P-15).
+  password the operator supplies, so the operator must hand it over safely; the account signs in with it but holds no admin role until an
+  authenticator app is set up (FR-ACC-07, story P-15).
 - `create_admin`: an admin creates another. The new admin gets no password from the creator: the account starts with a random one nobody
   knows and a single-use link by email to choose their own (a `reset` token, consumed by the password-reset story P-14).
 

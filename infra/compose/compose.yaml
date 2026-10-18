@@ -184,6 +184,8 @@ services:
       # origin the browser may call from (the Origin check): the dashboards of the web service below.
       VULNMART_CSRF_SECRET: ${VULNMART_DEV_CSRF_SECRET:-vulnmart-dev-csrf-secret-not-a-secret}
       VULNMART_PUBLIC_ORIGIN: http://127.0.0.1:3000
+      # Story P-15: the field key that seals second-factor secrets (a development value; production reads a secret file, architecture 06 s3).
+      VULNMART_FIELD_SECRET: ${VULNMART_DEV_FIELD_SECRET:-vulnmart-dev-field-secret-not-a-secret-0123456789}
     cap_drop:
       - ALL
     security_opt:

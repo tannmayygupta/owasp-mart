@@ -63,9 +63,23 @@ class Settings(BaseSettings):
     # file wins; staging and production do not start without one. dev and test make a random key per process (tokens then end with it).
     csrf_secret: str | None = Field(default=None, repr=False)
     csrf_secret_file: str | None = None
+    # The field key (story P-15, architecture 06 `K_field`): seals TOTP secrets and keys the hash of recovery codes. A secret of at least 32 bytes;
+    # production reads a file and the file wins; staging and production do not start without one; dev and test make a random one per process
+    # (second-factor secrets then do not survive a restart).
+    field_secret: str | None = Field(default=None, repr=False)
+    field_secret_file: str | None = None
     # Password quality (story P-14): `local` checks the bundled list of common passwords; `hibp` also asks the Pwned Passwords range API (it
     # sees only the first 5 characters of a SHA-1); `off` is for dev and test only.
     breach_check: Literal["local", "hibp", "off"] = "local"
+
+    def field_key_secret(self) -> bytes | None:
+        """The configured field key secret as bytes, or None when none is set."""
+        if self.field_secret_file:
+            with open(self.field_secret_file, encoding="utf-8") as f:
+                value = f.read().strip()
+        else:
+            value = self.field_secret
+        return value.encode("utf-8") if value else None
 
     def csrf_key(self) -> bytes | None:
         """The configured CSRF key as bytes, or None when none is set."""

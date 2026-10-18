@@ -136,13 +136,15 @@ def test_an_unverified_address_gets_403_only_after_the_right_password(sessions, 
     assert (right.status_code, right.json()["code"]) == (403, "AUTH-EMAIL-NOT-VERIFIED") and "set-cookie" not in right.headers
 
 
-def test_an_admin_login_is_refused_without_a_session_until_the_second_factor_exists(sessions, clock):
+def test_an_admin_with_only_a_password_signs_in_to_a_session_that_can_reach_no_admin_function(sessions, clock):
     add_user(sessions, account_type="admin")
     with client(make_app(sessions, clock)) as c:
         r = log_in(c)
-    assert (r.status_code, r.json()["code"]) == (500, "REQ-INTERNAL") and "set-cookie" not in r.headers
-    with sessions() as s:
-        assert s.scalars(select(UserSession)).all() == []
+        me = c.get("/api/v1/me")
+        admin_area = c.get("/api/v1/_test/scope")
+    assert r.status_code == 200 and r.json()["user"]["account_type"] == "admin" and r.json()["user"]["mfa_enabled"] is False
+    assert me.json()["account_type"] == "admin"
+    assert admin_area.json()["roles"] == [], "the scope of an admin session without a second factor holds no admin role (FR-ACC-07)"
 
 
 @pytest.mark.parametrize("bad,pointer", [({"email": "x"}, "/email"), ({"password": ""}, "/password"), ({"password": "x" * 129}, "/password"),

@@ -15,7 +15,7 @@ from .models import User
 from .passwords import PasswordPolicy
 from .security import hash_password, verify_password
 from .service import InvalidInput, check_new_password, clean_display_name
-from .sessions import InvalidCredentials, SessionService, UserView, _view
+from .sessions import InvalidCredentials, SessionService, UserView, _view, mfa_enabled
 
 
 class SessionEnded(Exception):
@@ -34,7 +34,7 @@ class SelfService:
             user = session.get(User, user_id)
             user.display_name = name
             session.flush()
-            return _view(user)
+            return _view(user, mfa=mfa_enabled(session, user.id))
 
     def change_password(self, *, user_id: str, token: str, current_password: str, new_password: str) -> str:
         """Change the password and return the new session value (the caller sets it as the cookie). Raises InvalidCredentials for a wrong

@@ -195,9 +195,8 @@ def test_the_seed_creates_an_admin_that_cannot_sign_in_yet(sessions, admins, aud
     (record,) = audit.records
     assert (record.actor, record.action, record.subject, dict(record.details)) == ("system:seed", "admin.created", user.id, {"via": "seed"})
     assert ADMIN_PASSWORD not in repr(record)
-    from vulnmart.accounts.sessions import MfaUnavailable
-    with pytest.raises(MfaUnavailable):
-        session_service.login(email="root@example.com", password=ADMIN_PASSWORD)
+    first_login = session_service.login(email="root@example.com", password=ADMIN_PASSWORD)  # allowed, but without the admin role until a second factor
+    assert first_login.session.roles == frozenset() and first_login.session.user.account_type == "admin"
 
 
 def test_seeding_the_same_address_again_changes_nothing(sessions, admins, audit):

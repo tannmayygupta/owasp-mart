@@ -2,8 +2,8 @@
 
 Run it on the server, inside the API container (it reads the same `VULNMART_POSTGRES_DSN`). The password never goes on the command line:
 it comes from `VULNMART_SEED_ADMIN_PASSWORD`, or from one line on standard input with `--password-stdin`, or (neither given) the command
-makes a random one and prints it once. At least 16 characters. The account exists at once but cannot sign in until the second factor
-exists (story P-15). Nothing is changed when an account with that address exists already (exit code 3).
+makes a random one and prints it once. At least 16 characters. The account exists at once. It signs in with the password, but a session
+without a proved second factor has no admin role: the first thing the admin does is set up an authenticator app (story P-15). Nothing is changed when an account with that address exists already (exit code 3).
 
 Exit codes: 0 created, 2 a value is not acceptable, 3 the address already has an account, 1 anything else. The audit entry goes to the
 audit port; until the durable audit log exists (story P-17) it is also written to the log as a JSON line.
@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None, *, settings: Settings | None = None, std
     if not created:
         print("Nothing changed: an account with that address exists already.", file=err)
         return 3
-    print("The admin account was created. It cannot sign in until the second factor exists (story P-15).", file=out)
+    print("The admin account was created. It signs in with the password but has no admin powers until an authenticator app is set up.", file=out)
     if generated:
         print(f"Password (shown once, store it safely): {password}", file=out)
     return 0

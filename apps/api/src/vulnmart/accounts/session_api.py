@@ -1,5 +1,5 @@
-"""The session routes of IF-1: createSession (login), getSession, deleteSession (logout). The second-factor login (completeMfaLogin)
-is story P-15; the user's own session list and "log out everywhere" exist in `SessionService` and get their routes with a contract change.
+"""The session routes of IF-1: createSession (login), getSession, deleteSession (logout). The second step of a login with a second factor (completeMfaLogin)
+is in mfa_api.py; the user's own session list and "log out everywhere" exist in `SessionService` and get their routes with a contract change.
 
 Login is throttled twice (FR-ACC-10, FR-ACC-08): every attempt from one visitor address counts against an hourly limit, and wrong
 passwords for one email address (known or not) count against a failure limit; past it the address waits for the rest of the window,
@@ -21,10 +21,10 @@ from vulnmart.problem import ProblemError
 
 from .http import (
     Authenticated, Strict, authenticated, authenticated_with_csrf, check_origin, clear_session_cookie, hash_slots, ip_of, ip_trunc,
-    limit, limiter_call, read_json, services, session_body, session_service, set_session_cookie, ua_class,
+    limit, limiter_call, mfa_service, read_json, services, session_body, session_service, set_session_cookie, timestamp, ua_class,
 )
 from .security import normalize_email
-from .sessions import EmailNotVerified, InvalidCredentials, MfaUnavailable
+from .sessions import EmailNotVerified, InvalidCredentials, MfaChallenge
 
 router = APIRouter(tags=["session"])
 
@@ -57,9 +57,14 @@ async def create_session(request: Request) -> JSONResponse:
         raise ProblemError(ErrorCode.AUTH_INVALID_CREDENTIALS) from None
     except EmailNotVerified:
         raise ProblemError(ErrorCode.AUTH_EMAIL_NOT_VERIFIED) from None
-    except MfaUnavailable:
-        raise ProblemError(ErrorCode.REQ_INTERNAL) from None  # logged by the service; the admin sees a generic error
-    limiter_call(limiter.reset, key)
+    limiter_call(limiter.reset, key)  # the password was right
+    if isinstance(result, MfaChallenge):
+        # a second factor is on: no session and no cookie yet, only a short-lived ticket for the second step (after the account's wait, if any)
+        mfa_wait = limiter_call(limiter.peek, f"mfa:fail:{result.user_id}", allowed_failures)
+        if not mfa_wait.allowed:
+            raise ProblemError(ErrorCode.REQ_RATE_LIMITED, headers={"Retry-After": str(mfa_wait.retry_after)})
+        ticket, ends = await asyncio.to_thread(mfa_service(request).issue_ticket, result.user_id)
+        return JSONResponse({"status": "mfa_required", "mfa_ticket": ticket, "mfa_ticket_expires_at": timestamp(ends)}, headers=NO_STORE)
     response = JSONResponse(session_body(sessions, result.token, result.session), headers=NO_STORE)
     set_session_cookie(response, result.token)
     return response

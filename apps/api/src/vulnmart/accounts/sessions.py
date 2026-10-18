@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from vulnmart.ports.scope import Role, Scope
 from vulnmart.ports.settings import SettingsPort
 
-from .models import User, UserRole, UserSession
+from .models import MfaCredential, User, UserRole, UserSession
 from .security import needs_rehash, hash_password, new_token, normalize_email, spend_the_same_time, token_hash, verify_password
 
 logger = logging.getLogger("vulnmart.accounts")
@@ -54,9 +54,11 @@ class EmailNotVerified(Exception):
     """The password was right but the address is not verified yet (FR-ACC-02)."""
 
 
-class MfaUnavailable(RuntimeError):
-    """The account needs a second factor (every admin, FR-ACC-07) and the second-factor login does not exist yet (story P-15).
-    The login is refused: an admin must never get a session with the password alone."""
+@dataclass(frozen=True, slots=True)
+class MfaChallenge:
+    """The password was right and the account has a second factor: no session yet; the route issues a ticket for this user (FR-ACC-07)."""
+
+    user_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +80,7 @@ class ResolvedSession:
     last_seen_at: datetime
     idle_expires_at: datetime
     absolute_expires_at: datetime
+    mfa_verified: bool = False  # a second factor was proved in this session
 
     @property
     def scope(self) -> Scope:
@@ -100,10 +103,14 @@ class SessionInfo:
     current: bool
 
 
-def _view(user: User) -> UserView:
+def mfa_enabled(session: Session, user_id: str) -> bool:
+    """Whether the account has a confirmed second factor (a pending enrolment does not count)."""
+    return session.scalar(select(MfaCredential.enabled_at).where(MfaCredential.user_id == user_id)) is not None
+
+
+def _view(user: User, *, mfa: bool = False) -> UserView:
     return UserView(id=user.id, email=user.email, display_name=user.display_name, account_type=user.account_type,
-                    email_verified=user.email_verified_at is not None, mfa_enabled=False,  # the second factor arrives with story P-15
-                    created_at=_aware(user.created_at))
+                    email_verified=user.email_verified_at is not None, mfa_enabled=mfa, created_at=_aware(user.created_at))
 
 
 class SessionService:
@@ -126,10 +133,15 @@ class SessionService:
 
     # -- login -------------------------------------------------------------------------------------------------------
 
-    def login(self, *, email: str, password: str, ip_trunc: str | None = None, ua_class: str | None = None) -> LoginResult:
+    def login(self, *, email: str, password: str, ip_trunc: str | None = None,
+              ua_class: str | None = None) -> LoginResult | MfaChallenge:
+        """Check the password. An account with a confirmed second factor gets an `MfaChallenge` (no session yet: `MfaService.complete_login` finishes
+        it). Every other account gets its session now; an admin without a second factor gets one too, but it carries no admin role (see `resolve`),
+        so it can enrol a factor and nothing else (FR-ACC-07: an admin without TOTP reaches no admin function)."""
         email_ci = normalize_email(email)
         with self._sessions() as session:
             user = session.scalar(select(User).where(User.email_ci == email_ci)) if email_ci else None
+            second_factor = user is not None and mfa_enabled(session, user.id)
         if user is None or user.status != "active":
             spend_the_same_time()
             raise InvalidCredentials
@@ -137,26 +149,29 @@ class SessionService:
             raise InvalidCredentials
         if user.email_verified_at is None:
             raise EmailNotVerified
-        if user.account_type == "admin":
-            logger.error("an admin login was refused: the second-factor login does not exist yet (story P-15)")
-            raise MfaUnavailable
         new_hash = hash_password(password) if needs_rehash(user.password_hash) else None  # raise the cost of an old hash at a login
+        if new_hash:
+            with self._sessions.begin() as session:
+                session.get(User, user.id).password_hash = new_hash
+        if second_factor:
+            return MfaChallenge(user_id=user.id)
+        return self.open_session(user.id, ip_trunc=ip_trunc, ua_class=ua_class, mfa=False)
+
+    def open_session(self, user_id: str, *, ip_trunc: str | None, ua_class: str | None, mfa: bool) -> LoginResult:
+        """A new session for an account whose login is complete. `mfa=True` records that a second factor was proved in it."""
         now = self._now()
         with self._sessions.begin() as session:
-            row = session.get(User, user.id)
-            row.last_login_at = now
-            if new_hash:
-                row.password_hash = new_hash
-            token = self._create(session, user.id, now, now + self._absolute(), ip_trunc, ua_class)
+            session.get(User, user_id).last_login_at = now
+            token = self._create(session, user_id, now, now + self._absolute(), ip_trunc, ua_class, mfa_at=now if mfa else None)
         resolved = self.resolve(token)
         assert resolved is not None  # created a moment ago
         return LoginResult(token=token, session=resolved)
 
     def _create(self, session: Session, user_id: str, now: datetime, absolute_expires_at: datetime, ip_trunc: str | None,
-                ua_class: str | None) -> str:
+                ua_class: str | None, *, mfa_at: datetime | None = None) -> str:
         token = new_token()
         session.add(UserSession(id_hash=token_hash(token), user_id=user_id, last_seen_at=now, absolute_expires_at=absolute_expires_at,
-                                ip_trunc=ip_trunc, ua_class=ua_class))
+                                ip_trunc=ip_trunc, ua_class=ua_class, mfa_at=mfa_at))
         return token
 
     # -- using a session ---------------------------------------------------------------------------------------------
@@ -183,10 +198,11 @@ class SessionService:
             roles = {Role(r) for r in session.scalars(select(UserRole.role).where(UserRole.user_id == user.id))}
             if user.account_type == "recruiter":
                 roles.add(Role.RECRUITER)
-            elif user.account_type == "admin":
-                roles.add(Role.ADMIN)
-            return ResolvedSession(token_hash=digest, user=_view(user), roles=frozenset(roles), last_seen_at=last_seen,
-                                   idle_expires_at=last_seen + idle, absolute_expires_at=absolute)
+            elif user.account_type == "admin" and row.mfa_at is not None:
+                roles.add(Role.ADMIN)  # an admin session that never proved a second factor has no admin role, so every admin function refuses it
+            return ResolvedSession(token_hash=digest, user=_view(user, mfa=mfa_enabled(session, user.id)), roles=frozenset(roles),
+                                   last_seen_at=last_seen, idle_expires_at=last_seen + idle, absolute_expires_at=absolute,
+                                   mfa_verified=row.mfa_at is not None)
 
     def logout(self, token: str) -> bool:
         """End the session now (FR-ACC-03). False when there was nothing live to end."""
@@ -201,14 +217,16 @@ class SessionService:
         with self._sessions.begin() as session:
             return self.rotate_in(session, token)
 
-    def rotate_in(self, session: Session, token: str) -> str | None:
-        """`rotate` inside a transaction the caller owns (a password change does everything or nothing)."""
+    def rotate_in(self, session: Session, token: str, *, mfa: bool | None = None) -> str | None:
+        """`rotate` inside a transaction the caller owns (a password change does everything or nothing). `mfa=True` records that a second
+        factor was just proved (enrolment confirmed), `False` clears it, `None` (the default) keeps what the old session had."""
         digest, now = token_hash(token), self._now()
         row = session.get(UserSession, digest)
         if row is None or row.revoked_at is not None:
             return None
         row.revoked_at = now
-        return self._create(session, row.user_id, now, _aware(row.absolute_expires_at), row.ip_trunc, row.ua_class)
+        mfa_at = row.mfa_at if mfa is None else (now if mfa else None)
+        return self._create(session, row.user_id, now, _aware(row.absolute_expires_at), row.ip_trunc, row.ua_class, mfa_at=mfa_at)
 
     # -- a user's own sessions (FR-ACC-04) ----------------------------------------------------------------------------
 
