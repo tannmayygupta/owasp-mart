@@ -11,6 +11,10 @@ const nextConfig = {
   // http://127.0.0.1:3000 (ports are bound to loopback), so allow that host. Dev server only.
   allowedDevOrigins: ['127.0.0.1'],
   poweredByHeader: false,
+  // Next compresses answers with gzip by default and holds back small chunks, which stops the live stream (`/api/v1/live`, Server-Sent Events, story P-22) from
+  // reaching the browser until the compressor has enough to send: the first frame never arrives. The stream must not be compressed by this proxy (FR-LIV-02: no
+  // buffering on the stream route); the API compresses nothing, and the production front (Vercel, Caddy) does its own compression.
+  compress: false,
   async headers() {
     const fixed = Object.entries(fixedHeaders({ https: HTTPS })).map(([key, value]) => ({ key, value }));
     return [{ source: '/:path*', headers: fixed }];

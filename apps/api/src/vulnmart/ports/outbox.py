@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
+from .errors import EventInvalid
+
 SCHEMA_VERSION = 1
 
 # The types of IF-3 0.1.0 a publisher may hand over (`stream.resync` is the hub's own control event, never published).
@@ -58,6 +60,30 @@ def audiences_for(event: Mapping[str, Any]) -> tuple[str, ...]:
             raise ValueError(f"{event['type']} needs the attempt mode to resolve its audiences")
         return first
     return by_mode[mode]
+
+
+def check_event(event: Any) -> None:
+    """Refuse anything that is not an IF-3 event a publisher may hand over (EventInvalid, naming the member). Shared by the in-memory outbox and the database one, so both
+    accept exactly the same events."""
+    if not isinstance(event, Mapping):
+        raise EventInvalid("an event is a JSON object")
+    extra = set(event) - {"schema_version", "type", "occurred_at", "data"}
+    if extra:
+        raise EventInvalid(f"an IF-3 event has no member {sorted(extra)[0]!r} (the relay resolves audiences)", field=f"/{sorted(extra)[0]}")
+    if event.get("schema_version") != SCHEMA_VERSION:
+        raise EventInvalid("schema_version must be 1", field="/schema_version")
+    if event.get("type") not in EVENT_TYPES:
+        raise EventInvalid(f"unknown event type {event.get('type')!r}", field="/type")
+    if not isinstance(event.get("occurred_at"), str) or not isinstance(event.get("data"), Mapping):
+        raise EventInvalid("occurred_at and data are required", field="/data")
+    members = set(event["data"])
+    wanted = DATA_MEMBERS[event["type"]]
+    if members != wanted:
+        name = sorted(members - wanted or wanted - members)[0]
+        raise EventInvalid(f"data of {event['type']} {'has no member' if name in members else 'needs the member'} {name!r}", field=f"/data/{name}")
+    mode = event["data"].get("mode", None)
+    if "mode" in wanted and mode not in AUDIENCES[event["type"]]:
+        raise EventInvalid(f"unknown attempt mode {mode!r}", field="/data/mode")
 
 
 @dataclass(frozen=True, slots=True)

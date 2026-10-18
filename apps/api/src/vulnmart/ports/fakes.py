@@ -22,7 +22,7 @@ from .audit import GENESIS_HASH, AuditRecord, chain_hash
 from .audit import canonical_json as canonical_json_strict
 from .errors import AttemptNotFound, EventInvalid, KeyIntegrity, KeyShredded, ScopeMissing, UnknownSetting
 from .keys import AttemptKey, Sealed, derive_event_key, derive_flag, derive_owner_hash
-from .outbox import AUDIENCES, DATA_MEMBERS, EVENT_TYPES, SCHEMA_VERSION, EmailJob, OutboxEntry, audiences_for
+from .outbox import EmailJob, OutboxEntry, audiences_for, check_event
 from .quota import DEFAULT_COMPANY_MAX, DEFAULT_MAX_INSTANCES, DEFAULT_TOTAL_MAX, QuotaLimits
 from .scope import Scope
 from .settings import SETTINGS
@@ -78,25 +78,7 @@ class FakeOutboxPort:
         self.emails: list[EmailJob] = []
 
     def publish(self, event: Mapping[str, Any]) -> OutboxEntry:
-        if not isinstance(event, Mapping):
-            raise EventInvalid("an event is a JSON object")
-        extra = set(event) - {"schema_version", "type", "occurred_at", "data"}
-        if extra:
-            raise EventInvalid(f"an IF-3 event has no member {sorted(extra)[0]!r} (the relay resolves audiences)", field=f"/{sorted(extra)[0]}")
-        if event.get("schema_version") != SCHEMA_VERSION:
-            raise EventInvalid("schema_version must be 1", field="/schema_version")
-        if event.get("type") not in EVENT_TYPES:
-            raise EventInvalid(f"unknown event type {event.get('type')!r}", field="/type")
-        if not isinstance(event.get("occurred_at"), str) or not isinstance(event.get("data"), Mapping):
-            raise EventInvalid("occurred_at and data are required", field="/data")
-        members = set(event["data"])
-        wanted = DATA_MEMBERS[event["type"]]
-        if members != wanted:
-            name = sorted(members - wanted or wanted - members)[0]
-            raise EventInvalid(f"data of {event['type']} {'has no member' if name in members else 'needs the member'} {name!r}", field=f"/data/{name}")
-        mode = event["data"].get("mode", None)
-        if "mode" in wanted and mode not in AUDIENCES[event["type"]]:
-            raise EventInvalid(f"unknown attempt mode {mode!r}", field="/data/mode")
+        check_event(event)
         with self._lock:
             entry = OutboxEntry(id=len(self.events) + 1, event=json.loads(json.dumps(event)), audiences=audiences_for(event),
                                 created_at=self._now())

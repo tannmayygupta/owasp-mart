@@ -14,6 +14,7 @@ import logging
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -25,6 +26,7 @@ from vulnmart.ports.outbox import OutboxPort
 from vulnmart.ports.quota import QuotaPort
 from vulnmart.ports.settings import SettingsPort
 
+from vulnmart.live.publisher import DbEventPublisher, LiveOutbox
 from vulnmart.notifications.service import DbOutboxPort
 from vulnmart.notifications.templates import validate_params
 from vulnmart.privacy.subjects import PseudonymisingAudit, SubjectService
@@ -66,8 +68,11 @@ def build_ports(settings: Settings, *, engine: Engine | None = None, session_sou
     sessions = make_sessions(engine, scope_or_none) if engine is not None else None
     settings_port: SettingsPort = DbSettingsPort(sessions) if sessions is not None else FakeSettingsPort()
     stubs = list(STUBS)
-    events = FakeOutboxPort()
+    events: Any = FakeOutboxPort()
     outbox: OutboxPort = events
+    if sessions is not None:
+        events = DbEventPublisher(sessions, session_source)  # events are durable as soon as there is a database (story P-22)
+        outbox = LiveOutbox(events, FakeOutboxPort())  # emails stay in the stand-in until a request session exists
     if sessions is not None and session_source is not None:
         outbox = DbOutboxPort(session_source, events, validator=validate_params)
         stubs.remove("outbox")

@@ -94,7 +94,7 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 | `quotas` | `scope` (`user`, `org`, `global`), `scope_id`, `max_instances` | OI-21 |
 | `job_runs` | `job`, `started_at`, `finished_at`, `status`, `detail` | Shown on the Admin dashboard (FR-PRV-18) |
 | `email_outbox` | `id`, `template`, `to_user_id`, `to_address_sealed`, `params jsonb`, `state`, `attempts`, `next_attempt_at` | Written in the same transaction as the cause (FR-NTF-02). `to_user_id` is a user id, or an invite id (`i-...`) for a person with no account; then `to_address_sealed` holds the address sealed with the field key (bound to the invite id) until the mail has left (story P-20) |
-| `domain_events` | `id bigserial`, `audience`, `type`, `payload jsonb`, `created_at`, `published_at` | Outbox for live updates (ADR 0006) |
+| `domain_events` | `id bigserial`, `type`, `payload jsonb`, `created_at`, `published_at`, `relay_attempts`, `dropped` | Outbox for live updates (ADR 0006, 0052). **As built (story P-22):** one row per event (the IF-3 event as the browser reads it, no audience: the relay resolves the audiences from the attempt's owner and company), written in the transaction of its cause; the application role may add, read, delete and mark rows (`published_at`, `relay_attempts`, `dropped`) but not change what an event says; no row-level security (not a person's or a company's table); an event whose attempt is not found after 20 passes is dropped |
 
 ### 2.8 Audit (stream P)
 
@@ -191,7 +191,7 @@ The scheduler is a small leader-elected loop (Postgres advisory lock, so two cop
 | Dramatiq queues and retries | `dramatiq:*` | Until processed | Unacknowledged jobs lost; outbox and scheduler recreate them |
 | Rate limits (FR-ACC-10, FR-ACH-01) | `rl:<scope>:<id>` | Window length | Limits reset (fails open for a short time) |
 | Session cache | `sess:<hash>` | Session timeouts (30 min idle, admin 15, 12 h absolute, FR-ACC-04) | Falls back to Postgres |
-| SSE replay buffer (D-17) | `live:user:<id>`, `live:org:<id>`, `live:admin` as Streams | Trimmed by age or length `[EF-24]` | Clients get `resync` and reload the snapshot |
+| SSE replay buffer (D-17) | `live:user:<id>`, `live:org:<id>`, `live:admin` as Streams, with `live:meta` (`latest`, `barrier`), `live:trim` (the newest id each trim removed), `live:seq` (the one id counter) and `live:oid:<stream>` (the newest outbox row appended) | 1000 entries and one hour per stream, exactly, trimmed when the relay appends `[EF-24]` (story P-22, ADR 0052) | Clients get `resync` and reload the snapshot |
 | Ingest idempotency and event stream | `evt:in` stream, `evt:seen:<instance>:<seq>` | Short | Duplicates are still rejected by the unique constraint in Postgres |
 | Counters for the capacity view | `metrics:*` | Short | Gaps in the Admin view |
 
