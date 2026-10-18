@@ -20,3 +20,10 @@ Story: production readiness 9.5 (stream L). This is how the deployed system of t
 
 ## Stopping and repairing
 `node scripts/live-deploy.mjs down-lab | down-platform`. A command can be run again at any time: files are replaced, containers are recreated only when they changed.
+
+## For people who must use the live site (a demonstration)
+
+- **Link:** https://tanmay-platform-prod.duckdns.org/ (the console; ports 80 and 443 are open to everybody since 2026-10-19; SSH only to the developer's address, refresh it with `node scripts/allow-my-ip.mjs`).
+- **Accounts:** there is no mail provider key yet, so the confirmation mail of a sign-up goes to Mailpit on vm-p (private) and a person who signs up alone never receives it. Make confirmed demo accounts with `node scripts/demo-accounts.mjs --base https://tanmay-platform-prod.duckdns.org --mailpit-ssh ubuntu@<vm-p address> --out <file outside the repository> --count 5 --prefix demo`. It prints the e-mail addresses (`demoN@vulnmart.example`) and writes the passwords to the file (mode 0600), never to the screen or the repository. The developer holds the file made on 2026-10-19 (`C:\Users\tanma\.vulnmart-deploy\prod\demo-accounts.txt`).
+- **What a visitor does:** sign in, press Start, wait a few seconds for the instance, press Open (the console opens the shop in a new tab through the gate), attack the shop, paste or let the sidecar credit a flag, see the score, press Submit. The deployed journey `scripts/e2e-live.mjs` does exactly this through the API (31 checks).
+- **Deploying the console:** `live-deploy.mjs platform` replaces the CONTENT of `console/` and `catalog/` (never the folder): a folder that is deleted and recreated leaves a running container with an empty, stale mount (this made the site answer 404 at the root until Caddy was restarted on 2026-10-19; the journey now checks the root page).

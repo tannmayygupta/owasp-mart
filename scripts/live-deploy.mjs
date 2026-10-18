@@ -244,7 +244,8 @@ cd /opt/vulnmart/platform
 cp stage/infra/deploy/platform.compose.yaml compose.yaml
 cp stage/infra/deploy/Caddyfile.platform Caddyfile
 install -d postgres/initdb && cp stage/infra/deploy/10-app-role.sql postgres/initdb/
-rm -rf catalog console && cp -r stage/challenges/catalog catalog && cp -r stage/apps/lab-console console
+# the two folders are bind-mounted into running containers: replace their CONTENT, never the folder (a deleted and recreated folder leaves a running container with an empty, stale mount)
+mkdir -p catalog console && find catalog console -mindepth 1 -delete && cp -r stage/challenges/catalog/. catalog/ && cp -r stage/apps/lab-console/. console/
 rm -rf stage
 `);
   log('secrets');

@@ -36,10 +36,12 @@ No new ADR. The rule "exploitable exactly when its flag is planted" avoids a con
 - scripts: live-deploy test 5 passed (the manifest now names the real shop, one image for shop and injector, the injector script, the shop health check); e2e-live test 2 passed.
 
 ## Evidence
-docs/assets/production-readiness/e2e-run11-real-shop.json.
+docs/assets/production-readiness/e2e-run11-real-shop.json (30 of 30) and e2e-run12-console-and-real-shop.json (31 of 31, with the console root check).
 
 ## Problems met and how they were fixed
 C03 is switched by two keys (C03A, C03B), not C03: the first test run failed on it. PowerShell prepends a byte-order mark when piping a document to a container, which the injector rightly refuses: use file redirection in a shell. The Alpine stub image cannot run the host's Docker CLI (probe), unrelated here.
+
+- **Found while preparing the live link:** the public site answered 404 at /. The host had the console files but the running Caddy had an empty /srv/console: the deploy script deleted and recreated the folder, so the container kept a stale mount. Fixed in live-deploy.mjs (copy into the existing folders), Caddy restarted, a check for the root page added to the journey. A second gap: no person can confirm a sign-up (mail goes to private Mailpit), so scripts/demo-accounts.mjs makes confirmed demo accounts (5 made on the live site; passwords are in a file outside the repository, never printed).
 
 ## Security notes (vulnerable parts only)
 The shop is deliberately exploitable in an instance; it is reachable only through the gate with a one-time ticket, on an isolated network (probe 18 of 18 on vm-i). The injector has no network and writes only to volumes; flags never go to the output, the environment or a label.

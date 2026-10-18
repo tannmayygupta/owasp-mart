@@ -68,7 +68,7 @@ function mailpit(target, args) {
   return r.stdout;
 }
 
-async function verificationToken(target, email) {
+export async function verificationToken(target, email) {
   for (let i = 0; i < 20; i++) {
     const list = JSON.parse(mailpit(target, `'http://127.0.0.1:8025/api/v1/search?query=to:${encodeURIComponent(email)}'`));
     const id = list.messages?.[0]?.ID;
@@ -114,6 +114,10 @@ export async function journey(o) {
   check('platform health through the site', h.status === 200 && h.data?.status === 'ok', `HTTP ${h.status} ${h.ms} ms`);
   const hz = await new Client(o.base).request('GET', '/healthz');
   check('API liveness through the site', hz.status === 200, `HTTP ${hz.status}`);
+  // the page a person opens: the console is served at the root and its script and style load (a stale bind mount once left the folder empty: 404 at the root)
+  const home = await new Client(o.base).request('GET', '/', { json: false });
+  const js = await new Client(o.base).request('GET', '/app.js', { json: false });
+  check('the console page and its script are served at the root of the site', home.status === 200 && /app\.js/.test(home.text) && js.status === 200 && js.text.length > 1000, `/ ${home.status}, app.js ${js.status}`);
   const direct = await fetch(`${o.base}/api/v1/me`, { redirect: 'manual' }).catch((e) => ({ status: 0, e }));
   check('an API call without a session is refused', direct.status === 401, `HTTP ${direct.status}`);
 
