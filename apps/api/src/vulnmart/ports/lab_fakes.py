@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import secrets
 import threading
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timedelta
+from typing import Any
 
 from .attempts import CANCELLABLE, WITHDRAWABLE, Attempt, AttemptMode, AttemptState
 from .errors import (
@@ -64,7 +66,7 @@ class FakeAttemptPort:
         return a
 
     def create_from_consent(self, *, user_id: str, org_id: str, template_id: str, invite_id: str, consent_id: str,
-                            attempt_id: str | None = None) -> Attempt:
+                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None) -> Attempt:
         with self.store.lock:
             for a in self.store.items.values():
                 if a.consent_id == consent_id:

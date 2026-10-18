@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -123,7 +123,8 @@ def read_report_key(path: str) -> bytes:
     return key
 
 
-def install_state_report_route(app: FastAPI, store: StateReportStore, key: bytes, *, nonces: NonceCache | None = None) -> None:
+def install_state_report_route(app: FastAPI, store: StateReportStore, key: bytes, *, nonces: NonceCache | None = None,
+                               on_moved: Callable[[StateReport], None] | None = None) -> None:
     cache = nonces or NonceCache()
 
     @app.post(ROUTE, include_in_schema=False)
@@ -167,6 +168,11 @@ def install_state_report_route(app: FastAPI, store: StateReportStore, key: bytes
             log.warning("impossible state transition reported (stored as history, state not moved): instance %s epoch %d transition %d %s -> %s",
                         report.instance_id[:32], report.epoch, report.transition,
                         report.from_state.value if report.from_state else "none", report.to_state.value)
+        if result.moved and on_moved is not None:
+            try:
+                on_moved(report)  # the live hub hears about the new state (handoff H-142); never part of the answer to the orchestrator
+            except Exception:
+                log.warning("announcing the instance state failed", exc_info=True)
         return Response(status_code=204 if result.new else 200, headers={"Cache-Control": "private, no-store"})
 
 
@@ -177,5 +183,5 @@ def install_state_reports(app: FastAPI, runtime: "LabRuntime", environ: Mapping[
     path = env.get(KEY_FILE_VAR, "")
     if not path:
         return False
-    install_state_report_route(app, runtime.state_reports, read_report_key(path))
+    install_state_report_route(app, runtime.state_reports, read_report_key(path), on_moved=runtime.announce_instance)
     return True

@@ -19,3 +19,4 @@ Not done: the shop in those instances is the stub shop with planted flags. The r
 ## Update 2026-10-19
 The real shop now runs in instances: the missing real injector was built (docs/dev-log/2026-10-19-tannmayygupta-real-shop-injector.md), the orchestrator creates, resets and destroys instances of the real shop on vm-i, and a flag read from the real shop credits a milestone (deployed journey 30 of 30). Not yet shown: the isolation probe from inside an orchestrator-made instance. Waiting for the developer's confirmation before the state is done.
 Live link: the console at the root of the site was found empty (stale mount) and fixed; demo accounts exist; journey 31 of 31 (docs/dev-log/2026-10-19-tannmayygupta-real-shop-injector.md).
+Akshay's merged work is wired in (live events, invite rules, free learner hints): docs/dev-log/2026-10-19-tannmayygupta-wiring-akshay-live-events-and-invite-rules.md.
