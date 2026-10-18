@@ -50,5 +50,6 @@
 | 0050 | [Invites: a sealed recipient address, a company-prefixed token, rules copied onto the invite, and `sent` read from the mail](0050-invites-sealed-recipient-company-prefixed-token-and-lazy-sent-state.md) | Proposed (the builder's design for the developer to confirm) |
 | 0051 | [Accepting invites: binding by verified address, the attempt id given out at binding, consent before the attempt, and generations for a re-invite](0051-accepting-invites-binding-by-verified-address-attempt-id-at-binding-and-generations.md) | Proposed (the builder's design for the developer to confirm) |
 | 0052 | [Live updates: the event outbox in Postgres, a relay into one Valkey stream per audience, ids from one counter, and the hub in the API process](0052-live-updates-hub-outbox-relay-one-stream-per-audience-and-ids-from-one-counter.md) | Proposed (the builder's design for the developer to confirm) |
+| 0053 | [Stream authorisation: the company's standing, passive session checks, and HTTP/2 through the front](0053-stream-authorisation-company-standing-passive-sessions-and-http2-through-the-front.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

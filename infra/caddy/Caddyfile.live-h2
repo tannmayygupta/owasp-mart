@@ -1,0 +1,20 @@
+# The live stream over HTTP/2 through the real Caddy image (story P-23, FR-LIV-03). Used only by the stack test scripts/e2e/platform-stack.e2e.test.mjs, which runs this
+# image on the compose network next to the API and speaks HTTP/2 to it with Node's http2 client. It mirrors the /api/* block of infra/deploy/Caddyfile.platform (the
+# `flush_interval -1` and the origin secret the API requires) with a local certificate from Caddy's own internal CA instead of the lego certificate. It is not a deployment
+# file. Caddy serves HTTP/2 on TLS by default and speaks HTTP/1.1 to the API; nothing here compresses the stream.
+{
+	admin off
+	skip_install_trust
+	auto_https disable_redirects
+}
+
+localhost:8443 {
+	tls internal
+
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			header_up X-Origin-Secret {env.ORIGIN_SECRET}
+		}
+	}
+}
