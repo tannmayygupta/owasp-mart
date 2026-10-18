@@ -6,6 +6,7 @@ role (no owner, no BYPASSRLS), so the grants of the migration are tested too.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -31,10 +32,9 @@ from vulnmart.kernel.settings import sqlalchemy_url
 from vulnmart.lab import pg
 from vulnmart.lab.runtime import LabRuntime
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
-from vulnmart.lab.keys import StoredKeyPort, init_keystore
-from vulnmart.ports.errors import AttemptNotFound, KeyIntegrity, KeyShredded
+from vulnmart.kernel.keys import DbKeyPort, KekRing
+from vulnmart.kernel.keystore import ensure_keystore, with_database
 from vulnmart.ports.fakes import FakeKeyPort
-from vulnmart.ports.keys import Sealed
 from vulnmart.ports.instance_host import InstanceState
 from vulnmart.ports.reports import IntegrityType, Milestone
 
@@ -56,7 +56,6 @@ def engine():
     app = None
     try:
         command.upgrade(Config(str(ROOT / "apps" / "api" / "alembic.ini")), "head")
-        init_keystore(with_db(OWNER, name))
         app = create_engine(sqlalchemy_url(with_db(APP, name)), pool_size=10)
         yield app
     finally:
@@ -66,6 +65,36 @@ def engine():
         with admin.connect() as c:
             c.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         admin.dispose()
+
+
+KEYSTORE_PASSWORD = "lab-keystore-test-password-1"
+MASTERS = {"event_master": b"e" * 32, "flag_key": b"f" * 32, "owner_key": b"o" * 32}
+
+
+@pytest.fixture(scope="module")
+def keystore_engine():
+    """The key service of story P-17 on its own database and role (the lab uses `DbKeyPort`, never a second key implementation)."""
+    suffix = uuid.uuid4().hex[:8]
+    database, role = f"vm_lab_ks_{suffix}", f"vm_lab_keys_{suffix}"
+    ensure_keystore(OWNER, database=database, role=role, role_password=KEYSTORE_PASSWORD)
+    admin = create_engine(sqlalchemy_url(OWNER), isolation_level="AUTOCOMMIT")
+    role_dsn = with_database(OWNER, database).replace(OWNER.split("//")[1].split("@")[0], f"{role}:{KEYSTORE_PASSWORD}")
+    eng = create_engine(sqlalchemy_url(role_dsn), pool_size=6)
+    try:
+        yield eng
+    finally:
+        eng.dispose()
+        with admin.connect() as c:
+            c.execute(text(f'DROP DATABASE IF EXISTS "{database}" WITH (FORCE)'))
+            c.execute(text(f'DROP ROLE IF EXISTS "{role}"'))
+        admin.dispose()
+
+
+def make_keys(keystore_engine, **masters) -> DbKeyPort:
+    from sqlalchemy.orm import sessionmaker
+
+    kek = KekRing.parse("1:" + base64.urlsafe_b64encode(bytes(range(32))).decode())
+    return DbKeyPort(sessionmaker(keystore_engine, expire_on_commit=False), kek, **{**MASTERS, **masters})
 
 
 def new_record(user="u-1", template="shop-v0", **kw) -> AttemptRecord:
@@ -244,10 +273,9 @@ def flag_event(clock, iid, epoch, seq, challenge, text_):
                      "route_template": "/api/x", "request_ref": f"req-{seq}"}}
 
 
-def test_the_whole_loop_on_postgres_and_a_restart_loses_nothing(engine):
+def test_the_whole_loop_on_postgres_and_a_restart_loses_nothing(engine, keystore_engine):
     clock, host = FakeClock(T0), FakeInstanceHost()
-    master = os.urandom(32).hex().encode()
-    keys = StoredKeyPort(engine, master)
+    keys = make_keys(keystore_engine)
     user = f"u-loop-{uuid.uuid4().hex[:8]}"
     rt = make_runtime(engine, clock, host, keys)
     started = rt.start_attempt(user, org_id="o-loop")
@@ -271,7 +299,7 @@ def test_the_whole_loop_on_postgres_and_a_restart_loses_nothing(engine):
     assert rt.state(aid)["state"] == "submitted" and rt.state(aid)["access"] == "frozen"
 
     # restart: a new runtime on the same database, the same keys, a new host handle
-    rt2 = make_runtime(engine, clock, host, StoredKeyPort(engine, master))
+    rt2 = make_runtime(engine, clock, host, make_keys(keystore_engine))
     (item,) = rt2.reports.evidence(aid)
     assert item.challenge_key == "C01" and rt2.reports.evidence_body(aid, item.evidence_id) == b"GET /_stub/planted-flag?key=C01\n\nuser=u1"
     with engine.connect() as c:
@@ -337,69 +365,16 @@ def test_a_withdrawn_attempt_is_purged_by_the_tick_after_the_undo_window(engine)
     assert rt.attempt_log.read(s.attempt_id) == ()
 
 
-def test_the_key_port_seals_with_aes_gcm_keeps_its_keys_across_instances_and_shreds(engine):
-    master = os.urandom(32).hex().encode()
-    k1, k2 = StoredKeyPort(engine, master), StoredKeyPort(engine, master)
-    a, b = f"a-{uuid.uuid4().hex[:8]}", f"a-{uuid.uuid4().hex[:8]}"
-    key = k1.create_attempt_key(a)
-    assert k2.create_attempt_key(a) == key, "creating twice gives the same key, from any instance"
-    k1.create_attempt_key(b)
-    sealed = k1.encrypt(a, b"secret body", b"aad-1")
-    assert b"secret body" not in sealed.ciphertext and len(sealed.nonce) == 24
-    assert k2.decrypt(a, sealed, b"aad-1") == b"secret body"
-    assert k1.encrypt(a, b"secret body", b"aad-1").ciphertext != sealed.ciphertext, "a fresh nonce each time"
-    with pytest.raises(KeyIntegrity):
-        k1.decrypt(a, sealed, b"other-aad")
-    with pytest.raises(KeyIntegrity):
-        k1.decrypt(b, sealed, b"aad-1")  # another attempt's key
-    with pytest.raises(KeyIntegrity):
-        k1.decrypt(a, Sealed(sealed.dek_id, 1, sealed.nonce, sealed.ciphertext[:-1] + bytes([sealed.ciphertext[-1] ^ 1])), b"aad-1")
-    with pytest.raises(AttemptNotFound):
-        k1.encrypt("a-unknown", b"x")
-    wrong = StoredKeyPort(engine, os.urandom(32).hex().encode())
-    with pytest.raises(KeyIntegrity):
-        wrong.decrypt(a, sealed, b"aad-1")  # another master key cannot open the stored data key
-    assert k1.event_key("i-1", 1) == k2.event_key("i-1", 1) != wrong.event_key("i-1", 1)
-    assert k1.flag("i-1", "C01", 1) == k2.flag("i-1", "C01", 1) != k1.flag("i-1", "C01", 2)
-    assert k1.owner_hash("u-1") == k2.owner_hash("u-1") and k1.decoy("i-1", "C01", 1, 0) != k1.flag("i-1", "C01", 1)
-    assert k1.shred(a) is True and k1.shred(a) is False and k1.shred("a-none") is False
-    with pytest.raises(KeyShredded):
-        k2.decrypt(a, sealed, b"aad-1")
-    with pytest.raises(KeyShredded):
-        k2.create_attempt_key(a)
-    with engine.connect() as c:
-        wrapped = c.execute(text("SELECT wrapped FROM deks WHERE attempt_id = :a"), {"a": a}).scalar_one()
-    assert bytes(wrapped) == b"", "the wrapped key is gone, not just flagged"
-
-
-def test_the_master_key_file_must_be_long_enough_and_private(tmp_path):
-    from vulnmart.lab.keys import read_master_key
-
-    short = tmp_path / "short"
-    short.write_text("too-short")
-    with pytest.raises(ValueError, match="at least"):
-        read_master_key(str(short))
-    good = tmp_path / "good"
-    good.write_text("k" * 40 + "\n")
-    if os.name != "nt":
-        good.chmod(0o644)
-        with pytest.raises(ValueError, match="0600"):
-            read_master_key(str(good))
-        good.chmod(0o600)
-    assert read_master_key(str(good)) == b"k" * 40
-
-
-def test_the_flag_rate_limit_survives_a_restart_because_it_reads_the_stored_log(engine):
+def test_the_flag_rate_limit_survives_a_restart_because_it_reads_the_stored_log(engine, keystore_engine):
     from vulnmart.ports.errors import FlagRateLimited
 
     clock, host = FakeClock(T0), FakeInstanceHost()
-    master = os.urandom(32).hex().encode()
-    keys = StoredKeyPort(engine, master)
+    keys = make_keys(keystore_engine)
     rt = make_runtime(engine, clock, host, keys)
     s = rt.start_attempt(f"u-rate-{uuid.uuid4().hex[:8]}")
     for _ in range(5):
         assert rt.submit_flag(s.attempt_id, "C04", "VM{WRONGWRONGWRONGWRONGWRONG}").result == "incorrect"
-    rt2 = make_runtime(engine, clock, host, StoredKeyPort(engine, master))
+    rt2 = make_runtime(engine, clock, host, make_keys(keystore_engine))
     with pytest.raises(FlagRateLimited) as hit:
         rt2.submit_flag(s.attempt_id, "C04", keys.flag(s.instance_id, "C04", 1))  # even the right value is refused
     assert hit.value.retry_after > 0

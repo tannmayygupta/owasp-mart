@@ -280,3 +280,12 @@ def test_a_running_attempts_instance_that_came_back_closed_is_opened_again_by_th
     clock.advance(minutes=1)
     rt.tick()
     assert host.get(s.instance_id).access is Access.FROZEN
+
+
+def test_the_postgres_store_needs_the_platform_key_service_and_never_makes_its_own_keys():
+    import pytest
+
+    with pytest.raises(ValueError, match="VULNMART_KEYSTORE_DSN"):
+        build_lab_runtime({"VULNMART_LAB_STORE": "postgres", "VULNMART_POSTGRES_DSN": "postgresql://x:y@localhost/z"})
+    with pytest.raises(ValueError, match="VULNMART_POSTGRES_DSN"):
+        build_lab_runtime({"VULNMART_LAB_STORE": "postgres", "VULNMART_KEYSTORE_DSN": "postgresql://x:y@localhost/z"})

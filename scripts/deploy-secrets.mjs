@@ -6,8 +6,10 @@
 //   pki/ingest.pem ingest.key  server certificate of the one TLS listener on vm-p (events and state reports; the private address of vm-p)
 //   pki/client.pem client.key  client certificate of the platform (the orchestrator admits only a certificate of this CA)
 //   keys/platform_key report_key gate_key_current gate_admin_secret   64 hex characters each (the platform key signs IF-5, the report key signs state reports)
-//   keys/origin_secret csrf_secret lab_master_key                      64 hex characters each
-//   keys/pg_owner_password pg_app_password                             48 hex characters each
+//   keys/origin_secret csrf_secret                                     64 hex characters each
+//   keys/event_master flag_key owner_key                               base64 (URL-safe) of 32 random bytes each: the three masters of the key service (story P-17)
+//   keys/kek                                                           one line `1:<base64 of 32 random bytes>`: the key-encryption key of the key service
+//   keys/pg_owner_password pg_app_password keystore_password           48 hex characters each
 // The extensions are the ones Python 3.14 requires (a CA needs keyUsage keyCertSign). Run again with --force to replace everything (a new CA means new certificates everywhere).
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -69,8 +71,10 @@ export function make(o) {
   leaf('ingest', 'vulnmart-ingest', 'serverAuth', `IP:${o.vmpIp}`);
   leaf('client', 'vulnmart-platform', 'clientAuth', '');
   for (const f of ['ca.srl', 'openssl.cnf']) fs.rmSync(path.join(pki, f), { force: true });
-  for (const n of ['platform_key', 'report_key', 'gate_key_current', 'gate_admin_secret', 'origin_secret', 'csrf_secret', 'lab_master_key']) fs.writeFileSync(path.join(keys, n), hex(32));
-  for (const n of ['pg_owner_password', 'pg_app_password']) fs.writeFileSync(path.join(keys, n), hex(24));
+  for (const n of ['platform_key', 'report_key', 'gate_key_current', 'gate_admin_secret', 'origin_secret', 'csrf_secret']) fs.writeFileSync(path.join(keys, n), hex(32));
+  for (const n of ['event_master', 'flag_key', 'owner_key']) fs.writeFileSync(path.join(keys, n), crypto.randomBytes(32).toString('base64url'));
+  fs.writeFileSync(path.join(keys, 'kek'), `1:${crypto.randomBytes(32).toString('base64url')}`);
+  for (const n of ['pg_owner_password', 'pg_app_password', 'keystore_password']) fs.writeFileSync(path.join(keys, n), hex(24));
   fs.writeFileSync(path.join(keys, 'gate_key_previous'), '');
   return { out, pki: fs.readdirSync(pki).sort(), keys: fs.readdirSync(keys).sort() };
 }

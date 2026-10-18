@@ -463,20 +463,22 @@ def _host_from_environ(environ: Mapping[str, str]) -> InstanceHost:
 
 def build_lab_runtime(environ: Mapping[str, str] | None = None, *, host: InstanceHost | None = None,
                       clock: Callable[[], datetime] | None = None, gate: ActivityGate | None = None) -> LabRuntime:
-    """The runtime from the environment. `VULNMART_LAB_STORE=postgres` keeps everything in the database (needs `VULNMART_POSTGRES_DSN` and
-    `VULNMART_LAB_KEY_FILE`, optionally `VULNMART_KEYSTORE_DSN`); without it the state is in memory (tests and the laptop demo)."""
+    """The runtime from the environment. `VULNMART_LAB_STORE=postgres` keeps everything in the database (needs `VULNMART_POSTGRES_DSN`) and uses the
+    platform's key service (`DbKeyPort` over `vm_keystore`, story P-17: the KEK, the three masters and `VULNMART_KEYSTORE_DSN` come from the same
+    settings as the rest of the API, read from the process environment); without it the state is in memory (tests and the laptop demo)."""
     env = os.environ if environ is None else environ
     stores, keys = None, None
     if env.get("VULNMART_LAB_STORE") == "postgres":
         from vulnmart.kernel.db import make_engine
-        from vulnmart.lab.keys import KEY_FILE_VAR, StoredKeyPort, read_master_key
+        from vulnmart.kernel.services import key_port_from
+        from vulnmart.kernel.settings import Settings
         from vulnmart.lab.pg import build_pg_stores
 
-        dsn, key_file = env.get("VULNMART_POSTGRES_DSN"), env.get(KEY_FILE_VAR)
-        if not dsn or not key_file:
-            raise ValueError(f"VULNMART_LAB_STORE=postgres needs VULNMART_POSTGRES_DSN and {KEY_FILE_VAR}")
+        dsn = env.get("VULNMART_POSTGRES_DSN")
+        if not dsn or not env.get("VULNMART_KEYSTORE_DSN"):
+            raise ValueError("VULNMART_LAB_STORE=postgres needs VULNMART_POSTGRES_DSN and VULNMART_KEYSTORE_DSN (the key service of story P-17)")
         stores = build_pg_stores(make_engine(dsn, pool_size=10, max_overflow=10))
-        keys = StoredKeyPort(make_engine(env.get("VULNMART_KEYSTORE_DSN") or dsn, pool_size=4), read_master_key(key_file))
+        keys = key_port_from(Settings())
     extra: dict[str, Any] = {}
     if env.get("VULNMART_LABS_ZONE"):
         extra["hostname_suffix"] = env["VULNMART_LABS_ZONE"]

@@ -247,13 +247,13 @@ rm -rf stage
   log('secrets');
   // the API (uid 65532) reads its files as their owner; Caddy runs as root WITHOUT the capability that skips file modes, so what only Caddy reads belongs to root
   // and the one secret both read (the origin secret) is readable by every user inside the two containers that mount it (the folder on the host is mode 700)
-  stage(host, ['csrf_secret', 'lab_master_key', 'gate_key_current', 'platform_key', 'report_key'].map((n) => ({ local: k(n), name: n })), '/opt/vulnmart/platform/secrets', OWNER, '400');
+  stage(host, ['csrf_secret', 'kek', 'event_master', 'flag_key', 'owner_key', 'gate_key_current', 'platform_key', 'report_key'].map((n) => ({ local: k(n), name: n })), '/opt/vulnmart/platform/secrets', OWNER, '400');
   stage(host, [{ local: k('origin_secret'), name: 'origin_secret' }], '/opt/vulnmart/platform/secrets', 'root:root', '444', '755');
   stage(host, [{ local: p('ca.pem'), name: 'ca.pem' }, { local: p('client.pem'), name: 'client.pem' }, { local: p('client.key'), name: 'client.key' }], '/opt/vulnmart/platform/pki', OWNER, '400');
   stage(host, [{ local: p('ingest.pem'), name: 'ingest.pem' }, { local: p('ingest.key'), name: 'ingest.key' }], '/opt/vulnmart/platform/pki', 'root:root', '400', '755');
   const envFile = path.join(os.tmpdir(), `platform-env-${Date.now()}`);
   const rd = (n) => fs.readFileSync(k(n), 'utf8').trim();
-  fs.writeFileSync(envFile, [`VULNMART_OWNER_DB_PASSWORD=${rd('pg_owner_password')}`, `VULNMART_APP_DB_PASSWORD=${rd('pg_app_password')}`, `VULNMART_PLATFORM_HOST=${platformHost}`, `VULNMART_LABS_ZONE=${zone}`, `VULNMART_VMI_PRIVATE_IP=${H.i.priv}`, `VULNMART_VMP_PRIVATE_IP=${H.p.priv}`, ''].join('\n'));
+  fs.writeFileSync(envFile, [`VULNMART_OWNER_DB_PASSWORD=${rd('pg_owner_password')}`, `VULNMART_APP_DB_PASSWORD=${rd('pg_app_password')}`, `VULNMART_KEYSTORE_PASSWORD=${rd('keystore_password')}`, `VULNMART_PLATFORM_HOST=${platformHost}`, `VULNMART_LABS_ZONE=${zone}`, `VULNMART_VMI_PRIVATE_IP=${H.i.priv}`, `VULNMART_VMP_PRIVATE_IP=${H.p.priv}`, ''].join('\n'));
   stage(host, [{ local: envFile, name: '.env' }], '/opt/vulnmart/platform', 'root:root', '600', '755');
   fs.rmSync(envFile, { force: true });
   log('swap, images and start');

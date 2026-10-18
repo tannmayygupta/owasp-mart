@@ -81,17 +81,16 @@ services:
       timeout: 3s
       retries: 15
 
-  # One-shot, as the owner role: the schema to the single Alembic head, then the keystore table of the lab (python -m vulnmart.lab.keys init).
+  # One-shot, as the owner role: the schema to the single Alembic head, then the keystore database vm_keystore with its own role (story P-17, idempotent).
   migrate:
     <<: *hardening
     restart: "no"
     image: vulnmart-api:prod
     container_name: vulnmart-migrate
-    command: ["sh", "-c", "alembic -c /app/alembic.ini upgrade head && python -m vulnmart.lab.keys init"]
+    command: ["python", "-m", "vulnmart.kernel.migrate"]
     environment:
       VULNMART_MIGRATE_DSN: postgresql://vulnmart:${VULNMART_OWNER_DB_PASSWORD}@postgres:5432/vulnmart
-      VULNMART_KEYSTORE_OWNER_DSN: postgresql://vulnmart:${VULNMART_OWNER_DB_PASSWORD}@postgres:5432/vulnmart
-      VULNMART_APP_ROLE: vulnmart_app
+      VULNMART_KEYSTORE_PASSWORD: ${VULNMART_KEYSTORE_PASSWORD}
     mem_limit: 256m
     pids_limit: 64
     tmpfs:
@@ -112,7 +111,12 @@ services:
       VULNMART_SERVICE: api
       VULNMART_LAB_RUNTIME: "1"
       VULNMART_LAB_STORE: postgres
-      VULNMART_LAB_KEY_FILE: /run/secrets/lab_master_key
+      # the key service of story P-17: wrapped per-attempt keys in vm_keystore (own role); the KEK and the three masters are files
+      VULNMART_KEYSTORE_DSN: postgresql://vulnmart_keys:${VULNMART_KEYSTORE_PASSWORD}@postgres:5432/vm_keystore
+      VULNMART_KEK_FILE: /run/secrets/kek
+      VULNMART_EVENT_MASTER_FILE: /run/secrets/event_master
+      VULNMART_FLAG_KEY_FILE: /run/secrets/flag_key
+      VULNMART_OWNER_KEY_FILE: /run/secrets/owner_key
       VULNMART_CATALOG_DIR: /catalog
       VULNMART_LABS_ZONE: ${VULNMART_LABS_ZONE}
       VULNMART_GATE_KEY_FILE: /run/secrets/gate_key_current
@@ -126,7 +130,10 @@ services:
     volumes:
       - ./secrets/origin_secret:/run/secrets/origin_secret:ro
       - ./secrets/csrf_secret:/run/secrets/csrf_secret:ro
-      - ./secrets/lab_master_key:/run/secrets/lab_master_key:ro
+      - ./secrets/kek:/run/secrets/kek:ro
+      - ./secrets/event_master:/run/secrets/event_master:ro
+      - ./secrets/flag_key:/run/secrets/flag_key:ro
+      - ./secrets/owner_key:/run/secrets/owner_key:ro
       - ./secrets/gate_key_current:/run/secrets/gate_key_current:ro
       - ./secrets/platform_key:/run/secrets/platform_key:ro
       - ./secrets/report_key:/run/secrets/report_key:ro
