@@ -58,7 +58,8 @@ Not fixed tonight, with the reason:
 ## Tests
 - Merged tree before the key switch: apps/api 2061 passed, 4 skipped.
 - After the key switch and before these fixes: apps/api 2060 passed, 4 skipped; npm test 1030 passed (2 skipped); orchestrator 467; py-attempts 357.
-- After the fixes: see the pull request (full runs are repeated after the final merge of main).
+- After the fixes and the second merge of main (P-18, P-19; the lab migration moved to 0010): apps/api 2186 passed, 4 skipped, 1 failed (Akshay's test_company_members rule that a table with org_id is scoped or listed on purpose; attempts is now listed on purpose with the reason, and that test file plus test_data_minimum re-ran: 55 passed; the full suite was not repeated after that one-line change). npm test 1030 passed, 2 skipped; orchestrator 467 passed; py-attempts 357 passed.
+- Deployed (vm-p database recreated on the final build, head 0010): scripts/e2e-live.mjs 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run7-final-build.json). The new erase-on-withdrawal path is proved by the Postgres tests, not on the deployed system (it needs the seven-day undo window to pass).
 
 ## Deployed result (after the developer approved stopping vm-p and recreating its database)
 - vm-p stopped, its Postgres volume removed, the new build started: the migrate job created the schema to head 0010 and the keystore database vm_keystore (own role); the data database holds no key table, vm_keystore holds deks, keystore_schema and shredded.
