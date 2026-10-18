@@ -17,7 +17,7 @@ from vulnmart.kernel.db import Base, org_scoped
 ORG_STATUSES = ("pending", "active", "rejected", "suspended", "deleted")  # architecture 04 section 10.5
 
 
-@org_scoped("id")
+@org_scoped("id", admin_visible=True)  # an admin reads the company directory across companies (story P-18); org_members stay company-only
 class Organization(Base):
     __tablename__ = "organizations"
     __table_args__ = (CheckConstraint("status IN ('pending', 'active', 'rejected', 'suspended', 'deleted')", name="status"),)
@@ -33,7 +33,7 @@ class Organization(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
-@org_scoped("org_id")
+@org_scoped("org_id", self_column="user_id")  # a member reads their own membership without a company in scope (story P-18)
 class OrgMember(Base):
     __tablename__ = "org_members"
     __table_args__ = (

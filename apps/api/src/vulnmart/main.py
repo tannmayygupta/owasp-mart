@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from vulnmart.accounts.api import router as accounts_router
+from vulnmart.accounts.directory import UserDirectory
 from vulnmart.accounts.admins import AdminService
 from vulnmart.accounts.fieldkeys import FieldKeys
 from vulnmart.accounts.me_api import router as me_router
@@ -31,6 +32,7 @@ from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRa
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
+from vulnmart.orgs.service import CompanyService
 from vulnmart.privacy.api import router as consent_router
 from vulnmart.privacy.consent import ConsentService
 from vulnmart.privacy.targets import ConsentTargets, FakeConsentTargets
@@ -115,6 +117,10 @@ def create_app(
     ports = app.state.ports
     app.state.roles = RoleService(ports.sessions, ports.audit, app.state.session_service) if ports.sessions else None
     app.state.admins = AdminService(ports.sessions, ports.settings, ports.audit, public_origin=settings.public_origin, policy=policy) if ports.sessions else None
+    # Recruiter signup and company approval (story P-18): no route yet (IF-1 has none, handoff H-138); the admin area (P-28) and the invite stories call this.
+    app.state.companies = (CompanyService(ports.sessions, app.state.accounts, UserDirectory(ports.sessions), app.state.roles, ports.audit, ports.scope,
+                                          public_origin=settings.public_origin)
+                           if ports.sessions is not None and app.state.accounts is not None and app.state.roles is not None else None)
     field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
     app.state.mfa_service = mfa or (MfaService(ports.sessions, field_keys, ports.audit, app.state.session_service)
                                     if ports.sessions is not None and app.state.session_service is not None else None)

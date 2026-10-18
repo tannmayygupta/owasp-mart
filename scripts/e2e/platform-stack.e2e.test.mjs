@@ -670,24 +670,81 @@ describe('platform and web profiles on a real Docker engine', () => {
       'out["verify"] = [v.ok, v.checked >= 2]',
       'r = app.state.audit_anchors.anchor()',
       'out["anchor"] = [r.head_seq >= 2, r.witness]',
+      'out["attempt"] = a',
       'print(json.dumps(out))',
     ].join('\n');
     const run = docker('exec', NAME('api'), 'python', '-c', program);
     assert.equal(run.status, 0, run.stderr);
-    assert.deepEqual(JSON.parse(run.stdout.trim().split('\n').pop()), {
+    const result = JSON.parse(run.stdout.trim().split('\n').pop());
+    const attempt = result.attempt;
+    delete result.attempt;
+    assert.deepEqual(result, {
       keys: 'DbKeyPort', audit: 'DbAuditPort', round_trip: 'evidence', shred: true, after_shred: 'shredded', verify: [true, true], anchor: [true, 'db'],
     });
     assert.equal(psql(`SELECT count(*) FROM audit_anchor WHERE anchor_date = current_date`), '1');
 
     // the keys are in their own database, with their own role, and the application's role cannot reach it
-    assert.equal(psqlDb('vm_keystore', 'SELECT count(*) FROM deks') >= '0', true);
-    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM shredded WHERE attempt_id LIKE 'a-E2E%'`), '1');
-    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM deks WHERE attempt_id LIKE 'a-E2E%'`), '0', 'the wrapped key is gone, not marked');
+    // (the dev volume persists between runs, so look at this run's attempt only)
+    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM shredded WHERE attempt_id = '${attempt}'`), '1');
+    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM deks WHERE attempt_id = '${attempt}'`), '0', 'the wrapped key is gone, not marked');
     assert.equal(psql(`SELECT count(*) FROM pg_tables WHERE tablename IN ('deks', 'shredded')`), '0', 'no key table in the data database');
     const appToKeys = docker('exec', '-e', 'PGPASSWORD=vulnmart-app-dev-only-not-a-secret', NAME('postgres'), 'psql', '-h', '127.0.0.1', '-U', 'vulnmart_app', '-d', 'vm_keystore', '-c', 'SELECT 1');
     assert.notEqual(appToKeys.status, 0);
     assert.match(appToKeys.stderr, /permission denied|not allowed|CONNECT/i);
   }, { timeout: 120000 });
+
+  // Story P-18: recruiter signup and company approval. IF-1 has no recruiter or admin route yet (handoff H-138), so the service is driven inside the API
+  // container, as the application database role, which also proves the row-level security of migration 0008 on the real stack.
+  test('companies (P-18): a recruiter signs up, verifies the address, the admin queue lists the company, the approval activates it and mails the owner', async () => {
+    const email = `e2e-recruiter-${RUN}@example.com`;
+    const adminEmail = `e2e-company-admin-${RUN}@example.com`;
+    const password = 'a long admin password 123';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app', 'from vulnmart.ports.scope import Scope, Role', 'c = app.state.companies', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const seeded = docker('exec', '-e', `VULNMART_SEED_ADMIN_PASSWORD=${password}`, NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Company Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    const admin = `Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN}))`;
+
+    // a disposable address is refused, a free webmail address is not (OI-10)
+    const refused = py('from vulnmart.accounts.service import InvalidInput', 'try:', `    c.signup_recruiter(email="x${RUN}@mailinator.com", password="correct horse battery staple", display_name="X", company_name="X Ltd")`,
+      '    print(json.dumps("accepted"))', 'except InvalidInput as e:', '    print(json.dumps([e.pointer, e.kind]))');
+    assert.deepEqual(refused, ['/email', 'disposable_email']);
+    assert.equal(psql(`SELECT count(*) FROM users WHERE email_ci LIKE 'x${RUN}@%'`), '0');
+
+    py(`c.signup_recruiter(email="${email}", password="correct horse battery staple", display_name="E2E Recruiter", company_name="E2E Security Ltd")`, 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT account_type || ',' || (email_verified_at IS NULL) FROM users WHERE email_ci = '${email}'`), 'recruiter,true');
+    assert.equal(psql(`SELECT o.status || ',' || o.email_domain || ',' || m.role FROM organizations o JOIN org_members m ON m.org_id = o.id JOIN users u ON u.id = m.user_id WHERE u.email_ci = '${email}'`), 'pending,example.com,owner');
+    const uid = psql(`SELECT id FROM users WHERE email_ci = '${email}'`);
+    assert.deepEqual(py(`s = c.standing("${uid}")`, 'print(json.dumps([s.state, s.org_name]))'), ['unverified_email', 'E2E Security Ltd']);
+
+    // the verification mail arrives and its link verifies the recruiter through the existing route
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    assert.deepEqual(py(`s = c.standing("${uid}")`, 'print(json.dumps(s.state))'), 'pending_approval');
+    assert.deepEqual(py(`try:`, `    c.active_company_of("${uid}")`, '    print(json.dumps("allowed"))', 'except Exception as e:', '    print(json.dumps([type(e).__name__, e.state]))'), ['NotActiveRecruiter', 'pending_approval']);
+
+    // the admin queue lists the company with the owner's name and the domain, not the address; one approval activates it
+    const queue = py(`q = c.pending(${admin})`, 'print(json.dumps([[x.name, x.owner_name, x.owner_email_domain, "@" in repr(x)] for x in q]))');
+    assert.ok(queue.some((r) => r[0] === 'E2E Security Ltd' && r[1] === 'E2E Recruiter' && r[2] === 'example.com' && r[3] === false), JSON.stringify(queue));
+    const orgId = psql(`SELECT m.org_id FROM org_members m WHERE m.user_id = '${uid}'`);
+    py(`c.approve(${admin}, "${orgId}")`, 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT status FROM organizations WHERE id = '${orgId}'`), 'active');
+    assert.deepEqual(py(`print(json.dumps([c.standing("${uid}").state, c.active_company_of("${uid}") == "${orgId}"]))`), ['active', true]);
+    assert.ok(await mailFor(email, 'is approved on VulnMart'), 'the approval mail reached the owner');
+    const second = py('from vulnmart.orgs.service import InvalidTransition', 'try:', `    c.approve(${admin}, "${orgId}")`, '    print(json.dumps("again"))', 'except InvalidTransition as e:', '    print(json.dumps(e.state))');
+    assert.equal(second, 'active', 'a decision is made once');
+
+    // the audit log has the three entries under pseudonyms, and an admin\'s own session has no company-table write path
+    assert.equal(psql(`SELECT string_agg(action, ',' ORDER BY seq) FROM audit_log WHERE action LIKE 'org.%' AND (subject = (SELECT subject_id FROM subject_map WHERE user_id = '${uid}'))`), 'org.created,org.approved');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%${uid}%' OR details LIKE '%${email}%'`), '0');
+    assert.equal(psql(`SELECT count(*) FROM pg_policies WHERE policyname IN ('admin_read', 'own_membership')`), '2');
+  }, { timeout: 180000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
