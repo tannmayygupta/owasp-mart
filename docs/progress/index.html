@@ -59,7 +59,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <h2>The three streams</h2>
 <div class="cards">
 <div class="card"><h3><a href="#lab">Lab: Tanmay</a></h3><p>Builds the part that starts a private copy of the shop for each person, keeps it isolated, detects the attacks, and scores the attempt.</p><p class="summary">29 done, 0 being implemented, 2 next, of 31 tasks.</p></div>
-<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">17 done, 1 being implemented, 14 next, of 32 tasks.</p></div>
+<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">18 done, 1 being implemented, 13 next, of 32 tasks.</p></div>
 <div class="card"><h3><a href="#target">Target: Sahil</a></h3><p>Builds the online shop that is deliberately vulnerable, with its 11 challenges, hints and the tests that prove each one can be solved.</p><p class="summary">16 done, 0 being implemented, 16 next, of 32 tasks.</p></div>
 </div>
 <h2>Contracts between the streams</h2>
@@ -181,7 +181,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <section id="platform">
 <h2>Platform stream: Akshay</h2>
 <p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p>
-<p class="summary"><strong>17 done, 1 being implemented, 14 next, 32 tasks in total.</strong></p>
+<p class="summary"><strong>18 done, 1 being implemented, 13 next, 32 tasks in total.</strong></p>
 <p class="source">source: docs/dev/dev2-akshay.md (working tree)</p>
 <h3>Sprint 1 <span class="dates">(2026-10-08 to 2026-10-14)</span></h3>
 <ul class="tasks">
@@ -209,7 +209,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <ul class="tasks">
 <li class="task done"><div class="head"><span class="tid">P-17</span> <span class="ttitle">Audit log and key service</span> <span class="status">Done</span></div><p class="build">Append-only audit log, encryption at rest and the key service with a KeyPort.</p><p class="waits">Waits on: P-12. Open in part: OI-28. Tanmay&#39;s flag and evidence tasks use your KeyPort.</p></li>
 <li class="task done"><div class="head"><span class="tid">P-18</span> <span class="ttitle">Recruiter signup and company approval</span> <span class="status">Done</span></div><p class="build">Recruiter signup, the company state machine from signup to active, rejected and suspended, and the approve and reject API.</p><p class="waits">Waits on: P-13, P-17. Open: free-email recruiters (OI-10).</p></li>
-<li class="task next"><div class="head"><span class="tid">P-19</span> <span class="ttitle">Company members, admin controls, data scoping, terms and invite caps</span> <span class="status">Next</span></div><p class="build">Colleagues join through the owner, admin controls over companies, company scoping of data, data-processing terms, invite caps.</p><p class="waits">Waits on: P-18.</p></li>
+<li class="task done"><div class="head"><span class="tid">P-19</span> <span class="ttitle">Company members, admin controls, data scoping, terms and invite caps</span> <span class="status">Done</span></div><p class="build">Colleagues join through the owner, admin controls over companies, company scoping of data, data-processing terms, invite caps.</p><p class="waits">Waits on: P-18.</p></li>
 <li class="task next"><div class="head"><span class="tid">P-20</span> <span class="ttitle">Assessment template, creating and sending invites, invite lifecycle</span> <span class="status">Next</span></div><p class="build">Assessment template, create and send invites by email, invite lifecycle states.</p><p class="waits">Waits on: P-10, P-19.</p></li>
 <li class="task next"><div class="head"><span class="tid">P-21</span> <span class="ttitle">Accepting invites, re-invite after a fault and bulk invites</span> <span class="status">Next</span></div><p class="build">A candidate accepts an invite with consent, a re-invite after a fault, and bulk invite handling.</p><p class="waits">Waits on: P-16, P-20.</p></li>
 <li class="task next"><div class="head"><span class="tid">P-22</span> <span class="ttitle">Live updates hub: SSE, heartbeat, snapshot with polling fallback, fan-out</span> <span class="status">Next</span></div><p class="build">Server-sent events with heartbeat and no buffering, a snapshot plus polling fallback, and the fan-out path from events to streams.</p><p class="waits">Waits on: P-06, P-12. Tanmay&#39;s L-11 proves SSE through Vercel (S-14).</p></li>

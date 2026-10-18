@@ -1,4 +1,4 @@
-"""Disposable email domains (story P-18, FR-ACC-10: "a disposable-domain email cannot start a recruiter signup"; FR-ORG-04).
+"""Disposable and free-webmail email domains (story P-18 and P-19, FR-ACC-10: "a disposable-domain email cannot start a recruiter signup"; FR-ORG-04).
 
 The bundled list `data/disposable-domains.txt` is a starter list from memory, not a maintained one (see its header). A listed domain and every
 subdomain of it are refused. Free webmail such as gmail.com is NOT on the list: the developer decided on 2026-10-18 (OI-10) that recruiters with a
@@ -25,4 +25,17 @@ def is_disposable(email_ci: str) -> bool:
     domain = domain_of(email_ci)
     listed = disposable_domains()
     parts = domain.split(".")
+    return any(".".join(parts[i:]) in listed for i in range(len(parts) - 1))
+
+
+@lru_cache(maxsize=1)
+def free_email_domains() -> frozenset[str]:
+    text = resources.files("vulnmart.orgs").joinpath("data/free-email-domains.txt").read_text(encoding="utf-8")
+    return frozenset(line.strip().lower() for line in text.splitlines() if line.strip() and not line.startswith("#"))
+
+
+def is_free_email(email_ci: str) -> bool:
+    """True for an address at a free webmail provider (or a subdomain of one): its domain says nothing about a company (story P-19)."""
+    parts = domain_of(email_ci).split(".")
+    listed = free_email_domains()
     return any(".".join(parts[i:]) in listed for i in range(len(parts) - 1))

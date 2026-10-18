@@ -40,8 +40,11 @@ INVENTORY = {
     "email_outbox": ("Email queue: template name, parameters, state; the address is looked up from the user at send time",
                      {"id", "to_user_id", "template", "params", "state", "attempts", "next_attempt_at", "claimed_until", "sent_at", "provider_message_id",
                       "last_error_code", "created_at", "updated_at"}),
+    "join_requests": ("Company data: a colleague's request to join, decided by the owner", {"id", "org_id", "user_id", "status", "decided_by", "decided_at", "created_at"}),
+    "dpa_acceptances": ("Company data: the owner's acceptance of the data-processing terms (company, user, version, hash, time)",
+                        {"id", "org_id", "user_id", "terms_version", "terms_sha256", "accepted_at"}),
     "organizations": ("Company data: name, email domain, status, reasons", {"id", "name", "email_domain", "status", "owner_user_id", "rejected_reason",
-                                                                             "suspended_reason", "created_at", "updated_at"}),
+                                                                             "suspended_reason", "domain_claim", "invite_cap", "created_at", "updated_at"}),
     "org_members": ("Company data: who belongs to a company", {"org_id", "user_id", "role", "status", "created_at", "updated_at"}),
 }
 
