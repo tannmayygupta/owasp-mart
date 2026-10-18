@@ -696,7 +696,8 @@ describe('platform and web profiles on a real Docker engine', () => {
   // Story P-18: recruiter signup and company approval. IF-1 has no recruiter or admin route yet (handoff H-138), so the service is driven inside the API
   // container, as the application database role, which also proves the row-level security of migration 0008 on the real stack.
   test('companies (P-18): a recruiter signs up, verifies the address, the admin queue lists the company, the approval activates it and mails the owner', async () => {
-    const email = `e2e-recruiter-${RUN}@example.com`;
+    const domain = `recruiters-${RUN}.example`;
+    const email = `e2e-recruiter@${domain}`;  // a domain of its own: the first recruiter of a work domain claims it, and the dev volume keeps earlier runs
     const adminEmail = `e2e-company-admin-${RUN}@example.com`;
     const password = 'a long admin password 123';
     const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
@@ -718,7 +719,7 @@ describe('platform and web profiles on a real Docker engine', () => {
 
     py(`c.signup_recruiter(email="${email}", password="correct horse battery staple", display_name="E2E Recruiter", company_name="E2E Security Ltd")`, 'print(json.dumps(True))');
     assert.equal(psql(`SELECT account_type || ',' || (email_verified_at IS NULL) FROM users WHERE email_ci = '${email}'`), 'recruiter,true');
-    assert.equal(psql(`SELECT o.status || ',' || o.email_domain || ',' || m.role FROM organizations o JOIN org_members m ON m.org_id = o.id JOIN users u ON u.id = m.user_id WHERE u.email_ci = '${email}'`), 'pending,example.com,owner');
+    assert.equal(psql(`SELECT o.status || ',' || o.email_domain || ',' || m.role FROM organizations o JOIN org_members m ON m.org_id = o.id JOIN users u ON u.id = m.user_id WHERE u.email_ci = '${email}'`), `pending,${domain},owner`);
     const uid = psql(`SELECT id FROM users WHERE email_ci = '${email}'`);
     assert.deepEqual(py(`s = c.standing("${uid}")`, 'print(json.dumps([s.state, s.org_name]))'), ['unverified_email', 'E2E Security Ltd']);
 
@@ -731,7 +732,7 @@ describe('platform and web profiles on a real Docker engine', () => {
 
     // the admin queue lists the company with the owner's name and the domain, not the address; one approval activates it
     const queue = py(`q = c.pending(${admin})`, 'print(json.dumps([[x.name, x.owner_name, x.owner_email_domain, "@" in repr(x)] for x in q]))');
-    assert.ok(queue.some((r) => r[0] === 'E2E Security Ltd' && r[1] === 'E2E Recruiter' && r[2] === 'example.com' && r[3] === false), JSON.stringify(queue));
+    assert.ok(queue.some((r) => r[0] === 'E2E Security Ltd' && r[1] === 'E2E Recruiter' && r[2] === domain && r[3] === false), JSON.stringify(queue));
     const orgId = psql(`SELECT m.org_id FROM org_members m WHERE m.user_id = '${uid}'`);
     py(`c.approve(${admin}, "${orgId}")`, 'print(json.dumps(True))');
     assert.equal(psql(`SELECT status FROM organizations WHERE id = '${orgId}'`), 'active');
@@ -820,6 +821,83 @@ describe('platform and web profiles on a real Docker engine', () => {
     const actions = psql(`SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM audit_log WHERE action IN ('org.join_requested', 'org.join_approved', 'org.terms_accepted', 'org.invite_cap_set', 'account.suspended', 'account.reinstated', 'org.member_removed', 'org.deleted')`);
     assert.equal(actions, 'account.reinstated,account.suspended,org.deleted,org.invite_cap_set,org.join_approved,org.join_requested,org.member_removed,org.terms_accepted');
     assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%${ownerId}%' OR details LIKE '%${colleagueId}%' OR details LIKE '%policy review%'`), '0');
+  }, { timeout: 240000 });
+
+  // Story P-20: a recruiter makes a template and invites a candidate who has no account; the mail really arrives through the worker, which opens the address that the
+  // API sealed in the outbox row. The service is driven inside the API container as the application role (IF-1 has no recruiter route yet, handoff H-138).
+  test('invites (P-20): a template, an invite by email to a person with no account, the mail arrives, the token is only a hash, resend kills the old link', async () => {
+    const domain = `invites-${RUN}.example`;
+    const ownerEmail = `owner@${domain}`;
+    const candidate = `candidate-${RUN}@example.org`;
+    const adminEmail = `e2e-invites-admin-${RUN}@example.com`;
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from sqlalchemy import text', 'from vulnmart.main import app', 'from vulnmart.ports.scope import Scope, Role',
+        'c, a = app.state.companies, app.state.assessments', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const seeded = docker('exec', '-e', 'VULNMART_SEED_ADMIN_PASSWORD=a long admin password 123', NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Invites Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    const admin = `Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN}))`;
+    py(`c.signup_recruiter(email="${ownerEmail}", password="correct horse battery staple", display_name="E2E Inviter", company_name="Invites Ltd")`, 'print(json.dumps(True))');
+    const mail = await mailFor(ownerEmail, 'Confirm your email');
+    assert.ok(mail, 'the verification mail of the recruiter arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    const ownerId = psql(`SELECT id FROM users WHERE email_ci = '${ownerEmail}'`);
+    const orgId = psql(`SELECT id FROM organizations WHERE domain_claim = '${domain}'`);
+    py(`c.approve(${admin}, "${orgId}")`, `t = c.terms_for("${ownerId}")`, `c.accept_terms("${ownerId}", t.version, t.sha256)`, 'print(json.dumps(True))');
+    const owner = `Scope(user_id="${ownerId}", org_id="${orgId}", roles=frozenset({Role.RECRUITER, Role.ORG_OWNER}))`;
+
+    // a template, then an invite: while the mail waits in the outbox its address is sealed and its link carries the only copy of the token
+    const created = py(`t = a.create_template(${owner}, {"title": "E2E assessment", "challenge_keys": ["C01", "C03"], "time_limit_min": 90})`,
+      `i = a.create_invite(${owner}, t.template_id, "${candidate}")`,
+      'with app.state.ports.sessions() as s:', '    row = s.execute(text("SELECT to_address_sealed, params::text FROM email_outbox WHERE to_user_id = :i"), {"i": i.invite_id}).one()',
+      'print(json.dumps({"template": t.template_id, "invite": i.invite_id, "state": i.state, "sealed": bool(row[0]) and "@" not in row[0], "params_clean": "@" not in row[1], "version": t.version}))');
+    assert.deepEqual([created.state, created.sealed, created.params_clean, created.version], ['created', true, true, 1]);
+    assert.match(created.invite, /^i-[A-Z2-7]{16}$/);
+
+    // the mail arrives at an address that has no account, through the worker
+    const invitation = await mailFor(candidate, 'invited you to a security assessment');
+    assert.ok(invitation, 'the invitation arrived in Mailpit');
+    const link = /https?:\/\/[^\s]+\/invite\?token=([a-z2-7]{26}\.[A-Za-z0-9_-]{43})/.exec(invitation.Text);
+    assert.ok(link, `a link with a token in the mail text: ${invitation.Text}`);
+    const token = link[1];
+    assert.deepEqual([...new Set(invitation.Text.match(/https?:\/\/[^\s]+/g))], [`http://127.0.0.1:3000/invite?token=${token}`], 'only its own link');
+    assert.ok(invitation.Text.includes('Invites Ltd') && invitation.Text.includes('E2E assessment'));
+
+    // the database holds the hash of the token and nothing that opens the invite; the address left the outbox with the mail
+    const sha = crypto.createHash('sha256').update(token).digest('hex');
+    assert.equal(psql(`SELECT token_hash FROM invites WHERE id = '${created.invite}'`), sha);
+    assert.equal(psql(`SELECT state || ',' || coalesce(to_address_sealed, 'cleared') FROM email_outbox WHERE to_user_id = '${created.invite}'`), 'sent,cleared');
+    assert.equal(psql(`SELECT count(*) FROM email_outbox WHERE params::text LIKE '%${token.slice(30)}%' OR to_address_sealed LIKE '%candidate%'`), '0', 'the sent row holds no token');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%${token.slice(30)}%' OR details LIKE '%${candidate}%'`), '0', 'no token and no address in the audit log');
+
+    // the state `sent` is read from the mail; the link finds the invite; a resend gives a new link and kills the old one
+    assert.deepEqual(py(`i = a.get_invite(${owner}, "${created.invite}")`, `f = a.find_by_token("${token}")`, 'print(json.dumps([i.state, f.invite_id, f.state, i.sent_at is not None]))'), ['sent', created.invite, 'sent', true]);
+    py(`a.resend(${owner}, "${created.invite}")`, 'print(json.dumps(True))');
+    const second = await (async () => {
+      for (let i = 0; i < 60; i += 1) {
+        const m = await mailFor(candidate, 'invited you to a security assessment', 1);
+        const t = m && /invite\?token=([a-z2-7]{26}\.[A-Za-z0-9_-]{43})/.exec(m.Text)?.[1];
+        if (t && t !== token) return t;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      return null;
+    })();
+    assert.ok(second, 'a second mail with a new link arrived');
+    assert.deepEqual(py(`print(json.dumps([a.find_by_token("${token}") is None, a.find_by_token("${second}").invite_id]))`), [true, created.invite], 'the old link is dead, the new one works');
+
+    // the cap, a cancel, and the audit entries under pseudonyms
+    py(`c.set_invite_cap(${admin}, "${orgId}", 1)`, 'print(json.dumps(True))');
+    const capped = py('from vulnmart.assessments.service import InviteCapReached', 'try:', `    a.create_invite(${owner}, "${created.template}", "second-${RUN}@example.org")`,
+      '    print(json.dumps(["created"]))', 'except InviteCapReached as e:', '    print(json.dumps(["cap", e.cap, e.remaining]))');
+    assert.deepEqual(capped, ['cap', 1, 0], 'one invite a day for this company, and the refused one made nothing');
+    assert.equal(py(`print(json.dumps(a.revoke(${owner}, "${created.invite}").state))`), 'revoked', 'the second mail had left, so the invite is revoked (a cancel is for an invite whose mail has not left)');
+    assert.equal(py(`print(json.dumps(a.find_by_token("${second}").state))`), 'revoked', 'a closed invite stays closed');
+    assert.equal(psql(`SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM audit_log WHERE action LIKE 'invite.%' OR action LIKE 'template.%'`), 'invite.created,invite.resent,invite.revoked,invite.sent,template.created');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%${ownerId}%'`), '0');
   }, { timeout: 240000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {

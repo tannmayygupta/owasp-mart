@@ -85,22 +85,33 @@ class DbOutboxPort:
     """
 
     def __init__(self, session_source: Callable[[], Session], events: Any, *, now: Clock = utc_now,
-                 validator: Callable[[str, Mapping[str, Any]], None] | None = None):
+                 validator: Callable[[str, Mapping[str, Any]], None] | None = None,
+                 address_sealer: Callable[[str, str], str] | None = None):
         self._session_source = session_source
         self._events = events
         self._now = now
         self._validator = validator  # checks the template name and parameters now, in the cause's transaction, not at delivery
+        self._address_sealer = address_sealer  # (address, aad) -> sealed text: for a recipient with no account (story P-20, an invited candidate)
 
     def publish(self, event: Mapping[str, Any]):
         return self._events.publish(event)
 
-    def enqueue_email(self, *, template: str, to_user_id: str, params: Mapping[str, Any] | None = None) -> EmailJob:
+    def enqueue_email(self, *, template: str, to_user_id: str, params: Mapping[str, Any] | None = None, to_address: str | None = None) -> EmailJob:
+        """Queue one email. `to_address` is for a person with no account: `to_user_id` is then their invite id (`i-...`), and the address is stored sealed (bound to
+        that id) in the row, never in `params`, and cleared when the mail has left. Without it the worker looks the address up from `to_user_id`."""
         check_email_args(template, to_user_id, params)
         if self._validator is not None:
             self._validator(template, params or {})
+        sealed = None
+        if to_address is not None:
+            if self._address_sealer is None:
+                raise ValueError("this outbox has no way to seal an address")
+            if "@" not in to_address or len(to_address) > 254:
+                raise ValueError("not an email address")
+            sealed = self._address_sealer(to_address, to_user_id)
         params = dict(params or {})
         now = self._now()
-        row = EmailOutbox(template=template, to_user_id=to_user_id, params=params, state="pending", attempts=0, next_attempt_at=now)
+        row = EmailOutbox(template=template, to_user_id=to_user_id, to_address_sealed=sealed, params=params, state="pending", attempts=0, next_attempt_at=now)
         session = self._session_source()
         session.add(row)
         session.flush()  # the id; the caller's commit makes the row real
@@ -153,7 +164,9 @@ class EmailOutboxService:
 
     def __init__(self, sessions: sessionmaker[Session], provider: EmailProvider, recipients: RecipientLookup, renderer: Renderer,
                  settings: SettingsPort, *, sender_address: str = "no-reply@vulnmart.invalid", sender_name: str = "VulnMart",
-                 now: Clock = utc_now, backoff: tuple[timedelta, ...] = BACKOFF, lease: timedelta = LEASE, batch: int = BATCH):
+                 now: Clock = utc_now, backoff: tuple[timedelta, ...] = BACKOFF, lease: timedelta = LEASE, batch: int = BATCH,
+                 address_opener: Callable[[str, str], str] | None = None):
+        self._address_opener = address_opener  # (sealed, aad) -> address, for rows that carry a sealed address (story P-20)
         self._sessions = sessions
         self._provider, self._recipients, self._renderer, self._settings = provider, recipients, renderer, settings
         self._sender = (sender_address, sender_name)
@@ -205,8 +218,9 @@ class EmailOutboxService:
             if row is None or row.state != "pending":
                 return "skipped"  # already sent by an earlier delivery of the same queue message
             template, user_id, params, attempts = row.template, row.to_user_id, dict(row.params), row.attempts
+            sealed_address = row.to_address_sealed
         try:
-            address = self._recipients.address_for(user_id)
+            address = self._open_address(sealed_address, user_id) if sealed_address else self._recipients.address_for(user_id)
             if not address:
                 raise PermanentSendError("no-recipient")
             try:
@@ -229,10 +243,20 @@ class EmailOutboxService:
             row = session.get(EmailOutbox, outbox_id)
             row.state, row.sent_at, row.provider_message_id = "sent", now, message_id[:255]
             row.attempts, row.claimed_until, row.last_error_code = attempts + 1, None, None
+            row.to_address_sealed = None  # the address of a person with no account is not kept once the mail left
             if secret:  # a single-use link is not kept once the mail left: the sent row holds nothing that opens an account
                 row.params = {k: (REMOVED if k in secret else v) for k, v in params.items()}
         logger.info("email %s sent (template %s)", outbox_id, template)
         return "sent"
+
+    def _open_address(self, sealed: str, key: str) -> str | None:
+        if self._address_opener is None:
+            return None  # no way to open it: the row fails as `no-recipient` rather than going to a wrong address
+        try:
+            return self._address_opener(sealed, key)
+        except Exception:  # noqa: BLE001 - a wrong key or a damaged value: not deliverable, and nothing about the value is logged
+            logger.warning("email address of %s could not be opened", key)
+            return None
 
     def _record_failure(self, outbox_id: int, attempts: int, err: SendError) -> str:
         now = self._now()

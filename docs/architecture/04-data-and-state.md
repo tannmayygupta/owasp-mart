@@ -50,9 +50,9 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `assessment_templates` | `id`, `org_id`, `title`, `time_limit_min`, `hints_mode`, `hint_cost_pct`, `reset_limit`, `invite_expiry_days`, `retention_days`, `settings jsonb` | A template used by started attempts is frozen: attempts copy the rules at start (FR-ASM-01) |
-| `template_challenges` | `template_id`, `challenge_key` | |
-| `invites` | `id`, `org_id`, `template_id`, `email_ci`, `token_hash`, `state`, `expires_at`, `superseded_by` | State machine below. Token is at least 128 bits, stored as a hash (FR-ASM-02) |
+| `assessment_templates` | `id`, `org_id`, `title`, `time_limit_min`, `hints_mode`, `hint_cost_pct`, `reset_limit`, `invite_expiry_days`, `retention_days`, `settings jsonb` (`writeup_required`, `results_visibility`, `flag_submissions_per_minute`), `version`, `created_by`, `created_at`, `updated_at` | A template used by started attempts is frozen: **as built (story P-20) each invite copies the rules (`invites.rules`) when it is made and an attempt copies them from the invite when it starts**, so an edit never changes a running attempt or an invite already sent (FR-ASM-01). Row-level security by company |
+| `template_challenges` | `template_id`, `challenge_key`, `org_id` | `org_id` added in story P-20 so the same central company filter applies |
+| `invites` | `id` (`i-` and 16 Base32 characters), `org_id`, `template_id`, `template_version`, `rules jsonb`, `email_ci`, `token_hash` (null after the invite purge), `state`, `expires_at`, `superseded_by`, `outbox_id`, `created_by`, `created_at`, `sent_at`, `opened_at`, `consented_at`, `started_at`, `closed_at` | State machine below. The token is 256 random bits behind a company prefix, stored only as a hash (FR-ASM-02). `sent` is read from the queued mail (`outbox_id`) when the invite is read. One live invite per template and address. Row-level security by company; the application role has no DELETE |
 | `consent_records` | `id`, `user_id`, `attempt_id`, `org_id`, `template_id`, `notice_version`, `notice_text_sha256`, `notice_text_snapshot`, `retention_days_shown`, `controller_name_shown`, `action` (`granted`, `declined`, `withdrawn`), `at`, `ip_hash`, `ua_hash`, `method`, `audit_seq` | **Append-only** (no UPDATE or DELETE grant). `audit_seq` links into the audit chain (FR-PRV-02) |
 
 ### 2.5 Attempts and instances (stream L)
@@ -88,7 +88,7 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 | `settings` | `key`, `value`, `updated_by`, `updated_at` | Quotas, global instance cap, retention defaults, invite cap (FR-ADM-05) |
 | `quotas` | `scope` (`user`, `org`, `global`), `scope_id`, `max_instances` | OI-21 |
 | `job_runs` | `job`, `started_at`, `finished_at`, `status`, `detail` | Shown on the Admin dashboard (FR-PRV-18) |
-| `email_outbox` | `id`, `template`, `to_user_id`, `params jsonb`, `state`, `attempts`, `next_attempt_at` | Written in the same transaction as the cause (FR-NTF-02) |
+| `email_outbox` | `id`, `template`, `to_user_id`, `to_address_sealed`, `params jsonb`, `state`, `attempts`, `next_attempt_at` | Written in the same transaction as the cause (FR-NTF-02). `to_user_id` is a user id, or an invite id (`i-...`) for a person with no account; then `to_address_sealed` holds the address sealed with the field key (bound to the invite id) until the mail has left (story P-20) |
 | `domain_events` | `id bigserial`, `audience`, `type`, `payload jsonb`, `created_at`, `published_at` | Outbox for live updates (ADR 0006) |
 
 ### 2.8 Audit (stream P)
