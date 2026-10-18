@@ -5,6 +5,9 @@ Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
 
+### Fixed (Sprint 3, Sahil, stream T)
+- CI `exploit runner` job now installs the workspace dependencies (`pnpm/action-setup` + `pnpm install --frozen-lockfile`). The challenge self-tests boot the real shop app (express/nunjucks), unlike the earlier `_example` test which used only node built-ins, so the job previously errored on import.
+
 ### Added (Sprint 3, Sahil, stream T)
 - C06 Vulnerable Components challenge (story 6.2 / T-24, FR-CHL-07, CWE-1321): the import-service worker's product-preview merge. The fixed (default) build keeps the safe merge (drops `__proto__`/`constructor`/`prototype`); the vulnerable build (`VM_CHALLENGE_C06=vulnerable`) uses a naive recursive `unsafeMerge`, so a `__proto__` import patch pollutes the worker's prototype. Contained in the fresh per-job worker process (no network, no database), so there is no code execution and nothing to exfiltrate — the worker's `proto_check` reports `polluted` vs `clean`. Self-test drives `runJob` in both modes.
 - C05 Security Misconfiguration challenge (story 6.1 / T-23, FR-CHL-06, CWE-489/209): a `challenges/c05-ops-console.mjs` mounting (before CSRF, anonymous) `GET /_ops/`, `GET /_ops/diagnostics` and a verbose `POST /api/cart`. The vulnerable build (`VM_CHALLENGE_C05=vulnerable`) serves the ops console and a hand-built synthetic diagnostics object whose `support_bridge_token` is the flag, and returns a stack trace naming an internal `_ops` file on broken JSON (events `ops.page_served`, `shop.verbose_error`); the fixed build 404s `/_ops/*` and returns a generic error with a correlation id. The diagnostics object is synthetic only — never env/db-url/secret — so it leaks no real data. Exploit test passes on the vulnerable build and fails on the fixed one. Epic-challenges-c05-c08 incepted.
