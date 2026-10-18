@@ -136,3 +136,15 @@
 - Raw user ids remain in other tables (consent records, the email outbox): the pseudonym protects the audit log only (P-25).
 - Every failed login writes an audit row; the volume is bounded by the rate limits but not by retention until P-24.
 - OI-28 is answered (self-hosted on VM-P) but not yet written into initial.md.
+
+## Deferred from: story-recruiter-signup-and-company-approval-plan (2026-10-18)
+
+- No HTTP route: IF-1 has no recruiter signup, standing, queue or decision route. A route is a contract change (bundle, generated clients, mock, COMPAT, the contract owner's look): story 5.3 of the companies epic (handoff H-138).
+- Colleagues joining a company by request, the data-processing terms accepted at approval (architecture 04 section 10.5), the invite cap, the admin delete, and the organisation scope set from the session for recruiters: story P-19. Two recruiters of one domain each start their own company until then.
+- The invite itself and its use of the gate `active_company_of`: P-20.
+- The admin queue screen and the other admin operations: P-28.
+- The disposable-domain list is a starter list of 75 domains written from memory; it is not maintained and not verified. Replace it with a maintained list and record its source and date.
+- OI-10 and OI-11 are answered by the developer (free webmail allowed with no extra check; re-apply at any time) but not yet written into initial.md. With no check on free webmail and no waiting period, the single admin approval is the only gate against fake recruiters.
+- A company is created for any domain: nothing checks that the email domain belongs to the company named.
+- The mail to admins about a new pending company is not built (the queue is pulled).
+- The two read-only policies (`admin_read`, `own_membership`) are exceptions to ADR 0014's one rule: a future table must opt in on purpose, and nothing with candidate data may.

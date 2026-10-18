@@ -191,13 +191,14 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Done when: Every sensitive action writes an audit entry and the key service encrypts and decrypts in a test.
   - Handoffs: H-08, H-09, H-10, H-21, H-132, H-135 (answered here), H-137 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-18. Recruiter signup and company approval**
+- [x] **P-18. Recruiter signup and company approval**  (service level: IF-1 has no recruiter or admin route, they are story 5.3 and a contract change; OI-10 and OI-11 answered: free webmail allowed, re-apply any time)
   - Epic: `epic-companies-and-approval`
-  - BMAD story: not planned yet; created when you incept `epic-companies-and-approval` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `5.1` in `epic-companies-and-approval` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Recruiter signup, the company state machine from signup to active, rejected and suspended, and the approve and reject API.
   - Covers: FR-ORG-01, 02, 04
   - Waits on: P-13, P-17. Open: free-email recruiters (OI-10).
   - Done when: A company moves from signup to approved or rejected with reasons and audit entries.
+  - Handoffs: H-138 (see docs/dev/HANDOFFS.md; read them when you plan P-19, P-20 and P-28)
 
 - [ ] **P-19. Company members, admin controls, data scoping, terms and invite caps**
   - Epic: `epic-companies-and-approval`

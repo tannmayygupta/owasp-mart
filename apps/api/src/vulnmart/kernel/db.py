@@ -47,14 +47,28 @@ class Base(DeclarativeBase):
 
 # table name -> the column that holds the organisation id
 ORG_SCOPED: dict[str, str] = {}
+# Tables an admin may READ across companies without an organisation in scope (story P-18: the company directory of the approval queue). Only
+# company metadata is listed here, never a table that holds candidate data (the privacy wall of FR-DSH-06): a new table is not admin-visible unless
+# its class says so, and its row-level security policy has to grant the same read on purpose.
+ORG_ADMIN_VISIBLE: set[str] = set()
+# Tables whose rows name a person (`user_column`): that person may read their own rows without an organisation in scope (story P-18: "which company am I in"),
+# and nobody else's. The session adds `user_column = scope.user_id` and the database policy says the same.
+ORG_SELF_VISIBLE: dict[str, str] = {}
+ADMIN_SETTING = "vulnmart.admin"
+USER_SETTING = "vulnmart.user_id"
 
 
-def org_scoped(column: str = "org_id") -> Callable[[type], type]:
-    """Class decorator: register a mapped class as org-scoped on `column`."""
+def org_scoped(column: str = "org_id", *, admin_visible: bool = False, self_column: str | None = None) -> Callable[[type], type]:
+    """Class decorator: register a mapped class as org-scoped on `column`. `admin_visible=True` lets an admin scope with no organisation read it;
+    `self_column` names the column that holds a user id, so that user may read their own rows with no organisation in scope."""
 
     def mark(cls: type) -> type:
         ORG_SCOPED[cls.__tablename__] = column  # type: ignore[attr-defined]
         cls.__org_column__ = column  # type: ignore[attr-defined]
+        if admin_visible:
+            ORG_ADMIN_VISIBLE.add(cls.__tablename__)  # type: ignore[attr-defined]
+        if self_column is not None:
+            ORG_SELF_VISIBLE[cls.__tablename__] = self_column  # type: ignore[attr-defined]
         return cls
 
     return mark
@@ -74,6 +88,11 @@ class ScopedSession(Session):
     def __init__(self, *args: Any, scope_source: ScopeSource, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.scope_source = scope_source
+
+    def admin_without_org(self) -> bool:
+        """True for an admin scope that acts for no company: the only scope that may read an admin-visible table across companies."""
+        scope = self.scope_source()
+        return scope is not None and scope.is_admin and scope.org_id is None
 
     def current_org(self) -> str | None:
         """The organisation in scope in one canonical spelling (a UUID as lowercase with dashes), so the Python filter and
@@ -120,6 +139,14 @@ def _guard_org_scope(state: ORMExecuteState) -> None:
     org = session.current_org()
     names = ", ".join(sorted(e.__tablename__ for e in entities))
     if org is None:
+        if state.is_select and session.admin_without_org() and all(e.__tablename__ in ORG_ADMIN_VISIBLE for e in entities):
+            return  # an admin reads the company directory across companies (no filter); the database policy grants the same read
+        scope = session.scope_source()
+        if state.is_select and scope is not None and all(e.__tablename__ in ORG_SELF_VISIBLE for e in entities):
+            for cls in entities:  # a person reads their own rows only, whatever the query asks for
+                state.statement = state.statement.options(with_loader_criteria(cls, getattr(cls, ORG_SELF_VISIBLE[cls.__tablename__]) == scope.user_id,
+                                                                               include_aliases=True))
+            return
         raise ScopeMissing(f"a query on {names} needs an organisation in scope")
     if "org_at_begin" in session.info and session.info["org_at_begin"] != org:
         # the Postgres setting was fixed when the transaction began: a different scope now would disagree with it
@@ -151,6 +178,10 @@ def _set_org_setting(session: Session, transaction: Any, connection: Any) -> Non
     session.info["org_at_begin"] = org
     if connection.dialect.name == "postgresql":
         connection.execute(text("SELECT set_config(:name, :value, true)"), {"name": ORG_SETTING, "value": org or ""})
+        connection.execute(text("SELECT set_config(:name, :value, true)"),
+                           {"name": ADMIN_SETTING, "value": "on" if org is None and session.admin_without_org() else ""})
+        scope = session.scope_source()
+        connection.execute(text("SELECT set_config(:name, :value, true)"), {"name": USER_SETTING, "value": scope.user_id if scope is not None else ""})
 
 
 @event.listens_for(ScopedSession, "after_transaction_end")
