@@ -23,6 +23,16 @@ Does not prove: the vulnerable **shop** (the instance runs the stub shop; the re
 | B5 | `ingest/engine.py`, runtime | The milestone engine ignores the attempt state and deadline: events after expiry or submit still credit milestones and change the score. C09 M2 is lost if the process restarts inside its 30 s grace. | A late or replayed event changes a frozen score. |
 | B6 | runtime `build_lab_runtime` | No activity gate in production (`AllowAllGate`): nothing is ever held for review; the integrity signals (`integrity.py`) are library code never imported by the API. | L-27 anti-cheat does not run. |
 
+### Status of the blockers on 2026-10-19
+
+| # | Status | Proof |
+|---|---|---|
+| B1 | Fixed, live | IF-5 1.1.0 signed `reportActivity`; the runtime reports accepted player events and flag pastes (throttled). The deployed journey now checks that the instance becomes `active` after play (30 of 30, `e2e-run10-b1-b5-b6-live.json`). A timed idle destroy has not been run live. |
+| B2 | Fixed, live | `vulnmart-reload-caddy.sh` on both hosts; behaviour tested (3 runs). A forced real renewal is still to be done. |
+| B3 | Fixed, live | Ports 80 and 443 are open to everybody on both hosts (security group check: 0.0.0.0/0 on 80 and 443; SSH only from the developer's address; 9443 and 9444 only between the two hosts). `scripts/allow-my-ip.mjs` refreshes the SSH allow-list in one command when the address changes. Not tested from another network (only from the developer's PC). |
+| B4 | Fixed, live | The labs chain no longer accepts tcp/443 and drops traffic between container networks; the probe on vm-i passes 18 of 18 forbidden targets (`isolation-probe-live-2026-10-19.json`); the audit check rejects an open 443 rule; host audit 9 PASS on fresh live data (`scripts/live-audit.mjs`); deployed journey still passes under the new rules (`e2e-run9-tighter-firewall.json`). |
+| B5 | Fixed in code and tests | A paste or event after the deadline or after the end scores nothing (even before the tick submits it); the C09 windows are rebuilt from the stored events after a restart. Proved by unit and runtime tests, not by a live restart test. |
+| B6 | Fixed in code and tests | Pasted flags go through `RecordedActivityGate`. Not run live (needs a held capture and a recruiter session). |
 ## Major
 
 - Scoring ignores mode: learners are charged hint costs the UI shows as 0 (`api.py:306` vs `RuntimeFacts`). Template rules (time limit, resets, hint mode) never reach the lab: every candidate gets 120 min, 3 resets, hints off. (L-22/L-23; cross-stream with Akshay.)

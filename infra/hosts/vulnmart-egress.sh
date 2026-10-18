@@ -61,7 +61,10 @@ iptables -A "$CH" -p tcp -d "$PLATFORM_SUBNET" --dport "$INGEST_PORT" -j ACCEPT
 iptables -A "$CH" -d 169.254.0.0/16 -j DROP
 iptables -A "$CH" -d "$VPC_CIDR" -j DROP
 iptables -A "$CH" -d "$HOST_IP/32" -j DROP
-iptables -A "$CH" -p tcp --dport 443 -j ACCEPT
+# No traffic between container networks through the host, and no tcp/443 for containers (an ACCEPT here skips Docker's isolation; audit B4).
+for s in $LABS_DOCKER_SUBNETS; do
+  iptables -A "$CH" -d "$s" -j DROP
+done
 iptables -A "$CH" -j DROP
 
 for s in $LABS_DOCKER_SUBNETS; do

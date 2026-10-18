@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
+from datetime import datetime
 from dataclasses import field as dc_field
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
@@ -451,6 +452,11 @@ class InstanceHost(Protocol):
 
         Raises InstanceNotFound, StaleAccessEpoch (older epoch, or equal with another value), InvalidState (destroyed).
         """
+        ...
+
+    def record_activity(self, instance_id: str, at: datetime | None = None) -> InstanceStatus:
+        """A player did something at `at` (now by default; it needs a time zone). `ready` or `idle` becomes `active`; the idle limit counts from the last
+        activity. Raises InstanceNotFound, InvalidState (not ready, active or idle), ValidationFailed (`at` without a time zone)."""
         ...
 
     def destroy(self, instance_id: str) -> Outcome:

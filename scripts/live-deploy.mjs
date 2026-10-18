@@ -276,6 +276,11 @@ function hooks(H) {
     sshScript(h.pub, 'hooks.sh', 'set -eu\nsudo systemctl daemon-reload\nsudo /usr/local/sbin/vulnmart-reload-caddy.sh\nsudo systemctl cat vulnmart-certs.service | grep ExecStartPost\n');
   }
   log('PASS the renewal hook is installed on both hosts');
+  // the firewall of the labs host (audit blocker B4): the script that builds the VULNMART-LABS chain, then the service that runs it
+  log('egress rules on vm-i');
+  stage(H.i.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-egress.sh'), name: 'vulnmart-egress.sh' }], '/usr/local/sbin', 'root:root', '755', '755');
+  sshScript(H.i.pub, 'egress.sh', 'set -eu\nsudo systemctl restart vulnmart-egress.service\nsystemctl is-active vulnmart-egress.service\nsudo iptables -S VULNMART-LABS\n');
+  log('PASS the labs chain is rebuilt on vm-i');
 }
 
 function status(H) {

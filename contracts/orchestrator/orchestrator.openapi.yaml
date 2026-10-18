@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: Orchestrator API (IF-5), contract v1.0.0
-  version: 1.0.0
+  version: 1.1.0
   description: |
     The calls between the platform worker (stream P, VM-P) and the lab orchestrator (stream L, VM-I).
     Seven calls go from the platform to the orchestrator; one signed state report goes back.
@@ -186,6 +186,40 @@ paths:
       responses:
         '200':
           description: Applied (or an identical repeat). Current state returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceStatus' }
+        '401': { $ref: '#/components/responses/BadSignature' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /v1/instances/{instance_id}/activity:
+    parameters:
+      - $ref: '#/components/parameters/InstanceIdPath'
+    post:
+      tags: [instances]
+      operationId: reportActivity
+      summary: Tell the orchestrator that a player did something
+      description: |
+        The platform forwards what the edge and the sidecar saw (any accepted event of a player session). `ready` or
+        `idle` becomes `active`; an `active` instance only gets a later last-activity time. The idle limit counts from
+        the last activity (from `ready` when none was reported), so a player is not cut off while playing. `at` is never
+        in the future (it is cut to now) and never moves the last activity backwards. Refused with 409 ORCH-INVALID-STATE
+        when the instance is not ready, active or idle.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivityRequest' }
+      responses:
+        '200':
+          description: Recorded. Current state returned.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/InstanceStatus' }
@@ -496,6 +530,16 @@ components:
       properties:
         access: { $ref: '#/components/schemas/Access' }
         access_epoch: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
+    ActivityRequest:
+      type: object
+      additionalProperties: false
+      required: [at]
+      properties:
+        at:
+          description: When the player acted (RFC 3339, with a time zone).
+          type: string
+          maxLength: 40
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$'
     Hostname:
       description: DNS name the instance answers on (the edge routes by it).
       type: string

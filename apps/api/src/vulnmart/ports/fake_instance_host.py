@@ -150,6 +150,7 @@ class _Record:
     memory_mb: int
     prints: dict[tuple[int, str], str] = field(default_factory=dict)  # (epoch, "create" or "reset") -> fingerprint
     transition: int = 0  # last transition number of the current epoch; a reset starts the count again
+    last_activity: datetime | None = None  # the latest player activity the platform reported
 
 
 class FakeInstanceHost:
@@ -309,6 +310,24 @@ class FakeInstanceHost:
         if access_epoch > current.access_epoch or access != current.access:
             self._set(rec, access=access, access_epoch=access_epoch)
         return rec.status
+
+    def record_activity(self, instance_id: str, at: datetime | None = None) -> InstanceStatus:
+        self._settle()
+        rec = self._get(instance_id)
+        if at is not None and (not isinstance(at, datetime) or at.tzinfo is None):
+            raise ValidationFailed("at carries a time zone", field="/at")
+        if rec.status.state not in (InstanceState.READY, InstanceState.ACTIVE, InstanceState.IDLE):
+            raise InvalidState("activity is not allowed in this state")
+        now = self._now()
+        at = min(at or now, now)  # never in the future, never backwards
+        rec.last_activity = max(rec.last_activity, at) if rec.last_activity is not None else at
+        if rec.status.state is not InstanceState.ACTIVE:
+            self._move(rec, InstanceState.ACTIVE, "player activity")
+        return rec.status
+
+    def last_activity(self, instance_id: str) -> datetime | None:
+        """Test view: the latest activity the platform reported for an instance."""
+        return self._get(instance_id).last_activity
 
     def destroy(self, instance_id: str) -> Outcome:
         self._settle()

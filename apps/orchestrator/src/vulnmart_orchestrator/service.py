@@ -43,7 +43,7 @@ from starlette.routing import request_response
 
 from .auth import MIN_KEY_LENGTH, Verifier, body_sha256
 from .backend import FAIL_TEMPLATE, BackendError, ServiceFakeBackend
-from .builder import INSTANCE_ID, TemplateInvalid, parse_access, parse_create, parse_reset
+from .builder import INSTANCE_ID, TemplateInvalid, parse_access, parse_activity, parse_create, parse_reset
 from .capacity import DEFAULT_CAPACITY_MB
 from .engine import Orchestrator
 from .gate import GatePort, NullGate
@@ -74,7 +74,7 @@ ROUTES: list[tuple[re.Pattern[str], tuple[str, ...], str]] = [
     (re.compile(r"/v1/instances"), ("GET", "POST"), "collection"),
     (re.compile(r"/v1/host"), ("GET",), "host"),
     (re.compile(r"/v1/instances/([^/]+)"), ("GET",), "get"),
-    (re.compile(r"/v1/instances/([^/]+)/(reset|access|destroy)"), ("POST",), "action"),
+    (re.compile(r"/v1/instances/([^/]+)/(reset|access|destroy|activity)"), ("POST",), "action"),
 ]
 
 
@@ -314,7 +314,7 @@ class Service:
         if self.fake_controls:  # test control of the fake backend: before the signature, unsigned by design (loopback only)
             ctl = FAKE_ACTIVITY.fullmatch(raw_path.decode("latin-1"))
             if ctl:
-                status, answer = self._activity(request, ctl.group(1), buf)
+                status, answer = self._fake_activity(request, ctl.group(1), buf)
                 return status, json.dumps(answer, separators=(",", ":")).encode(), {"Content-Type": "application/json"}, "fake-activity"
         target = raw_path.decode("latin-1")
         query = request.scope.get("query_string", b"")
@@ -396,7 +396,12 @@ class Service:
                 raise ProblemError(INTERNAL, "the worker could not be started") from None
         return (202 if accepted.changed else 200), accepted.view
 
-    def _activity(self, request: Request, instance_id: str, buf: bytes) -> tuple[int, dict]:
+    def _activity(self, instance_id: str, buf: bytes) -> tuple[int, dict]:
+        """IF-5 `reportActivity`: the platform tells the orchestrator that a player did something (it forwards what the edge and the sidecar saw), so the idle
+        limit counts from the last activity and not from the moment the instance became ready (audit of 2026-10-18, blocker B1)."""
+        return 200, self.engine.record_activity(instance_id, parse_activity(_loads(buf)))
+
+    def _fake_activity(self, request: Request, instance_id: str, buf: bytes) -> tuple[int, dict]:
         """Test control of `--backend fake` only, not part of IF-5: unsigned and loopback only, like the Node fake."""
         if request.method != "POST" or not request.client or request.client.host not in LOOPBACK:
             raise ProblemError(ROUTE_UNKNOWN, "not available")

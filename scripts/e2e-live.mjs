@@ -152,6 +152,9 @@ export async function journey(o) {
   await sleep(2500);
   const afterSeen = (await c.request('GET', `/api/v1/attempts/${aid}/challenges`)).data?.items?.find((x) => x.challenge_key === 'C01');
   check('the sidecar saw the flag and the platform credited the challenge', afterSeen?.solved === true || afterSeen?.held === true, `${afterSeen?.best_milestone}${afterSeen?.held ? ' held' : ''}`);
+  // audit blocker B1: the platform tells the orchestrator that the player is active, so the idle limit counts from play and not from "ready"
+  let act; for (let i = 0; i < 45; i++) { act = (await c.request('GET', `/api/v1/instances/${iid}`)).data; if (act?.state === 'active') break; await sleep(2000); }
+  check('the orchestrator is told the player is active (the idle limit counts from play)', act?.state === 'active', act?.state);
 
   const wrong = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C02', flag: 'VM{WRONGWRONGWRONGWRONGWRONG}' } });
   check('a wrong flag is incorrect', wrong.status === 200 && wrong.data?.result === 'incorrect', `credit ${wrong.data?.credit}`);

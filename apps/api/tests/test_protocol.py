@@ -307,6 +307,47 @@ def test_access_on_unknown_and_destroyed_instances(harness):
         harness.host.set_access(req.instance_id, Access.OPEN, 1)
 
 
+# ---- activity (IF-5 reportActivity, audit blocker B1) ----
+def test_activity_makes_a_ready_instance_active_and_a_repeat_changes_nothing(harness):
+    from datetime import UTC, datetime, timedelta
+
+    req = create_request()
+    harness.host.create(req)
+    harness.settle(req.instance_id, S.READY)
+    first = harness.host.record_activity(req.instance_id, datetime.now(UTC) - timedelta(seconds=5))
+    assert first.state is S.ACTIVE
+    again = harness.host.record_activity(req.instance_id)  # now by default
+    assert again.state is S.ACTIVE and again.instance_id == req.instance_id
+    assert harness.host.get(req.instance_id).state is S.ACTIVE
+
+
+def test_activity_with_a_time_in_the_future_is_cut_to_now_not_refused(harness):
+    from datetime import UTC, datetime, timedelta
+
+    req = create_request()
+    harness.host.create(req)
+    harness.settle(req.instance_id, S.READY)
+    assert harness.host.record_activity(req.instance_id, datetime.now(UTC) + timedelta(days=3)).state is S.ACTIVE
+
+
+def test_activity_on_unknown_destroyed_and_not_yet_ready_instances(harness):
+    from vulnmart.ports.instance_host import ValidationFailed
+
+    with pytest.raises(InstanceNotFound):
+        harness.host.record_activity(new_id())
+    req = create_request()
+    harness.host.create(req)
+    harness.settle(req.instance_id, S.READY)
+    with pytest.raises(ValidationFailed):
+        from datetime import datetime
+
+        harness.host.record_activity(req.instance_id, datetime.now())  # no time zone
+    harness.host.destroy(req.instance_id)
+    harness.settle(req.instance_id, S.DESTROYED)
+    with pytest.raises(InvalidState):
+        harness.host.record_activity(req.instance_id)
+
+
 # ---- destroy ----
 def test_destroy_then_repeat(harness):
     req = create_request()
