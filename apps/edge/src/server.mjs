@@ -72,7 +72,8 @@ export function createPlayerHandler({ gate, resolveUpstream = (name) => ({ hostn
     }
     const to = resolveUpstream(m[1]);
     const headers = {};
-    for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k)) headers[k] = v;
+    // x-vm-* is the platform's own channel to the sidecar: a client never sets it (review finding C10); the sidecar strips it as well
+    for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && !k.startsWith('x-vm-')) headers[k] = v;
     if (d.cookie !== undefined) headers.cookie = d.cookie;
     const up = http.request({ hostname: to.hostname, port: to.port ?? 8080, method: req.method, path: req.url, headers, timeout: timeoutMs }, (r) => {
       const out = {};
@@ -161,6 +162,7 @@ export async function main(env = process.env) {
     zone: need('EDGE_ZONE'), keys, adminSecretFile: need('EDGE_ADMIN_SECRET_FILE'), ingestUrl: need('EDGE_INGEST_URL'),
     playerHost: await resolveBindHost(env.EDGE_PLAYER_BIND_HOST ?? '0.0.0.0'),
     adminHost: await resolveBindHost(env.EDGE_ADMIN_BIND_HOST ?? '127.0.0.1'),
+    relayHost: await resolveBindHost(env.EDGE_RELAY_BIND_HOST ?? '0.0.0.0'), // the instance-facing address in production (review finding C3)
     playerPort: int('EDGE_PLAYER_PORT', 8080), adminPort: int('EDGE_ADMIN_PORT', 9090), relayPort: int('EDGE_RELAY_PORT', 8081),
     relayRateMax: int('EDGE_RELAY_RATE_MAX', 120), relayRateWindowMs: int('EDGE_RELAY_RATE_WINDOW_MS', 10000),
     log: (m) => console.log(m),

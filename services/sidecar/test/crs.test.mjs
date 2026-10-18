@@ -9,6 +9,7 @@ import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import { createCrs, mapTags, mapRuleIds, mapScore, buildInspectDoc, matchData } from '../src/crs.mjs';
 import { main } from '../src/main.mjs';
+import { buildCapture } from '../src/capture.mjs';
 import { closeServer, listen } from '../src/common.mjs';
 import { startServer } from '../../../contracts/mocks/fake-ingest/server.mjs';
 import { freshValues, startDoc, flagOf, fakeFlag, until, wait, request, freePort, shop, boot } from './helpers.mjs';
@@ -70,7 +71,7 @@ test('rule ids are numeric, 3 to 9 digits, at most 50; the score is an integer c
   assert.deepEqual(matchData({ rule_ids: ['942100'], tags: ['attack-sqli'], anomaly_score: 5, action: 'deny', status: 403 }), { rule_ids: ['942100'], tags: ['attack_sqli'], anomaly_score: 5 });
 });
 
-test('the document sent to the helper holds no cookie, authorization or x-vm-* header, no flag-like text, no credential; the body is cut at 8 KiB', () => {
+test('the document sent to the helper holds no cookie, authorization or x-vm-* header and no flag-like text; the body is cut at 8 KiB', () => {
   const flag = fakeFlag();
   const doc = buildInspectDoc({
     method: 'POST', url: `/api/x?q=1&t=${flag}`,
@@ -78,10 +79,27 @@ test('the document sent to the helper holds no cookie, authorization or x-vm-* h
     bodyBuf: Buffer.from(JSON.stringify({ password: 'hunter2', q: `a ${flag}`, pad: 'x'.repeat(9000) })),
   });
   const text = JSON.stringify(doc);
-  assert.ok(!text.includes(flag) && !text.includes('hunter2') && !text.includes('sid=abc') && !text.includes('Bearer'));
+  assert.ok(!text.includes(flag) && !text.includes('sid=abc') && !text.includes('Bearer'));
   assert.deepEqual(Object.keys(doc.headers).sort(), ['host', 'user-agent', 'x-note']);
   assert.ok(doc.body.length <= 8192);
   assert.equal(doc.method, 'POST');
+});
+
+test('a classic login injection in a password field reaches the helper (review finding C2) while the evidence capture still blanks the field', () => {
+  const attack = "' OR 1=1--";
+  const doc = buildInspectDoc({ method: 'POST', url: '/login', headers: { 'content-type': 'application/json' },
+    bodyBuf: Buffer.from(JSON.stringify({ email: 'a@b.c', password: attack })) });
+  assert.ok(doc.body.includes(attack), 'the helper sees the payload');
+  const form = buildInspectDoc({ method: 'POST', url: '/login?token=' + encodeURIComponent(attack), headers: {}, bodyBuf: Buffer.from('email=a%40b.c&password=' + encodeURIComponent(attack)) });
+  assert.ok(form.body.includes(encodeURIComponent(attack)) && form.uri.includes(encodeURIComponent(attack)));
+  const kept = buildCapture({ method: 'POST', url: '/login', headers: {}, bodyBuf: Buffer.from(JSON.stringify({ password: attack })) });
+  assert.ok(!kept.body.includes(attack), 'the stored capture is blanked');
+});
+
+test('a Referer or Origin with a secret query value is blanked in the stored capture (review finding C9)', () => {
+  const kept = buildCapture({ method: 'GET', url: '/x', headers: { referer: 'https://shop.test/a?token=abc123&password=hunter2&q=1', origin: 'https://shop.test' }, bodyBuf: null });
+  assert.ok(!JSON.stringify(kept).includes('abc123') && !JSON.stringify(kept).includes('hunter2'));
+  assert.ok(kept.headers_redacted.referer.includes('q=1') && kept.headers_redacted.origin === 'https://shop.test');
 });
 
 test('SQLi: a valid proxy.crs_match with attack_sqli reaches the fake ingest, after the answer was sent; the answer is byte-identical to a run without the helper', async () => {

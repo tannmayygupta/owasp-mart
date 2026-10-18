@@ -52,16 +52,27 @@ class Rules:
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> Rules:
+        """Strict: an unknown member, a float, a string or a bool where a whole number belongs is a ValueError, never a silent cut (finding B12)."""
         defaults = cls()
+        unknown = set(data) - set(defaults.to_dict())
+        if unknown:
+            raise ValueError(f"unknown rule member: {sorted(unknown)[0]}")
+
+        def whole(key: str) -> int:
+            value = data.get(key, getattr(defaults, key))
+            if type(value) is not int:
+                raise ValueError(f"{key} must be a whole number")
+            return value
+
+        warnings = data.get("warning_minutes", defaults.warning_minutes)
+        if not isinstance(warnings, (list, tuple)) or any(type(m) is not int for m in warnings):
+            raise ValueError("warning_minutes must be a list of whole numbers")
+        mode = data.get("activity_check_mode", defaults.activity_check_mode)
+        if not isinstance(mode, str):
+            raise ValueError("activity_check_mode must be text")
         return cls(
-            time_limit_minutes=int(data.get("time_limit_minutes", defaults.time_limit_minutes)),  # type: ignore[arg-type]
-            grace_seconds=int(data.get("grace_seconds", defaults.grace_seconds)),  # type: ignore[arg-type]
-            warning_minutes=tuple(int(m) for m in data.get("warning_minutes", defaults.warning_minutes)),  # type: ignore[attr-defined]
-            freeze_minutes=int(data.get("freeze_minutes", defaults.freeze_minutes)),  # type: ignore[arg-type]
-            reset_limit=int(data.get("reset_limit", defaults.reset_limit)),  # type: ignore[arg-type]
-            min_capture_seconds=int(data.get("min_capture_seconds", defaults.min_capture_seconds)),  # type: ignore[arg-type]
-            idle_capture_seconds=int(data.get("idle_capture_seconds", defaults.idle_capture_seconds)),  # type: ignore[arg-type]
-            instant_capture_seconds=int(data.get("instant_capture_seconds", defaults.instant_capture_seconds)),  # type: ignore[arg-type]
-            activity_check_mode=str(data.get("activity_check_mode", defaults.activity_check_mode)),
-            withdrawal_undo_days=int(data.get("withdrawal_undo_days", defaults.withdrawal_undo_days)),  # type: ignore[arg-type]
+            time_limit_minutes=whole("time_limit_minutes"), grace_seconds=whole("grace_seconds"), warning_minutes=tuple(warnings),
+            freeze_minutes=whole("freeze_minutes"), reset_limit=whole("reset_limit"), min_capture_seconds=whole("min_capture_seconds"),
+            idle_capture_seconds=whole("idle_capture_seconds"), instant_capture_seconds=whole("instant_capture_seconds"),
+            activity_check_mode=mode, withdrawal_undo_days=whole("withdrawal_undo_days"),
         )

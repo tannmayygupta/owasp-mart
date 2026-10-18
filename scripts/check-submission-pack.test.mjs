@@ -106,3 +106,18 @@ test('checkFile and arguments', () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('the secret scan reads logs, shell and PowerShell files and every doc folder, and a key file is a finding by its name (review finding D9)', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'pack-'));
+  try {
+    for (const d of ['docs/assets/run', 'docs/research', 'docs/dev']) mkdirSync(path.join(root, d), { recursive: true });
+    writeFileSync(path.join(root, 'docs/assets/run/proof.log'), `ok\nAWS key ${'AKIA' + 'ABCDEFGHIJKLMNOP'} leaked\n`);
+    writeFileSync(path.join(root, 'docs/research/helper.ps1'), `$token = 'ghp_${'a1B2c3D4e5F6g7H8i9J0'}k1L2'\n`);
+    writeFileSync(path.join(root, 'docs/dev/notes.md'), 'nothing to see\n');
+    writeFileSync(path.join(root, 'docs/assets/run/server.pem'), 'x\n');
+    const kinds = scanPack(root, realIo).hits.map((h) => `${h.file}:${h.kind}`).sort();
+    assert.deepEqual(kinds, ['docs/assets/run/proof.log:AWS access key id', 'docs/assets/run/server.pem:a key or secret file by its name', 'docs/research/helper.ps1:GitHub token']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

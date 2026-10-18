@@ -109,10 +109,15 @@ export function portNumbers(port) {
   return { host: num(parts[parts.length - 2]), container: num(parts[parts.length - 1]) };
 }
 
+// A lab service is one in the profile lab or one with the name of a lab service: removing or changing the profile must not switch the rules off,
+// because without the profile the service would start on every default up (review finding D4).
+const LAB_SERVICE_NAMES = ['docker-proxy', 'edge-gate', 'edge-caddy', 'orchestrator'];
+const isLabService = (svc, profiles) => profiles.includes('lab') || LAB_SERVICE_NAMES.includes(svc);
+
 function checkLabPorts(svc, def, name) {
   const profiles = asList(def.profiles).map(String);
   const ports = asList(def.ports);
-  if (!profiles.includes('lab') || !ports.length) return [];
+  if (!isLabService(svc, profiles) || !ports.length) return [];
   const out = [];
   const fail = (msg) => out.push(`${name}: service ${svc}: ${msg}`);
   for (const p of ports) {
@@ -200,7 +205,8 @@ function checkParsed(text, name, lineProblems) {
       if (exposesSocket(src) || /docker/.test(src)) fail(`${where}: a device entry that exposes the Docker socket is not allowed`);
     }
     problems.push(...checkLabPorts(svc, def, name));
-    if (svc === ORCH_SERVICE && asList(def.profiles).map(String).includes('lab')) problems.push(...checkOrchestrator(def, name));
+    // the override file adds secrets to the orchestrator and is checked by its own rule (checkOverride); the base file's service is checked in full
+    if (svc === ORCH_SERVICE && !OVERRIDE_FILE.test(name) && isLabService(svc, asList(def.profiles).map(String))) problems.push(...checkOrchestrator(def, name));
     const vols = asList(def.volumes).map(volumeInfo);
     if (svc !== SOCKET_PROXY_SERVICE) {
       for (const v of vols) {

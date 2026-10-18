@@ -262,3 +262,21 @@ def test_the_log_gets_flag_hint_and_milestone_lines_the_metrics_and_timeline_rea
     assert names == [("session_started", None, None), ("hint_unlocked", "C01", 1), ("flag_submitted", "C02", "incorrect"),
                      ("flag_submitted", "C02", "correct"), ("milestone_reached", "C02", "M3")]
     assert rt.time_metrics(s.attempt_id).retries == {"C02": 2} or rt.time_metrics(s.attempt_id).retries
+
+
+def test_a_running_attempts_instance_that_came_back_closed_is_opened_again_by_the_tick():
+    # review finding C1, the lab side: an orchestrator that restarted adopts the instance closed
+    rt, clock, host = make_runtime()
+    s = rt.start_attempt("u-1")
+    host.set_access(s.instance_id, Access.CLOSED, host.get(s.instance_id).access_epoch + 100)
+    assert host.get(s.instance_id).access is Access.CLOSED
+    rt.tick()
+    st = host.get(s.instance_id)
+    assert st.access is Access.OPEN and st.access_epoch > 100
+    before = st.access_epoch
+    rt.tick()
+    assert host.get(s.instance_id).access_epoch == before, "nothing to heal: nothing is sent"
+    rt.submit(s.attempt_id)  # frozen after a submit: never opened again by the tick
+    clock.advance(minutes=1)
+    rt.tick()
+    assert host.get(s.instance_id).access is Access.FROZEN

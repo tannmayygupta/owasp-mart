@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
-  FILES, auditAll, auditDaemon, auditDockerInfo, auditImds, auditInspect, auditIptables, auditListeners, cidrContains, exitCodeOf,
+  FILES, auditAll, auditDaemon, auditDockerInfo, auditImds, auditInspect, auditIptables, auditLabsChain, auditListeners, cidrContains, exitCodeOf,
   parseArgs, parseCidr, parseListeners, redactEvidence,
 } from './vmi-audit.mjs';
 
@@ -14,7 +14,7 @@ const statuses = (rows) => Object.fromEntries(rows.map((r) => [r.name, r.status]
 
 test('good fixtures: every line is PASS', () => {
   const rows = auditAll(load('good'));
-  assert.equal(rows.length, 8);
+  assert.equal(rows.length, 9);
   assert.deepEqual(rows.filter((r) => r.status !== 'PASS'), []);
   assert.equal(exitCodeOf(rows), 0);
 });
@@ -30,6 +30,7 @@ const BAD = {
   'bad-public-port': 'listening-ports',
   'bad-imds-optional': 'imds-v2-required',
   'bad-empty-info': 'docker-info',
+  'bad-labs-chain-open': 'host-rule-labs-chain',
 };
 test('every bad fixture folder exists in the table and the table has no stale entry', () => {
   const dirs = readdirSync(FIX).filter((d) => d.startsWith('bad-')).sort();
@@ -151,4 +152,45 @@ test('parseArgs and redaction', () => {
   assert.match(parseArgs(['--zzz']).error, /Unknown option/);
   const r = redactEvidence('host 203.0.113.9 account 123456789012 instance i-0abc1234def567890 key ' + 'AKIA' + 'ABCDEFGHIJKLMNOP');
   assert.ok(!/203\.0|123456789012|i-0abc|AKIA/.test(r));
+});
+
+test('labs chain (finding D1): the jump alone is not enough, the content must hold the drops and end in a DROP', () => {
+  const good = readFileSync(path.join(FIX, 'good', FILES.labsChain), 'utf8');
+  assert.equal(auditLabsChain(good)[0].status, 'PASS');
+  assert.equal(auditLabsChain('-N VULNMART-LABS\n')[0].status, 'FAIL');
+  assert.equal(auditLabsChain('')[0].status, 'FAIL');
+  assert.match(auditLabsChain(good.replace('-A VULNMART-LABS -j DROP\n', ''))[0].detail, /last rule is not a DROP/);
+  assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 169\.254\.0\.0\/16 -j DROP\n/, ''))[0].detail, /metadata/);
+  assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 10\.0\.0\.0\/16 -j DROP\n/, ''))[0].detail, /private network range/);
+  assert.match(auditLabsChain(good.replace('-A VULNMART-LABS -d 169.254.0.0/16 -j DROP', '-A VULNMART-LABS -j RETURN\n-A VULNMART-LABS -d 169.254.0.0/16 -j DROP'))[0].detail, /blanket RETURN/);
+});
+
+test('inspect (finding D2): added capabilities, host IPC, devices, unconfined profiles, a bind of a path below a sensitive one, a lookalike proxy name', () => {
+  const base = { Name: '/x', HostConfig: { CapDrop: ['ALL'], SecurityOpt: ['no-new-privileges'] }, Config: { Labels: {} }, Mounts: [] };
+  const one = (over) => auditInspect(JSON.stringify([{ ...base, ...over, HostConfig: { ...base.HostConfig, ...(over.HostConfig ?? {}) } }]))[0];
+  assert.equal(one({}).status, 'PASS');
+  assert.match(one({ HostConfig: { CapAdd: ['SYS_ADMIN'] } }).detail, /adds capabilities/);
+  assert.match(one({ HostConfig: { IpcMode: 'host' } }).detail, /host IPC/);
+  assert.match(one({ HostConfig: { Devices: [{ PathOnHost: '/dev/sda' }] } }).detail, /host devices/);
+  assert.match(one({ HostConfig: { SecurityOpt: ['no-new-privileges', 'seccomp=unconfined'] } }).detail, /unconfined/);
+  assert.match(one({ Mounts: [{ Type: 'bind', Source: '/root/.ssh', Destination: '/k', RW: false }] }).detail, /host path \/root\/\.ssh/);
+  assert.equal(one({ Mounts: [{ Type: 'bind', Source: '/opt/vulnmart/data', Destination: '/d', RW: false }] }).status, 'PASS');
+  const sock = { Type: 'bind', Source: '/var/run/docker.sock', Destination: '/var/run/docker.sock', RW: false };
+  assert.equal(one({ Name: '/vulnmart-docker-proxy', Mounts: [sock] }).status, 'PASS');
+  assert.equal(one({ Name: '/evil-docker-proxy-2', Mounts: [sock] }).status, 'FAIL');
+});
+
+test('listeners (finding D3): the orchestrator port is fine on a private address and a failure on every address', () => {
+  const l = (addr) => `LISTEN 0 128 ${addr}:9443 0.0.0.0:*\nLISTEN 0 128 0.0.0.0:22 0.0.0.0:*\n`;
+  assert.equal(auditListeners(l('10.0.2.10'))[0].status, 'PASS');
+  assert.equal(auditListeners(l('0.0.0.0'))[0].status, 'FAIL');
+  assert.equal(auditListeners(l('52.1.2.3'))[0].status, 'FAIL');
+});
+test('inspect (finding D11): only the edge gate may sit on an instance network besides the instance containers', () => {
+  const c = (name, nets, labels = {}) => ({ Name: `/${name}`, HostConfig: { CapDrop: ['ALL'], SecurityOpt: ['no-new-privileges'] }, Config: { Labels: labels }, Mounts: [], NetworkSettings: { Networks: Object.fromEntries(nets.map((n) => [n, {}])) } });
+  const run = (...list) => auditInspect(JSON.stringify(list))[0];
+  assert.equal(run(c('vulnmart-edge-gate', ['edge-public', 'vm-i-aaaaaaaaaaaaaaaa-e1']), c('vm-i-aaaaaaaaaaaaaaaa-e1-shop', ['vm-i-aaaaaaaaaaaaaaaa-e1'], { 'vm.instance': 'x' })).status, 'PASS');
+  const bad = run(c('vulnmart-orchestrator', ['labs-core', 'vm-i-aaaaaaaaaaaaaaaa-e1']));
+  assert.equal(bad.status, 'FAIL');
+  assert.match(bad.detail, /vulnmart-orchestrator: attached to an instance network/);
 });

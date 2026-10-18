@@ -379,3 +379,14 @@ def test_the_real_pusher_is_accepted_over_http_and_repeats_are_200(client, lab):
         pusher2.stop()
     assert seen[6:] == [200] * 6
     assert [r.transition for r in lab[1].state_reports.history(IID)] == [1, 2, 3, 4, 5, 6]
+
+
+def test_a_destroyed_instance_is_never_resurrected_by_a_later_report(client, lab):
+    # review finding A7: `ready` to `active` is a legal pair, but not after the instance is gone
+    steps = [(None, "requested"), ("requested", "provisioning"), ("provisioning", "starting"), ("starting", "ready"),
+             ("ready", "stopping"), ("stopping", "destroyed")]
+    for n, (frm, to) in enumerate(steps, start=1):
+        assert post(client, body(transition=n, frm=frm, to=to)).status_code == 204
+    assert post(client, body(transition=9, frm="ready", to="active")).status_code == 204  # valid IF-5, stored as history
+    assert lab[1].instance_states == {IID: "destroyed"}
+    assert [x.transition for x in lab[1].state_reports.history(IID)][-1] == 9

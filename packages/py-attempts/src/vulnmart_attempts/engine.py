@@ -26,7 +26,9 @@ log = logging.getLogger(__name__)
 Events = Callable[[dict[str, Any]], None]
 
 MAX_RETRIES = 10
-DESTROY_CLAIM_LEASE_SECONDS = 60  # a claim whose owner crashed is taken over after this long
+DESTROY_CLAIM_LEASE_SECONDS = 300  # a claim whose owner crashed is taken over after this long (a destroy can take a while: finding B11)
+READY_AT_TOLERANCE_SECONDS = 300
+FREEZE_PATIENCE = timedelta(minutes=5)  # how long after its first failure a freeze may hold up the destroy
 
 
 class ResetLimitReached(Exception):
@@ -159,6 +161,9 @@ class AttemptEngine:
     def instance_ready(self, attempt_id: str, at: datetime, instance_id: str | None = None) -> AttemptRecord:
         """D-80: the clock starts when the instance is ready. Repeated calls return the same record."""
         require_aware(at, "at")
+        now = self._clock()
+        if abs((at - now).total_seconds()) > READY_AT_TOLERANCE_SECONDS:
+            at = now  # the clock is the server's: a stale or future instant from a caller never moves the deadline (finding B8)
         for _ in range(MAX_RETRIES):
             rec = self._load(attempt_id)
             if rec.state == AttemptState.RUNNING:
@@ -178,6 +183,9 @@ class AttemptEngine:
         for _ in range(MAX_RETRIES):
             rec = self._load(attempt_id)
             now = self._clock()
+            if (rec.state == AttemptState.SUBMITTED and rec.deadline_at is not None and rec.submitted_at == rec.deadline_at
+                    and now <= rec.deadline_at + timedelta(seconds=rec.rules.grace_seconds)):
+                return rec  # the tick already submitted it at the deadline; a submit inside the grace window gets the same answer (finding B3)
             if rec.state != AttemptState.RUNNING or not accepts_request(now, rec.times, rec.rules):
                 raise InvalidTransition(rec.state, AttemptState.SUBMITTED)
             try:
@@ -249,7 +257,19 @@ class AttemptEngine:
         for _ in range(MAX_RETRIES):
             rec = self._load(attempt_id)
             if rec.state == AttemptState.WITHDRAWN:
-                return rec
+                if rec.delete_after is not None:
+                    return rec
+                # withdrawn, then undone: a new request starts a new undo window (review finding B5)
+                now = self._clock()
+                try:
+                    new = self._save(rec, withdrawn_at=now, delete_after=now + timedelta(days=rec.rules.withdrawal_undo_days), undone_at=None)
+                except Conflict:
+                    continue
+                self._emit("attempt_withdrawn", new, delete_after=_iso(new.delete_after))  # type: ignore[arg-type]
+                return new
+            if rec.state == AttemptState.EXPIRED:
+                self._advance(attempt_id)  # the tick's own step is between expired and submitted; let it finish (review finding B4)
+                continue
             target = move(rec.state, AttemptState.WITHDRAWN)
             if rec.instance_id is not None and not rec.destroyed and not destroyed_here:
                 self._instances.destroy(rec.instance_id)
@@ -336,10 +356,14 @@ class AttemptEngine:
         if rec.state == AttemptState.EXPIRED:
             return self._submit_expired(rec)
         if rec.state == AttemptState.SUBMITTED:
+            if not rec.destroyed and destroy_due(now, rec.times):
+                # a freeze that keeps failing must not keep an instance alive for ever: after the patience the instance goes anyway
+                # (review finding B2); until then a failed freeze blocks the destroy, so a live instance is never cut off unfrozen
+                gave_up = rec.freeze_failed_at is not None and now >= rec.freeze_failed_at + FREEZE_PATIENCE
+                if rec.access == "frozen" or gave_up:
+                    return self._destroy(rec, now)
             if rec.access != "frozen" and not rec.destroyed:
                 return self._freeze(rec)
-            if not rec.destroyed and destroy_due(now, rec.times):
-                return self._destroy(rec, now)
             return False
         if rec.state == AttemptState.REPORTED:
             # reported before the freeze window ended: the instance still has to be destroyed (review finding B1)
@@ -367,8 +391,7 @@ class AttemptEngine:
             new = self._save(rec, warnings_sent=tuple(rec.warnings_sent) + tuple(due))
         except Conflict:
             return True  # reload and decide again; the winner sent them
-        for minutes in due:
-            self._emit("time_warning_sent", new, minutes_left=minutes)
+        self._emit("time_warning_sent", new, minutes_left=min(due))  # a late first tick tells the urgent one only (finding B10)
         return True
 
     def _expire(self, rec: AttemptRecord) -> bool:
@@ -397,6 +420,11 @@ class AttemptEngine:
                 self._instances.freeze(rec.instance_id)
             except Exception:
                 log.exception("freeze failed for attempt %s; retried next tick", rec.id)
+                if rec.freeze_failed_at is None:
+                    try:
+                        self._save(rec, freeze_failed_at=self._clock())  # the patience of the destroy counts from here (finding B2)
+                    except Conflict:
+                        pass
                 return False
         try:
             self._save(rec, access="frozen")

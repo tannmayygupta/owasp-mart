@@ -5,7 +5,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
-import { blankSecrets, redactFlagLike, BODY_CAP_BYTES } from './capture.mjs';
+import { redactFlagLike, BODY_CAP_BYTES } from './capture.mjs';
 
 export const DEFAULT_BINARY = '/app/crs-detect';
 export const DEFAULT_HOST = '127.0.0.1';
@@ -62,8 +62,11 @@ export function buildInspectDoc({ method, url, headers, bodyBuf }) {
     if (NEVER_SENT_HEADERS.has(name) || INTERNAL_HEADER.test(name)) continue;
     h[name] = redactFlagLike(Array.isArray(v) ? v.join(', ') : String(v)).slice(0, 1024);
   }
-  const body = bodyBuf && bodyBuf.length ? redactFlagLike(blankSecrets(bodyBuf.subarray(0, BODY_CAP_BYTES).toString('utf8'))) : '';
-  return { method: String(method).slice(0, 16), uri: redactFlagLike(blankSecrets(String(url).slice(0, 2048))), headers: h, body };
+  // Field values named like a password are NOT blanked here (review finding C2): the classic login injection sits in exactly such a field, and
+  // the helper is the one process on this loopback that must see it. The helper answers rule ids, tags and a score only; it keeps nothing and
+  // logs nothing. Flag-like text, cookies and authorization still never go (the evidence capture still blanks every secret field).
+  const body = bodyBuf && bodyBuf.length ? redactFlagLike(bodyBuf.subarray(0, BODY_CAP_BYTES).toString('utf8')) : '';
+  return { method: String(method).slice(0, 16), uri: redactFlagLike(String(url).slice(0, 2048)), headers: h, body };
 }
 
 // The helper's answer -> the data of proxy.crs_match (without route_template), or null when there is no match.
