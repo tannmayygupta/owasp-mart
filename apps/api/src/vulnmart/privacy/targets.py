@@ -1,4 +1,4 @@
-"""ConsentTargets: what the consent routes need from the invite and attempt side (story P-16; the real one arrives with story P-21).
+"""ConsentTargets: what the consent routes need from the invite and attempt side (story P-16; the real one is `assessments.accept.InviteConsentTargets`, story P-21).
 
 A candidate attempt waits in state `consent` after an invite is opened and verified (architecture 04 section 10.1). The consent routes need to
 find that attempt for the caller and, once the person decides, move it on: a grant makes it `ready`, a decline ends it. Today the attempt port
@@ -24,6 +24,7 @@ class ConsentTarget:
     template_id: str
     company_name: str  # the party that decides how results are used (FR-PRV-01)
     state: str  # the attempt state; only `consent` can be decided
+    retention_days: int | None = None  # what the template set for this attempt (story P-21); None: the platform default is shown
 
 
 @runtime_checkable
@@ -47,8 +48,8 @@ class FakeConsentTargets:
         self.fail_next = 0  # tests: make the next `proceed` calls raise, as a down attempt service would
 
     def add(self, *, attempt_id: str, user_id: str, org_id: str = "o-ORG", template_id: str = "t-TEMPLATE", company_name: str = "Example Company Ltd",
-            state: str = "consent") -> ConsentTarget:
-        target = ConsentTarget(attempt_id, user_id, org_id, template_id, company_name, state)
+            state: str = "consent", retention_days: int | None = None) -> ConsentTarget:
+        target = ConsentTarget(attempt_id, user_id, org_id, template_id, company_name, state, retention_days)
         with self._lock:
             self._targets[attempt_id] = target
         return target

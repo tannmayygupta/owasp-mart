@@ -173,3 +173,14 @@
 - A deleted candidate's invite keeps `email_ci`; whether deletion clears it is for P-25.
 - The template ranges are the research placeholders of OI-25 (time 30 to 480, resets 0 to 10, expiry 1 to 30, retention 30 to 365); OI-14 and OI-15 are answered but not yet in `initial.md`. A cost percentage of hints (default 20 when hints are on) is a placeholder.
 - A template cannot be archived, only deleted when it has no invites.
+
+## Deferred from: story-accepting-invites-re-invite-after-a-fault-and-bulk-invites-plan (2026-10-18)
+
+- No HTTP route for opening a link, accepting, a re-invite or a bulk invite (story 5.3, a contract change); the candidate's pages and the recruiter's invite screens (P-26, P-27).
+- Only the first way of FR-ASM-04 is built (a different verified address cannot use the link); the "bind only after the candidate confirms" way is not.
+- In production `create_app` is given no lab attempt port, so the consent routes still answer 404 for every attempt id; wiring the real port (and the real attempt store) is stream L's (H-141, H-346).
+- Later generations of a re-invite use the template key `<template>~n` on the lab port because the engine allows one attempt per account and template; a real supersede on the port is stream L's. The rules of the invite are not yet passed to the attempt.
+- A grant recorded for an invite that was revoked in the meantime leaves a consent record without an attempt; the candidate is refused with the invite's state.
+- The invite keeps `user_id`, `attempt_id` and `email_ci` after it closes; the retention sweep (P-24) and deletion (P-25) decide when they go. `consent_records` stay append-only (H-136).
+- Binding is by the verified address only; a candidate who registered with another address needs a new invite. A bulk list is capped at 500 addresses (a placeholder, OI-25).
+- The scheduler that calls `expire_all` and `purge_closed_tokens` is P-24.

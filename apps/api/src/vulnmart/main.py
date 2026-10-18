@@ -33,8 +33,10 @@ from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRa
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
+from vulnmart.assessments.accept import InviteAcceptance, InviteConsentTargets
 from vulnmart.assessments.service import AssessmentService
 from vulnmart.orgs.service import CompanyService
+from vulnmart.ports.attempts import AttemptPort
 from vulnmart.privacy.api import router as consent_router
 from vulnmart.privacy.consent import ConsentService
 from vulnmart.privacy.targets import ConsentTargets, FakeConsentTargets
@@ -96,9 +98,11 @@ def create_app(
     mfa: MfaService | None = None,
     consent: ConsentService | None = None,
     consent_targets: ConsentTargets | None = None,
+    attempts: AttemptPort | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
-    production reads the environment (the account routes need a database address, and Valkey for the rate limits)."""
+    production reads the environment (the account routes need a database address, and Valkey for the rate limits). `attempts` is the lab's attempt port (IF-9): with it
+    the consent routes find the attempts of invites and a granted consent creates the attempt (story P-21); without it the consent targets stay empty."""
     settings = settings or get_settings()
     app = create_service_app("api", checks=checks, settings=settings, timeout=timeout, configure_logs=configure_logs)
     app.state.settings = settings
@@ -124,10 +128,6 @@ def create_app(
     field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
     app.state.mfa_service = mfa or (MfaService(ports.sessions, field_keys, ports.audit, app.state.session_service)
                                     if ports.sessions is not None and app.state.session_service is not None else None)
-    # The consent routes need the invite and attempt side (story P-21): until it exists the targets are empty, so every attempt id is answered 404.
-    app.state.consent_service = consent or (ConsentService(ports.sessions, consent_targets or FakeConsentTargets(), ports.audit, ports.settings,
-                                                            field_keys or field_keys_from(settings))
-                                            if ports.sessions is not None else None)
     # The daily anchor of the audit log (story P-17). No route and no schedule yet: the scheduler of story P-24 calls `app.state.audit_anchors.anchor()`.
     if ports.audit_db is not None and ports.audit_sessions is not None:
         anchor_keys = field_keys or field_keys_from(settings)
@@ -137,8 +137,16 @@ def create_app(
         app.state.audit_anchors = None
     # Assessment templates and invites (story P-20): no route yet (IF-1 has none for recruiters, story 5.3); the invite story (P-21) and the dashboards use this.
     app.state.assessments = (AssessmentService(ports.sessions, app.state.companies, ports.audit, ports.scope, ports.settings, field_keys or field_keys_from(settings),
-                                               public_origin=settings.public_origin)
+                                               public_origin=settings.public_origin, attempts=attempts)
                              if app.state.companies is not None else None)
+    # Accepting invites (story P-21): no route yet (story 5.3); the consent routes get the invite side of their port once the lab's attempt port is given.
+    app.state.invite_acceptance = (InviteAcceptance(app.state.assessments, UserDirectory(ports.sessions)) if app.state.assessments is not None else None)
+    if consent_targets is None and attempts is not None and app.state.assessments is not None and app.state.roles is not None:
+        consent_targets = InviteConsentTargets(app.state.assessments, attempts, app.state.roles)
+    # Until an attempt port is given the targets are empty, so every attempt id is answered 404.
+    app.state.consent_service = consent or (ConsentService(ports.sessions, consent_targets or FakeConsentTargets(), ports.audit, ports.settings,
+                                                            field_keys or field_keys_from(settings))
+                                            if ports.sessions is not None else None)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)

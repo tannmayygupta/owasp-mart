@@ -22,10 +22,11 @@ class UserBrief:
     display_name: str
     email_domain: str
     email_verified: bool
+    email_ci: str | None = None  # the canonical address, for the one caller that must compare it (an invite is bound to one address, story P-21)
 
 
 def _brief(user: User) -> UserBrief:
-    return UserBrief(user.id, user.account_type, user.status, user.display_name, user.email_ci.rsplit("@", 1)[-1], user.email_verified_at is not None)
+    return UserBrief(user.id, user.account_type, user.status, user.display_name, user.email_ci.rsplit("@", 1)[-1], user.email_verified_at is not None, user.email_ci)
 
 
 class UserDirectory:
