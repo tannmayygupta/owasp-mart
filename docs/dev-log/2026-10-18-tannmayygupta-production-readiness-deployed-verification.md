@@ -39,7 +39,7 @@ docs/assets/production-readiness/ (no secrets; addresses and instance ids redact
 
 ## Problems met and how they were fixed
 GNU tar on Windows reading "C:" as a host; /opt/vulnmart mode; an old throwaway Caddy holding 443; Caddy not able to read files owned by 65532; relay URL needing the full path; orchestrator needing a restart after a manifest change; gate key text versus hex bytes (ticket 403); the capacity error becoming a 500. All fixed and recorded in the runbook.
-A fourth journey after the API restart (e2e-run4-after-restart.json) FAILED at "request an instance" with HTTP 429: seven instances from earlier runs still hold the orchestrator budget. Removing them on vm-i was denied by the permission classifier (deletion scope), so it was not done. This is the open item.
+A fourth journey after the API restart (e2e-run4-after-restart.json) FAILED at "request an instance" with HTTP 429: seven instances from earlier runs still hold the orchestrator budget. Removing them on vm-i was denied by the permission classifier (deletion scope), so it was not done. Resolved later the same day on the developer's explicit go-ahead: the leftover test containers, networks and volumes (names starting vm-i-) were removed on vm-i, the lab stack was redeployed (live-deploy.mjs lab) and the journey was run again: 29 PASS, 0 FAIL (e2e-run5-after-cleanup.json).
 
 ## Security notes (vulnerable parts only)
 No flag or secret is in any doc. The origin secret and key files are outside the repository.
