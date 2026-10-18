@@ -20,7 +20,7 @@ import hashlib
 import hmac
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
@@ -82,10 +82,11 @@ class ResolvedSession:
     idle_expires_at: datetime
     absolute_expires_at: datetime
     mfa_verified: bool = False  # a second factor was proved in this session
+    org_id: str | None = None  # the company a recruiter acts for (their active membership), set from the session (story P-19, FR-ORG-06)
 
     @property
     def scope(self) -> Scope:
-        return Scope(user_id=self.user.id, org_id=None, roles=self.roles)  # org_id arrives with the company stories (P-18, P-19)
+        return Scope(user_id=self.user.id, org_id=self.org_id, roles=self.roles)
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,7 +116,8 @@ def _view(user: User, *, mfa: bool = False) -> UserView:
 
 
 class SessionService:
-    def __init__(self, sessions: sessionmaker[Session], settings: SettingsPort, csrf_key: bytes, *, now: Clock = utc_now, audit: AuditPort | None = None):
+    def __init__(self, sessions: sessionmaker[Session], settings: SettingsPort, csrf_key: bytes, *, now: Clock = utc_now, audit: AuditPort | None = None,
+                 org_resolver: Callable[[str], tuple[str, str] | None] | None = None):
         if len(csrf_key) < 16:
             raise ValueError("the CSRF key is at least 16 bytes")
         self._sessions = sessions
@@ -123,6 +125,13 @@ class SessionService:
         self._csrf_key = csrf_key
         self._now = now
         self._audit = audit  # logins, failed logins and logouts are written to the audit log (story P-17, FR-PRV-10) when one is given
+        # For a recruiter: (company id, `owner` or `member`) of their active membership, or None. It becomes the organisation of the scope of every request
+        # (story P-19). It is called after the session row is read, never inside its transaction.
+        self._org_resolver = org_resolver
+
+    def set_org_resolver(self, resolver: Callable[[str], tuple[str, str] | None] | None) -> None:
+        """For the process wiring: the company service needs this service (to end sessions) and this service needs the company service, so one is set after the other."""
+        self._org_resolver = resolver
 
     def _record(self, action: str, *, actor: str, subject: str | None, **details: object) -> None:
         if self._audit is not None:
@@ -210,9 +219,21 @@ class SessionService:
                 roles.add(Role.RECRUITER)
             elif user.account_type == "admin" and row.mfa_at is not None:
                 roles.add(Role.ADMIN)  # an admin session that never proved a second factor has no admin role, so every admin function refuses it
-            return ResolvedSession(token_hash=digest, user=_view(user, mfa=mfa_enabled(session, user.id)), roles=frozenset(roles),
-                                   last_seen_at=last_seen, idle_expires_at=last_seen + idle, absolute_expires_at=absolute,
-                                   mfa_verified=row.mfa_at is not None)
+            resolved = ResolvedSession(token_hash=digest, user=_view(user, mfa=mfa_enabled(session, user.id)), roles=frozenset(roles),
+                                       last_seen_at=last_seen, idle_expires_at=last_seen + idle, absolute_expires_at=absolute,
+                                       mfa_verified=row.mfa_at is not None)
+        return self._with_company(resolved)
+
+    def _with_company(self, resolved: ResolvedSession) -> ResolvedSession:
+        """A recruiter with an active membership acts for that company; an owner also holds the owner role. Nobody else gets an organisation."""
+        if self._org_resolver is None or resolved.user.account_type != "recruiter":
+            return resolved
+        membership = self._org_resolver(resolved.user.id)
+        if membership is None:
+            return resolved
+        org_id, member_role = membership
+        roles = resolved.roles | ({Role.ORG_OWNER} if member_role == "owner" else set())
+        return replace(resolved, org_id=org_id, roles=frozenset(roles))
 
     def logout(self, token: str) -> bool:
         """End the session now (FR-ACC-03). False when there was nothing live to end."""

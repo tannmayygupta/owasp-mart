@@ -200,13 +200,14 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Done when: A company moves from signup to approved or rejected with reasons and audit entries.
   - Handoffs: H-138 (see docs/dev/HANDOFFS.md; read them when you plan P-19, P-20 and P-28)
 
-- [ ] **P-19. Company members, admin controls, data scoping, terms and invite caps**
+- [x] **P-19. Company members, admin controls, data scoping, terms and invite caps**  (service level, no routes (story 5.3); the cap is a decision function that P-20 applies when it counts the invites; assessments, invites and candidates do not exist yet, so the cross-company test over them comes with P-20 and P-21)
   - Epic: `epic-companies-and-approval`
-  - BMAD story: not planned yet; created when you incept `epic-companies-and-approval` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `5.2` in `epic-companies-and-approval` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Colleagues join through the owner, admin controls over companies, company scoping of data, data-processing terms, invite caps.
   - Covers: FR-ORG-03, 05, 06, 07, 08
   - Waits on: P-18.
   - Done when: A recruiter never sees another company's data in tests and invite caps are enforced.
+  - Handoffs: H-138 (partly answered here), H-139 (see docs/dev/HANDOFFS.md; read them when you plan P-20 and P-21)
 
 - [ ] **P-20. Assessment template, creating and sending invites, invite lifecycle**
   - Epic: `epic-assessments-and-invites`

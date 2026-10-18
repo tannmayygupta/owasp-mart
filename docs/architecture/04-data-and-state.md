@@ -30,10 +30,10 @@ Two databases in one PostgreSQL 18 cluster: `vulnmart` (everything below) and `v
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `organizations` | `id`, `name`, `email_domain`, `status` (state machine below), `owner_user_id`, `rejected_reason`, `suspended_reason` | `org_id` root for scoping |
+| `organizations` | `id`, `name`, `email_domain`, `status` (state machine below), `owner_user_id`, `rejected_reason`, `suspended_reason`, `domain_claim` (the work email domain the company claims, unique, story P-19: the next recruiter of that domain asks to join; null for free webmail, rejected and deleted companies), `invite_cap` (the admin's override of the daily invite cap, FR-ORG-08; null: the global setting) | `org_id` root for scoping |
 | `org_members` | `org_id`, `user_id`, `role` (`owner`, `member`), `status` | |
-| `join_requests` | `org_id`, `user_id`, `status`, `decided_by` | Owner decides (FR-ORG-03) |
-| `dpa_acceptances` | `org_id`, `user_id`, `terms_version`, `accepted_at` | FR-ORG-07 |
+| `join_requests` | `id`, `org_id`, `user_id`, `status` (`requested`, `approved`, `rejected`), `decided_by`, `decided_at`, `created_at` | Owner decides (FR-ORG-03). Row-level security by company; the requester also reads their own (policy `own_join_request`) |
+| `dpa_acceptances` | `id`, `org_id`, `user_id`, `terms_version`, `terms_sha256`, `accepted_at` | FR-ORG-07. One per company and version; append-only for the application role |
 
 ### 2.3 Catalogue (content owned by T, tables read by P and L)
 

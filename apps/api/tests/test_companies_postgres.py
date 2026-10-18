@@ -28,6 +28,7 @@ from vulnmart.accounts.models import User
 from vulnmart.accounts.passwords import PasswordPolicy
 from vulnmart.accounts.roles import RoleService
 from vulnmart.accounts.service import AccountService
+from vulnmart.accounts.status import AccountStatusService
 from vulnmart.kernel.db import make_sessions
 from vulnmart.kernel.scope import ContextScopePort, scope_or_none
 from vulnmart.kernel.settings import sqlalchemy_url
@@ -94,8 +95,11 @@ def sessions(app_engine):
 @pytest.fixture
 def companies(sessions):
     audit = FakeAuditPort()
-    accounts = AccountService(sessions, FakeSettingsPort(), public_origin=ORIGIN, policy=PasswordPolicy())
-    return CompanyService(sessions, accounts, UserDirectory(sessions), RoleService(sessions, audit), audit, ContextScopePort(), public_origin=ORIGIN)
+    settings = FakeSettingsPort()
+    accounts = AccountService(sessions, settings, public_origin=ORIGIN, policy=PasswordPolicy())
+    roles = RoleService(sessions, audit)
+    return CompanyService(sessions, accounts, UserDirectory(sessions), roles, audit, ContextScopePort(), settings, AccountStatusService(sessions, roles, audit),
+                          public_origin=ORIGIN)
 
 
 def add_admin(owner):
@@ -272,12 +276,14 @@ def test_eight_admins_deciding_one_company_at_once_leave_one_decision_and_one_ma
     assert status in ("active", "rejected") and mails == 1
 
 
-def test_migration_0008_goes_down_and_up_again(database, owner):
+def test_migrations_0009_and_0008_go_down_and_up_again(database, owner):
     cfg = Config(str(ROOT / "apps" / "api" / "alembic.ini"))
     os.environ["VULNMART_MIGRATE_DSN"] = with_db(OWNER, database[2])
     command.downgrade(cfg, "0007")
     with owner.connect() as c:
-        assert c.execute(text("SELECT count(*) FROM pg_policies WHERE policyname IN ('admin_read', 'own_membership')")).scalar_one() == 0
+        assert c.execute(text("SELECT count(*) FROM pg_policies WHERE policyname IN ('admin_read', 'own_membership', 'own_join_request')")).scalar_one() == 0
+        assert c.execute(text("SELECT to_regclass('join_requests')")).scalar_one() is None
     command.upgrade(cfg, "head")
     with owner.connect() as c:
-        assert c.execute(text("SELECT count(*) FROM pg_policies WHERE policyname IN ('admin_read', 'own_membership')")).scalar_one() == 2
+        assert c.execute(text("SELECT count(*) FROM pg_policies WHERE policyname IN ('admin_read', 'own_membership', 'own_join_request')")).scalar_one() == 3
+        assert c.execute(text("SELECT to_regclass('dpa_acceptances')")).scalar_one() == "dpa_acceptances"
