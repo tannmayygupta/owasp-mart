@@ -1,0 +1,34 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (555.6668ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (147.2174ms)
+  ✔ the page is served and the API is also reachable directly on its own port (113.4461ms)
+  ✔ API errors follow the IF-8 format through the web origin: unknown route and wrong method (56.3782ms)
+  ✔ origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (105.9688ms)
+  ✔ page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (121.9469ms)
+  ✔ caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (670.0459ms)
+  ✔ mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (11570.0106ms)
+  ✔ mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost) (9016.8559ms)
+  ✔ accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (15453.4947ms)
+  ✔ sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good (6498.481ms)
+  ✔ password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work (16026.148ms)
+  ✔ admins (P-13): the seed command makes an admin with no learner role who signs in without admin powers, a second seed changes nothing, signup cannot make an admin (23623.5581ms)
+  ✔ mfa (P-15): an admin enrols an authenticator app, then needs the code (or a recovery code, once) to sign in; a code cannot be replayed (4951.2977ms)
+  ✔ consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record (8070.8071ms)
+  ✔ audit and keys (P-17): a login is logged under a pseudonym, the chain verifies and anchors; a key is created, used and shredded in vm_keystore (7917.8114ms)
+  ✔ companies (P-18): a recruiter signs up, verifies the address, the admin queue lists the company, the approval activates it and mails the owner (28567.3428ms)
+  ✔ company members (P-19): a colleague joins through the owner, the terms gate invites, the cap applies, a suspended recruiter is out at once (56347.1486ms)
+  ✔ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (458.6362ms)
+  ✔ hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (407.3878ms)
+  ✔ web has no secrets or flags in its environment (60.9895ms)
+  ✔ Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (13356.6342ms)
+  ✔ Valkey down: public health 503 degraded, /readyz names valkey; recovers (6567.3377ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (13751.6843ms)
+✔ platform and web profiles on a real Docker engine (256610.2863ms)
+ℹ tests 24
+ℹ suites 1
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 256795.0931

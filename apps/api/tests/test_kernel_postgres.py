@@ -92,7 +92,7 @@ def test_the_app_role_owns_nothing_and_cannot_bypass_row_level_security(db):
     app.dispose()
     assert tuple(row) == (False, False)
     assert "vulnmart_app" not in owners
-    assert forced == ["org_members", "organizations"]
+    assert forced == ["dpa_acceptances", "join_requests", "org_members", "organizations"]
 
 
 def test_row_level_security_shows_only_the_organisation_of_the_transaction(db):
@@ -157,7 +157,7 @@ def test_downgrade_to_empty_and_upgrade_again(db):
     assert left == []
     command.upgrade(db["config"], "head")
     with db["owner"].connect() as c:
-        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0008"
+        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0009"
 
 
 def test_the_migration_stops_when_the_app_role_does_not_exist(monkeypatch):

@@ -22,6 +22,7 @@ from vulnmart.accounts.models import User, UserRole
 from vulnmart.accounts.passwords import PasswordPolicy
 from vulnmart.accounts.roles import NotAnAdmin, RoleService
 from vulnmart.accounts.service import AccountService, InvalidInput
+from vulnmart.accounts.status import AccountStatusService
 from vulnmart.kernel.db import ORG_ADMIN_VISIBLE, ORG_SELF_VISIBLE, Base, make_sessions
 from vulnmart.kernel.scope import ContextScopePort, scope_or_none
 from vulnmart.notifications.models import EmailOutbox
@@ -71,9 +72,17 @@ def audit():
 
 
 @pytest.fixture
-def companies(sessions, audit, clock):
-    accounts = AccountService(sessions, FakeSettingsPort(), public_origin=ORIGIN, now=clock, policy=PasswordPolicy())
-    return CompanyService(sessions, accounts, UserDirectory(sessions), RoleService(sessions, audit), audit, ContextScopePort(), public_origin=ORIGIN, now=clock)
+def ended(sessions):
+    return []
+
+
+@pytest.fixture
+def companies(sessions, audit, clock, ended):
+    settings = FakeSettingsPort()
+    accounts = AccountService(sessions, settings, public_origin=ORIGIN, now=clock, policy=PasswordPolicy())
+    roles = RoleService(sessions, audit)
+    return CompanyService(sessions, accounts, UserDirectory(sessions), roles, audit, ContextScopePort(), settings, AccountStatusService(sessions, roles, audit),
+                          public_origin=ORIGIN, end_sessions=ended.append, now=clock)
 
 
 def add_admin(sessions, uid=ADMIN):
@@ -210,11 +219,21 @@ def test_the_company_name_is_cleaned(companies, sessions):
     assert org_row(sessions).name == "Acme Security Ltd"
 
 
-def test_two_recruiters_of_one_domain_each_start_their_own_company_for_now(companies, sessions):
-    """Joining an existing company of the same domain is story P-19 (company members)."""
+def test_a_second_recruiter_of_a_claimed_domain_asks_to_join_instead_of_starting_a_company(companies, sessions):
+    """FR-ORG-03: the first recruiter of a work domain creates the company and claims the domain; the next one becomes a request the owner decides."""
     signup(companies, email="ana@acme.example", company="Acme")
-    signup(companies, email="bo@acme.example", company="Acme")
-    assert org_row(sessions, "ana@acme.example").id != org_row(sessions, "bo@acme.example").id
+    signup(companies, email="bo@acme.example", company="Whatever Bo Typed")
+    ana_org = org_row(sessions, "ana@acme.example")
+    assert companies.claimed_by("acme.example") == str(ana_org.id)
+    bo = user_id(sessions, "bo@acme.example")
+    assert companies.membership_of(bo) is None
+    assert [(r.user_id, r.display_name) for r in companies.join_requests(user_id(sessions, "ana@acme.example"))] == [(bo, "Ana Recruiter")]
+
+
+def test_free_webmail_never_claims_a_domain_so_two_gmail_recruiters_each_get_a_company(companies, sessions):
+    signup(companies, email="ana@gmail.com", company="Ana Consulting")
+    signup(companies, email="bo@gmail.com", company="Bo Consulting")
+    assert org_row(sessions, "ana@gmail.com").id != org_row(sessions, "bo@gmail.com").id and companies.claimed_by("gmail.com") is None
 
 
 # ---- where a recruiter stands -----------------------------------------------------------------------------------------------------------
@@ -303,7 +322,7 @@ def test_the_queue_and_every_decision_need_an_admin(companies, sessions):
         with pytest.raises(NotAnAdmin):
             companies.suspend(actor, org_id, "no")
         with pytest.raises(NotAnAdmin):
-            companies.reinstate(actor, org_id)
+            companies.reinstate(actor, org_id, "no")
     assert org_row(sessions).status == "pending"
 
 
@@ -368,7 +387,7 @@ def test_suspend_and_reinstate(companies, sessions, audit):
         companies.suspend(ADMIN_SCOPE, str(org.id), "too early")  # only an active company can be suspended
     companies.approve(ADMIN_SCOPE, str(org.id))
     with pytest.raises(InvalidTransition):
-        companies.reinstate(ADMIN_SCOPE, str(org.id))
+        companies.reinstate(ADMIN_SCOPE, str(org.id), "too early")
     with pytest.raises(InvalidInput):
         companies.suspend(ADMIN_SCOPE, str(org.id), " ")
     companies.suspend(ADMIN_SCOPE, str(org.id), "Complaint under review")
@@ -376,7 +395,9 @@ def test_suspend_and_reinstate(companies, sessions, audit):
     with pytest.raises(NotActiveRecruiter) as e:
         companies.active_company_of(uid)
     assert e.value.state == "suspended"
-    companies.reinstate(ADMIN_SCOPE, str(org.id))
+    with pytest.raises(InvalidInput):
+        companies.reinstate(ADMIN_SCOPE, str(org.id), "")  # every admin action needs a reason
+    companies.reinstate(ADMIN_SCOPE, str(org.id), "Complaint withdrawn")
     assert companies.standing(uid).state == "active" and org_row(sessions).suspended_reason is None
     assert [e[0] for e in entries(audit)] == ["org.created", "org.approved", "org.suspended", "org.reinstated"]
     assert [m[0] for m in mails(sessions)].count("org.approval_outcome") == 1, "suspension sends no approval-outcome mail"
@@ -421,8 +442,9 @@ def test_a_stranger_cannot_apply_for_a_company_and_an_active_one_has_nothing_to_
 
 # ---- what the organisation guard allows ---------------------------------------------------------------------------------------------------
 
-def test_the_admin_visible_and_self_visible_tables_are_exactly_the_two_intended(companies):
-    assert ORG_ADMIN_VISIBLE == {"organizations"} and ORG_SELF_VISIBLE == {"org_members": "user_id"}
+def test_the_admin_visible_and_self_visible_tables_are_exactly_the_ones_intended(companies):
+    assert ORG_ADMIN_VISIBLE == {"organizations"}
+    assert ORG_SELF_VISIBLE == {"org_members": "user_id", "join_requests": "user_id"}
 
 
 def test_the_guard_refuses_company_tables_without_a_scope_and_for_the_wrong_scope(companies, sessions):

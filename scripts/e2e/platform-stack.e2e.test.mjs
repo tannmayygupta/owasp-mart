@@ -746,6 +746,82 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(psql(`SELECT count(*) FROM pg_policies WHERE policyname IN ('admin_read', 'own_membership')`), '2');
   }, { timeout: 180000 });
 
+  // Story P-19: colleagues, the terms, the cap, the admin's control of a recruiter and the company in the session scope; again through the service inside the
+  // API container as the application role (IF-1 has no route for them yet, handoff H-138), with the real login and session over HTTP.
+  test('company members (P-19): a colleague joins through the owner, the terms gate invites, the cap applies, a suspended recruiter is out at once', async () => {
+    const domain = `corp-${RUN}.example`;
+    const ownerEmail = `owner@${domain}`;
+    const colleagueEmail = `colleague@${domain}`;
+    const adminEmail = `e2e-members-admin-${RUN}@example.com`;
+    const adminPassword = 'a long admin password 123';
+    const password = 'correct horse battery staple';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app', 'from vulnmart.ports.scope import Scope, Role', 'c = app.state.companies', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const seeded = docker('exec', '-e', `VULNMART_SEED_ADMIN_PASSWORD=${adminPassword}`, NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Members Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    const admin = `Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN}))`;
+    const signup = (email, company, name) => py(`c.signup_recruiter(email="${email}", password="${password}", display_name="${name}", company_name="${company}")`, 'print(json.dumps(True))');
+
+    // the first recruiter of the domain starts the company and claims it; the second asks to join it
+    signup(ownerEmail, 'Corp Security Ltd', 'E2E Owner');
+    signup(colleagueEmail, 'Ignored Name', 'E2E Colleague');
+    assert.equal(psql(`SELECT count(*) FROM organizations WHERE domain_claim = '${domain}'`), '1');
+    assert.equal(psql(`SELECT count(*) FROM join_requests j JOIN organizations o ON o.id = j.org_id WHERE o.domain_claim = '${domain}' AND j.status = 'requested'`), '1');
+    for (const email of [ownerEmail, colleagueEmail]) {
+      const mail = await mailFor(email, 'Confirm your email');
+      assert.ok(mail, `the verification mail of ${email} arrived`);
+      assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    }
+    const ownerId = psql(`SELECT id FROM users WHERE email_ci = '${ownerEmail}'`);
+    const colleagueId = psql(`SELECT id FROM users WHERE email_ci = '${colleagueEmail}'`);
+    const orgId = psql(`SELECT id FROM organizations WHERE domain_claim = '${domain}'`);
+    assert.deepEqual(py(`print(json.dumps([c.standing("${colleagueId}").state, c.membership_of("${colleagueId}")]))`), ['pending_approval', null]);
+
+    // the admin approves the company, the owner accepts the colleague; the gate needs the terms
+    py(`c.approve(${admin}, "${orgId}")`, 'print(json.dumps(True))');
+    const requests = py(`print(json.dumps([[r.request_id, r.user_id, r.display_name] for r in c.join_requests("${ownerId}")]))`);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0][1], colleagueId);
+    py(`c.approve_join("${ownerId}", "${requests[0][0]}")`, 'print(json.dumps(True))');
+    assert.deepEqual(py(`print(json.dumps(c.membership_of("${colleagueId}")))`), [orgId, 'member']);
+    assert.ok(await mailFor(colleagueEmail, 'is approved on VulnMart'), 'the colleague was told');
+    const gate = (user) => py('from vulnmart.orgs.service import TermsNotAccepted', 'try:', `    print(json.dumps(["ok", c.invite_company_of("${user}")]))`, 'except TermsNotAccepted as e:', '    print(json.dumps(["terms", e.org_id]))');
+    assert.deepEqual(gate(colleagueId), ['terms', orgId]);
+    py(`t = c.terms_for("${ownerId}")`, `c.accept_terms("${ownerId}", t.version, t.sha256)`, 'print(json.dumps(True))');
+    assert.deepEqual(gate(colleagueId), ['ok', orgId], 'the whole company can invite once the owner accepted');
+    assert.equal(psql(`SELECT count(*) FROM dpa_acceptances WHERE org_id = '${orgId}' AND user_id = '${ownerId}'`), '1');
+
+    // the cap: the global default, then an admin's number for this company
+    assert.deepEqual(py(`print(json.dumps(c.invite_cap("${orgId}")))`), 50);
+    py(`c.set_invite_cap(${admin}, "${orgId}", 5)`, 'print(json.dumps(True))');
+    assert.deepEqual(py(`d = c.check_invite_cap("${orgId}", 4)`, 'e = c.check_invite_cap("' + orgId + '", 5)', 'print(json.dumps([d.allowed, d.remaining, e.allowed, e.remaining]))'), [true, 1, false, 0]);
+
+    // the colleague signs in over HTTP; the session carries the company, and a suspension ends it at once
+    const login = await postJson('/api/v1/session', { email: colleagueEmail, password });
+    assert.equal(login.status, 200);
+    const token = /__Host-vm_session=([^;]+)/.exec(login.headers.getSetCookie()[0])[1];
+    assert.deepEqual(py(`s = app.state.session_service.resolve("${token}")`, 'print(json.dumps([s.scope.org_id, "recruiter" in [r.value for r in s.roles], "org_owner" in [r.value for r in s.roles]]))'), [orgId, true, false]);
+    py(`c.suspend_recruiter(${admin}, "${orgId}", "${colleagueId}", "e2e: policy review")`, 'print(json.dumps(True))');
+    assert.equal((await call('GET', '/api/v1/session', { headers: { cookie: `__Host-vm_session=${token}` } })).status, 401, 'the session ended at once');
+    assert.equal((await postJson('/api/v1/session', { email: colleagueEmail, password })).status, 401, 'a suspended recruiter cannot sign in');
+    py(`c.reinstate_recruiter(${admin}, "${orgId}", "${colleagueId}", "e2e: cleared")`, 'print(json.dumps(True))');
+    assert.equal((await postJson('/api/v1/session', { email: colleagueEmail, password })).status, 200);
+
+    // removing a member and deleting the company; the audit log has it all under pseudonyms
+    py(`c.remove_member("${ownerId}", "${colleagueId}")`, 'print(json.dumps(True))');
+    assert.deepEqual(py(`print(json.dumps(c.membership_of("${colleagueId}")))`), null);
+    py(`c.delete_company(${admin}, "${orgId}", "e2e cleanup")`, 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT status || ',' || coalesce(domain_claim, 'none') FROM organizations WHERE id = '${orgId}'`), 'deleted,none');
+    const actions = psql(`SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM audit_log WHERE action IN ('org.join_requested', 'org.join_approved', 'org.terms_accepted', 'org.invite_cap_set', 'account.suspended', 'account.reinstated', 'org.member_removed', 'org.deleted')`);
+    assert.equal(actions, 'account.reinstated,account.suspended,org.deleted,org.invite_cap_set,org.join_approved,org.join_requested,org.member_removed,org.terms_accepted');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%${ownerId}%' OR details LIKE '%${colleagueId}%' OR details LIKE '%policy review%'`), '0');
+  }, { timeout: 240000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

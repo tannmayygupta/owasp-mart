@@ -148,3 +148,15 @@
 - A company is created for any domain: nothing checks that the email domain belongs to the company named.
 - The mail to admins about a new pending company is not built (the queue is pulled).
 - The two read-only policies (`admin_read`, `own_membership`) are exceptions to ADR 0014's one rule: a future table must opt in on purpose, and nothing with candidate data may.
+
+## Deferred from: story-company-members-admin-controls-data-scoping-terms-and-invite-caps-plan (2026-10-18)
+
+- Still no HTTP route for any recruiter, company or admin function (story 5.3, a contract change); the terms page, the member list and the join request screens are dashboards work.
+- The cap is a decision function: counting the invites sent today, showing the message and keeping the pending list is story P-20. Assessments, invites and candidates do not exist yet, so a test that a recruiter of company A cannot read, change or guess company B's assessments, invites or candidates comes with P-20 and P-21 (two tests already fail when a new table with an organisation column is not scoped).
+- Deleting a company changes its state, ends its members' access and frees its domain; removing its data (and its join requests and terms acceptances, which the application role cannot delete) follows the retention rules: P-24, P-25.
+- A person is in one company only; changing company means being removed and asking again. An owner cannot hand the company to someone else or leave it.
+- Nothing checks that a domain belongs to the company named; with OI-10 and OI-11 as answered, the one admin approval is the only gate, and the first signup of a small provider's domain that is missing from the free-webmail list claims it.
+- The free-webmail list is a starter list from memory (about 45 domains); replace it with a maintained list. The data-processing terms are a draft no lawyer has reviewed (OI-33).
+- A colleague's outcome mail reuses the company approval template ("your company has been approved"); a dedicated template changes the FR-NTF-01 list.
+- The owner is not told about a new join request by mail (the list is pulled); a stream already open when a recruiter is removed or suspended is for the live-update stories to close (P-22, P-23).
+- OI-11's second half (company-name verification beyond the email domain) was not asked and is not built.
