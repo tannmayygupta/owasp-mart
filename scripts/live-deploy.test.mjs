@@ -22,8 +22,11 @@ test('the manifest names every role by digest and carries what the stub and the 
   const m = buildManifest(digests);
   assert.equal(Object.keys(m.images).length, 7);
   assert.ok(Object.values(m.images).every((r) => /@sha256:[0-9a-f]{64}$/.test(r)));
-  assert.deepEqual(m.commands.shop, ['shop']);
-  assert.deepEqual(m.commands.injector, ['inject']);
+  assert.equal(m.commands.shop, undefined, 'the real shop runs its default command');
+  assert.deepEqual(m.commands.injector, ['/app/src/instance/inject.mjs'], 'the injector is the shop image\'s inject script (IF-6 section 5)');
+  assert.equal(m.images.shop, m.images.injector, 'the shop and its injector are one image');
+  assert.ok(m.images.shop.includes('/shop@') && !m.images.shop.includes('stub'), 'the real shop, not the stub');
+  assert.ok(m.healthchecks.shop.join(' ').includes('/readyz'), 'the shop is healthy only after the injector marker (/readyz)');
   assert.ok(m.commands.sidecar.includes('--relay') && m.commands.sidecar.includes('--upstream'));
   assert.ok(Object.keys(m.healthchecks).every((r) => ['CMD', '/nodejs/bin/node'].every((x, i) => m.healthchecks[r][i] === x)), 'distroless roles check with node by absolute path');
   assert.deepEqual(Object.keys(MANIFEST_EXTRAS).sort(), ['commands', 'entrypoints', 'healthchecks']);

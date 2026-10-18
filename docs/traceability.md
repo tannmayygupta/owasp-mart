@@ -307,6 +307,7 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | LE-16 | Audit of the lab stream and the renewal hook fix (touches LE-2, LE-4, NFR-SEC-04) | Audit done; renewal hook fixed and deployed on both hosts; six blockers recorded, five open | docs/audit/2026-10-18-lab-stream-audit.md |
 | LE-17 | Activity reaches the orchestrator (IF-5 1.1.0) and pasted flags are checked against activity (touches FR-INS-04, FR-ACH-02, FR-ACH-03) | Done in code with tests; live proof recorded in the pull request | docs/dev-log/2026-10-19-tannmayygupta-audit-fixes-b1-b6.md |
 | LE-18 | Public demo access, labs firewall without container 443, no scoring after the end, C09 window recovery (touches NFR-ISO-01, NFR-ISO-05, FR-DET-06, R-4) | Done, live-proved (probe 18 of 18, audit 9 PASS, journey 30 of 30); recovery and deadline proved by tests | docs/dev-log/2026-10-19-tannmayygupta-audit-fixes-b3-b4-b5.md |
+| LE-19 | The real shop runs in lab instances: real injector, placements, exploitable exactly when planted (touches FR-INS-01, FR-INS-02, FR-FLG-03, FR-SHP-12, NFR-ISO-01) | Done and live-proved (34 tests, container proof, deployed journey 30 of 30 on the real shop); C06 and C10 placements, C03 part B and the C07 mailbox not proved against the real services | docs/dev-log/2026-10-19-tannmayygupta-real-shop-injector.md |
 
 
 ## Live updates (P stream)

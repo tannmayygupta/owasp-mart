@@ -144,13 +144,19 @@ export async function journey(o) {
   const page = await c.request('GET', `${host}/healthz`, { json: false });
   check('the shop answers through the gate and the sidecar', page.status === 200, `HTTP ${page.status} ${page.ms} ms`);
 
-  // read a planted flag the way a player would: the response carries it, the sidecar sees it and tells the platform
-  const planted = await c.request('GET', `${host}/_stub/planted-flag?key=C01`, { json: false });
+  // read a flag the way a player would: the response carries it, the sidecar sees it and tells the platform. The stub shop serves any planted flag at /_stub/planted-flag;
+  // the real shop does not, so a player takes C05 from its unauthenticated diagnostics page (the weakness of that challenge).
+  const readFlag = async (key) => {
+    const stub = await c.request('GET', `${host}/_stub/planted-flag?key=${key}`, { json: false });
+    if (stub.status === 200) return stub;
+    return key === 'C05' ? c.request('GET', `${host}/_ops/diagnostics`, { json: false }) : stub;
+  };
+  const planted = await readFlag('C05');
   const m = /VM\{[A-Z2-7]{24}\}/.exec(planted.text);
-  check('a planted flag is served by the instance', planted.status === 200 && !!m, `HTTP ${planted.status}`);
+  check('a flag is read off the shop the way a player would', planted.status === 200 && !!m, `HTTP ${planted.status}`);
   const flag = m?.[0] ?? 'VM{missing}';
   await sleep(2500);
-  const afterSeen = (await c.request('GET', `/api/v1/attempts/${aid}/challenges`)).data?.items?.find((x) => x.challenge_key === 'C01');
+  const afterSeen = (await c.request('GET', `/api/v1/attempts/${aid}/challenges`)).data?.items?.find((x) => x.challenge_key === 'C05');
   check('the sidecar saw the flag and the platform credited the challenge', afterSeen?.solved === true || afterSeen?.held === true, `${afterSeen?.best_milestone}${afterSeen?.held ? ' held' : ''}`);
   // audit blocker B1: the platform tells the orchestrator that the player is active, so the idle limit counts from play and not from "ready"
   let act; for (let i = 0; i < 45; i++) { act = (await c.request('GET', `/api/v1/instances/${iid}`)).data; if (act?.state === 'active') break; await sleep(2000); }
@@ -158,21 +164,21 @@ export async function journey(o) {
 
   const wrong = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C02', flag: 'VM{WRONGWRONGWRONGWRONGWRONG}' } });
   check('a wrong flag is incorrect', wrong.status === 200 && wrong.data?.result === 'incorrect', `credit ${wrong.data?.credit}`);
-  const right = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C01', flag } });
+  const right = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C05', flag } });
   check('the right flag is correct and credited', right.status === 200 && right.data?.result === 'correct' && right.data?.credit === 'credited', `${right.data?.result}/${right.data?.credit}`);
   const hint = await c.request('POST', `/api/v1/attempts/${aid}/challenges/C03/hints/1/unlock`);
   check('a hint unlocks', hint.status === 200 && hint.data?.unlocked === true, `HTTP ${hint.status}`);
   const score = (await c.request('GET', `/api/v1/attempts/${aid}/score`)).data;
   check('the score counts the capture', score?.score > 0, `score ${score?.score}`);
 
-  const before = (await c.request('GET', `${host}/_stub/planted-flag?key=C05`, { json: false })).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
+  const before = (await readFlag('C05')).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
   const reset = await c.request('POST', `/api/v1/instances/${iid}/reset`, { body: { confirm: true } });
   check('reset starts a new round', reset.status === 202 && reset.data?.epoch === 2, `epoch ${reset.data?.epoch}`);
   let back; for (let i = 0; i < 60; i++) { back = (await c.request('GET', `/api/v1/instances/${iid}`)).data; if (['ready', 'active', 'idle'].includes(back?.state)) break; await sleep(2000); }
   check('the instance is ready again after the reset', ['ready', 'active', 'idle'].includes(back?.state), `${back?.state}`);
   const stale = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C05', flag: before ?? 'VM{missing}' } });
   check('a flag of the old round no longer counts', stale.status === 200 && stale.data?.result === 'incorrect', `${stale.data?.result}`);
-  const fresh = (await c.request('GET', `${host}/_stub/planted-flag?key=C05`, { json: false })).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
+  const fresh = (await readFlag('C05')).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
   check('the new round has other flags', !!fresh && fresh !== before);
   const second = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C05', flag: fresh ?? 'VM{missing}' } });
   check('a flag of the new round counts', second.status === 200 && second.data?.result === 'correct', `${second.data?.result}/${second.data?.credit}`);  const tl = (await c.request('GET', `/api/v1/attempts/${aid}/timeline`)).data;

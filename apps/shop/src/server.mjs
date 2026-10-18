@@ -7,7 +7,7 @@
 import { createApp } from './app.mjs';
 import { openDb } from './db/index.mjs';
 import { migrate } from './db/migrate.mjs';
-import { makeReadiness, lazyDb, makeEmitter } from './instance/instance.mjs';
+import { makeReadiness, lazyDb, makeEmitter, makeInstanceChallenges } from './instance/instance.mjs';
 // `seedAll` is imported dynamically in the local-run branch only: the seed data
 // lives outside src/ and is NOT shipped in the instance image (the instance gets
 // a pre-seeded snapshot from the injector), so the instance path must not load it.
@@ -67,7 +67,9 @@ if (!readiness) {
   emit = makeEmitter(process.env.VM_SIDECAR_EVENTS_URL);
 }
 
-const app = createApp({ db, isReady: readiness?.ready, emit });
+// In an instance the challenges that are exploitable, and the C03 catalogue flag, come from the flags file the injector wrote (instance.mjs).
+const instance = process.env.VM_FLAGS_PATH ? makeInstanceChallenges(process.env.VM_FLAGS_PATH) : { challenges: {}, flagOf: () => undefined };
+const app = createApp({ db, isReady: readiness?.ready, emit, challenges: instance.challenges, flagOf: instance.flagOf });
 const server = app.listen(PORT, HOST, () => {
   console.log(`vulnmart-shop listening on http://${HOST}:${PORT}`);
 });

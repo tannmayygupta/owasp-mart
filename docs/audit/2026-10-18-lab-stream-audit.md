@@ -10,7 +10,7 @@ Result: **10 of 31 are verified complete (L-01, 02, 03, 04, 06, 07, 13, 16, 17, 
 
 Proves (deployed on AWS Sydney, `e2e-run8-merged-main.json`, 29 checks): sign-up and mail, instance start (about 6 s), one-time ticket and gate, planted flag credited, hints, reset with new flags, submit and freeze, report. Postgres persistence and restart, the key service in a separate keystore database, backup and restore on the deployed database (manual), a host audit (9 PASS).
 
-Does not prove: the vulnerable **shop** (the instance runs the stub shop; the real injector is stream T), an **assessment** attempt, a **recruiter** report (no route or screen in main), long attempts (see B1), the demo rehearsal, S-8 sandboxing, load beyond 6 learners.
+Since 2026-10-19 it proves the vulnerable **shop** too (the real shop with a real injector runs in the instances; see the dev-log of that day). Does not prove: an **assessment** attempt, a **recruiter** report (no route or screen in main), long attempts (see B1), the demo rehearsal, S-8 sandboxing, load beyond 6 learners.
 
 ## Blockers (fix before real users)
 
