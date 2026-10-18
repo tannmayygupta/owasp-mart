@@ -439,16 +439,15 @@ test('the service has a start timeout and the script header says when Caddy may 
   assert.match(sh, /^set -eu$/m, 'set -eu is on its own line (it was glued to a comment and dead)');
 });
 
-test('H2: the service reloads the origin Caddy after the run through the admin socket, and a failed reload cannot fail the unit', () => {
+test('H2: the service restarts this host\'s Caddy after the run only when the certificate files changed, and a failed restart cannot fail the unit', () => {
+  // The first hook reloaded a container that the deployed hosts do not have (vulnmart-origin-caddy-1) and Caddy reads certificate files only at start (audit of 2026-10-18).
+  // The behaviour of the script is tested in scripts/reload-caddy-hook.test.mjs.
   const svc = readFileSync(path.join(HOSTS, 'vulnmart-certs.service'), 'utf8');
   const m = svc.match(/^ExecStartPost=(.*)$/m);
   assert.ok(m, 'ExecStartPost present');
-  assert.ok(m[1].startsWith('-'), 'leading - : a failed reload is ignored');
-  assert.match(m[1], /docker exec vulnmart-origin-caddy-1 caddy reload --config \/etc\/caddy\/Caddyfile --adapter caddyfile --address unix\/\/tmp\/caddy-admin\.sock/);
-  const compose = readFileSync(path.join(ROOT, 'infra', 'caddy', 'compose.p.yaml'), 'utf8');
-  assert.match(compose, /^name: vulnmart-origin$/m);
-  assert.match(compose, /^  caddy:$/m);
-  assert.match(readFileSync(path.join(ROOT, 'infra', 'caddy', 'Caddyfile.p'), 'utf8'), /admin unix\/\/tmp\/caddy-admin\.sock/);
+  assert.ok(m[1].startsWith('-'), 'leading - : a failed restart is ignored');
+  assert.match(m[1], /\/usr\/local\/sbin\/vulnmart-reload-caddy\.sh$/);
+  assert.doesNotMatch(svc, /vulnmart-origin-caddy-1/);
 });
 
 test('H1: a failing copy exits 1, writes no certs-ok stamp and leaves no .new file', { skip }, () => {

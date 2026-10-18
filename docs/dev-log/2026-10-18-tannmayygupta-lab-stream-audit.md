@@ -31,6 +31,8 @@ No technical decision that needs an ADR. The rule for the ticks is written at th
 - Live: `live-deploy.mjs hooks` ran on both hosts; both printed "first run, state recorded" and the installed unit shows ExecStartPost=-/usr/local/sbin/vulnmart-reload-caddy.sh. The journal of vm-p before the fix showed "No such container: vulnmart-origin-caddy-1" on every run.
 - Live facts I checked myself: both certificates are Let's Encrypt and expire 15 January 2027; vm-p disk 27 percent, memory 892 of 1905 MB; vm-i disk 18 percent, memory 1138 of 7776 MB; no container restarting; the SSM agent runs on both hosts but no instance profile is attached.
 
+- CI of the audit pull request failed in two jobs and was fixed: three existing tests pinned the old hook or the list of files cloud-init writes (certs-host H2, cloud-hosts baseline list and rendered cloud-init), and the Oracle Terraform module shares the cloud-init template and lacked the new variable. After the fix: certs-host, cloud-hosts, verify-hosts and reload hook tests 68 passed, 2 skipped; 	erraform test aws 37 passed, oci 10 passed.
+
 ## Evidence
 docs/assets/production-readiness/ (journey and load runs of the same day).
 
