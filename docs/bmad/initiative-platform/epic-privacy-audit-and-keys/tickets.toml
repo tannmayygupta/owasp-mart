@@ -1,0 +1,51 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-18: one story per task of docs/dev/dev2-akshay.md that names this epic (P-16, P-17, P-24, P-25), as START-HERE.md section 5 asks
+# (the developer chose "continue automatically"). FR-PRV-19 and 20 ride with P-31 (admin limits, legal review and incident handling) in the task
+# file, and the epic that holds that task is chosen when it is reached. OI-37 answered by the developer on 2026-10-18: assessment retention plus
+# 12 months; not yet recorded in initial.md.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Consent screen, consent record, minimum data and 18-and-over"
+description = "Serves the versioned consent notice, writes an append-only consent record for every grant and decline (version, text snapshot and hash, retention and company shown, hashed address and browser, audit sequence), keeps a candidate from proceeding without it, and proves that only the minimum data is stored and that the 18-and-over declaration is recorded at signup."
+verify = "A candidate with an attempt in state consent reads the notice, a stale notice is refused, a grant or decline writes exactly one record that cannot be updated or deleted, and a test fails when a new column holds data the inventory does not list."
+covers = ["FR-PRV-01", "FR-PRV-02", "FR-PRV-03", "FR-PRV-13"]
+after = ["3.2"]
+hitl = false
+risk = "high"
+# Decision 2026-10-18: the attempt in state consent comes from the invite flow (P-21), and the attempt port (stream L) has no step out of it yet.
+# This story defines the small port it needs (ConsentTargets) with an in-memory fake, and P-21 wires the real one (handoff H-136). Not a blocker.
+
+[[entry]]
+id = 2
+type = "story"
+title = "Audit log and key service"
+description = "A hash-chained append-only audit log with concurrent-safe writers and the per-attempt key service (KeyPort) with shredding."
+verify = "The chain verifies end to end under concurrent writes and a shredded key makes its data unreadable."
+covers = ["FR-PRV-10", "FR-PRV-12"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Retention scheduler, retention rules and log rules"
+description = "The scheduled jobs for retention, learner warnings, invite purge and log purge, with the rules for each data class and the last run visible to an admin."
+verify = "Each job is registered, runs on schedule and records its last run."
+covers = ["FR-PRV-04", "FR-PRV-05", "FR-PRV-06", "FR-PRV-07", "FR-PRV-14", "FR-PRV-15", "FR-PRV-16", "FR-PRV-17", "FR-PRV-18"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Deletion workflow, 7-day undo and who viewed me"
+description = "Deletion and withdrawal requests with the 7-day undo window, the candidate's view of who looked at their results, and the purge through the attempt port."
+verify = "A deletion request completes after the undo window and the candidate sees the company-level view history."
+covers = ["FR-PRV-08", "FR-PRV-09", "FR-PRV-11"]
+after = [2, 3]
+hitl = false
+risk = "high"

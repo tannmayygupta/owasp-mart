@@ -21,6 +21,7 @@ MIN_SECRET = 32
 _SALT = b"vm-field-salt-v1"
 _SEAL_LABEL = b"vm-field-seal-v1"
 _RECOVERY_LABEL = b"vm-field-recovery-v1"
+_CONTEXT_LABEL = b"vm-field-context-v1"
 PREFIX = "v1."
 
 
@@ -32,6 +33,7 @@ class FieldKeys:
     def __init__(self, seal_key: bytes, recovery_key: bytes):
         self._aes = AESGCM(seal_key)
         self._recovery_key = recovery_key
+        self._context_key = hkdf_sha256(recovery_key, _SALT, _CONTEXT_LABEL)
 
     @classmethod
     def from_secret(cls, secret: bytes) -> FieldKeys:
@@ -56,3 +58,8 @@ class FieldKeys:
     def recovery_hash(self, account: str, code: str) -> str:
         """The stored form of a recovery code: a keyed hash, so a copy of the table cannot be searched for the 50-bit codes offline."""
         return hmac.new(self._recovery_key, f"{account}:{code}".encode(), hashlib.sha256).hexdigest()
+
+    def context_hash(self, kind: str, value: str) -> str:
+        """A keyed hash of a visitor address or browser string (a consent record keeps this, never the value): the same input gives the same
+        hash, so two records of one visitor can be compared, but a copy of the table cannot be reversed by hashing every IPv4 address."""
+        return hmac.new(self._context_key, f"{kind}:{value}".encode(), hashlib.sha256).hexdigest()

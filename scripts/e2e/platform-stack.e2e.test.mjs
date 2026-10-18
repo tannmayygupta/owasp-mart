@@ -566,6 +566,59 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(psql(`SELECT count(*) FROM recovery_codes JOIN users ON users.id = recovery_codes.user_id WHERE email_ci = '${email}' AND used_at IS NOT NULL`), '1');
   }, { timeout: 240000 });
 
+  // Story P-16: the consent routes through the real proxy. No attempt in state consent exists on the stack until the invite flow (P-21), so the
+  // routes can only show what they refuse; the notice, the record and the race are proved against a fake attempt side in the pytest suite.
+  test('consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record', async () => {
+    const email = `e2e-consent-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psqlAs = (...args) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', ...args);
+    const psql = (sql) => psqlAs('-c', sql).stdout.trim();
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Consent', age_declaration: true })).status, 202);
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    const attempt = 'a-ABCDEFGHIJKLMNOP';
+    const notice = `/api/v1/consent/notice?attempt_id=${attempt}`;
+    const body = { attempt_id: attempt, notice_version: '2026-10-18.1', notice_text_sha256: '0'.repeat(64), decision: 'granted' };
+
+    assert.equal((await call('GET', notice)).status, 401);
+    assert.equal((await call('GET', '/api/v1/me/consents')).status, 401);
+    assert.equal((await postJson('/api/v1/consent', body)).status, 401);
+
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 200);
+    const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(login.headers.getSetCookie()[0])[1]}`;
+    const csrf = (await login.json()).csrf_token;
+
+    const missing = await call('GET', notice, { headers: { cookie } });
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).code, 'ATT-NOT-FOUND');
+    assert.equal(missing.headers.get('cache-control'), 'private, no-store');
+    assert.equal((await call('GET', '/api/v1/consent/notice?attempt_id=nope', { headers: { cookie } })).status, 422);
+    assert.equal((await postJson('/api/v1/consent', body, { cookie })).status, 403, 'no CSRF token');
+    assert.equal((await postJson('/api/v1/consent', body, { cookie, 'x-csrf-token': csrf, origin: 'https://evil.example' })).status, 403, 'another site');
+    const unknown = await postJson('/api/v1/consent', body, { cookie, 'x-csrf-token': csrf });
+    assert.equal(unknown.status, 404);
+    assert.equal((await unknown.json()).code, 'ATT-NOT-FOUND');
+    const own = await call('GET', '/api/v1/me/consents', { headers: { cookie } });
+    assert.equal(own.status, 200);
+    assert.deepEqual(await own.json(), { items: [], has_more: false });
+    assert.equal((await call('GET', '/api/v1/me/consents?limit=101', { headers: { cookie } })).status, 422);
+    assert.equal(psql(`SELECT count(*) FROM consent_records`), '0', 'nothing was written by the refused calls');
+
+    // the database itself: the application role has SELECT and INSERT only, and cannot change a record
+    assert.equal(psql(`SELECT version_num FROM alembic_version`).length > 0, true);
+    assert.equal(psql(`SELECT string_agg(privilege_type, ',' ORDER BY privilege_type) FROM information_schema.role_table_grants WHERE table_name = 'consent_records' AND grantee = 'vulnmart_app'`), 'INSERT,SELECT');
+    assert.equal(psql(`INSERT INTO consent_records (id, user_id, attempt_id, notice_version, notice_text_sha256, notice_text_snapshot, retention_days_shown, controller_name_shown, action, audit_seq) VALUES ('k-E2ETESTE2ETESTAA', 'u-X', '${attempt}', '2026-10-18.1', '${'a'.repeat(64)}', 't', 180, 'C', 'granted', 1) RETURNING 1`).split('\n')[0], '1');
+    for (const sql of ["UPDATE consent_records SET action = 'declined'", 'DELETE FROM consent_records', 'TRUNCATE consent_records']) {
+      const refused = psqlAs('-c', `SET ROLE vulnmart_app; ${sql}`);
+      assert.notEqual(refused.status, 0, sql);
+      assert.match(refused.stderr, /permission denied/, sql);
+    }
+    assert.equal(psql(`SELECT action FROM consent_records WHERE attempt_id = '${attempt}'`), 'granted');
+    psql(`DELETE FROM consent_records WHERE attempt_id = '${attempt}'`); // clean up as the owner, so a rerun on this volume starts empty
+  }, { timeout: 120000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

@@ -169,13 +169,14 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: MFA enrolment and login work in tests, and recovery is covered.
   - Handoffs: H-130, H-134 (answered here), H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-16. Consent screen, consent record, minimum data and 18-and-over**
+- [x] **P-16. Consent screen, consent record, minimum data and 18-and-over**  (API level: the notice text and the three routes; no consent page, and no attempt in state consent exists until P-21; OI-37 answered, wording is a draft until legal review OI-33)
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: not planned yet; created when you incept `epic-privacy-audit-and-keys` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `4.1` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Consent screen, stored consent record, collect only the minimum data, 18-and-over check.
   - Covers: FR-PRV-01, 02, 03, 13
   - Waits on: P-12. Open in part: OI-37.
   - Done when: A new user cannot proceed without consent and the consent record is stored.
+  - Handoffs: H-136 (see docs/dev/HANDOFFS.md; read them when you plan P-21, P-24 and P-25)
 
 ## Sprint 3 (22 Oct to 28 Oct 2026)
 
@@ -221,7 +222,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Covers: FR-ASM-04, 05, 06
   - Waits on: P-16, P-20.
   - Done when: Accept, re-invite and bulk work in tests and the invite purge job can see expired invites.
-  - Handoffs: H-133 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-133, H-136 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-22. Live updates hub: SSE, heartbeat, snapshot with polling fallback, fan-out**
   - Epic: `epic-live-updates`

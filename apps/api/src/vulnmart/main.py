@@ -30,6 +30,9 @@ from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRa
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
+from vulnmart.privacy.api import router as consent_router
+from vulnmart.privacy.consent import ConsentService
+from vulnmart.privacy.targets import ConsentTargets, FakeConsentTargets
 
 PUBLIC_HEALTH_REUSE_SECONDS = 2.0
 
@@ -91,6 +94,8 @@ def create_app(
     policy: PasswordPolicy | None = None,
     self_service: SelfService | None = None,
     mfa: MfaService | None = None,
+    consent: ConsentService | None = None,
+    consent_targets: ConsentTargets | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits)."""
@@ -112,11 +117,16 @@ def create_app(
     field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
     app.state.mfa_service = mfa or (MfaService(ports.sessions, field_keys, ports.audit, app.state.session_service)
                                     if ports.sessions is not None and app.state.session_service is not None else None)
+    # The consent routes need the invite and attempt side (story P-21): until it exists the targets are empty, so every attempt id is answered 404.
+    app.state.consent_service = consent or (ConsentService(ports.sessions, consent_targets or FakeConsentTargets(), ports.audit, ports.settings,
+                                                            field_keys or field_keys_from(settings))
+                                            if ports.sessions is not None else None)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)
     app.include_router(me_router)
     app.include_router(mfa_router)
+    app.include_router(consent_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs
     # one round of checks, not one per call (the answer itself is never cached by anyone else: no-store).
