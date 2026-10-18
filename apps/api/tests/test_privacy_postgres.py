@@ -193,7 +193,7 @@ def test_migration_0006_goes_down_and_up_again(sessions):
     command.upgrade(cfg, "head")
     with engine.connect() as c:
         assert c.execute(text("SELECT to_regclass('consent_records')")).scalar_one() == "consent_records"
-        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0006"
+        assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() >= "0006"
         privileges = {r[0] for r in c.execute(text("SELECT privilege_type FROM information_schema.role_table_grants "
                                                    "WHERE table_name = 'consent_records' AND grantee = 'vulnmart_app'"))}
     assert privileges == {"SELECT", "INSERT"}

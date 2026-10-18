@@ -95,9 +95,10 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 
 | Table | Key columns |
 |---|---|
-| `audit_log` | `seq bigserial`, `at`, `actor_subject`, `actor_type`, `action`, `target_type`, `target_id`, `org_id`, `result`, `ip_trunc`, `meta jsonb`, `prev_hash`, `row_hash` |
-| `audit_checkpoint` | `seq`, `hash`, `reason` (written when old rows are purged) |
-| `audit_anchor` | `anchor_date`, `head_seq`, `head_hash`, `anchored_at`, `witness` |
+| `audit_log` | `seq` (set by the writer under the chain lock, no gap), `at` (whole seconds UTC), `actor`, `action`, `subject`, `details` (the canonical JSON text the hash covers), `prev_hash`, `row_hash`. **As built (story P-17):** the IF-9 `AuditPort` carries only actor, action, subject and details, so the columns `actor_type`, `target_type`, `target_id`, `org_id`, `result`, `ip_trunc` and `meta` of the first sketch are not columns; an org or a result goes in `details`, and an indexed column is added by a migration if a screen needs one (handoff H-137) |
+| `audit_checkpoint` | `seq`, `hash`, `reason`, `created_at` (written when old rows are purged) |
+| `audit_anchor` | `anchor_date`, `head_seq`, `head_hash`, `anchored_at`, `witness` (`file` when the line was also written outside the database, else `db`) |
+| `subject_map` (owner `privacy`) | `subject_id` (`s-` and 16 Base32 characters, the pseudonym in the audit log), `user_id` (unique), `created_at`. No foreign key; deleting the row is how a person is forgotten by the log (FR-PRV-10) |
 
 ## 3. Organization filtering in one place
 
@@ -114,7 +115,7 @@ A second scope exists for participants: rows owned by a person are filtered by `
 
 **Writers.** One function `append_audit(...)` inserts a row inside a transaction holding an advisory lock on the chain, so rows are strictly ordered with no gaps and the chain stays correct under concurrent writes. Volume is low (logins, views, admin actions), so serialisation is fine. This is tested in spike S-10.
 
-**Database roles.** `audit_writer` may only INSERT. The application's normal role has no UPDATE or DELETE on the audit tables. A separate `audit_purger` role may delete rows older than 12 months only through a function that writes an `audit_checkpoint` row with the hash that precedes the new first row, so the chain verifies from the checkpoint.
+**Database roles.** `audit_writer` may only INSERT. The application's normal role has no UPDATE or DELETE on the audit tables. **As built (story P-17):** there is no separate `audit_writer` role: the writer has to read the head, and the application is the only writer, so the application role has SELECT and INSERT on the three audit tables and nothing else; the `audit_purger` path is story P-24. A separate `audit_purger` role may delete rows older than 12 months only through a function that writes an `audit_checkpoint` row with the hash that precedes the new first row, so the chain verifies from the checkpoint.
 
 **Deleting a person.** The `subject_map` row is deleted. Audit rows stay and identify nobody (FR-PRV-10); the chain is unaffected because hashes cover pseudonymous values only.
 
@@ -130,7 +131,7 @@ A second scope exists for participants: rows owned by a person are filtered by `
 ### 5.2 Keys
 - One **DEK per attempt** (random 256-bit), used with AES-256-GCM to encrypt that attempt's evidence and answers. PRD wording says "per-assessment key" (D-25, FR-PRV-12); deleting **one** candidate while others in the same assessment remain needs a key per candidate attempt, so the architecture uses a per-attempt key (listed as PRD issue P-9 in README for the user to confirm).
 - A **KEK** (key-encryption key, versioned) wraps DEKs. The KEK is a file secret on VM-P (ADR 0009).
-- Wrapped DEKs live in the separate `vm_keystore` database, **not** in `vulnmart`. The `vulnmart` database and the keystore are backed up under **different rules**.
+- Wrapped DEKs live in the separate `vm_keystore` database, **not** in `vulnmart`. The `vulnmart` database and the keystore are backed up under **different rules**. **As built (story P-17):** `vm_keystore` has `deks` (`attempt_id`, `dek_id`, `kek_version`, `nonce`, `wrapped`, `created_at`) and `shredded` (`attempt_id`, `shredded_at`, ids only), is reached only by the role `vulnmart_keys` (the application role cannot connect), and is created by `python -m vulnmart.kernel.migrate`; see `docs/runbooks/keystore-and-audit-anchor.md`.
 
 ### 5.3 Shredding rule that survives backups
 Problem: if the wrapped DEK sat in the same rolling backups as the ciphertext, restoring any backup within 14 days would bring the data back, so deleting the key would not erase it (the goal of FR-PRV-12 and spike S-10).

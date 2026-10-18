@@ -1,11 +1,11 @@
-"""Kernel tables (architecture 04 section 2.7; owner `kernel` in contracts/db/table-owners.yaml): settings, quotas, job runs."""
+"""Kernel tables (architecture 04 sections 2.7 and 2.8; owner `kernel` in contracts/db/table-owners.yaml): settings, quotas, job runs, and the audit log with its checkpoint and anchor."""
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
@@ -62,3 +62,51 @@ class JobRun(Timestamps, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     detail: Mapped[str | None] = mapped_column(Text)  # a fixed summary, never an exception text with values
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class AuditLog(Base):
+    """One entry of the hash-chained audit log (FR-PRV-10, architecture 04 section 4). Append-only: the application role has SELECT and INSERT only.
+
+    `details` is the canonical JSON text that the hash covers, so a row can be re-hashed exactly as it was written. `actor` and `subject` are
+    pseudonymous ids (`subject_map`) or system names, never an email address or a name."""
+
+    __tablename__ = "audit_log"
+    __table_args__ = (
+        CheckConstraint("seq >= 1", name="seq"),
+        CheckConstraint("length(row_hash) = 64 AND length(prev_hash) = 64", name="hash_length"),
+        UniqueConstraint("row_hash", name="uq_audit_log_row_hash"),
+        Index("ix_audit_log_subject_seq", "subject", "seq"),
+        Index("ix_audit_log_actor_seq", "actor", "seq"),
+        Index("ix_audit_log_action_seq", "action", "seq"),
+    )
+
+    seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)  # strictly 1, 2, 3 ... with no gap (one writer at a time)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)  # whole seconds, UTC
+    actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    subject: Mapped[str | None] = mapped_column(String(128))
+    details: Mapped[str] = mapped_column(Text, nullable=False)
+    prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class AuditCheckpoint(Base):
+    """Written when old rows are purged: the hash of the last purged row, so the chain verifies from the next row (architecture 04 section 4)."""
+
+    __tablename__ = "audit_checkpoint"
+
+    seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AuditAnchor(Base):
+    """The head of the chain on one day, also published outside the database (OI-28: a signed line in a file on VM-P that an operator ships off the machine)."""
+
+    __tablename__ = "audit_anchor"
+
+    anchor_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    head_seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    head_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    anchored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    witness: Mapped[str] = mapped_column(String(16), nullable=False)  # `file` when a line was also written outside the database, else `db`

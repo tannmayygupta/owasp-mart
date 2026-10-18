@@ -26,6 +26,7 @@ from vulnmart.accounts.roles import RoleService
 from vulnmart.accounts.service import AccountService
 from vulnmart.accounts.session_api import router as session_router
 from vulnmart.accounts.sessions import SessionService
+from vulnmart.kernel.audit import AuditAnchors, FileAnchorSink
 from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRateLimiter
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
@@ -57,7 +58,7 @@ def _sessions_from(settings: Settings, ports) -> SessionService | None:
         key = secrets.token_bytes(32)
     if ports.sessions is None:
         return None
-    return SessionService(ports.sessions, ports.settings, key)
+    return SessionService(ports.sessions, ports.settings, key, audit=ports.audit)
 
 
 def field_keys_from(settings: Settings) -> FieldKeys:
@@ -110,7 +111,7 @@ def create_app(
     app.state.self_service = self_service or (SelfService(app.state.ports.sessions, app.state.session_service, policy)
                                               if app.state.ports.sessions is not None and app.state.session_service is not None else None)
     # The role and admin services have no route yet (the admin area is story P-28); later stories find them here. The audit port is the
-    # in-memory stand-in until story P-17.
+    # real log (DbAuditPort behind PseudonymisingAudit) when a database is configured, the in-memory stand-in otherwise (story P-17).
     ports = app.state.ports
     app.state.roles = RoleService(ports.sessions, ports.audit, app.state.session_service) if ports.sessions else None
     app.state.admins = AdminService(ports.sessions, ports.settings, ports.audit, public_origin=settings.public_origin, policy=policy) if ports.sessions else None
@@ -121,6 +122,13 @@ def create_app(
     app.state.consent_service = consent or (ConsentService(ports.sessions, consent_targets or FakeConsentTargets(), ports.audit, ports.settings,
                                                             field_keys or field_keys_from(settings))
                                             if ports.sessions is not None else None)
+    # The daily anchor of the audit log (story P-17). No route and no schedule yet: the scheduler of story P-24 calls `app.state.audit_anchors.anchor()`.
+    if ports.audit_db is not None and ports.audit_sessions is not None:
+        anchor_keys = field_keys or field_keys_from(settings)
+        app.state.audit_anchors = AuditAnchors(ports.audit_db, ports.audit_sessions, lambda line: anchor_keys.context_hash("audit-anchor", line),
+                                               FileAnchorSink(settings.audit_anchor_file) if settings.audit_anchor_file else None)
+    else:
+        app.state.audit_anchors = None
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)

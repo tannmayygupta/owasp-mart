@@ -619,6 +619,76 @@ describe('platform and web profiles on a real Docker engine', () => {
     psql(`DELETE FROM consent_records WHERE attempt_id = '${attempt}'`); // clean up as the owner, so a rerun on this volume starts empty
   }, { timeout: 120000 });
 
+  // Story P-17: the audit log and the key service on the real stack. A login through the proxy leaves a pseudonymised entry in the hash chain, the chain
+  // verifies and anchors, and the key service (database vm_keystore, its own role, the KEK from the environment) creates, uses and shreds a key.
+  test('audit and keys (P-17): a login is logged under a pseudonym, the chain verifies and anchors; a key is created, used and shredded in vm_keystore', async () => {
+    const email = `e2e-audit-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psqlDb = (db, sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', db, '-At', '-c', sql).stdout.trim();
+    const psql = (sql) => psqlDb('vulnmart', sql);
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Audit', age_declaration: true })).status, 202);
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    assert.equal((await postJson('/api/v1/session', { email, password: 'not the password at all' })).status, 401);
+    assert.equal((await postJson('/api/v1/session', { email, password })).status, 200);
+
+    // the entries exist, under pseudonyms: the user id and the address are nowhere in the table
+    const userId = psql(`SELECT id FROM users WHERE email_ci = '${email}'`);
+    assert.match(userId, /^u-[A-Z2-7]{16}$/);
+    const pseudonym = psql(`SELECT subject_id FROM subject_map WHERE user_id = '${userId}'`);
+    assert.match(pseudonym, /^s-[A-Z2-7]{16}$/);
+    assert.equal(psql(`SELECT string_agg(action, ',' ORDER BY seq) FROM audit_log WHERE subject = '${pseudonym}'`), 'auth.login_failed,auth.login');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE actor || coalesce(subject, '') || details LIKE '%${userId}%' OR details LIKE '%${email}%'`), '0');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE actor = '${pseudonym}' AND action = 'auth.login'`), '1');
+
+    // the database role of the API can read and append to the log and cannot change it
+    for (const sql of ["UPDATE audit_log SET actor = 'x'", 'DELETE FROM audit_log', 'TRUNCATE audit_log']) {
+      const refused = docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-c', `SET ROLE vulnmart_app; ${sql}`);
+      assert.notEqual(refused.status, 0, sql);
+      assert.match(refused.stderr, /permission denied/, sql);
+    }
+
+    // inside the API container: the real ports, as the running process builds them
+    const program = [
+      'import json, secrets',
+      'from vulnmart.main import app',
+      'from vulnmart.ports.errors import KeyShredded',
+      'p = app.state.ports',
+      'a = "a-E2E" + secrets.token_hex(6).upper()',
+      'out = {"keys": type(p.keys).__name__, "audit": type(p.audit_db).__name__}',
+      'p.keys.create_attempt_key(a)',
+      's = p.keys.encrypt(a, b"evidence", b"row")',
+      'out["round_trip"] = p.keys.decrypt(a, s, b"row").decode()',
+      'out["shred"] = p.keys.shred(a)',
+      'try:',
+      '    p.keys.decrypt(a, s, b"row")',
+      '    out["after_shred"] = "readable"',
+      'except KeyShredded:',
+      '    out["after_shred"] = "shredded"',
+      'v = p.audit_db.verify()',
+      'out["verify"] = [v.ok, v.checked >= 2]',
+      'r = app.state.audit_anchors.anchor()',
+      'out["anchor"] = [r.head_seq >= 2, r.witness]',
+      'print(json.dumps(out))',
+    ].join('\n');
+    const run = docker('exec', NAME('api'), 'python', '-c', program);
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(JSON.parse(run.stdout.trim().split('\n').pop()), {
+      keys: 'DbKeyPort', audit: 'DbAuditPort', round_trip: 'evidence', shred: true, after_shred: 'shredded', verify: [true, true], anchor: [true, 'db'],
+    });
+    assert.equal(psql(`SELECT count(*) FROM audit_anchor WHERE anchor_date = current_date`), '1');
+
+    // the keys are in their own database, with their own role, and the application's role cannot reach it
+    assert.equal(psqlDb('vm_keystore', 'SELECT count(*) FROM deks') >= '0', true);
+    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM shredded WHERE attempt_id LIKE 'a-E2E%'`), '1');
+    assert.equal(psqlDb('vm_keystore', `SELECT count(*) FROM deks WHERE attempt_id LIKE 'a-E2E%'`), '0', 'the wrapped key is gone, not marked');
+    assert.equal(psql(`SELECT count(*) FROM pg_tables WHERE tablename IN ('deks', 'shredded')`), '0', 'no key table in the data database');
+    const appToKeys = docker('exec', '-e', 'PGPASSWORD=vulnmart-app-dev-only-not-a-secret', NAME('postgres'), 'psql', '-h', '127.0.0.1', '-U', 'vulnmart_app', '-d', 'vm_keystore', '-c', 'SELECT 1');
+    assert.notEqual(appToKeys.status, 0);
+    assert.match(appToKeys.stderr, /permission denied|not allowed|CONNECT/i);
+  }, { timeout: 120000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

@@ -122,3 +122,17 @@
 - `audit_seq` links to the in-memory audit stand-in until P-17, so it points at nothing durable yet.
 - The inventory test lists the columns of the tables of streams P; the lab's tables (attempts, evidence, events) are inventoried by stream L's stories.
 - The rate limit on decisions (30 an hour per account) is a placeholder.
+
+## Deferred from: story-audit-log-and-key-service-plan (2026-10-18)
+
+- The 12-month purge of audit rows (needs a privileged path that writes a checkpoint first) and the scheduled daily anchor job and chain check with an admin alert: story P-24.
+- The audit entries of events that do not exist yet (approvals, invites, views and exports of candidate data, assessment steps, deletion steps, retention changes, admin access, log reads, failed access to resources): each is written by the story that creates the event.
+- The keystore snapshot after every shred (new snapshot, then delete older ones), the 14-day backup of the data database off VM-P, shipping the anchor file off the machine, and mounting a writable volume for it: operator and deployment steps (runbook, P-32, L-17); nothing was run on a VM.
+- A restore drill with real backup files (spike S-19); the test here uses a copy of the data taken before the shred.
+- The signed one-line commit to a separate repository and the email to the admins (ADR 0008) are not built; the anchor is a table row and a signed line in a file.
+- KeyPort.flag has no key version argument (handoff H-137); the three master keys have no rotation procedure.
+- The seed-admin command still writes its `admin.created` entry to an in-memory port, not to the durable log.
+- The audit write is committed before the caller's transaction (an action that rolls back still leaves its entry); joining the caller's transaction needs a request-scoped session.
+- Raw user ids remain in other tables (consent records, the email outbox): the pseudonym protects the audit log only (P-25).
+- Every failed login writes an audit row; the volume is bounded by the rate limits but not by retention until P-24.
+- OI-28 is answered (self-hosted on VM-P) but not yet written into initial.md.
