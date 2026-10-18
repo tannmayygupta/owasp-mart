@@ -116,9 +116,18 @@ class AccountService:
 
     def signup(self, *, email: str, password: str, display_name: str) -> None:
         """Create a learner and queue the verification mail, or queue the "already registered" mail. Returns nothing either way."""
+        self.signup_account(email=email, password=password, display_name=display_name)
+
+    def signup_account(self, *, email: str, password: str, display_name: str, account_type: str = "participant",
+                       check_email: Callable[[str], None] | None = None, on_create: Callable[[Session, User], None] | None = None) -> None:
+        """The signup of any account type (the learner signup above, the recruiter signup of story P-18). `check_email` gets the canonical address and
+        raises InvalidInput to refuse it (it must not depend on whether the address has an account); `on_create` runs in the same transaction
+        right after a new user row exists (never for a known address), so what it adds is made exactly when the account is."""
         email_ci = normalize_email(email)
         if email_ci is None:
             raise InvalidInput("/email")
+        if check_email is not None:
+            check_email(email_ci)
         name = clean_display_name(display_name)
         check_new_password(self._policy, password, pointer="/password", email=email_ci, display_name=name)
         password_hash = hash_password(password)  # always, so a known address costs the same time as a new one
@@ -129,11 +138,14 @@ class AccountService:
                 if existing is not None:
                     self._send_already_registered(session, existing)
                     return
-                user = User(id=new_user_id(), account_type="participant", email=email.strip()[:254], email_ci=email_ci,
+                user = User(id=new_user_id(), account_type=account_type, email=email.strip()[:254], email_ci=email_ci,
                             password_hash=password_hash, display_name=name, status="active", age_declared_at=now)
                 session.add(user)
                 session.flush()
-                session.add(UserRole(user_id=user.id, role="learner", account_type="participant"))
+                if account_type == "participant":
+                    session.add(UserRole(user_id=user.id, role="learner", account_type="participant"))
+                if on_create is not None:
+                    on_create(session, user)
                 self._send_verification(session, user.id, now)
         except IntegrityError:
             # Two signups for one address at the same moment: the second one lost the unique index. Answer as for a known address.

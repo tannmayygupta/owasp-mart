@@ -1,0 +1,48 @@
+# Free webmail domains (story P-19, FR-ORG-03): an address on one of these says nothing about a company, so its domain never claims a company and never matches
+# one (two recruiters with gmail.com addresses are strangers, not colleagues). One domain a line; "#" starts a comment.
+# A STARTER LIST written from memory of common providers. It is NOT complete and NOT verified against a maintained source. A domain missing here can be
+# claimed by the first person who signs up with it, and other people with an address there then ask that person to join. Replace it with a maintained
+# list and record its source and date here before relying on it. A subdomain of a listed domain counts too.
+gmail.com
+googlemail.com
+outlook.com
+outlook.in
+hotmail.com
+hotmail.co.uk
+live.com
+live.in
+msn.com
+yahoo.com
+yahoo.in
+yahoo.co.in
+yahoo.co.uk
+yahoo.fr
+ymail.com
+rocketmail.com
+icloud.com
+me.com
+mac.com
+aol.com
+proton.me
+protonmail.com
+pm.me
+tutanota.com
+tuta.io
+gmx.com
+gmx.net
+gmx.de
+web.de
+mail.com
+zoho.com
+zohomail.com
+yandex.com
+yandex.ru
+mail.ru
+qq.com
+163.com
+126.com
+sina.com
+rediffmail.com
+fastmail.com
+hey.com
+hushmail.com

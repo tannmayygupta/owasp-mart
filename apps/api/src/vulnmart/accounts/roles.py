@@ -98,6 +98,10 @@ class RoleService:
         if role not in ROLES:
             raise ValueError(f"unknown role {role!r}")
 
+    def require_admin(self, actor: Scope) -> str:
+        """For other modules (story P-18): the admin's user id, or NotAnAdmin."""
+        return self._require_admin(actor)
+
     def _require_admin(self, actor: Scope) -> str:
         """The admin's user id. The scope says admin and the database must agree: an account that stopped being an active admin is refused."""
         if not actor.is_admin:

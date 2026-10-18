@@ -87,8 +87,8 @@ def test_an_unknown_name_or_a_wrongly_typed_row_is_refused(port):
 
 def test_the_history_has_one_root_and_one_head():
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0008"]
-    assert [r.revision for r in script.walk_revisions()] == ["0008", "0007", "0006", "0005", "0004", "0003", "0002", "0001"]
+    assert script.get_heads() == ["0010"]
+    assert [r.revision for r in script.walk_revisions()] == ["0010", "0009", "0008", "0007", "0006", "0005", "0004", "0003", "0002", "0001"]
 
 
 def test_stream_l_single_head_check_passes():
@@ -138,4 +138,5 @@ def test_every_table_of_the_metadata_is_in_the_table_owners_file():
         sorted(["email_outbox", "email_tokens", "job_runs", "org_members", "organizations", "quotas", "sessions", "settings", "user_roles", "users",
                 "activity_buckets", "attempt_events", "attempts", "bot_visits", "evidence", "events", "flag_submissions", "held_captures",
                 "hint_unlocks", "instance_epochs", "instances", "integrity_flags", "milestones", "review_audit", "security_events",
-                "audit_anchor", "audit_checkpoint", "audit_log", "consent_records", "mfa_credentials", "recovery_codes", "subject_map"]))
+                "audit_anchor", "audit_checkpoint", "audit_log", "consent_records", "mfa_credentials", "recovery_codes", "subject_map",
+                "dpa_acceptances", "join_requests"]))

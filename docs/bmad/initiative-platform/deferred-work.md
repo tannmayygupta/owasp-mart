@@ -136,3 +136,27 @@
 - Raw user ids remain in other tables (consent records, the email outbox): the pseudonym protects the audit log only (P-25).
 - Every failed login writes an audit row; the volume is bounded by the rate limits but not by retention until P-24.
 - OI-28 is answered (self-hosted on VM-P) but not yet written into initial.md.
+
+## Deferred from: story-recruiter-signup-and-company-approval-plan (2026-10-18)
+
+- No HTTP route: IF-1 has no recruiter signup, standing, queue or decision route. A route is a contract change (bundle, generated clients, mock, COMPAT, the contract owner's look): story 5.3 of the companies epic (handoff H-138).
+- Colleagues joining a company by request, the data-processing terms accepted at approval (architecture 04 section 10.5), the invite cap, the admin delete, and the organisation scope set from the session for recruiters: story P-19. Two recruiters of one domain each start their own company until then.
+- The invite itself and its use of the gate `active_company_of`: P-20.
+- The admin queue screen and the other admin operations: P-28.
+- The disposable-domain list is a starter list of 75 domains written from memory; it is not maintained and not verified. Replace it with a maintained list and record its source and date.
+- OI-10 and OI-11 are answered by the developer (free webmail allowed with no extra check; re-apply at any time) but not yet written into initial.md. With no check on free webmail and no waiting period, the single admin approval is the only gate against fake recruiters.
+- A company is created for any domain: nothing checks that the email domain belongs to the company named.
+- The mail to admins about a new pending company is not built (the queue is pulled).
+- The two read-only policies (`admin_read`, `own_membership`) are exceptions to ADR 0014's one rule: a future table must opt in on purpose, and nothing with candidate data may.
+
+## Deferred from: story-company-members-admin-controls-data-scoping-terms-and-invite-caps-plan (2026-10-18)
+
+- Still no HTTP route for any recruiter, company or admin function (story 5.3, a contract change); the terms page, the member list and the join request screens are dashboards work.
+- The cap is a decision function: counting the invites sent today, showing the message and keeping the pending list is story P-20. Assessments, invites and candidates do not exist yet, so a test that a recruiter of company A cannot read, change or guess company B's assessments, invites or candidates comes with P-20 and P-21 (two tests already fail when a new table with an organisation column is not scoped).
+- Deleting a company changes its state, ends its members' access and frees its domain; removing its data (and its join requests and terms acceptances, which the application role cannot delete) follows the retention rules: P-24, P-25.
+- A person is in one company only; changing company means being removed and asking again. An owner cannot hand the company to someone else or leave it.
+- Nothing checks that a domain belongs to the company named; with OI-10 and OI-11 as answered, the one admin approval is the only gate, and the first signup of a small provider's domain that is missing from the free-webmail list claims it.
+- The free-webmail list is a starter list from memory (about 45 domains); replace it with a maintained list. The data-processing terms are a draft no lawyer has reviewed (OI-33).
+- A colleague's outcome mail reuses the company approval template ("your company has been approved"); a dedicated template changes the FR-NTF-01 list.
+- The owner is not told about a new join request by mail (the list is pulled); a stream already open when a recruiter is removed or suspended is for the live-update stories to close (P-22, P-23).
+- OI-11's second half (company-name verification beyond the email domain) was not asked and is not built.

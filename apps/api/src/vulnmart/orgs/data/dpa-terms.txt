@@ -1,0 +1,24 @@
+# Data-processing terms for companies (story P-19, FR-ORG-07). Lines that start with "#" are not shown. Changing any shown line changes the hash, so the version in
+# terms.py must change with it (a test checks this). DRAFT wording: a lawyer has not reviewed it (OI-33); do not publish it as final. The marker {{company}} is
+# filled in before the text is hashed and shown.
+
+Data-processing terms for {{company}}
+
+These terms apply when {{company}} invites candidates to an assessment on VulnMart.
+
+Roles
+- {{company}} decides why and how the results of its candidates are used. {{company}} is the controller of that data.
+- VulnMart runs the assessment and stores the candidate's data for {{company}}. VulnMart is the processor of that data.
+
+What VulnMart does
+- It processes candidate data only to run the assessment, to show the results to {{company}} and to keep the records the candidate was told about.
+- It does not use candidate data for anything else, and it does not show it to another company.
+- It keeps candidate data for the time shown to the candidate and then deletes it. It carries out a candidate's request to see, download or delete their data, and tells {{company}} where the request touches its results.
+- It keeps the data safe with the measures described on the VulnMart site, and it tells {{company}} without undue delay if it learns that candidate data was exposed.
+
+What {{company}} does
+- It invites only people who are 18 or over, and only for a real hiring purpose.
+- It uses the results only for that purpose, and does not share a candidate's data outside {{company}} except where the law requires it.
+- It answers its candidates' questions about how it uses their results.
+
+Accepting these terms is needed before {{company}} can invite candidates. The acceptance is recorded with the name of the person who accepted, the version of these terms and the time.

@@ -6,14 +6,14 @@ Developer: tannmayygupta. Date: 2026-10-18. Branch: sprint-4-tanmay.
 FR-PRV-12 (key service), FR-SES-02, FR-SES-10, NFR-SEC-04, D-98 follow-up; handoff H-137 (answered).
 
 ## Summary (plain language, 3-5 lines)
-Before opening the pull request I merged main into the branch and reviewed the result. Two real problems showed up. Both branches had a migration called 0005, so the chain was broken. And Akshay's key service (P-17, a separate keystore database) already existed, while I had built a second, weaker one in the main database. The lab now uses his, and my migration is 0008.
+Before opening the pull request I merged main into the branch and reviewed the result. Two real problems showed up. Both branches had a migration called 0005 (and when I merged main a second time, main had gained 0008 and 0009 as well), so the chain was broken. And Akshay's key service (P-17, a separate keystore database) already existed, while I had built a second, weaker one in the main database. The lab now uses his, and my migration is 0010.
 
 ## Why
 A pull request that merges two migration histories with the same id, or two key implementations that disagree about where keys live, would break the first real deployment and weaken the privacy design (keys apart from data, shredding without touching data).
 
 ## What was built
-- Merge of origin/main (6 commits, Akshay's P-15, P-16, P-17) with conflicts resolved: CHANGELOG (both kept), main.py (lab mount plus mfa and consent routers), test_kernel_settings (new head 0008 and the union of tables), test_kernel_postgres (dynamic head).
-- Lab-state migration renamed 0005 to 0008, now revising 0007.
+- Merge of origin/main (6 commits, Akshay's P-15, P-16, P-17) with conflicts resolved: CHANGELOG (both kept), main.py (lab mount plus mfa and consent routers), test_kernel_settings (new head 0010 and the union of tables), test_kernel_postgres (dynamic head).
+- Lab-state migration renamed 0005 to 0008, and again to 0010 when main gained its own 0008 and 0009 (P-18, P-19), now revising 0007.
 - attempts added to the data inventory of tests/test_data_minimum.py (P-16 test failed without it: the table holds a user id).
 - The lab runtime now takes its keys from `key_port_from(Settings())` (DbKeyPort over vm_keystore). `vulnmart.lab.keys` (StoredKeyPort) is deleted; its tests are replaced by tests on a real keystore database (test_lab_pg.py `keystore_engine`), and Akshay's tests already cover the key service itself.
 - Deployment: platform compose runs `python -m vulnmart.kernel.migrate` (creates vm_keystore and its role), the API gets VULNMART_KEYSTORE_DSN, KEK and the three masters as files; deploy-secrets makes event_master, flag_key, owner_key, kek and keystore_password; live-deploy stages them.
@@ -27,7 +27,7 @@ A pull request that merges two migration histories with the same id, or two key 
 Two migrations with revision id 0005 (renamed mine). The privacy inventory test failing on attempts (added). A first guess at the test database user failed; the real credentials come from the container's environment.
 
 ## Deployed result (same day, after the developer approved stopping vm-p and recreating its database)
-- vm-p stopped, its Postgres volume removed, the new build started: migrate job created the schema to head 0008 and the keystore database vm_keystore (own role); the data database holds no key table (0 of deks and shredded), vm_keystore holds deks, keystore_schema and shredded.
+- vm-p stopped, its Postgres volume removed, the new build started: migrate job created the schema to head 0010 and the keystore database vm_keystore (own role); the data database holds no key table (0 of deks and shredded), vm_keystore holds deks, keystore_schema and shredded.
 - First start failed: VULNMART_ENV=production needs a field key since Akshay's MFA code (P-15) was merged. Added field_secret (64 hex, made by deploy-secrets, mounted in api and worker). Second start healthy.
 - Deployed journey (scripts/e2e-live.mjs): 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run6-new-key-service.json).
 - Suites after the key switch: npm test 1030 passed, 2 skipped; orchestrator 467 passed; py-attempts 357 passed; apps/api run with Postgres enabled (see the pull request).
@@ -37,7 +37,7 @@ Fixed, each with a regression test:
 1. BLOCKER Withdrawal did not erase what it claimed: no key shred, a failed purge was never retried, rows of replaced instances survived. Now `LabRuntime._erase` shreds the key first, purges, then marks the attempt purged; `tick` finishes any deleted attempt not yet purged; replaced or removed instances drop their events, activity, bot visits and epochs (tests: test_a_deleted_attempt_loses_its_key..., test_the_rows_of_a_replaced_instance...).
 2. MAJOR Captured request bodies sat in clear in `events.event`. Now the event row keeps metadata and the body length only; the body exists only sealed in `evidence` (test_a_capture_body_is_never_kept_in_the_events_table).
 3. MAJOR Instance leak if the API stopped midway through a start. A retried start now destroys the instance of the stale directory row first (test_a_start_that_died_midway...).
-5. MAJOR App role broader than the code needs. Narrowed in migration 0008: attempts no DELETE; evidence and instance_epochs no UPDATE; events only UPDATE (digest, engine_seen); proved by a parametrized permission-denied test.
+5. MAJOR App role broader than the code needs. Narrowed in migration 0010: attempts no DELETE; evidence and instance_epochs no UPDATE; events only UPDATE (digest, engine_seen); proved by a parametrized permission-denied test.
 10. Reviewer refusals (ReviewFinal, ReviewForbidden, NotHeld) were unmapped 500s; now 409/404 like the integrity-flag route.
 9. Reverse tabnabbing: the console clears window.opener before sending the ticket URL to the vulnerable lab shop.
 12. deploy-secrets --force could destroy every key silently: now needs --destroy-keys too when a kek exists.
@@ -61,7 +61,7 @@ Not fixed tonight, with the reason:
 - After the fixes: see the pull request (full runs are repeated after the final merge of main).
 
 ## Deployed result (after the developer approved stopping vm-p and recreating its database)
-- vm-p stopped, its Postgres volume removed, the new build started: the migrate job created the schema to head 0008 and the keystore database vm_keystore (own role); the data database holds no key table, vm_keystore holds deks, keystore_schema and shredded.
+- vm-p stopped, its Postgres volume removed, the new build started: the migrate job created the schema to head 0010 and the keystore database vm_keystore (own role); the data database holds no key table, vm_keystore holds deks, keystore_schema and shredded.
 - First start failed: VULNMART_ENV=production needs a field key since Akshay's MFA code (P-15) was merged. Added field_secret. Second start healthy.
 - Deployed journey (scripts/e2e-live.mjs): 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run6-new-key-service.json).
 

@@ -30,10 +30,10 @@ Two databases in one PostgreSQL 18 cluster: `vulnmart` (everything below) and `v
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `organizations` | `id`, `name`, `email_domain`, `status` (state machine below), `owner_user_id`, `rejected_reason`, `suspended_reason` | `org_id` root for scoping |
+| `organizations` | `id`, `name`, `email_domain`, `status` (state machine below), `owner_user_id`, `rejected_reason`, `suspended_reason`, `domain_claim` (the work email domain the company claims, unique, story P-19: the next recruiter of that domain asks to join; null for free webmail, rejected and deleted companies), `invite_cap` (the admin's override of the daily invite cap, FR-ORG-08; null: the global setting) | `org_id` root for scoping |
 | `org_members` | `org_id`, `user_id`, `role` (`owner`, `member`), `status` | |
-| `join_requests` | `org_id`, `user_id`, `status`, `decided_by` | Owner decides (FR-ORG-03) |
-| `dpa_acceptances` | `org_id`, `user_id`, `terms_version`, `accepted_at` | FR-ORG-07 |
+| `join_requests` | `id`, `org_id`, `user_id`, `status` (`requested`, `approved`, `rejected`), `decided_by`, `decided_at`, `created_at` | Owner decides (FR-ORG-03). Row-level security by company; the requester also reads their own (policy `own_join_request`) |
+| `dpa_acceptances` | `id`, `org_id`, `user_id`, `terms_version`, `terms_sha256`, `accepted_at` | FR-ORG-07. One per company and version; append-only for the application role |
 
 ### 2.3 Catalogue (content owned by T, tables read by P and L)
 
@@ -111,6 +111,8 @@ Rule (FR-ORG-06, NFR-EXT-01): every recruiter-owned row has `org_id`, and **one 
 
 1. **Application layer.** A single database-session class applies an organization filter to every query on tables that carry `org_id`. If a query touches such a table and the session has no organization scope, it **raises an error** instead of returning rows (the "missing filter fails a test" criterion).
 2. **Database layer.** PostgreSQL Row-Level Security on the same tables with a policy comparing `org_id` to a per-transaction setting. By default a table owner and any role with BYPASSRLS skip RLS, and a table with RLS enabled and no policy shows no rows `[EF-25]`, so the application connects as a role that is **not** the table owner and has no BYPASSRLS, and the tables use `FORCE ROW LEVEL SECURITY`. Setting the variable per transaction is a common pattern, not in the page read `[EF-25]`.
+
+**As built (story P-18, ADR 0048): two read-only exceptions.** A session whose scope is an admin with no company reads `organizations` across companies (policy `admin_read`, the setting `vulnmart.admin`, and `org_scoped(admin_visible=True)` in Python), which the approval queue needs; and a person with no company in scope reads only the `org_members` rows that name them (policy `own_membership`, the setting `vulnmart.user_id`, and `org_scoped(self_column="user_id")`), which answers "which company am I in". Writes still need the company in scope; no table with candidate data is opted in.
 
 A second scope exists for participants: rows owned by a person are filtered by `user_id`. Tests (FR-DSH-06, NFR-SEC-08) try cross-user and cross-company reads for every role against every list and detail route; the 404-versus-403 choice is the same for "missing" and "not yours" so identifiers cannot be probed.
 

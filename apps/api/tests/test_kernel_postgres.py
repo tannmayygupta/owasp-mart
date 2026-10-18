@@ -93,7 +93,7 @@ def test_the_app_role_owns_nothing_and_cannot_bypass_row_level_security(db):
     app.dispose()
     assert tuple(row) == (False, False)
     assert "vulnmart_app" not in owners
-    assert forced == ["org_members", "organizations"]
+    assert forced == ["dpa_acceptances", "join_requests", "org_members", "organizations"]
 
 
 def test_row_level_security_shows_only_the_organisation_of_the_transaction(db):

@@ -22,6 +22,7 @@ SETTINGS: dict[str, int | bool | str] = {
     "consent_withdraw_undo_days": 7,  # FR-PRV-08
     "consent_record_extra_months": 12,  # FR-PRV-02, OI-37 (developer's answer 2026-10-18; [LAWYER] review pending): the short consent record outlives the assessment record by this
     "rate_consent_per_user_per_hour": 30,  # FR-PRV-02 (placeholder): consent decisions from one account; a person decides once per attempt
+    "invite_cap_per_company_per_day": 50,  # FR-ORG-08 (placeholder, to be tuned against email limits NFR-CST-02): invites one company may send a day; an admin can set another number for one company
     "flag_submit_per_minute": 10,  # FR-FLG (placeholder)
     "rate_login_per_ip_per_hour": 60,  # FR-ACC-10 (placeholder): every login attempt from one visitor address
     "login_failures_per_window": 10,  # FR-ACC-08, FR-ACC-10 (placeholder): wrong passwords for one address before it waits

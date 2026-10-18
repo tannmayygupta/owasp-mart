@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from vulnmart.accounts.api import router as accounts_router
+from vulnmart.accounts.directory import UserDirectory
 from vulnmart.accounts.admins import AdminService
 from vulnmart.accounts.fieldkeys import FieldKeys
 from vulnmart.accounts.me_api import router as me_router
@@ -26,6 +27,7 @@ from vulnmart.accounts.self_service import SelfService
 from vulnmart.accounts.roles import RoleService
 from vulnmart.accounts.service import AccountService
 from vulnmart.accounts.session_api import router as session_router
+from vulnmart.accounts.status import AccountStatusService
 from vulnmart.accounts.sessions import SessionService
 from vulnmart.kernel.audit import AuditAnchors, FileAnchorSink
 from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRateLimiter
@@ -34,6 +36,7 @@ from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
 from vulnmart.lab.runtime import LabRuntime
 from vulnmart.lab.tickets import TicketMinter, minter_from_environ
+from vulnmart.orgs.service import CompanyService
 from vulnmart.privacy.api import router as consent_router
 from vulnmart.privacy.consent import ConsentService
 from vulnmart.privacy.targets import ConsentTargets, FakeConsentTargets
@@ -152,6 +155,13 @@ def create_app(
     ports = app.state.ports
     app.state.roles = RoleService(ports.sessions, ports.audit, app.state.session_service) if ports.sessions else None
     app.state.admins = AdminService(ports.sessions, ports.settings, ports.audit, public_origin=settings.public_origin, policy=policy) if ports.sessions else None
+    # Recruiter signup and company approval (story P-18): no route yet (IF-1 has none, handoff H-138); the admin area (P-28) and the invite stories call this.
+    app.state.companies = (CompanyService(ports.sessions, app.state.accounts, UserDirectory(ports.sessions), app.state.roles, ports.audit, ports.scope,
+                                          ports.settings, AccountStatusService(ports.sessions, app.state.roles, ports.audit), public_origin=settings.public_origin,
+                                          end_sessions=app.state.session_service.revoke_all if app.state.session_service is not None else None)
+                           if ports.sessions is not None and app.state.accounts is not None and app.state.roles is not None else None)
+    if app.state.companies is not None and app.state.session_service is not None:
+        app.state.session_service.set_org_resolver(app.state.companies.membership_of)  # a recruiter acts for their company in every request (story P-19)
     field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
     app.state.mfa_service = mfa or (MfaService(ports.sessions, field_keys, ports.audit, app.state.session_service)
                                     if ports.sessions is not None and app.state.session_service is not None else None)
