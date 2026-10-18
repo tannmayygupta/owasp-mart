@@ -1,40 +1,54 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c03
-title: "Injection"
-status: stub
+title: Injection
+status: complete
 owasp:
-  "2021": "A03"
-  "2025": "A05"
+  "2021": A03
+  "2025": A05
 cwe:
-  primary: "CWE-89"
-  related: ["CWE-79"]
-attack: ["T1190", "T1059.007"]
+  primary: CWE-89
+  related:
+    - CWE-79
+attack:
+  - T1190
+  - T1059.007
 difficulty: 3
 tier: Medium
 flag:
   placement: catalogue-store
   delivery: catalogue
-start_state: "a customer able to search products and open support tickets (placeholder seed)"
+start_state: part A needs no account (anonymous search); part B needs a seeded customer ticket author
 milestones:
   m1:
-    summary: "the player found a weakness in product search or stored ticket markup"
-    signal: null
+    summary: the player found a weakness in product search or stored ticket markup
+    signal: "part A: shop.catalog_query_error (a SQL error from search) or proxy.crs_match; part B: shop.ticket_markup_stored"
   m2:
-    summary: "the player exploited the SQL injection or ran stored XSS in the support bot"
-    signal: null
+    summary: the player exploited the SQL injection or ran stored XSS in the support bot
+    signal: "part A: the search response holds the ops-note marker or the flag; part B: collector.hit with bot_tagged = true"
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: "part A: proxy.flag_seen (C03A) on the search route; part B: collector.hit with a valid token for C03B"
 hints:
   - level: 1
-    text: null
+    text: >-
+      Part A: what happens when your search text contains a single quote? Part B: how does the agent screen show your
+      message?
   - level: 2
-    text: null
+    text: >-
+      Part A: your text ends up inside a database query; UNION can add rows from another table. Part B: text may be
+      shown as page code.
   - level: 3
-    text: null
+    text: >-
+      Part A: the query has four columns; read a table of merchandising notes. Part B: put a small script in a ticket
+      message that reads the agent profile.
 exploit_test: challenges/tests/c03
 fixed_build: challenges/fixed/c03
+brief: >-
+  Two injection flaws: a product search built by string concatenation (SQLi) and a support ticket message shown
+  unescaped (stored XSS).
+write_up:
+  vulnerable: String-concatenated SQL; an unescaped render of stored user markup.
+  fix: Parameterised queries (+ allow-listed sort, least-privilege account, generic errors); HTML-escape all user content.
+decoys: []

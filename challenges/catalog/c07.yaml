@@ -1,40 +1,48 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c07
-title: "Authentication Failures"
-status: stub
+title: Authentication Failures
+status: complete
 owasp:
-  "2021": "A07"
-  "2025": "A07"
+  "2021": A07
+  "2025": A07
 cwe:
-  primary: "CWE-307"
-  related: ["CWE-640"]
-attack: ["T1110.001", "T1078"]
+  primary: CWE-307
+  related:
+    - CWE-640
+attack:
+  - T1110.001
+  - T1078
 difficulty: 2
 tier: Easy
 flag:
   placement: database-seed
   delivery: db
-start_state: "a customer who knows the finance account exists (placeholder seed)"
+start_state: a seeded customer (or none); the finance mailbox address is on the public Contact page
 milestones:
   m1:
-    summary: "the player requested a password reset for the finance account"
-    signal: null
+    summary: the player requested a password reset for the finance account
+    signal: auth.reset_requested with account_role = finance from a non-finance session
   m2:
-    summary: "the finance password was changed through the reset flow"
-    signal: null
+    summary: the finance password was changed through the reset flow
+    signal: "auth.password_reset_completed with account_role = finance (backup: >500 failed confirms then a success)"
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: proxy.flag_seen on /finance/settings/settlement for a finance session
 hints:
   - level: 1
-    text: null
+    text: Finance staff forget passwords too. How does the shop prove who you are when you do?
   - level: 2
-    text: null
+    text: Look at how long the reset code is and what happens after many wrong tries.
   - level: 3
-    text: null
+    text: Request a reset for the finance mailbox, then send every possible code to the confirm step with a tool.
 exploit_test: challenges/tests/c07
 fixed_build: challenges/fixed/c07
+brief: The password reset uses a short 4-digit code with no attempt limit; brute-force it to take over the finance account.
+write_up:
+  vulnerable: A 4-digit code, no attempt limit, and responses that reveal which accounts exist.
+  fix: >-
+    A 128-bit single-use token hashed at rest, an attempt limit per token and per account, generic responses, notify the
+    owner, end sessions after reset.
+decoys: []

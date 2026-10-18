@@ -37,12 +37,18 @@ export function semanticProblems(entry, stem, rawText) {
   if (entry.tier !== want) {
     problems.push(`tier "${entry.tier}" does not match difficulty ${entry.difficulty} (expected "${want}")`);
   }
-  // The exploit-test and fixed-build paths must point at this challenge's own key.
+  // The exploit-test and fixed-build references must point at this challenge's key.
   if (entry.exploit_test && !entry.exploit_test.endsWith(`/${entry.key}`)) {
     problems.push(`exploit_test "${entry.exploit_test}" does not end with the key "${entry.key}"`);
   }
   if (entry.fixed_build && !entry.fixed_build.endsWith(`/${entry.key}`)) {
     problems.push(`fixed_build "${entry.fixed_build}" does not end with the key "${entry.key}"`);
+  }
+  // A "complete" entry must have no placeholder nulls in its milestones or hints.
+  if (entry.status === 'complete') {
+    for (const m of ['m1', 'm2', 'm3']) if (entry.milestones?.[m]?.signal == null) problems.push(`complete entry has a null ${m}.signal`);
+    for (const h of entry.hints ?? []) if (h.text == null) problems.push(`complete entry has a null hint (level ${h.level})`);
+    if (!entry.brief) problems.push('complete entry is missing a brief');
   }
   // A flag delivered through the environment needs a written reason (FR-FLG-03).
   if (entry.flag?.delivery === 'env' && !entry.flag?.reason) {

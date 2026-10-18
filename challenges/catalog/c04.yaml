@@ -1,40 +1,50 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c04
-title: "Insecure Design"
-status: stub
+title: Insecure Design
+status: complete
 owasp:
-  "2021": "A04"
-  "2025": "A06"
+  "2021": A04
+  "2025": A06
 cwe:
-  primary: "CWE-840"
-  related: ["CWE-841", "CWE-799"]
-attack: ["T1657"]
+  primary: CWE-840
+  related:
+    - CWE-841
+    - CWE-799
+attack:
+  - T1657
 difficulty: 3
 tier: Medium
 flag:
   placement: database-seed
   delivery: db
-start_state: "a customer with a seeded order eligible for the instant-refund path (placeholder seed)"
+start_state: seeded customer with one delivered order, total paid 2,500 (placeholder)
 milestones:
   m1:
-    summary: "the player used the instant-refund rule on the seeded order"
-    signal: null
+    summary: the player used the instant-refund rule on the seeded order
+    signal: shop.refund_decision with path = quick (any decision)
   m2:
-    summary: "two or more quick refunds were auto-approved on one order"
-    signal: null
+    summary: two or more quick refunds were auto-approved on one order
+    signal: platform counts shop.refund_decision path = quick, decision = auto_approved for one order_id (>= 2)
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: shop.refund_invariant_broken plus proxy.flag_seen on the refund statement route
 hints:
   - level: 1
-    text: null
+    text: Refund your delivered order. Then look at what the shop says is still refundable.
   - level: 2
-    text: null
+    text: The instant-refund rule looks at each request alone. Does anything add the requests up?
   - level: 3
-    text: null
+    text: Ask for a refund below the instant limit twice, so the sum is more than you paid.
 exploit_test: challenges/tests/c04
 fixed_build: challenges/fixed/c04
+brief: >-
+  A "quick refund" feature checks each request against a limit but never the running total, so repeated refunds exceed
+  the amount paid.
+write_up:
+  vulnerable: A second refund feature written without the shared refundable-balance invariant.
+  fix: >-
+    One assertRefundable on every path, a per-order refundable balance enforced in a transaction, a count cap,
+    idempotency keys, an abuse-case review.
+decoys: []

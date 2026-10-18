@@ -302,7 +302,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The flag shows only when the store was approved by the fail-open path and the exploit test passes and fails as required.
   - Handoffs: H-55 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
+- [x] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
   - Epic: `epic-catalogue-hints-and-verification`
   - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
   - EARLY PR: yes. P-26 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.

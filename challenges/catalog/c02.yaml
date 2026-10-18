@@ -1,40 +1,50 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c02
-title: "Cryptographic Failures"
-status: stub
+title: Cryptographic Failures
+status: complete
 owasp:
-  "2021": "A02"
-  "2025": "A04"
+  "2021": A02
+  "2025": A04
 cwe:
-  primary: "CWE-328"
-  related: ["CWE-799", "CWE-330", "CWE-338"]
-attack: ["T1657"]
+  primary: CWE-328
+  related:
+    - CWE-799
+    - CWE-330
+    - CWE-338
+attack:
+  - T1657
 difficulty: 3
 tier: Medium
 flag:
   placement: database-seed
   delivery: db
-start_state: "a customer who has bought a few gift cards (placeholder seed)"
+start_state: a seeded or self-registered customer; buying a card uses the simulated payment
 milestones:
   m1:
-    summary: "the player tried a well-formed gift-card code that is not their own"
-    signal: null
+    summary: the player tried a well-formed gift-card code that is not their own
+    signal: shop.giftcard_attempt with result = unknown_wellformed (a well-formed code not issued to the player)
   m2:
-    summary: "the player redeemed a card they did not buy"
-    signal: null
+    summary: the player redeemed a card they did not buy
+    signal: shop.giftcard_attempt result = redeemed, card_class = unsold_test
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: shop.giftcard_attempt card_class = flag_card, plus proxy.flag_seen on /api/wallet/redeem
 hints:
   - level: 1
-    text: null
+    text: Look at your two gift-card codes. Do they look random?
   - level: 2
-    text: null
+    text: The code is a fingerprint of something printed on the receipt. Which common hash gives 32 hex characters?
   - level: 3
-    text: null
+    text: Hash the serial of the oldest card the same way; use the first 12 characters with the same prefix.
 exploit_test: challenges/tests/c02
 fixed_build: challenges/fixed/c02
+brief: Gift-card codes are derived from a predictable serial, so any card's code can be forged.
+write_up:
+  vulnerable: A bare unkeyed hash of a counter used as a secret code.
+  fix: >-
+    128-bit random codes from a CSPRNG, store only a keyed hash, single-use, rate limit and lock redemption, log
+    failures.
+decoys:
+  - staff test cards (serials 2 and 3) carry a proof marker, not the flag

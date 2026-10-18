@@ -1,40 +1,53 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c09
-title: "Logging and Alerting Failures"
-status: stub
+title: Logging and Alerting Failures
+status: complete
 owasp:
-  "2021": "A09"
-  "2025": "A09"
+  "2021": A09
+  "2025": A09
 cwe:
-  primary: "CWE-778"
-  related: ["CWE-223", "CWE-307"]
-attack: ["T1110.001", "T1078"]
+  primary: CWE-778
+  related:
+    - CWE-223
+    - CWE-307
+attack:
+  - T1110.001
+  - T1078
 difficulty: 3
 tier: Medium
 flag:
   placement: database-seed
   delivery: db
-start_state: "a customer who has found the legacy login route (placeholder seed)"
+start_state: a seeded customer; the player brings a wordlist
 milestones:
   m1:
-    summary: "the player used the legacy login route"
-    signal: null
+    summary: the player used the legacy login route
+    signal: auth.attempt with route = legacy (separate from the shop security log)
   m2:
-    summary: "an attack succeeded with zero security events recorded for the account"
-    signal: null
+    summary: an attack succeeded with zero security events recorded for the account
+    signal: >-
+      negative-observation rule: >= 20 legacy auth.attempt failures then a success in 10 minutes with zero
+      shop.security_event_written for that account
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: proxy.flag_seen on the case-notes route for a support session that is not the bot
 hints:
   - level: 1
-    text: null
+    text: Try the web login a few times. What does the shop do to you? Is every door guarded the same way?
   - level: 2
-    text: null
+    text: The shop also has a phone-app API. Compare what happens when you fail there.
   - level: 3
-    text: null
+    text: Guess the dormant support agent password on the app route, then use the session on the web side.
 exploit_test: challenges/tests/c09
 fixed_build: challenges/fixed/c09
+brief: >-
+  A legacy mobile login route logs nothing and never locks, so a brute force against a dormant support agent is
+  invisible.
+write_up:
+  vulnerable: One auth route missing from the security-event pipeline, with no lockout.
+  fix: >-
+    One shared auth service for all channels, log every authentication event, alert on thresholds, a test that every
+    route emits events, retire legacy APIs.
+decoys: []

@@ -111,7 +111,7 @@ test('owasp.2021 null is accepted (C11 has no 2021 category)', () => {
 test('a malformed OWASP tag fails the schema', () => {
   const tmp = makeTempCatalog();
   const p = path.join(tmp, 'c01.yaml');
-  fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('"2025": "A01"', '"2025": "A99"'));
+  fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/"2025": "?A01"?/, '"2025": "A99"'));
   const { ok, errors } = validateCatalog({ dir: tmp, schemaPath: DEFAULT_SCHEMA });
   assert.equal(ok, false);
   assert.ok(errors.some((e) => e.includes('c01.yaml')));
@@ -144,13 +144,8 @@ test('an exploit_test path for the wrong key fails', () => {
 test('hints out of order fail the schema', () => {
   const tmp = makeTempCatalog();
   const p = path.join(tmp, 'c01.yaml');
-  // Swap level 1 and 3 by renumbering the first and third hint. Normalize line
-  // endings first so the multi-line replace works on a CRLF (Windows) checkout.
-  const text = fs
-    .readFileSync(p, 'utf8')
-    .replace(/\r\n/g, '\n')
-    .replace('  - level: 1\n    text: null', '  - level: 3\n    text: null')
-    .replace('  - level: 3\n    text: null\nexploit_test', '  - level: 1\n    text: null\nexploit_test');
+  // Make the first hint level 2, so it no longer matches the prefixItems const 1.
+  const text = fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n').replace('- level: 1', '- level: 2');
   fs.writeFileSync(p, text);
   const { ok } = validateCatalog({ dir: tmp, schemaPath: DEFAULT_SCHEMA });
   assert.equal(ok, false);
