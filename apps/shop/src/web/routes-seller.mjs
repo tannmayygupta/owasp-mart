@@ -6,6 +6,7 @@ import { requireRole } from './middleware.mjs';
 import { ForbiddenError, NotFoundError, ValidationError } from '../domain/shop-service.mjs';
 import * as seller from '../domain/seller-service.mjs';
 import * as money from '../domain/money-service.mjs';
+import { getSellerOrderByNo } from '../challenges/c01-cross-store-order.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -20,7 +21,7 @@ const SELLER = requireRole('seller_owner', 'seller_staff');
 const OWNER = requireRole('seller_owner');
 const back = (res, title, message) => res.render('message', { title, message });
 
-export function registerSellerRoutes(app, db) {
+export function registerSellerRoutes(app, db, { emit = () => {}, challenges = {} } = {}) {
   // Registration: a logged-in customer (or storeless user) becomes a seller.
   app.get('/seller/register', requireRole('customer', 'seller_owner'), h((req, res) => res.render('seller/register', {})));
   app.post('/seller/register', requireRole('customer', 'seller_owner'), h((req, res) => {
@@ -43,6 +44,14 @@ export function registerSellerRoutes(app, db) {
     res.redirect('/seller');
   }));
   app.post('/seller/refunds/:id/reject', SELLER, h((req, res) => { money.rejectRefund(db, req.user, req.params.id); res.redirect('/seller'); }));
+
+  // C01 (Broken Access Control). Seller order detail by order number, as JSON.
+  // The fix (default build) scopes the lookup to the caller's store; the
+  // vulnerable build looks up by number only. All logic is in the challenge module.
+  app.get('/api/seller/orders/:orderNo', SELLER, h((req, res) => {
+    const order = getSellerOrderByNo(db, req.user, req.params.orderNo, { challenges, emit });
+    res.json(order);
+  }));
 
   // Store profile (owner only).
   app.post('/seller/store', OWNER, h((req, res) => {

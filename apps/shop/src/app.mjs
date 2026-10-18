@@ -33,7 +33,7 @@ const ALWAYS_READY = () => true;
 // without it the shop is always-ready (tests / local runs). Pass { emit } to post
 // app events to the sidecar on built flows (T-09, IF-4); without it emission is a
 // no-op (local runs and tests that do not assert on events).
-export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) {
+export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {} } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -75,7 +75,7 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) 
     app.use(checkCsrf);
     registerRoutes(app, db, emit);
     registerStaffRoutes(app, db);
-    registerSellerRoutes(app, db);
+    registerSellerRoutes(app, db, { emit, challenges });
   }
 
   // Terminal handler: unknown routes return a JSON body, never a stack trace

@@ -156,6 +156,12 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 |---|---|---|---|---|---|---|
 | FR-SHP-12 | Deterministic seeded world built as a CI snapshot; per-epic seed mechanism | Done (mechanism + baseline; in-container copy T-09, injector T-04) | `apps/shop/seed/registry.mjs`, `seed/contributions/000-baseline.mjs`, `seed/build-snapshot.mjs` | `apps/shop/test/seed.test.mjs` | snapshot builds in ~320 ms; world deterministic across builds; later epics add seed files without editing shared code | [2026-10-09-sahillroy-t08-snapshot-seeding](dev-log/2026-10-09-sahillroy-t08-snapshot-seeding.md) |
 
+## Challenges C01–C04 (T stream)
+
+| ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |
+|---|---|---|---|---|---|---|
+| FR-CHL-02 | C01 Broken Access Control: seller can read a cross-store order (IDOR, CWE-639) in the vulnerable build; fixed build scopes to the caller's store | Done | `apps/shop/src/challenges/c01-cross-store-order.mjs`, `apps/shop/src/challenges/mode.mjs`, `apps/shop/migrations/0003_order_no_and_buyer_note.sql` | `challenges/tests/c01-cross-store-order/c01.test.mjs` | Exploit passes on the vulnerable build (foreign order served + `shop.cross_store_order_read`), fails (404, no event) on the fixed build; support order view never exposes `buyer_note`; default build is fixed/safe; shop suite 134 pass | [2026-10-18-sahillroy-t19-c01-broken-access-control](dev-log/2026-10-18-sahillroy-t19-c01-broken-access-control.md) |
+
 ## Orchestrator engine (L-13 part 1)
 | ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |
 |---|---|---|---|---|---|---|

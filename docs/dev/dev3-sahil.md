@@ -199,7 +199,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Waits on: T-17. Open in part: OI-19.
   - Done when: A partial refund reverses commission in proportion and refunded total never exceeds the amount paid on any path.
 
-- [ ] **T-19. C01 Broken Access Control (cross-store order read)**
+- [x] **T-19. C01 Broken Access Control (cross-store order read)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C01 as designed with its flag, milestones, hints, write-up and exploit test.
