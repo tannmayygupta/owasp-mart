@@ -251,9 +251,12 @@ def test_every_table_with_an_organisation_column_is_scoped_or_listed_here_on_pur
     """A new table with an `org_id` must register with `org_scoped` (and get a row-level security policy), or be added below with the reason."""
     import vulnmart.accounts.models  # noqa: F401
     import vulnmart.kernel.models  # noqa: F401
+    import vulnmart.lab.models  # noqa: F401  (so the answer does not depend on which test imported them first)
     import vulnmart.privacy.models  # noqa: F401
 
     on_purpose = {
+        "attempts": "stream L: the lab runtime and the event receiver work without a session scope, so a row-level policy would stop them; access is decided in the lab API "
+                    "(the owner, or a reviewer of the company: vulnmart.lab.api reviewable, same 404 for anyone else). A follow-up may add a policy once the runtime acts with a scope",
         "consent_records": "an append-only proof that outlives the company; org_id is a plain pointer, read by the candidate (story P-16)",
     }
     with_org_column = {name for name, table in Base.metadata.tables.items() if "org_id" in table.columns}

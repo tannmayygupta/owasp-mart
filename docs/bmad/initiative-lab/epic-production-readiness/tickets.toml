@@ -1,0 +1,68 @@
+# tickets.toml: the stories of this epic in build order. tickets.py reads it.
+# Created 2026-10-18 after the cumulative review and the status check against the code (docs/dev-log/2026-10-18-tannmayygupta-sprint-4-review-and-s-8.md).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Postgres persistence of the lab state, a real key port and the purge of withdrawn data"
+description = "Migration 0005 and the stores of vulnmart.lab.pg for attempts, instances, epochs, events, milestones, held captures, integrity flags, flag submissions, hints, evidence, activity, bot visits and the attempt log; StoredKeyPort with AES-256-GCM and wrapped per-attempt keys; the flag rate limit read from the stored log; purge of an attempt's data when a withdrawal reaches deleted."
+verify = "Tests on a real Postgres 18 as the app role: the schema matches the models, the whole assessment loop runs on the stores and a second runtime on the same database keeps every attempt, score, held capture, event and sealed evidence; the grants refuse an update of append-only tables."
+covers = ["FR-SES-02", "FR-SES-10", "FR-SCR-01", "FR-DET-03", "NFR-SEC-04"]
+after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "The IF-2 lab routes and the catalogue served by the real API, with the runtime and its tick in the API process"
+description = "Routes for instances (request, get, open, reset, stop), attempts (get, submit, flags, score, challenges, hints, evidence, integrity flags and decisions, report, timeline), the catalogue and my attempts, over the lab runtime, with the session, Origin and CSRF rules of the account routes; gate ticket minting; the runtime and the event receiver mounted in the API when VULNMART_LAB_RUNTIME=1 with a tick loop."
+verify = "Every answer of the real routes is validated against the schemas of the lab and platform OpenAPI files; ownership and not-found rules, the query rules, the flag rate limit, the 410 for withdrawn attempts and the reviewer decision path are tested."
+covers = ["FR-SES-04", "FR-FLG-05", "FR-HNT-01", "FR-ACH-07", "FR-SCR-10", "NFR-SEC-03"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Close the confirmed review findings of sprints 3 and 4 in the runtime, attempts, edge, sidecar and infrastructure scripts"
+description = "Work through the findings of docs/dev-log/2026-10-18-tannmayygupta-sprint-4-review-and-s-8.md: attempts B2 to B5, B8 to B12; runtime A5, A7; edge C1, C3, C4, C5; sidecar C2, C7, C9; infrastructure and scripts D1 to D11. Each is fixed with a test or recorded as accepted with the reason."
+verify = "A regression test per fixed finding; the suites stay green; the open-findings list of the dev-log is updated with the real state."
+covers = ["NFR-SEC-02", "NFR-ISO-05", "FR-SES-02"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "An instance created by the orchestrator from the real shop image, locally and on vm-i"
+description = "Build the real shop image from stream T's code, create an instance through the orchestrator with the Docker backend, the injector and the sidecar, run the isolation probe and the flag loop against it locally, then on vm-i."
+verify = "The orchestrator creates, resets and destroys a real instance; the probe passes from inside it; a flag read from the real shop credits a milestone."
+covers = ["FR-INS-01", "FR-INS-02", "NFR-ISO-01"]
+after = [3]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Deployed verification: platform and lab on vm-p and vm-i, end-to-end suite, load check, audit, backup and restore"
+description = "Deploy the platform profile and the lab profile, run the end-to-end suite and the load check on the deployed system, the read-only audit, and a backup and restore test; record real numbers."
+verify = "The suite is green on the deployed system; load numbers are recorded; the audit passes; a backup restores into a scratch database with equal row counts."
+covers = ["LX-1", "LX-2"]
+after = [4]
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Demo rehearsal and the production-readiness report"
+description = "Rehearse the demo on the deployed system and the laptop fallback, record problems found, and write the readiness report."
+verify = "A rehearsal is recorded with its problems; the report lists done tasks, evidence, blockers and the steps for a working demo."
+covers = ["LX-3", "LX-4"]
+after = [5]
+hitl = true
+risk = "medium"

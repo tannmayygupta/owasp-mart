@@ -54,3 +54,10 @@ slug = "epic-integration-and-demo-readiness"
 title = "End-to-end suite and demo readiness"
 covers = []
 after = [{ epic = 7, needs = "every lab epic done and the other streams' epics merged" }]
+
+[[epic]]
+id = 9
+slug = "epic-production-readiness"
+title = "The lab is persistent, served by the real API, runs real instances and its review findings are closed"
+covers = []
+after = [{ epic = 7, needs = "the attempt, scoring and integrity engines" }, { epic = 8, needs = "the demo runtime this makes real" }]

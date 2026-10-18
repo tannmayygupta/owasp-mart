@@ -178,7 +178,7 @@
 
 - No HTTP route for opening a link, accepting, a re-invite or a bulk invite (story 5.3, a contract change); the candidate's pages and the recruiter's invite screens (P-26, P-27).
 - Only the first way of FR-ASM-04 is built (a different verified address cannot use the link); the "bind only after the candidate confirms" way is not.
-- In production `create_app` is given no lab attempt port, so the consent routes still answer 404 for every attempt id; wiring the real port (and the real attempt store) is stream L's (H-141, H-346).
+- `create_app` uses the lab runtime's own attempt port when `VULNMART_LAB_RUNTIME=1` runs the lab in the same process (merged from main on 2026-10-18); without the lab runtime the consent routes still answer 404 for every attempt id. Not run against a real lab runtime: only the engine in tests and in the stack test (H-141).
 - Later generations of a re-invite use the template key `<template>~n` on the lab port because the engine allows one attempt per account and template; a real supersede on the port is stream L's. The rules of the invite are not yet passed to the attempt.
 - A grant recorded for an invite that was revoked in the meantime leaves a consent record without an attempt; the candidate is refused with the invite's state.
 - The invite keeps `user_id`, `attempt_id` and `email_ci` after it closes; the retention sweep (P-24) and deletion (P-25) decide when they go. `consent_records` stay append-only (H-136).

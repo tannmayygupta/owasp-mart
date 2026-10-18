@@ -550,7 +550,7 @@ def test_reset_raises_the_epoch_and_other_states_are_409(fresh):
 
 def test_open_ticket_for_a_ready_instance(mock):
     s, b, _ = mock.call("POST", f"/api/v1/instances/{I_CAND}/open", "cam")
-    assert s == 200 and re.match(r"^https://i-bbbbbbbbbbbbbbbb\.labs\.example\.invalid/_vm/enter\?t=[A-Za-z0-9_-]{16,}$", b["url"])
+    assert s == 200 and re.match(r"^https://i-bbbbbbbbbbbbbbbb\.labs\.example\.invalid/_vm/enter\?t=[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}$", b["url"])
     other = mock.call("POST", f"/api/v1/instances/{I_CAND}/open", "cam")[1]["url"]
     assert other != b["url"]  # one ticket per call
 

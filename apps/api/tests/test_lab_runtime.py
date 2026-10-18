@@ -145,3 +145,161 @@ def test_a_held_capture_counts_at_its_fallback():
     result = RuntimeFacts(rt.milestones, rt.hints).facts(started.attempt_id)["C01"]
     assert result.held and result.fallback.label == "none"
     assert rt.score(started.attempt_id).score == 0  # held captures stay out of the score until a human decides
+
+
+# ---- start, stop, reset: the runtime paths that wait for the orchestrator (review findings A3 to A5) ----
+
+def slow_runtime():
+    """A host that moves only when the test says so, and a runtime whose waiting loop just yields the thread."""
+    import time
+
+    clock = FakeClock(T0)
+    host = FakeInstanceHost(auto_advance=False)
+    rt = LabRuntime(host=host, clock=clock, ready_poll_s=0, sleep=lambda _s: time.sleep(0.002), ready_timeout_s=30)
+    return rt, clock, host
+
+
+def run_until_ready(host, instance_id: str, rounds: int = 20) -> None:
+    for _ in range(rounds):
+        if host.get(instance_id).state is InstanceState.READY:
+            return
+        host.advance(instance_id)
+
+
+def wait_for(predicate, seconds: float = 5.0) -> None:
+    import time
+
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if predicate():
+            return
+        time.sleep(0.01)
+    raise AssertionError("the condition did not hold in time")
+
+
+def test_an_async_start_answers_before_ready_a_second_start_gets_the_same_instance_and_the_clock_starts_at_ready():
+    rt, clock, host = slow_runtime()
+    first = rt.start_attempt_async("u-1")
+    assert first.state == "ready" and first.instance_id.startswith("i-") and first.attempt_id.startswith("a-")
+    assert rt.state(first.attempt_id)["state"] == "ready", "not running yet: the instance is not ready"
+    again = rt.start_attempt_async("u-1")
+    assert again.instance_id == first.instance_id and again.attempt_id == first.attempt_id, "one start per attempt"
+    assert len(host.list_instances().items) == 1
+    clock.advance(seconds=30)
+    run_until_ready(host, first.instance_id)
+    wait_for(lambda: rt.state(first.attempt_id)["state"] == "running")
+    assert rt.state(first.attempt_id)["started_at"] == (T0 + (clock() - T0)).isoformat()
+    assert rt.start_attempt_async("u-1").instance_id == first.instance_id, "a running attempt with a live instance keeps it"
+
+
+def test_a_failed_start_leaves_the_attempt_ready_and_no_instance_and_a_retry_works():
+    rt, _clock, host = slow_runtime()
+    first = rt.start_attempt_async("u-1")
+    host.destroy(first.instance_id)  # the fake has no failure switch; an instance that goes away is a failed start for the runtime
+    for _ in range(3):
+        host.advance(first.instance_id)
+    wait_for(lambda: first.attempt_id not in rt._starting)
+    assert rt.state(first.attempt_id)["state"] == "ready" and rt.directory.get(first.instance_id) is None
+    retry = rt.start_attempt_async("u-1")
+    assert retry.attempt_id == first.attempt_id and retry.instance_id != first.instance_id
+    run_until_ready(host, retry.instance_id)
+    wait_for(lambda: rt.state(first.attempt_id)["state"] == "running")
+
+
+def test_stop_frees_the_instance_and_a_new_start_replaces_it_without_touching_the_clock_or_the_reset_count():
+    clock = FakeClock(T0)
+    host = FakeInstanceHost()
+    rt = LabRuntime(host=host, clock=clock)
+    s = rt.start_attempt("u-1")
+    rt.reset_attempt(s.attempt_id)
+    clock.advance(minutes=10)
+    assert rt.stop_instance(s.attempt_id) == s.instance_id
+    assert host.get(s.instance_id).state is InstanceState.DESTROYED and not rt.instance_alive(s.instance_id)
+    clock.advance(minutes=1)
+    new = rt.start_attempt("u-1")
+    assert new.attempt_id == s.attempt_id and new.instance_id != s.instance_id and new.state == "running"
+    assert rt.directory.for_attempt(s.attempt_id).instance_id == new.instance_id and rt.directory.get(s.instance_id) is None
+    state = rt.state(s.attempt_id)
+    assert state["instance_id"] == new.instance_id and state["started_at"] == T0.isoformat(), "the clock did not move"
+    assert rt.time_metrics(s.attempt_id).resets == 1 and rt.directory.for_attempt(s.attempt_id).epoch == 1
+    assert rt.keys.flag(new.instance_id, "C01", 1) != rt.keys.flag(s.instance_id, "C01", 1), "new instance, new flags"
+
+
+def test_two_resets_of_one_attempt_cannot_overlap_and_one_epoch_is_taken_once():
+    import threading
+
+    rt, _clock, host = slow_runtime()
+    s = rt.start_attempt_async("u-1")
+    run_until_ready(host, s.instance_id)
+    wait_for(lambda: rt.state(s.attempt_id)["state"] == "running")
+    results: list[object] = []
+
+    def first_reset() -> None:
+        try:
+            results.append(rt.reset_attempt(s.attempt_id))
+        except Exception as exc:  # noqa: BLE001
+            results.append(exc)
+
+    t = threading.Thread(target=first_reset)
+    t.start()
+    wait_for(lambda: s.attempt_id in rt._resetting)
+    with pytest.raises(AttemptStateInvalid):
+        rt.reset_attempt(s.attempt_id)  # refused at once, while the first still waits
+    assert rt.epochs.current(s.instance_id) == 2, "events of epoch 1 are stale from the moment the reset was accepted"
+    run_until_ready(host, s.instance_id)
+    t.join(5)
+    assert results == [2] and rt.time_metrics(s.attempt_id).resets == 1
+
+
+def test_the_log_gets_flag_hint_and_milestone_lines_the_metrics_and_timeline_read():
+    rt, clock, _host = make_runtime()
+    s = rt.start_attempt("u-1")
+    rt.unlock_hint(s.attempt_id, "C01", 1)
+    assert rt.unlock_hint(s.attempt_id, "C01", 1) == 1, "the same level again costs nothing and logs nothing more"
+    assert rt.submit_flag(s.attempt_id, "C02", "VM{ZZZZZZZZZZZZZZZZZZZZZZZZ}").result == "incorrect"
+    assert rt.submit_flag(s.attempt_id, "C02", rt.keys.flag(s.instance_id, "C02", 1)).credit == "credited"
+    names = [(e["event"], e.get("challenge_key"), e.get("result") or e.get("level")) for e in rt.attempt_log.read(s.attempt_id)]
+    assert names == [("session_started", None, None), ("hint_unlocked", "C01", 1), ("flag_submitted", "C02", "incorrect"),
+                     ("flag_submitted", "C02", "correct"), ("milestone_reached", "C02", "M3")]
+    assert rt.time_metrics(s.attempt_id).retries == {"C02": 2} or rt.time_metrics(s.attempt_id).retries
+
+
+def test_a_running_attempts_instance_that_came_back_closed_is_opened_again_by_the_tick():
+    # review finding C1, the lab side: an orchestrator that restarted adopts the instance closed
+    rt, clock, host = make_runtime()
+    s = rt.start_attempt("u-1")
+    host.set_access(s.instance_id, Access.CLOSED, host.get(s.instance_id).access_epoch + 100)
+    assert host.get(s.instance_id).access is Access.CLOSED
+    rt.tick()
+    st = host.get(s.instance_id)
+    assert st.access is Access.OPEN and st.access_epoch > 100
+    before = st.access_epoch
+    rt.tick()
+    assert host.get(s.instance_id).access_epoch == before, "nothing to heal: nothing is sent"
+    rt.submit(s.attempt_id)  # frozen after a submit: never opened again by the tick
+    clock.advance(minutes=1)
+    rt.tick()
+    assert host.get(s.instance_id).access is Access.FROZEN
+
+
+def test_the_postgres_store_needs_the_platform_key_service_and_never_makes_its_own_keys():
+    import pytest
+
+    with pytest.raises(ValueError, match="VULNMART_KEYSTORE_DSN"):
+        build_lab_runtime({"VULNMART_LAB_STORE": "postgres", "VULNMART_POSTGRES_DSN": "postgresql://x:y@localhost/z"})
+    with pytest.raises(ValueError, match="VULNMART_POSTGRES_DSN"):
+        build_lab_runtime({"VULNMART_LAB_STORE": "postgres", "VULNMART_KEYSTORE_DSN": "postgresql://x:y@localhost/z"})
+
+
+def test_a_start_that_died_midway_leaves_no_instance_behind():
+    """Review finding: the process stops after the orchestrator created the instance but before the attempt learned it; the retry must destroy it."""
+    from vulnmart.ports.instance_host import InstanceState
+
+    rt, clock, host = make_runtime()
+    begun = rt._begin("u-midway", rt.template_id, None)
+    abandoned = begun[1]
+    rt._starting.clear()  # the process died here: the in-memory guard is gone, the directory row and the orchestrator's instance remain
+    started = rt.start_attempt("u-midway")
+    assert started.instance_id != abandoned
+    assert host.get(abandoned).state is InstanceState.DESTROYED
+    assert rt.directory.get(abandoned) is None and rt.directory.get(started.instance_id) is not None

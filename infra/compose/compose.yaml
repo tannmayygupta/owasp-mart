@@ -360,12 +360,15 @@ services:
       EDGE_KEY_PREVIOUS_FILE: /run/secrets/gate_key_previous
       EDGE_ADMIN_SECRET_FILE: /run/secrets/gate_admin_secret
       EDGE_INGEST_URL: ${VULNMART_EDGE_INGEST_URL:-http://ingest.invalid:8081}
+      # An https ingest URL (the one TLS listener of vm-p) needs the CA of its certificate; an empty file means none (the file must exist).
+      EDGE_INGEST_CA_FILE: /run/secrets/ingest_ca
       EDGE_PLAYER_BIND_HOST: edge-gate-player
       EDGE_ADMIN_BIND_HOST: edge-gate-admin
     volumes:
       - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_key_current:/run/secrets/gate_key_current:ro
       - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_key_previous:/run/secrets/gate_key_previous:ro
       - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_admin_secret:/run/secrets/gate_admin_secret:ro
+      - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/ingest_ca.pem:/run/secrets/ingest_ca:ro
     cap_drop:
       - ALL
     security_opt:
@@ -455,6 +458,9 @@ services:
       - /etc/vulnmart/images.json
       - --state-dir
       - /var/lib/vulnmart/orchestrator
+      # What the host can really hold: set it below the memory of the machine (the default, 8192, is more than vm-i has).
+      - --capacity-mb
+      - "${VULNMART_ORCH_CAPACITY_MB:-8192}"
       - --docker-host
       - tcp://docker-proxy:2375
       - --edge-container

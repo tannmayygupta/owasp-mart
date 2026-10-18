@@ -1,7 +1,8 @@
 """LabRuntime: the attempt engine, scoring, flag checking, milestone engine and the event receiver in one process (D-95, D-96).
 
-All state is in memory; a restart loses attempts (the real tables are Akshay's, H-330). Keys are random per process, so no
-flag or event key of one run is valid in another. Answers of this class hold ids, states, numbers and result words, never
+With `VULNMART_LAB_STORE=postgres` (the deployed mode) the state is in Postgres (`vulnmart.lab.pg`) and the keys come from the platform key
+service (`DbKeyPort`), so a restart loses nothing. Without it (tests, the laptop demo) all state is in memory and the keys are random per
+process, so no flag or event key of one run is valid in another. Answers of this class hold ids, states, numbers and result words, never
 a flag, a digest, a key or a pasted text.
 """
 from __future__ import annotations
@@ -19,28 +20,24 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from vulnmart_attempts import AttemptEngine, Fact, InMemoryAttemptStore, InvalidTransition, Milestone as ScoreMilestone, ResetLimitReached
-from vulnmart_attempts.attempt_log import InMemoryAttemptLog
+from vulnmart_attempts import AttemptEngine, Fact, InvalidTransition
+from vulnmart_attempts import AttemptState as AttemptState_, Milestone as ScoreMilestone, ResetLimitReached
 from vulnmart_attempts.metrics import time_metrics
-from vulnmart_attempts.review import HeldCaptureReview, HeldItem, InMemoryAudit, InMemoryHeldStore, default_may_review
+from vulnmart_attempts.review import HeldCaptureReview, HeldItem, default_may_review
 
 from vulnmart.flags.checker import FlagChecker
 from vulnmart.flags.material import CHALLENGE_KEYS, build_material
 from vulnmart.flags.submit import FlagSubmissionResult, FlagSubmitService
-from vulnmart.ingest.activity import InMemoryActivityStore
-from vulnmart.ingest.bots import BotRecorder, InMemoryBotVisitStore
+from vulnmart.ingest.bots import BotRecorder
 from vulnmart.ingest.engine import MilestoneEngine
-from vulnmart.ingest.evidence import EvidenceReader, EvidenceRecorder, InMemoryEvidenceStore
+from vulnmart.ingest.evidence import EvidenceReader, EvidenceRecorder
 from vulnmart.ingest.handler import IngestHandler
-from vulnmart.ingest.store import MemoryEventStore, MemoryInstanceEpochs, MemorySecuritySink
-from vulnmart.ingest.stores import (
-    ActivityGate,
-    InMemoryEventLog, InMemoryFlagSubmissionLog, InMemoryInstanceDirectory, InMemoryIntegritySink,
-    InMemoryMilestoneStore, InstanceInfo,
-)
+from vulnmart.ingest.stores import ActivityGate, InstanceInfo, MilestoneStore
+from vulnmart.lab.catalog import Catalog, default_catalog_dir, load_catalog
 from vulnmart.lab.clock import OffsetClock
 from vulnmart.lab.control import HostInstanceControl
 from vulnmart.lab.state_reports import StateReportStore
+from vulnmart.lab.stores import HintLedger, LabStores, OrgOf, memory_stores
 from vulnmart.ports.attempts import AttemptState
 from vulnmart.ports.engine_attempts import EngineAttemptPort
 from vulnmart.ports.engine_reports import EngineReportPort
@@ -48,7 +45,7 @@ from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, Instan
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
 from vulnmart.ports.fakes import FakeKeyPort
 from vulnmart.ports.http_instance_host import HttpInstanceHost
-from vulnmart.ports.instance_host import Access, CreateRequest, InstanceHost, InstanceState, Limits, ResetRequest
+from vulnmart.ports.instance_host import Access, CreateRequest, InstanceHost, InstanceNotFound, InstanceState, Limits, ResetRequest
 from vulnmart.ports.reports import Milestone as PortMilestone, Score
 
 log = logging.getLogger("vulnmart.lab")
@@ -57,6 +54,10 @@ READY_TIMEOUT_S = 120.0
 READY_POLL_S = 1.0
 MAX_HINT_LEVEL = 3
 DEFAULT_TEMPLATE_LIMITS = Limits(memory_mb=256, cpu_limit=1.0, pids_limit=256, idle_minutes=1440, max_minutes=1440)
+
+
+def new_attempt_id() -> str:
+    return "a-" + base64.b32encode(secrets.token_bytes(10)).decode("ascii")  # a- and 16 Base32 characters (IF-2 AttemptId)
 
 
 def new_instance_id() -> str:
@@ -73,15 +74,15 @@ class StartedAttempt:
 class RuntimeFacts:
     """Scoring facts from the milestone store and the hint ledger. A held capture counts at its fallback (D-86)."""
 
-    def __init__(self, milestones: InMemoryMilestoneStore, hints: dict[tuple[str, str], set[int]]) -> None:
+    def __init__(self, milestones: MilestoneStore, hints: HintLedger) -> None:
         self._milestones, self._hints = milestones, hints
 
     def facts(self, attempt_id: str) -> Mapping[str, Fact]:
         out: dict[str, Fact] = {}
         for ck in CHALLENGE_KEYS:
             best = ScoreMilestone[self._milestones.best(attempt_id, ck).name]
-            levels = tuple(sorted(self._hints.get((attempt_id, ck), ())))
-            held = (attempt_id, ck) in self._milestones.held and best < ScoreMilestone.M3
+            levels = self._hints.levels(attempt_id, ck)
+            held = self._milestones.is_held(attempt_id, ck) and best < ScoreMilestone.M3
             if held:
                 out[ck] = Fact(milestone=ScoreMilestone.M3, hint_levels=levels, held=True, fallback=best)
             elif best is not ScoreMilestone.NONE or levels:
@@ -94,7 +95,7 @@ class LabRuntime:
                  template_id: str = "shop-v0", challenge_keys: tuple[str, ...] = CHALLENGE_KEYS,
                  hostname_suffix: str = "instances.example.invalid", ready_timeout_s: float = READY_TIMEOUT_S,
                  ready_poll_s: float = READY_POLL_S, sleep: Callable[[float], None] = time.sleep, gate: ActivityGate | None = None,
-                 limits: Limits = DEFAULT_TEMPLATE_LIMITS) -> None:
+                 limits: Limits = DEFAULT_TEMPLATE_LIMITS, stores: LabStores | None = None, catalog: Catalog | None = None) -> None:
         self.clock: Callable[[], datetime] = clock or OffsetClock()
         self.host = host
         # Random master keys per process, never the fixed FAKE_* constants (D-96).
@@ -105,17 +106,20 @@ class LabRuntime:
         self._limits = limits
         self._lock = threading.RLock()
 
-        self.attempt_log = InMemoryAttemptLog()  # ids and metadata only (FR-TIM-04)
-        self.hints: dict[tuple[str, str], set[int]] = {}
-        self.milestones = InMemoryMilestoneStore()
-        self.integrity = InMemoryIntegritySink()
-        self.directory = InMemoryInstanceDirectory()
-        self.epochs = MemoryInstanceEpochs()
+        s = stores or memory_stores()
+        self.stores = s
+        self.catalog = catalog or Catalog({})  # titles and hint texts (IF-7); empty means keys and placeholders
+        self.attempt_log = s.attempt_log  # ids and metadata only (FR-TIM-04)
+        self.hints = s.hints
+        self.milestones = s.milestones
+        self.integrity = s.integrity
+        self.directory = s.directory
+        self.epochs = s.epochs
         self.state_reports = StateReportStore()  # what the orchestrator reported per instance (H-347); empty without a receiver
-        self.events = InMemoryEventLog()
-        self.engine = AttemptEngine(InMemoryAttemptStore(), HostInstanceControl(host), self.clock, events=self.attempt_log.from_engine)
+        self.events = s.events
+        self.engine = AttemptEngine(s.attempts, HostInstanceControl(host), self.clock, events=self._engine_event)
         self.attempts = EngineAttemptPort(self.engine)
-        self.evidence_store = InMemoryEvidenceStore()
+        self.evidence_store = s.evidence
         self.reports = EngineReportPort(attempts=self.attempts, facts=RuntimeFacts(self.milestones, self.hints),
                                         integrity=self.integrity, clock=self.clock,
                                         evidence=EvidenceReader(store=self.evidence_store, keys=self.keys))
@@ -123,21 +127,50 @@ class LabRuntime:
         gate_kw = {"gate": gate} if gate is not None else {}
         self.milestone_engine = MilestoneEngine(log=self.events, milestones=self.milestones, integrity=self.integrity,
                                                 directory=self.directory, checker=self.checker, **gate_kw)
-        self.activity = InMemoryActivityStore()
-        self.bots = BotRecorder(InMemoryBotVisitStore())
+        self.activity = s.activity
+        self.bots = BotRecorder(s.bots)
         self.evidence = EvidenceRecorder(keys=self.keys, store=self.evidence_store, directory=self.directory, checker=self.checker,
                                          milestones=self.milestones, integrity=self.integrity)
-        self.flag_log = InMemoryFlagSubmissionLog()
+        self.flag_log = s.flag_log
         self.submit_service = FlagSubmitService(attempts=self.attempts, directory=self.directory, checker=self.checker,
                                                 milestones=self.milestones, integrity=self.integrity, log=self.flag_log,
                                                 clock=self.clock, **gate_kw)
-        self.handler = IngestHandler(keys=self.keys, epochs=self.epochs, store=MemoryEventStore(), security=MemorySecuritySink(),
+        self.handler = IngestHandler(keys=self.keys, epochs=self.epochs, store=s.event_store, security=s.security,
                                      sink=self._on_event, now=self.clock)
-        self._attempt_ids: list[str] = []
-        self.org_of_attempt: dict[str, str] = {}
-        self.held_store, self.audit = InMemoryHeldStore(), InMemoryAudit()
+        self._starting: dict[str, str] = {}  # attempt id -> the instance whose start is under way (one start per attempt)
+        self._resetting: set[str] = set()
+        self.org_of_attempt = OrgOf(s.attempts)
+        self.held_store, self.audit = s.held, s.audit
         self.review = HeldCaptureReview(self.held_store, self.audit, self.clock, default_may_review(self.org_of_attempt),
                                         events=self.attempt_log.append)
+    def _engine_event(self, payload: Mapping[str, Any]) -> None:
+        """The engine's events go to the ids-only log; a withdrawn attempt that reaches `deleted` is erased at once. The engine swallows an error of this
+        sink, so a failed erase is not lost: `tick` erases every `deleted` attempt that is not yet marked purged."""
+        self.attempt_log.from_engine(payload)
+        if self.stores.purge and payload.get("event") == "attempt.state_changed" and payload.get("to") == "deleted":
+            try:
+                self._erase(payload["attempt_id"])
+            except Exception:
+                log.exception("erasing attempt %s failed; the next tick tries again", payload["attempt_id"])
+
+    def _erase(self, attempt_id: str) -> None:
+        """FR-SES-10: the key is shredded first (the sealed rows are unreadable even if the next step fails), then the rows go, then the attempt is
+        marked purged. Every step is safe to repeat, so a failure anywhere is finished by a later call."""
+        self.keys.shred(attempt_id)
+        if self.stores.purge:
+            self.stores.purge(attempt_id)
+        self.engine.mark_purged(attempt_id)
+
+    def _erase_pending(self) -> None:
+        """A `deleted` attempt whose erase did not finish (the database was away, the process stopped): finish it. Never raises."""
+        if not self.stores.purge:
+            return
+        for rec in self.engine.in_states(AttemptState_.DELETED):
+            if rec.purged_at is None:
+                try:
+                    self._erase(rec.id)
+                except Exception:
+                    log.exception("erasing attempt %s failed; the next tick tries again", rec.id)
 
     @property
     def instance_states(self) -> dict[str, str]:
@@ -146,10 +179,10 @@ class LabRuntime:
 
     def _sync_held(self, attempt_id: str) -> None:
         """Every capture the milestone store holds becomes an open item of the review (FR-ACH-07)."""
-        for (aid, ck), at in tuple(self.milestones.held.items()):
-            if aid == attempt_id and self.held_store.get(aid, ck) is None:
-                best = ScoreMilestone[self.milestones.best(aid, ck).name]
-                self.held_store.add(HeldItem(aid, ck, ScoreMilestone.M3, best, at))
+        for ck, at in self.milestones.held_for(attempt_id).items():
+            if self.held_store.get(attempt_id, ck) is None:
+                best = ScoreMilestone[self.milestones.best(attempt_id, ck).name]
+                self.held_store.add(HeldItem(attempt_id, ck, ScoreMilestone.M3, best, at))
 
     def held_captures(self, attempt_id: str) -> tuple[HeldItem, ...]:
         self.attempts.get(attempt_id)
@@ -161,11 +194,12 @@ class LabRuntime:
         it out of the score, never zeroes anything, and releases the `reported` block. Raises ReviewForbidden / ReviewFinal / NotHeld."""
         self.attempts.get(attempt_id)
         self._sync_held(attempt_id)
-        self.review.decide(attempt_id, challenge_key, reviewer, decision, note)
+        item = self.review.decide(attempt_id, challenge_key, reviewer, decision, note)
         with self._lock:
-            if decision == "accept":
+            # also on a repeated decision: a credit that failed after the first one is made good here (review finding A6)
+            if item.status == "accepted":
                 self.milestones.credit(attempt_id, challenge_key, PortMilestone.M3, self.clock())
-            self.milestones.held.pop((attempt_id, challenge_key), None)
+            self.milestones.clear_held(attempt_id, challenge_key)
         return decision
 
     def _on_event(self, event: Mapping[str, Any], at: datetime) -> None:
@@ -173,47 +207,109 @@ class LabRuntime:
         result = self.milestone_engine.process(event, at)
         if result.stored is False:
             return  # a replay: nothing else sees it
+        for credit in result.credits:
+            self._journal("milestone_reached", credit.attempt_id, challenge_key=credit.challenge_key, level=credit.milestone.value,
+                          instance_id=event["instance_id"])
         self.evidence.observe(event, at, result)
         self.activity.record(event, at)
         self.bots.observe(event, at)
 
     # ---- calls ----
 
-    def start_attempt(self, user_id: str, template_id: str | None = None, org_id: str | None = None) -> StartedAttempt:
-        """Create the attempt, start its instance, wait for ready, open access and start the clock (D-80)."""
-        template = template_id or self.template_id
+    def _journal(self, event: str, attempt_id: str, **extra: Any) -> None:
+        """One line of the ids-only attempt log (FR-TIM-04). A failing log never undoes the step it describes."""
+        try:
+            self.attempt_log.append({"event": event, "attempt_id": attempt_id, "at": self.clock().isoformat(), **extra})
+        except Exception:
+            log.exception("attempt log append failed (%s)", event)
+
+    def instance_alive(self, instance_id: str | None) -> bool:
+        """True while the orchestrator still holds the instance in a state that can serve (not stopping, destroyed or failed)."""
+        if not instance_id:
+            return False
+        try:
+            return self.host.get(instance_id).state not in (InstanceState.DESTROYED, InstanceState.FAILED, InstanceState.STOPPING)
+        except InstanceNotFound:
+            return False
+
+    def _begin(self, user_id: str, template: str, org_id: str | None) -> tuple[Any, str, int, str] | StartedAttempt:
+        """The fast half of a start, under the lock: the attempt, its data key, a fresh instance asked of the orchestrator.
+
+        Returns what the slow half needs, or a `StartedAttempt` when there is nothing to do (the attempt already has a live instance,
+        or a start is already under way for it)."""
         with self._lock:
-            rec = self.engine.create(user_id, template, consent_id=f"demo-consent-{secrets.token_hex(4)}")
-            if rec.state.value == "running" and rec.instance_id:
-                return StartedAttempt(rec.id, rec.instance_id, rec.state.value)
-            if rec.state.value != "ready":
+            rec = self.engine.create(user_id, template, consent_id=f"demo-consent-{secrets.token_hex(4)}", org_id=org_id,
+                                     attempt_id=new_attempt_id())
+            if rec.id in self._starting:
+                return StartedAttempt(rec.id, self._starting[rec.id], rec.state.value)
+            if rec.state.value not in ("ready", "running"):
                 # submitted, cancelled, withdrawn, reported: no new instance (review finding A1)
                 raise AttemptStateInvalid("the attempt cannot be started in its state")
-            if org_id:
-                self.org_of_attempt[rec.id] = org_id
-                self.attempts.set_org(rec.id, org_id)
-            if rec.id not in self._attempt_ids:
-                self._attempt_ids.append(rec.id)
+            if self.instance_alive(rec.instance_id):
+                return StartedAttempt(rec.id, rec.instance_id, rec.state.value)
+            self.keys.create_attempt_key(rec.id)  # the data key that seals this attempt's evidence (without it every capture is dropped)
+            stale = self.directory.for_attempt(rec.id)
+            if stale is not None:
+                # a start that died midway (the process stopped between the orchestrator's create and the attempt learning the instance), or an
+                # instance that was lost: the directory is about to replace it, so the orchestrator must not keep it either (review finding)
+                try:
+                    self.host.destroy(stale.instance_id)
+                except Exception:
+                    log.exception("destroying the stale instance %s failed; the orchestrator's idle timer remains", stale.instance_id[:10])
             instance_id = new_instance_id()
             material = build_material(self.keys, instance_id, 1, self.challenge_keys)
             request = CreateRequest(instance_id=instance_id, template_id=template, epoch=1, material=material,
                                     hostname=f"{instance_id.lower()}.{self._suffix}", limits=self._limits,
                                     owner_hash=self.keys.owner_hash(user_id))
             self.host.create(request)
-            try:
-                self._wait_ready(instance_id)
-                self.host.set_access(instance_id, Access.OPEN, 1)
-                self.directory.add(InstanceInfo(instance_id, rec.id, template, 1, tuple(self.challenge_keys)))
-                self.epochs.set(instance_id, 1)
-                started = self.engine.instance_ready(rec.id, self.clock(), instance_id)
-            except Exception:
-                # no leaked instance when a later step fails (review finding A2); _wait_ready already destroys on timeout
-                try:
-                    self.host.destroy(instance_id)
-                except Exception:
-                    log.exception("cleanup of %s failed", instance_id)
-                raise
+            # registered at once: the owner can poll the instance while it starts, and an event of epoch 1 has a known epoch
+            self.directory.add(InstanceInfo(instance_id, rec.id, template, 1, tuple(self.challenge_keys)))
+            self.epochs.set(instance_id, 1)
+            self._starting[rec.id] = instance_id
+            return rec, instance_id, 1, template
+
+    def _finish(self, rec: Any, instance_id: str, epoch: int, template: str) -> StartedAttempt:
+        """The slow half, outside the lock (it waits for the orchestrator): ready, access open, directory, epoch, clock."""
+        try:
+            self._wait_ready(instance_id)
+            self.host.set_access(instance_id, Access.OPEN, 1)
+            started = self.engine.instance_ready(rec.id, self.clock(), instance_id)
+            if started.instance_id != instance_id:  # a running attempt whose old instance died now points at the new one
+                started = self.engine.set_instance(rec.id, instance_id)
             return StartedAttempt(started.id, instance_id, started.state.value)
+        except Exception:
+            # no leaked instance when a step fails (review finding A2); _wait_ready already destroys on timeout
+            try:
+                self.host.destroy(instance_id)
+            except Exception:
+                log.exception("cleanup of %s failed", instance_id)
+            self.directory.remove(instance_id)
+            raise
+        finally:
+            with self._lock:
+                self._starting.pop(rec.id, None)
+
+    def start_attempt(self, user_id: str, template_id: str | None = None, org_id: str | None = None) -> StartedAttempt:
+        """Create the attempt, start its instance, wait for ready, open access and start the clock (D-80). Blocks until ready."""
+        begun = self._begin(user_id, template_id or self.template_id, org_id)
+        return begun if isinstance(begun, StartedAttempt) else self._finish(*begun)
+
+    def start_attempt_async(self, user_id: str, template_id: str | None = None, org_id: str | None = None) -> StartedAttempt:
+        """The same start without the wait: answers at once with the new instance id while a background thread waits for ready
+        (the browser polls the instance, IF-2 requestInstance). A start that fails leaves the attempt as it was and destroys the instance."""
+        begun = self._begin(user_id, template_id or self.template_id, org_id)
+        if isinstance(begun, StartedAttempt):
+            return begun
+        rec, instance_id, epoch, template = begun
+
+        def work() -> None:
+            try:
+                self._finish(rec, instance_id, epoch, template)
+            except Exception:
+                log.exception("the start of instance %s failed", instance_id)
+
+        threading.Thread(target=work, name=f"lab-start-{instance_id[:8]}", daemon=True).start()
+        return StartedAttempt(rec.id, instance_id, rec.state.value)
 
     def _wait_ready(self, instance_id: str) -> None:
         deadline = time.monotonic() + self._ready_timeout
@@ -230,7 +326,13 @@ class LabRuntime:
             self._sleep(self._ready_poll)
 
     def submit_flag(self, attempt_id: str, challenge_key: str, text: str) -> FlagSubmissionResult:
-        return self.submit_service.submit_flag(attempt_id, challenge_key, text)
+        result = self.submit_service.submit_flag(attempt_id, challenge_key, text)
+        info = self.directory.for_attempt(attempt_id)
+        extra = {"instance_id": info.instance_id} if info else {}
+        self._journal("flag_submitted", attempt_id, challenge_key=challenge_key, result=result.result, **extra)
+        if result.credit == "credited":
+            self._journal("milestone_reached", attempt_id, challenge_key=challenge_key, level="M3", **extra)
+        return result
 
     def unlock_hint(self, attempt_id: str, challenge_key: str, level: int) -> int:
         """Levels unlock in order, each once. Returns the number of levels now unlocked for the challenge."""
@@ -240,22 +342,28 @@ class LabRuntime:
         if challenge_key not in self.challenge_keys:
             raise ChallengeNotFound("not a challenge of this template")
         with self._lock:
-            have = self.hints.setdefault((attempt_id, challenge_key), set())
-            if type(level) is not int or level != len(have) + 1 or level > MAX_HINT_LEVEL:
+            have = self.hints.levels(attempt_id, challenge_key)
+            if type(level) is not int or level < 1 or level > MAX_HINT_LEVEL:
                 raise AttemptStateInvalid("hint levels unlock in order")
-            have.add(level)
-            return len(have)
+            if level in have:
+                return len(have)  # unlocked before: the same answer, no second cost
+            if level != len(have) + 1:
+                raise AttemptStateInvalid("hint levels unlock in order")
+            self.hints.add(attempt_id, challenge_key, level, self.clock())
+            self._journal("hint_unlocked", attempt_id, challenge_key=challenge_key, level=level, cost=0)
+            return len(have) + 1
 
-    def reset_attempt(self, attempt_id: str) -> int:
-        """New epoch, new flags (FR-INS-07). Counted against the template limit while the attempt runs (FR-SES-09); the clock does
-        not move. Returns the new epoch."""
+    def _begin_reset(self, attempt_id: str) -> tuple[str, int]:
+        """The fast half of a reset, under the lock: every check, then the orchestrator is asked. Returns (instance id, new epoch)."""
         attempt = self.attempts.get(attempt_id)
         if attempt.state not in (AttemptState.READY, AttemptState.RUNNING):
             raise AttemptStateInvalid("the attempt cannot be reset in its state")
-        info = self.directory.for_attempt(attempt_id)
-        if info is None:
-            raise InstanceNotReady("the attempt has no instance")
         with self._lock:
+            info = self.directory.for_attempt(attempt_id)  # read inside the lock: two resets cannot both compute the same epoch
+            if info is None:
+                raise InstanceNotReady("the attempt has no instance")
+            if attempt_id in self._resetting:
+                raise AttemptStateInvalid("a reset is already under way")
             try:
                 self.engine.can_reset(attempt_id)  # raises before the instance is touched when the limit is used up
             except (ResetLimitReached, InvalidTransition):
@@ -263,12 +371,52 @@ class LabRuntime:
             epoch = info.epoch + 1
             material = build_material(self.keys, info.instance_id, epoch, info.challenge_keys)
             self.host.reset(info.instance_id, ResetRequest(epoch=epoch, material=material))
-            self._wait_ready(info.instance_id)
             self.directory.add(InstanceInfo(info.instance_id, attempt_id, info.template_id, epoch, info.challenge_keys))
-            self.epochs.set(info.instance_id, epoch)
-            self.engine.record_reset(attempt_id)
-            return epoch
+            self.epochs.set(info.instance_id, epoch)  # from now an event of the old epoch is stale, even while the instance restarts
+            self._resetting.add(attempt_id)
+            return info.instance_id, epoch
 
+    def _finish_reset(self, attempt_id: str, instance_id: str) -> None:
+        """The slow half, outside the lock: wait for ready, then count the reset (a reset that never got ready is not counted)."""
+        try:
+            self._wait_ready(instance_id)
+        except Exception:
+            # the orchestrator's reconciler owns the rest; the attempt stays as it was and a new instance can replace the dead one
+            log.exception("reset of %s did not reach ready", instance_id)
+            raise
+        finally:
+            with self._lock:
+                self._resetting.discard(attempt_id)
+        self.engine.record_reset(attempt_id)  # the engine writes the `instance_reset` line of the log itself
+
+    def reset_attempt(self, attempt_id: str) -> int:
+        """New epoch, new flags (FR-INS-07). Counted against the template limit while the attempt runs (FR-SES-09); the clock does
+        not move. Returns the new epoch once the instance is ready again. The wait is outside the lock; a second reset of the same
+        attempt meanwhile is refused (review findings A3, A4, A5)."""
+        instance_id, epoch = self._begin_reset(attempt_id)
+        self._finish_reset(attempt_id, instance_id)
+        return epoch
+
+    def reset_attempt_async(self, attempt_id: str) -> int:
+        """The same reset without the wait: returns the new epoch at once while a background thread waits for ready (IF-2 resetInstance)."""
+        instance_id, epoch = self._begin_reset(attempt_id)
+
+        def work() -> None:
+            try:
+                self._finish_reset(attempt_id, instance_id)
+            except Exception:
+                log.exception("the reset of instance %s failed", instance_id)
+
+        threading.Thread(target=work, name=f"lab-reset-{instance_id[:8]}", daemon=True).start()
+        return epoch
+    def stop_instance(self, attempt_id: str) -> str:
+        """Free the instance (the learner pressed stop). The attempt keeps its state and clock; `start_attempt` can ask for a new instance."""
+        rec = self.engine.get(attempt_id)
+        if rec.state.value not in ("ready", "running") or rec.access == "frozen":
+            raise AttemptStateInvalid("the instance cannot be stopped in this state")
+        if rec.instance_id and self.instance_alive(rec.instance_id):
+            self.host.destroy(rec.instance_id)
+        return rec.instance_id or ""
     def withdraw(self, attempt_id: str) -> str:
         return self.attempts.withdraw(attempt_id).state.value
 
@@ -276,7 +424,7 @@ class LabRuntime:
         """FR-TIM-01 to 03: headline time to capture, estimated active time, resets and retries (the score never reads them)."""
         rec = self.engine.get(attempt_id)
         info = self.directory.for_attempt(attempt_id)
-        captures = {ck: at for (aid, ck), (m, at) in self.milestones.items.items() if aid == attempt_id and m.value == "M3"}
+        captures = self.milestones.captures(attempt_id)
         stamps = [b.minute for b in self.activity.buckets(info.instance_id)] if info else []
         started = rec.started_at or rec.created_at
         return time_metrics(started, captures, stamps, self.attempt_log.read(attempt_id))
@@ -300,14 +448,31 @@ class LabRuntime:
         """Do what is due: engine steps, the milestone engine's timers, and `submitted` to `reported` (D-88)."""
         now = self.clock()
         changed = list(self.engine.tick())
-        self.milestone_engine.tick(now)
-        for attempt_id in tuple(self._attempt_ids):
-            rec = self.engine.get(attempt_id)
-            if rec.state.value == "submitted" and rec.destroyed:  # the engine destroys only a `submitted` attempt
-                held_open = sum(1 for (aid, _ck) in self.milestones.held if aid == attempt_id)
-                if self.engine.mark_reported(attempt_id, held_open).state.value == "reported":
-                    changed.append(attempt_id)
+        for credit in self.milestone_engine.tick(now) or ():  # a pending M2 whose window passed
+            self._journal("milestone_reached", credit.attempt_id, challenge_key=credit.challenge_key, level=credit.milestone.value)
+        self.review.remind_overdue()  # an open held capture older than 7 days: a reminder, never a score change
+        for rec in self.engine.in_states(AttemptState_.SUBMITTED):
+            if rec.destroyed:  # the engine destroys only a `submitted` attempt
+                held_open = len(self.milestones.held_for(rec.id))
+                if self.engine.mark_reported(rec.id, held_open).state.value == "reported":
+                    changed.append(rec.id)
+        self._heal_access()
+        self._erase_pending()
         return tuple(dict.fromkeys(changed))
+
+    def _heal_access(self) -> None:
+        """A running attempt whose instance is ready but closed (the orchestrator restarted and adopted it closed) is opened again with the
+        next access epoch. Never raises: the next tick tries again."""
+        for rec in self.engine.in_states(AttemptState_.RUNNING):
+            if not rec.instance_id or rec.access == "frozen":
+                continue
+            try:
+                st = self.host.get(rec.instance_id)
+                if st.state in (InstanceState.READY, InstanceState.ACTIVE, InstanceState.IDLE) and st.access is Access.CLOSED:
+                    self.host.set_access(rec.instance_id, Access.OPEN, st.access_epoch + 1)
+                    log.info("access of instance %s opened again after an adoption", rec.instance_id[:10])
+            except Exception:
+                log.exception("healing the access of %s failed", rec.instance_id)
 
 
 def _host_from_environ(environ: Mapping[str, str]) -> InstanceHost:
@@ -327,6 +492,29 @@ def _host_from_environ(environ: Mapping[str, str]) -> InstanceHost:
 
 def build_lab_runtime(environ: Mapping[str, str] | None = None, *, host: InstanceHost | None = None,
                       clock: Callable[[], datetime] | None = None, gate: ActivityGate | None = None) -> LabRuntime:
+    """The runtime from the environment. `VULNMART_LAB_STORE=postgres` keeps everything in the database (needs `VULNMART_POSTGRES_DSN`) and uses the
+    platform's key service (`DbKeyPort` over `vm_keystore`, story P-17: the KEK, the three masters and `VULNMART_KEYSTORE_DSN` come from the same
+    settings as the rest of the API, read from the process environment); without it the state is in memory (tests and the laptop demo)."""
     env = os.environ if environ is None else environ
-    return LabRuntime(host=host or _host_from_environ(env), clock=clock, gate=gate)
+    stores, keys = None, None
+    if env.get("VULNMART_LAB_STORE") == "postgres":
+        from vulnmart.kernel.db import make_engine
+        from vulnmart.kernel.services import key_port_from
+        from vulnmart.kernel.settings import Settings
+        from vulnmart.lab.pg import build_pg_stores
+
+        dsn = env.get("VULNMART_POSTGRES_DSN")
+        if not dsn or not env.get("VULNMART_KEYSTORE_DSN"):
+            raise ValueError("VULNMART_LAB_STORE=postgres needs VULNMART_POSTGRES_DSN and VULNMART_KEYSTORE_DSN (the key service of story P-17)")
+        stores = build_pg_stores(make_engine(dsn, pool_size=10, max_overflow=10))
+        keys = key_port_from(Settings())
+    extra: dict[str, Any] = {}
+    if env.get("VULNMART_LABS_ZONE"):
+        extra["hostname_suffix"] = env["VULNMART_LABS_ZONE"]
+    if env.get("VULNMART_LAB_TEMPLATE_ID"):
+        extra["template_id"] = env["VULNMART_LAB_TEMPLATE_ID"]
+    if env.get("VULNMART_LAB_READY_TIMEOUT_S"):
+        extra["ready_timeout_s"] = float(env["VULNMART_LAB_READY_TIMEOUT_S"])
+    return LabRuntime(host=host or _host_from_environ(env), clock=clock, gate=gate, stores=stores, keys=keys,
+                      catalog=load_catalog(default_catalog_dir(env)), **extra)
 

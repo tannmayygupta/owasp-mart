@@ -95,18 +95,21 @@ def apply_check(check: FlagCheck, info: InstanceInfo, *, event_epoch: int, at: d
     c = check.challenge_key
     if check.flag_class is FlagClass.CORRECT and c is not None and event_epoch == info.epoch:
         if not gate.allows(info.attempt_id, c, at):
-            return "held", milestones.hold(info.attempt_id, c, at)
+            new = milestones.hold(info.attempt_id, c, at)
+            integrity.add(info.attempt_id, IntegrityType.ACTIVITY,
+                          "The capture does not match the recorded activity; it is held for review.", f"held:{c}", c, at)
+            return "held", new
         new = milestones.credit(info.attempt_id, c, Milestone.M3, at)
         return "credited", new
     if check.flag_class is FlagClass.DECOY and c is not None:
         new = integrity.add(info.attempt_id, IntegrityType.DECOY,
-                            f"A decoy value of challenge {c} was used on instance {info.instance_id}.", f"decoy:{c}")
+                            f"A decoy value of challenge {c} was used on instance {info.instance_id}.", f"decoy:{c}", c, at)
         return "none", new
     if check.flag_class is FlagClass.OTHER_INSTANCE and c is not None and check.other_instance_id:
         new = integrity.add(
             info.attempt_id, IntegrityType.SHARING,
             f"A value of challenge {c} that belongs to instance {check.other_instance_id} was used on instance {info.instance_id}.",
-            f"sharing:{check.other_instance_id}")
+            f"sharing:{check.other_instance_id}", c, at)
         return "none", new
     return "none", False
 

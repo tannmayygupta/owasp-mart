@@ -2,6 +2,9 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import https from 'node:https';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -189,7 +192,7 @@ test('rate limiter: bounded table, windows are per key', () => {
 test('the ingest URL must be an http origin; https and paths are refused', () => {
   assert.equal(parseIngestUrl('http://ingest:8081').hostname, 'ingest');
   for (const bad of ['nonsense', 'ftp://x:1', 'http://u:p@x:1', 'http://x:1/path', 'http://x:1/?q=1', 'http://x:1/#f']) assert.throws(() => parseIngestUrl(bad), /ingest URL/, bad);
-  assert.throws(() => createRelay({ ingestUrl: 'https://ingest:8081' }), /only an http/);
+  assert.throws(() => createRelay({ ingestUrl: 'https://ingest:8081' }), /needs the CA/);
 });
 
 test('the problem titles equal the IF-8 registry (contracts/errors/error-codes.yaml)', () => {
@@ -204,4 +207,44 @@ test('the problem titles equal the IF-8 registry (contracts/errors/error-codes.y
 test('the relay holds no key and reads no environment', () => {
   const src = fs.readFileSync(path.join(ROOT, 'apps', 'edge', 'src', 'relay.mjs'), 'utf8').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
   assert.ok(!/process\.env|readFileSync|createHmac|event_key/.test(src));
+});
+
+// A real TLS round trip with a throwaway certificate (skipped where the openssl program is missing). One listener on vm-p carries the relayed
+// events and the orchestrator's state reports, so the relay must be able to verify a private CA.
+const opensslOk = spawnSync('openssl', ['version']).status === 0;
+test('an https ingest with the CA of its certificate receives the event; the wrong CA is refused and answered as an internal error', { skip: !opensslOk }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-tls-'));
+  const make = (name) => {
+    const r = spawnSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(dir, `${name}.key`), '-out', path.join(dir, `${name}.crt`), '-days', '1',
+      '-subj', '/CN=ingest.test', '-addext', 'subjectAltName=IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'keyUsage=critical,keyCertSign,digitalSignature,keyEncipherment'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return { key: fs.readFileSync(path.join(dir, `${name}.key`)), cert: fs.readFileSync(path.join(dir, `${name}.crt`), 'utf8') };
+  };
+  const good = make('good');
+  const other = make('other');
+  const got = [];
+  const tlsIngest = https.createServer({ key: good.key, cert: good.cert }, (req, res) => {
+    const c = [];
+    req.on('data', (x) => c.push(x));
+    req.on('end', () => { got.push({ url: req.url, sig: req.headers['x-vm-signature'], body: Buffer.concat(c).toString('utf8') }); res.writeHead(202, { 'content-type': 'application/json' }); res.end('{"status":"accepted"}'); });
+  });
+  await new Promise((resolve) => tlsIngest.listen(0, '127.0.0.1', resolve));
+  const url = `https://127.0.0.1:${tlsIngest.address().port}`;
+  const ok = await startRelay({ ingestUrl: url, ingestCa: good.cert });
+  const bad = await startRelay({ ingestUrl: url, ingestCa: other.cert });
+  try {
+    const r = await call(ok.port, { body: EVENT });
+    assert.equal(r.status, 202);
+    assert.deepEqual(got.map((g) => [g.url, g.sig, g.body]), [[RELAY_PATH, SIG, EVENT]]);
+    const refused = await call(bad.port, { body: EVENT });
+    assert.equal(refused.status, 500);
+    assert.equal(JSON.parse(refused.text).code, 'REQ-INTERNAL');
+    assert.equal(got.length, 1, 'nothing reached the ingest through the relay that does not trust its certificate');
+  } finally {
+    await ok.stop();
+    await bad.stop();
+    tlsIngest.closeAllConnections();
+    tlsIngest.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

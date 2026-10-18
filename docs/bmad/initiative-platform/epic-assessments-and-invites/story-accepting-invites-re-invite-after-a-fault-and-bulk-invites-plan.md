@@ -21,7 +21,7 @@ context:
 
 **Problem:** An invited candidate cannot get from the link to an attempt: nothing opens the link, matches the verified address, binds the invite, puts the consent screen first, or creates the attempt and the candidate role after a grant; a recruiter cannot grant a re-invite after a fault; and 200 invites at once have no handling (FR-ASM-04, 05, 06).
 
-**Approach:** `InviteAcceptance` (open the link, accept as a signed-in account whose verified address matches) and `InviteConsentTargets` (the invite side of the consent port: the consent first, a grant creates the attempt through the lab port with an id the invite handed out at binding and gives the candidate role, a decline closes the invite); `AssessmentService.reinvite` (a new generation that supersedes the old attempt), `create_invites` (bulk, per-address outcomes, the cap hands back the rest) and `purge_closed_tokens` (so the invite purge can see closed invites). Migration 0011. No route (story 5.3).
+**Approach:** `InviteAcceptance` (open the link, accept as a signed-in account whose verified address matches) and `InviteConsentTargets` (the invite side of the consent port: the consent first, a grant creates the attempt through the lab port with an id the invite handed out at binding and gives the candidate role, a decline closes the invite); `AssessmentService.reinvite` (a new generation that supersedes the old attempt), `create_invites` (bulk, per-address outcomes, the cap hands back the rest) and `purge_closed_tokens` (so the invite purge can see closed invites). Migration 0012. No route (story 5.3).
 
 ## Boundaries & Constraints
 
@@ -48,14 +48,14 @@ context:
 
 ## Code Map
 
-- `apps/api/src/vulnmart/assessments/{accept,service,models}.py`, `migrations/versions/0011_invite_binding_and_generations.py` (single head 0011).
+- `apps/api/src/vulnmart/assessments/{accept,service,models}.py`, `migrations/versions/0012_invite_binding_and_generations.py` (single head 0012).
 - `privacy/targets.py` (`ConsentTarget.retention_days`), `privacy/consent.py`, `ports/attempts.py` and `ports/lab_fakes.py` (`attempt_id`), `accounts/directory.py` (`UserBrief.email_ci`), `kernel/db.py` untouched (the self-visible table list comes from the model), `main.py` (`create_app(attempts=)`, `app.state.invite_acceptance`).
 - Tests: `test_invite_acceptance.py`, `test_invite_acceptance_postgres.py`; stack test `scripts/e2e/platform-stack.e2e.test.mjs`.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] Model and migration 0011 (binding columns, generations, `own_invite`), the self-visible guard for invites.
+- [x] Model and migration 0012 (binding columns, generations, `own_invite`), the self-visible guard for invites.
 - [x] `InviteAcceptance` and `InviteConsentTargets`; the consent notice shows the invite's retention.
 - [x] `reinvite`, `create_invites`, `purge_closed_tokens`, `AlreadyStarted`.
 - [x] Unit tests with the real attempt engine, Postgres tests as the application role (policy, races), the real-stack test.

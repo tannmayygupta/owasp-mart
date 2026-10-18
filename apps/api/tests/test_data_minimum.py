@@ -41,6 +41,8 @@ INVENTORY = {
     "email_outbox": ("Email queue: template name, parameters, state; the address is looked up from the user at send time, or (an invited candidate) kept sealed until the mail leaves",
                      {"id", "to_user_id", "template", "params", "state", "attempts", "next_attempt_at", "claimed_until", "sent_at", "provider_message_id",
                       "last_error_code", "to_address_sealed", "created_at", "updated_at"}),
+    "attempts": ("Assessment data: whose attempt, which template and company, its state and the attempt record (times, hints, score, grace; no content typed by the person)",
+                 {"id", "user_id", "template_id", "org_id", "state", "version", "record", "created_at", "updated_at"}),
     "join_requests": ("Company data: a colleague's request to join, decided by the owner", {"id", "org_id", "user_id", "status", "decided_by", "decided_at", "created_at"}),
     "dpa_acceptances": ("Company data: the owner's acceptance of the data-processing terms (company, user, version, hash, time)",
                         {"id", "org_id", "user_id", "terms_version", "terms_sha256", "accepted_at"}),

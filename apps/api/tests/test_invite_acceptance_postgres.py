@@ -1,4 +1,4 @@
-"""Story P-21 against a real Postgres 18 as the application role: migration 0011, the policy `own_invite` (a signed-in candidate reads the invite bound to them and nothing
+"""Story P-21 against a real Postgres 18 as the application role: migration 0012, the policy `own_invite` (a signed-in candidate reads the invite bound to them and nothing
 else, with no company in scope, and cannot change it), the unique attempt id, the whole accept-consent-attempt flow through row-level security, and the races (eight
 accepts of one link, two accounts binding one invite, eight re-invites of one invite, eight clicks on one consent). Skipped unless VULNMART_TEST_POSTGRES_DSN and
 VULNMART_TEST_APP_DSN are set (see test_kernel_postgres.py)."""
@@ -224,10 +224,10 @@ def test_a_revoke_and_an_accept_at_once_never_leave_a_bound_attempt_on_a_revoked
 
 # ---- the migration -----------------------------------------------------------------------------------------------------------------------
 
-def test_migration_0011_goes_down_and_up_again(database, owner):
+def test_migration_0012_goes_down_and_up_again(database, owner):
     cfg = Config(str(ROOT / "apps" / "api" / "alembic.ini"))
     os.environ["VULNMART_MIGRATE_DSN"] = with_db(OWNER, database[2])
-    command.downgrade(cfg, "0010")
+    command.downgrade(cfg, "0011")
     with owner.connect() as c:
         assert c.execute(text("SELECT count(*) FROM information_schema.columns WHERE table_name = 'invites' AND column_name IN "
                               "('user_id', 'attempt_id', 'generation', 'supersedes_attempt_id')")).scalar_one() == 0

@@ -47,6 +47,10 @@ class AttemptLog(Protocol):
         """Events of one attempt in arrival order; an unknown attempt gives an empty tuple."""
         ...
 
+    def read_keyed(self, attempt_id: str) -> tuple[tuple[int, dict[str, Any]], ...]:
+        """The same events with a number that grows in arrival order (the timeline cursor is built from it)."""
+        ...
+
 
 def validate_event(event: Mapping[str, Any]) -> dict[str, Any]:
     """Return a clean copy or raise ValueError (unknown name, unknown field, missing id, non-scalar or long value)."""
@@ -68,19 +72,11 @@ def validate_event(event: Mapping[str, Any]) -> dict[str, Any]:
     return dict(event)
 
 
-class InMemoryAttemptLog:
-    def __init__(self) -> None:
-        self._lock = _thread.allocate_lock()
-        self._by_attempt: dict[str, list[dict[str, Any]]] = defaultdict(list)
+class EngineBridge:
+    """`from_engine`, shared by every log (needs `append`)."""
 
-    def append(self, event: Mapping[str, Any]) -> None:
-        clean = validate_event(event)
-        with self._lock:
-            self._by_attempt[clean["attempt_id"]].append(clean)
-
-    def read(self, attempt_id: str) -> tuple[dict[str, Any], ...]:
-        with self._lock:
-            return tuple(dict(e) for e in self._by_attempt.get(attempt_id, ()))
+    def append(self, event: Mapping[str, Any]) -> None:  # pragma: no cover - implemented by the log
+        raise NotImplementedError
 
     def from_engine(self, payload: Mapping[str, Any]) -> None:
         """Connect with `AttemptEngine(..., events=log.from_engine)`.
@@ -95,3 +91,22 @@ class InMemoryAttemptLog:
                          "state": "running"})
             return
         self.append(payload)
+
+
+class InMemoryAttemptLog(EngineBridge):
+    def __init__(self) -> None:
+        self._lock = _thread.allocate_lock()
+        self._by_attempt: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+    def append(self, event: Mapping[str, Any]) -> None:
+        clean = validate_event(event)
+        with self._lock:
+            self._by_attempt[clean["attempt_id"]].append(clean)
+
+    def read(self, attempt_id: str) -> tuple[dict[str, Any], ...]:
+        with self._lock:
+            return tuple(dict(e) for e in self._by_attempt.get(attempt_id, ()))
+
+    def read_keyed(self, attempt_id: str) -> tuple[tuple[int, dict[str, Any]], ...]:
+        with self._lock:
+            return tuple((i, dict(e)) for i, e in enumerate(self._by_attempt.get(attempt_id, ()), start=1))

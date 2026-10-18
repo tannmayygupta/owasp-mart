@@ -1227,7 +1227,7 @@ export interface components {
             updated_at: components["schemas"]["Timestamp"];
         };
         OpenTicket: {
-            /** @description One-time URL on the instance host (architecture 03 section 3). Single use. */
+            /** @description One-time URL on the instance host (architecture 03 section 3). Single use. The ticket is payload.signature (two base64url parts joined by a dot, contracts/edge/gate-ticket.md section 2). */
             url: string;
             expires_at: components["schemas"]["Timestamp"];
         };

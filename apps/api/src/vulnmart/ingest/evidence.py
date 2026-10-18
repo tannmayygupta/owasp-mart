@@ -12,6 +12,7 @@ as the data source of the real `ReportPort`. The store is a Protocol with an in-
 """
 from __future__ import annotations
 
+import base64
 import re
 import secrets
 import threading
@@ -257,7 +258,7 @@ class EvidenceRecorder:
             self.stats.refused_too_large += 1
             self.integrity.add(info.attempt_id, IntegrityType.ACTIVITY,
                                f"A captured request of challenge {challenge_key} was larger than the evidence limit and was refused.",
-                               f"evidence-size:{k[2]}")
+                               f"evidence-size:{k[2]}", challenge_key, at)
             self._done.add(k)
             return
         held_empty = has_flag_pattern(body) or any(has_flag_pattern(str(v)) for v in headers.values())
@@ -266,7 +267,7 @@ class EvidenceRecorder:
             self.alarm("flag pattern in an evidence capture")
             self.integrity.add(info.attempt_id, IntegrityType.ACTIVITY,
                                f"A captured request of challenge {challenge_key} still held a flag pattern; it was stored with an empty body.",
-                               f"evidence-flag:{k[2]}")
+                               f"evidence-flag:{k[2]}", challenge_key, at)
             plaintext = b""
         else:
             redact_headers(headers)  # second pass over the header map; headers are checked, not kept (only the body is sealed)
@@ -279,7 +280,7 @@ class EvidenceRecorder:
             self._done.add(k)
             return
         del plaintext
-        self.store.add(EvidenceRow(evidence_id="ev-" + secrets.token_hex(8), attempt_id=info.attempt_id, challenge_key=challenge_key,
+        self.store.add(EvidenceRow(evidence_id="e-" + base64.b32encode(secrets.token_bytes(10)).decode("ascii"), attempt_id=info.attempt_id, challenge_key=challenge_key,
                                    captured_at=at, size=0 if held_empty else len(body.encode("utf-8")), sealed=sealed, aad=aad,
                                    held_empty=held_empty))
         self.stats.sealed += 1

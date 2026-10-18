@@ -7,7 +7,8 @@
 //   EDGE_KEY_CURRENT_FILE      file with the current gate key: at least 64 hex characters (32 bytes), one line (required)
 //   EDGE_KEY_PREVIOUS_FILE     optional; a missing file, a folder or an empty file means no previous key
 //   EDGE_ADMIN_SECRET_FILE     file with the admin secret (read on every admin call, see admin.mjs) (required)
-//   EDGE_INGEST_URL            origin of the ingest, e.g. http://ingest:8081 (required)
+//   EDGE_INGEST_URL            origin of the ingest, e.g. http://ingest:8081 (required); https needs EDGE_INGEST_CA_FILE
+//   EDGE_INGEST_CA_FILE        optional; the PEM of the CA of the ingest certificate (a missing file, a folder or an empty file means none)
 //   EDGE_PLAYER_BIND_HOST      address or Docker network alias to bind the player listener to (default 0.0.0.0)
 //   EDGE_ADMIN_BIND_HOST       address or network alias to bind the admin listener to (default 127.0.0.1); a name is resolved at start with retries
 //   EDGE_PLAYER_PORT / EDGE_ADMIN_PORT / EDGE_RELAY_PORT   defaults 8080 / 9090 / 8081
@@ -23,6 +24,11 @@ import { createAdmin } from './admin.mjs';
 import { createGate } from './gate.mjs';
 import { createRelay } from './relay.mjs';
 import { createStore } from './state.mjs';
+
+// A file that may be missing, empty or a folder (Docker makes one of a missing bind source): all of that means none.
+function readOptionalFile(p) {
+  try { return p && fs.statSync(p).isFile() ? fs.readFileSync(p, 'utf8') : ''; } catch { return ''; }
+}
 
 const HOP = new Set(['connection', 'keep-alive', 'proxy-connection', 'transfer-encoding', 'upgrade', 'te', 'trailer', 'cookie']);
 const UPSTREAM_RE = /^(vm-i-[a-z2-7]{16}-e[1-9][0-9]{0,15}-sidecar):8080$/;
@@ -72,7 +78,8 @@ export function createPlayerHandler({ gate, resolveUpstream = (name) => ({ hostn
     }
     const to = resolveUpstream(m[1]);
     const headers = {};
-    for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k)) headers[k] = v;
+    // x-vm-* is the platform's own channel to the sidecar: a client never sets it (review finding C10); the sidecar strips it as well
+    for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && !k.startsWith('x-vm-')) headers[k] = v;
     if (d.cookie !== undefined) headers.cookie = d.cookie;
     const up = http.request({ hostname: to.hostname, port: to.port ?? 8080, method: req.method, path: req.url, headers, timeout: timeoutMs }, (r) => {
       const out = {};
@@ -116,7 +123,7 @@ const close = (server) => new Promise((resolve) => { server.closeAllConnections?
  * @returns {{ ports: {player:number, admin:number, relay:number}, gate, stop: () => Promise<void> }}
  */
 export async function startServer({
-  zone, keys, adminSecretFile, ingestUrl,
+  zone, keys, adminSecretFile, ingestUrl, ingestCa = '',
   playerHost = '0.0.0.0', adminHost = '127.0.0.1', relayHost = '0.0.0.0',
   playerPort = 8080, adminPort = 9090, relayPort = 8081,
   relayRateMax, relayRateWindowMs, resolveUpstream, now, log = () => {},
@@ -124,7 +131,7 @@ export async function startServer({
   const store = createStore({ zone });
   const gate = createGate({ keys, zone, store, ...(now ? { now } : {}) });
   const admin = createAdmin({ store, secretFile: adminSecretFile });
-  const relay = createRelay({ ingestUrl, rateMax: relayRateMax, rateWindowMs: relayRateWindowMs, log });
+  const relay = createRelay({ ingestUrl, ingestCa, rateMax: relayRateMax, rateWindowMs: relayRateWindowMs, log });
   const player = http.createServer(createPlayerHandler({ gate, resolveUpstream, log }));
   const adminServer = http.createServer(createAdminHandler({ admin }));
   for (const s of [player, adminServer]) { s.headersTimeout = 10000; s.requestTimeout = 30000; }
@@ -159,8 +166,10 @@ export async function main(env = process.env) {
   };
   const s = await startServer({
     zone: need('EDGE_ZONE'), keys, adminSecretFile: need('EDGE_ADMIN_SECRET_FILE'), ingestUrl: need('EDGE_INGEST_URL'),
+    ingestCa: readOptionalFile(env.EDGE_INGEST_CA_FILE), // an https ingest URL needs it; a missing, empty or folder path means none
     playerHost: await resolveBindHost(env.EDGE_PLAYER_BIND_HOST ?? '0.0.0.0'),
     adminHost: await resolveBindHost(env.EDGE_ADMIN_BIND_HOST ?? '127.0.0.1'),
+    relayHost: await resolveBindHost(env.EDGE_RELAY_BIND_HOST ?? '0.0.0.0'), // the instance-facing address in production (review finding C3)
     playerPort: int('EDGE_PLAYER_PORT', 8080), adminPort: int('EDGE_ADMIN_PORT', 9090), relayPort: int('EDGE_RELAY_PORT', 8081),
     relayRateMax: int('EDGE_RELAY_RATE_MAX', 120), relayRateWindowMs: int('EDGE_RELAY_RATE_WINDOW_MS', 10000),
     log: (m) => console.log(m),

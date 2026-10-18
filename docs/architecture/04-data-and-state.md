@@ -77,6 +77,11 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 | `integrity_flags` | `id`, `attempt_id`, `type` (`decoy`, `sharing`, `timing`, `activity`, `similarity`), `explanation`, `status`, `decided_by`, `decision_note` | Evidence for a human, never an automatic fail (FR-ACH-06). Held captures are `milestones.status = held` linked here |
 | `score_snapshots` | `attempt_id`, `score`, `per_challenge jsonb`, `computed_at`, `version` | Recomputed from milestones, hints and decisions; the dashboards read this |
 | `activity_buckets` | `attempt_id`, `bucket_start`, `request_count`, `rule_tags jsonb` | Basis for active time and the activity check (FR-TIM-02, FR-ACH-02) |
+| `held_captures` | `attempt_id`, `challenge_key`, `held_at`, `milestone`, `fallback`, `evidence_ids`, `status` (`open`, `accepted`, `rejected`), `reminded`, `decided_at` | A capture the activity check held for a human (FR-ACH-07); added by migration 0005 |
+| `review_audit` | `attempt_id`, `challenge_key`, `reviewer`, `decision`, `at`, `note_id`, `note` | Every held-capture decision (FR-SCR-10); added by migration 0005 |
+| `attempt_events` | `attempt_id`, `event jsonb` | The ids-only attempt event log (FR-TIM-04); added by migration 0005 |
+| `bot_visits` | `instance_id`, `epoch`, `visit_id`, `ticket_id`, `phase`, `at` | `bot.visit` records, never a credit (FR-DET-09); added by migration 0005 |
+| `security_events` | `kind`, `instance_id`, `epoch`, `seq`, `created_at` | Refused events worth a human's eye, ids and numbers only; added by migration 0005 |
 
 ### 2.7 Privacy, admin and operations (stream P)
 

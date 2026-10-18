@@ -64,6 +64,7 @@ def test_every_owner_is_a_module_package():
 def test_stream_l_tables_belong_to_stream_l_modules():
     lab_modules = {"attempts", "instances", "scoring", "ingest", "flags"}
     lab_tables = {"attempts", "instance_hosts", "instances", "instance_transitions", "instance_epochs", "events", "milestones",
-                  "flag_submissions", "hint_unlocks", "evidence", "integrity_flags", "score_snapshots", "activity_buckets"}
+                  "flag_submissions", "hint_unlocks", "evidence", "integrity_flags", "score_snapshots", "activity_buckets",
+                  "held_captures", "review_audit", "attempt_events", "bot_visits", "security_events"}
     for row in OWNERS["tables"]:
         assert (row["table"] in lab_tables) == (row["owner"] in lab_modules), row

@@ -210,7 +210,7 @@ def test_eight_moves_of_one_invite_to_opened_leave_one_move(owner, companies, as
 
 
 def test_migration_0010_goes_down_and_up_again(database, owner):
-    """Down to 0009 passes through 0011 and 0010; up again to the head."""
+    """Down to 0009 passes through 0012, 0011 and 0010; up again to the head."""
     cfg = Config(str(ROOT / "apps" / "api" / "alembic.ini"))
     os.environ["VULNMART_MIGRATE_DSN"] = with_db(OWNER, database[2])
     command.downgrade(cfg, "0009")

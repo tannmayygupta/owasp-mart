@@ -120,7 +120,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
 
 Truth summary (2026-10-13): built and verified locally: L-09 preparation and release commit, L-10 to L-13 code. NOT built: L-14, L-15, L-16.
 
-- [x] **L-09. Tag contracts v1.0.0 and start the change rules**
+- [ ] **L-09. Tag contracts v1.0.0 and start the change rules**
+  - Unticked 2026-10-18 on the developer's instruction after a code-based status check: the tag contracts-v1.0.0 does not exist and the COMPAT.md approvals are pending, so the Done-when is not met.
   - Closed 2026-10-12 on the developer's instruction. Release commit done 2026-10-13 (0a2a43b). NOT met: tag contracts-v1.0.0 does not exist; all 19 COMPAT.md Approvals rows pending (Akshay, Sahil, and Tanmay's own); the approvals rule is NOT-APPLICABLE until the tag; handoff checklist has 27 unticked lines (node scripts/tag-contracts.mjs --dry-run).
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.7` in `epic-lab-baseline` (find it with `bmad-ticket`)
@@ -156,7 +157,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Handoffs: H-113, H-129, H-131 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Status 2026-10-12 (story 2.3): the Caddy origin-secret gate, the stock Caddy edge for vm-p, the Vercel probe project with the `routes` header transform, the S-14 check script, ADR 0031, decision D-50 (Proposed) and the runbook `docs/runbooks/vercel-and-origin.md` are built and tested with real Caddy in Docker (including TLS) and stand-in proxies. NOT met (ticked on the developer's instruction): the live steps are the developer's (Vercel login and project, sensitive environment variable, secret files on vm-p, port 443, the S-14 run) and the real wiring waits for Akshay's P-07 and the live certificates of L-10.
 
-- [x] **L-12. Image builds for amd64 and arm64 and deploy pipelines**
+- [ ] **L-12. Image builds for amd64 and arm64 and deploy pipelines**
+  - Unticked 2026-10-18 on the developer's instruction after a code-based status check: no recorded run shows a hello stack from CI on both VMs and the laptop, so the Done-when is not met.
   - Closed 2026-10-12 on the developer's instruction (ticked on the developer's instruction, live steps open). arm64 not built (D-51 amends LE-4); only amd64 is in scope. Still open (developer, live): run images workflow on GitHub, make the hello package public, deploy to both VMs and laptop. NOT met: Done-when (hello stack from CI on both VMs and the laptop).
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
@@ -339,7 +341,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Waits on: L-23. Open question OI-26: ask before building.
   - Done when: The board and aid work as the decision on OI-26 says.
 
-- [x] **L-29. Isolation proof and extra hardening on VM-I**
+- [ ] **L-29. Isolation proof and extra hardening on VM-I**
+  - Unticked 2026-10-18 on the developer's instruction after a code-based status check: S-8 was not tested live and the audit does not yet read the VULNMART-LABS chain (review finding D1), so the Done-when is not fully met.
   - Ticked 2026-10-18 with a caveat: S-8 (user namespaces, rootless Docker, gVisor) was NOT tested live; the developer skipped it for the demo and the result is reasoning only (docs/research/s-8-instance-sandboxing.md, story dropped). The isolation tests do pass on VM-I.
   - Sprint 4 run 2026-10-18 (L-29 part 1): S-3 answered live (the per-subnet INPUT rule blocks the gateway; an uncovered subnet leaks gateway:22), probe PASS after a Docker restart and a reboot, vm-i exposes only 22, read-only audit 8 PASS 0 FAIL, S-15 emulated with the real edge-gate (restart healthy in 3.3 s with 20 networks); research note docs/research/s-3-s-15-vm-i-isolation.md. Open for the Done-when: part 2 (S-8: user namespaces, rootless Docker, gVisor, wider pools) and 20 real instances through the orchestrator.
   - Status 2026-10-17 (not ticked): `scripts/vmi-audit.mjs` (22 tests, fixtures) and runbook `docs/runbooks/vmi-hardening.md` are built; the isolation tests on VM-I are the developer's runs (Part A), no live result exists; S-8 stays open.

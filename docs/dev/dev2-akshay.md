@@ -218,7 +218,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Done when: A recruiter creates an assessment and sends an invite and the invite email arrives.
   - Handoffs: H-139, H-140 (see docs/dev/HANDOFFS.md; read them when you plan P-21)
 
-- [x] **P-21. Accepting invites, re-invite after a fault and bulk invites**  (service level, no routes (story 5.3); the lab port is given to `create_app` in tests and the demo only, production wiring is stream L's; the first way of FR-ASM-04: a different verified address cannot use the link)
+- [x] **P-21. Accepting invites, re-invite after a fault and bulk invites**  (service level, no routes (story 5.3); `create_app` takes the lab runtime's attempt port when the lab runs in the same process (tests give an engine port); the first way of FR-ASM-04: a different verified address cannot use the link)
   - Epic: `epic-assessments-and-invites`
   - BMAD story: planned, ref `6.2` in `epic-assessments-and-invites` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: A candidate accepts an invite with consent, a re-invite after a fault, and bulk invite handling.

@@ -67,3 +67,14 @@ def test_system_clock_is_aware_utc():
 def test_non_utc_aware_offset_is_accepted():
     ist = timezone(timedelta(hours=5, minutes=30))
     assert require_aware(datetime(2026, 1, 1, tzinfo=ist)).utcoffset() == timedelta(hours=5, minutes=30)
+
+
+def test_from_dict_is_strict_about_types_and_unknown_members():
+    # review finding B12
+    from vulnmart_attempts import Rules
+
+    assert Rules.from_dict(Rules().to_dict()) == Rules()
+    for bad in ({"time_limit_minutes": 119.9}, {"time_limit_minutes": "120"}, {"reset_limit": True}, {"warning_minutes": "15"},
+                {"warning_minutes": [15.5]}, {"activity_check_mode": 1}, {"nope": 1}):
+        with pytest.raises(ValueError):
+            Rules.from_dict(bad)

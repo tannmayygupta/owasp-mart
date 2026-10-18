@@ -270,6 +270,19 @@ function unlistedArtefacts(root, sha, folders, listed, skip) {
   return [...names].filter((p) => ARTEFACT.test(p) && !listed.has(p) && !artefactSkipped(p, skip));
 }
 
+// The table-owners list is data, one `- { table: <name>, owner: <module>, ... }` per line (shape checked by scripts/check_table_owners.py). A new row is additive;
+// a row removed or given another owner is breaking. Read by line so the checker needs no YAML package.
+const TABLE_ROW = /^\s*-\s*\{\s*table:\s*([A-Za-z0-9_]+)\s*,\s*owner:\s*([A-Za-z0-9_]+)/gm;
+export function diffTableOwners(baseText, headText) {
+  const rows = (t) => new Map([...String(t).matchAll(TABLE_ROW)].map((m) => [m[1], m[2]]));
+  const before = rows(baseText);
+  const after = rows(headText);
+  const removed = [...before.keys()].filter((t) => !after.has(t));
+  const changed = [...before].filter(([t, o]) => after.has(t) && after.get(t) !== o).map(([t, o]) => `${t}: ${o} to ${after.get(t)}`);
+  const added = [...after.keys()].filter((t) => !before.has(t));
+  return { removed, changed, added };
+}
+
 async function compareFiles({ root, sha, c, bc, getOasdiff, artefacts = true, skip = [] }) {
   const schemas = [...new Set([...c.schemas, ...(bc?.schemas ?? [])])];
   const openapi = [...new Set([...c.openapi, ...(bc?.openapi ?? [])])];
@@ -290,6 +303,11 @@ async function compareFiles({ root, sha, c, bc, getOasdiff, artefacts = true, sk
         } catch (e) {
           errors.push(`${f}: could not be compared (${e.message})`);
         }
+      } else if (f === 'contracts/db/table-owners.yaml') {
+        const d = diffTableOwners(bt, ht);
+        for (const t of d.removed) breaking.push(`${f}: table ${t} removed from the list`);
+        for (const t of d.changed) breaking.push(`${f}: owner changed (${t})`);
+        if (d.added.length) notes.push(`${f}: ${d.added.length} table(s) added (${d.added.join(', ')}); additive`);
       } else {
         breaking.push(`${f}: unlisted YAML file changed; it is not machine-comparable here (list it under "schemas" or "openapi" in contracts/registry.json, or declare the change as BREAKING)`);
       }

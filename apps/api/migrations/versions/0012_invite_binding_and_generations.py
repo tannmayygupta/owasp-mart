@@ -1,7 +1,7 @@
 """Accepting invites (story P-21, FR-ASM-04, FR-ASM-05): invites.user_id, attempt_id, generation, supersedes_attempt_id, and the policy `own_invite`.
 
-Revision ID: 0011
-Revises: 0010
+Revision ID: 0012
+Revises: 0011
 Created: 2026-10-18 (story P-21)
 Owner module: assessments (stream P).
 
@@ -15,8 +15,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0011"
-down_revision = "0010"
+revision = "0012"
+down_revision = "0011"
 branch_labels = None
 depends_on = None
 

@@ -1,0 +1,13 @@
+STATUS  STEP                   DETAIL
+------  ---------------------  ----------------------------------------
+PASS    docker-seccomp         security options: apparmor,profile=default, seccomp,profile=builtin, cgroupns; rootless no; userns no (checked, not extended); storage overlayfs
+PASS    daemon-pools           pools allow 256 networks, target 7
+PASS    daemon-live-restore    live-restore is true; no-new-privileges default off (set per container, see container-hardening)
+PASS    host-rule-docker-user  first rule jumps lab subnet <addr>/16, <addr>/16 to VULNMART-LABS
+PASS    host-rule-input        first INPUT rule(s) drop new connections from <addr>/16, <addr>/16
+PASS    host-rule-labs-chain   10 rules; metadata and VPC dropped, everything else ends in a DROP
+PASS    container-hardening    47 container(s): none privileged, no host network, socket only read-only in docker-proxy, no unlisted writable binds, instances drop ALL and set no-new-privileges
+PASS    listening-ports        9 listener(s); public ports: 22, 443, 9443; the rest are loopback
+PASS    imds-v2-required       2 instance(s): HttpTokens required
+
+9 PASS, 0 FAIL, 0 SKIP (saved outputs; no live host result unless you ran the bundle on the host)

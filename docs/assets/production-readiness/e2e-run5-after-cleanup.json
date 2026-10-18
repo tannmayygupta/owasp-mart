@@ -1,0 +1,155 @@
+{
+  "at": "2026-10-18T12:21:54.530Z",
+  "base": "https://tanmay-platform-prod.duckdns.org",
+  "rows": [
+    {
+      "name": "platform health through the site",
+      "ok": true,
+      "detail": "HTTP 200 1734 ms"
+    },
+    {
+      "name": "API liveness through the site",
+      "ok": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "an API call without a session is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "name": "sign up, confirm by mail, sign in",
+      "ok": true,
+      "detail": "learner ready"
+    },
+    {
+      "name": "catalogue lists the eleven challenges",
+      "ok": true,
+      "detail": "11 items"
+    },
+    {
+      "name": "request an instance",
+      "ok": true,
+      "detail": "HTTP 202"
+    },
+    {
+      "name": "the instance becomes ready and the clock starts",
+      "ok": true,
+      "detail": "6 s from the request"
+    },
+    {
+      "name": "instance state is ready or active with access open",
+      "ok": true,
+      "detail": "ready/open"
+    },
+    {
+      "name": "one-time ticket issued",
+      "ok": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "the instance refuses a visitor without the ticket",
+      "ok": true,
+      "detail": "HTTP 403"
+    },
+    {
+      "name": "the ticket is exchanged for the gate cookie",
+      "ok": true,
+      "detail": "HTTP 302"
+    },
+    {
+      "name": "the ticket works once only",
+      "ok": true,
+      "detail": "HTTP 403"
+    },
+    {
+      "name": "the shop answers through the gate and the sidecar",
+      "ok": true,
+      "detail": "HTTP 200 586 ms"
+    },
+    {
+      "name": "a planted flag is served by the instance",
+      "ok": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "the sidecar saw the flag and the platform credited the challenge",
+      "ok": true,
+      "detail": "M3"
+    },
+    {
+      "name": "a wrong flag is incorrect",
+      "ok": true,
+      "detail": "credit none"
+    },
+    {
+      "name": "the right flag is correct and credited",
+      "ok": true,
+      "detail": "correct/credited"
+    },
+    {
+      "name": "a hint unlocks",
+      "ok": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "the score counts the capture",
+      "ok": true,
+      "detail": "score 63"
+    },
+    {
+      "name": "reset starts a new round",
+      "ok": true,
+      "detail": "epoch 2"
+    },
+    {
+      "name": "the instance is ready again after the reset",
+      "ok": true,
+      "detail": "ready"
+    },
+    {
+      "name": "a flag of the old round no longer counts",
+      "ok": true,
+      "detail": "incorrect"
+    },
+    {
+      "name": "the new round has other flags",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "a flag of the new round counts",
+      "ok": true,
+      "detail": "correct/credited"
+    },
+    {
+      "name": "the timeline tells the story",
+      "ok": true,
+      "detail": "11 entries"
+    },
+    {
+      "name": "submit ends the attempt",
+      "ok": true,
+      "detail": "submitted"
+    },
+    {
+      "name": "the instance is frozen after the submit",
+      "ok": true,
+      "detail": "frozen"
+    },
+    {
+      "name": "the report has the score, the time and the hints",
+      "ok": true,
+      "detail": "score 125, 26 s"
+    },
+    {
+      "name": "no answer shows the flag",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "aid": "a-2BRCIBBKLYGD6XIQ",
+  "iid": "i-6ZMJWAJENGRPUIJO",
+  "startToRunning": 6,
+  "total": 32.7
+}
