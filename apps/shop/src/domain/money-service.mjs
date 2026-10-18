@@ -55,6 +55,24 @@ export function refundableRemaining(db, orderItemId) {
   return Math.max(0, itemPaidCents(oi) - refundedCents(db, oi.id));
 }
 
+// Order-level refund accounting — the SINGLE invariant every refund path shares
+// (item refunds + the C04 quick-refund ledger). The C04 fix routes through this;
+// the vulnerable quick path deliberately skips it.
+export function orderPaidCents(db, orderId) {
+  return db.prepare('SELECT total_cents FROM orders WHERE id = ?').get(parseId(orderId))?.total_cents ?? 0;
+}
+export function orderRefundedCents(db, orderId) {
+  const id = parseId(orderId);
+  const itemRefunds = db
+    .prepare("SELECT COALESCE(SUM(r.amount_cents),0) AS s FROM refunds r JOIN order_items oi ON oi.id = r.order_item_id WHERE oi.order_id = ? AND r.status IN ('approved','processed')")
+    .get(id).s;
+  const ledger = db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS s FROM refund_ledger WHERE order_id = ?').get(id).s;
+  return itemRefunds + ledger;
+}
+export function orderRefundableRemaining(db, orderId) {
+  return Math.max(0, orderPaidCents(db, orderId) - orderRefundedCents(db, orderId));
+}
+
 // Refund rows a staff member (all) or a seller (own store only) may act on.
 export function listRefunds(db, actor) {
   if (['support_agent', 'finance', 'admin'].includes(actor?.role)) {
@@ -91,6 +109,11 @@ export function approveRefund(db, actor, refundId, { amount, idempotencyKey } = 
   if (!Number.isInteger(amt) || amt <= 0) throw new ValidationError('the refund amount must be a positive integer');
   const remaining = itemPaidCents(item) - refundedCents(db, item.id, { excludeRefundId: refund.id });
   if (amt > remaining) throw new ValidationError(`the refund (${amt}) would exceed the amount paid still refundable (${remaining})`);
+  // The shared order-level invariant (also counts C04 quick refunds): no path may
+  // push the order's refunded total past what was paid for the order.
+  if (amt > orderRefundableRemaining(db, item.order_id)) {
+    throw new ValidationError('the refund would exceed the order amount paid');
+  }
   // Permission: seller is 'own_store_under_limit' (needs amount + limit); support/admin unscoped.
   if (!can(actor.role, 'approve_refund', { actor_store_id: actor.store_id, resource_store_id: item.store_id, amount: amt, limit: SELLER_REFUND_LIMIT_CENTS })) {
     throw new ForbiddenError();

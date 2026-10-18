@@ -226,7 +226,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit tests pass and fail as required, and SQL injection cannot reach other data.
   - Handoffs: H-47 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-22. C04 Insecure Design (refund total beyond the amount paid)**
+- [x] **T-22. C04 Insecure Design (refund total beyond the amount paid)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C04 as a separate quick-refund path on top of the correct model.

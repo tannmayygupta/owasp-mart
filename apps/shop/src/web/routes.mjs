@@ -7,6 +7,7 @@ import * as shop from '../domain/shop-service.mjs';
 import * as giftcards from '../challenges/c02-gift-card-codes.mjs';
 import { searchCatalog } from '../challenges/c03a-catalog-search.mjs';
 import { noteTicketMarkup } from '../challenges/c03b-ticket-xss.mjs';
+import { quickRefund, refundStatement } from '../challenges/c04-quick-refund.mjs';
 
 // Map a service error to an HTTP response; rethrow anything unexpected.
 function handleError(err, res) {
@@ -60,6 +61,16 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
   app.post('/api/wallet/redeem', requireCustomer, hj((req, res) => {
     const out = giftcards.redeem(db, req.user, req.body?.code, { challenges, emit });
     res.json(out);
+  }));
+
+  // C04 (Insecure Design): the quick-refund path + its statement. The cumulative
+  // invariant lives in the challenge module; these are thin JSON adapters.
+  app.post('/api/orders/:id/refunds', requireCustomer, hj((req, res) => {
+    const out = quickRefund(db, req.user, req.params.id, { amount: req.body?.amount ? Number(req.body.amount) : undefined, idempotencyKey: req.body?.idempotency_key || undefined }, { challenges, emit });
+    res.json(out);
+  }));
+  app.get('/api/orders/:id/refund-statement', requireCustomer, hj((req, res) => {
+    res.json(refundStatement(db, req.user, req.params.id));
   }));
 
   // Catalogue
