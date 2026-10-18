@@ -13,6 +13,7 @@ import { configureViews } from './web/views.mjs';
 import { loadUser, checkCsrf } from './web/middleware.mjs';
 import { registerRoutes } from './web/routes.mjs';
 import { registerStaffRoutes } from './web/routes-staff.mjs';
+import { registerSellerRoutes } from './web/routes-seller.mjs';
 
 // Build id and catalogue version are supplied by the environment at run time.
 // They default to "dev" so the skeleton answers even outside an instance.
@@ -74,6 +75,7 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) 
     app.use(checkCsrf);
     registerRoutes(app, db, emit);
     registerStaffRoutes(app, db);
+    registerSellerRoutes(app, db);
   }
 
   // Terminal handler: unknown routes return a JSON body, never a stack trace

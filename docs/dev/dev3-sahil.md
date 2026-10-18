@@ -183,7 +183,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 
 Goal: Seller and money flows, and challenges C01 to C06.
 
-- [ ] **T-17. Seller flows**
+- [x] **T-17. Seller flows**
   - Epic: `epic-shop-seller-and-money`
   - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: Seller store registration and approval, products, fulfilment and staff.

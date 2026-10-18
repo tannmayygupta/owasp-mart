@@ -1,0 +1,50 @@
+{% extends "layout.njk" %}{% block title %}Seller dashboard{% endblock %}{% block body %}
+<h1>{{ store.name }}</h1>
+<p class="muted">Store status: <strong>{{ store.status }}</strong>{% if store.status != 'approved' %} — you cannot publish products until an admin approves the store.{% endif %}</p>
+
+<section>
+  <h2>Store profile</h2>
+  <form method="post" action="/seller/store">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Name <input name="name" value="{{ store.name }}" maxlength="120" required></label>
+    <label>KYC details <textarea name="kyc_text" maxlength="2000">{{ store.kyc_text }}</textarea></label>
+    <button>Save profile</button>
+  </form>
+  <p><a href="/seller/staff">Manage staff</a></p>
+</section>
+
+<section>
+  <h2>Products</h2>
+  <table><tr><th>#</th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
+  {% for p in products %}<tr>
+    <td>{{ p.id }}</td><td>{{ p.title }}</td><td>{{ p.price_cents | cents }}</td><td>{{ p.stock }}</td><td>{{ p.status }}</td>
+    <td>
+      {% if p.status == 'draft' %}<form class="inline" method="post" action="/seller/products/{{ p.id }}/submit"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Submit for review</button></form>{% endif %}
+      {% if p.status == 'published' %}<form class="inline" method="post" action="/seller/products/{{ p.id }}/unlist"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Unlist</button></form>{% endif %}
+    </td>
+  </tr>{% else %}<tr><td colspan="6" class="muted">No products yet.</td></tr>{% endfor %}</table>
+
+  <h3>Add a product</h3>
+  <form method="post" action="/seller/products">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Title <input name="title" maxlength="120" required></label>
+    <label>Description <textarea name="description" maxlength="2000"></textarea></label>
+    <label>Price (cents) <input name="price_cents" type="number" min="0" value="0" required></label>
+    <label>Stock <input name="stock" type="number" min="0" value="0" required></label>
+    <button>Create draft</button>
+  </form>
+</section>
+
+<section>
+  <h2>Orders to fulfil</h2>
+  <table><tr><th>Item</th><th>Product</th><th>Qty</th><th>Ship to</th><th>Status</th><th></th></tr>
+  {% for it in items %}<tr>
+    <td>{{ it.id }}</td><td>{{ it.title }}</td><td>{{ it.qty }}</td><td>{{ it.ship_city }}, {{ it.ship_country }}</td><td>{{ it.status }}</td>
+    <td>
+      {% if it.status == 'paid' %}<form class="inline" method="post" action="/seller/items/{{ it.id }}/fulfil"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="to" value="processing"><button>Start</button></form>{% endif %}
+      {% if it.status == 'processing' %}<form class="inline" method="post" action="/seller/items/{{ it.id }}/fulfil"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="to" value="shipped"><button>Ship</button></form>{% endif %}
+      {% if it.status == 'shipped' %}<form class="inline" method="post" action="/seller/items/{{ it.id }}/fulfil"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="to" value="delivered"><button>Mark delivered</button></form>{% endif %}
+    </td>
+  </tr>{% else %}<tr><td colspan="6" class="muted">No orders yet.</td></tr>{% endfor %}</table>
+</section>
+{% endblock %}
