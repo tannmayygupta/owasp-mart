@@ -195,8 +195,9 @@ class SessionService:
 
     # -- using a session ---------------------------------------------------------------------------------------------
 
-    def resolve(self, token: str) -> ResolvedSession | None:
-        """The live session behind a cookie value, or None (unknown, revoked, ended, or its account is no longer active). Counts as activity."""
+    def resolve(self, token: str, *, touch: bool = True) -> ResolvedSession | None:
+        """The live session behind a cookie value, or None (unknown, revoked, ended, or its account is no longer active). Counts as activity unless `touch=False`:
+        the live stream and its snapshot look at a session without keeping it alive (story P-23), so a dashboard left open still times out when its owner is idle."""
         digest = token_hash(token)
         now = self._now()
         with self._sessions.begin() as session:
@@ -212,7 +213,7 @@ class SessionService:
             if now >= absolute or now - last_seen >= idle:
                 row.revoked_at = now  # ended for good: no later clock reading brings it back
                 return None
-            if now - last_seen >= TOUCH_EVERY:
+            if touch and now - last_seen >= TOUCH_EVERY:
                 row.last_seen_at = last_seen = now
             roles = {Role(r) for r in session.scalars(select(UserRole.role).where(UserRole.user_id == user.id))}
             if user.account_type == "recruiter":

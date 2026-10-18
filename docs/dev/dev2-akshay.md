@@ -235,9 +235,9 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Waits on: P-06, P-12. Tanmay's L-11 proves SSE through Vercel (S-14).
   - Done when: A change shows live in a browser within the target time and the polling fallback works when SSE is blocked.
 
-- [ ] **P-23. Stream authorisation and HTTP/2**
+- [x] **P-23. Stream authorisation and HTTP/2**  (the stream is authorised from the session and the company's standing and re-checked while open; HTTP/2 proven locally through the real Caddy image, not through Vercel (S-14); the stream and snapshot no longer extend an idle session)
   - Epic: `epic-live-updates`
-  - BMAD story: not planned yet; created when you incept `epic-live-updates` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `7.2` in `epic-live-updates` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Authorise every stream per user and company; HTTP/2 as far as the spike allows.
   - Covers: FR-LIV-03, 05
   - Waits on: P-19, P-22.

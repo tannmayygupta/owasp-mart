@@ -197,3 +197,13 @@
 - SSE through the real Vercel and Caddy path, and HTTP/2, are not verified (S-2, S-14). The web proxy of the local stack needed `compress: false`; Caddy's `encode` in front of production has not been checked.
 - A client that held exactly the newest id before a Valkey reset is told to resync (the evidence that it was up to date goes with the reset).
 - Old rows of `domain_events` are not purged yet (P-24).
+
+
+## Deferred from: story-stream-authorisation-and-http-2-plan (2026-10-19)
+
+- HTTP/2 is proven locally with the real Caddy image only; Vercel's leg and the Hobby plan are spike S-14 and not verified. The API itself speaks HTTP/1.1 and HTTP/2 between the front and the API is not used.
+- A logout, revoke, suspension or removal ends an open stream within the 30-second re-check, not at once; the events delivered in between are the person's own and were authorised when appended.
+- The stream and its snapshot do not count as session activity (the dashboards must make a real call when the person does something, H-143); whether the dashboards want a keep-alive ping is theirs to decide with the developer.
+- The standing check is a few queries per connection per re-check; at the connection cap that is about 70 checks a second per process (placeholders, OI-25), and the cap is per process.
+- The authorisation tests that need a company use the real services on SQLite and the Postgres suite of P-22; a Postgres test of the company stream with row-level security was not added (the stream reads no company table).
+- A new company state (for example an archived one) takes the live view away only if `active_company_of` stops returning the company.

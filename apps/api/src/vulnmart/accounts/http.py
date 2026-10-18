@@ -226,12 +226,12 @@ class Authenticated:
     session: ResolvedSession
 
 
-async def _authenticate(request: Request) -> Authenticated:
+async def _authenticate(request: Request, *, touch: bool = True) -> Authenticated:
     service = session_service(request)
     token = request.cookies.get(SESSION_COOKIE)
     if not token or not _TOKEN.fullmatch(token):
         raise ProblemError(ErrorCode.AUTH_SESSION_REQUIRED)
-    session = await asyncio.to_thread(service.resolve, token)
+    session = await asyncio.to_thread(lambda: service.resolve(token, touch=touch))
     if session is None:  # unknown, revoked or ended: the cookie is useless, so the answer also clears it
         raise ProblemError(ErrorCode.AUTH_SESSION_REQUIRED, headers={"Set-Cookie": _CLEARED})
     return Authenticated(token, session)
@@ -240,6 +240,14 @@ async def _authenticate(request: Request) -> Authenticated:
 async def authenticated(request: Request) -> AsyncIterator[Authenticated]:
     """Dependency for a safe (read) route: a live session, with its user and roles in scope for the rest of the request."""
     auth = await _authenticate(request)
+    with _scope.acting_as(auth.session.scope):
+        yield auth
+
+
+async def authenticated_passive(request: Request) -> AsyncIterator[Authenticated]:
+    """Like `authenticated`, but the call does not count as activity (the idle timeout is not extended): for what a page does by itself while its owner does nothing,
+    the live stream that reconnects on its own and the polling that stands in for it (story P-23)."""
+    auth = await _authenticate(request, touch=False)
     with _scope.acting_as(auth.session.scope):
         yield auth
 

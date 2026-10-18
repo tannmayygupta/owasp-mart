@@ -37,6 +37,7 @@ from vulnmart.kernel.settings import Settings, get_settings
 from vulnmart.assessments.accept import InviteAcceptance, InviteConsentTargets
 from vulnmart.lab.runtime import LabRuntime
 from vulnmart.live.api import router as live_router
+from vulnmart.live.authorise import StreamAuthoriser
 from vulnmart.live.hub import HubConfig, LiveHub
 from vulnmart.live.snapshot import EmptySnapshot, LabSnapshotSource, SnapshotSource
 from vulnmart.live.store import StreamReader, ValkeyStreamStore
@@ -137,6 +138,7 @@ def create_app(
     live_store: StreamReader | None = None,
     live_config: HubConfig | None = None,
     live_snapshot: SnapshotSource | None = None,
+    live_authoriser: StreamAuthoriser | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits). `attempts` is the lab's attempt port (IF-9): with it
@@ -195,6 +197,7 @@ def create_app(
     # Live updates (story P-22): the hub reads the streams the worker's relay fills; the snapshot is the lab's own state (nothing without a lab in this process).
     store = live_store if live_store is not None else (ValkeyStreamStore(settings.valkey_url) if settings.valkey_url else None)
     app.state.live_hub = LiveHub(store, live_config) if store is not None else None
+    app.state.live_authoriser = live_authoriser or StreamAuthoriser(app.state.companies.active_company_of if app.state.companies is not None else None)
     app.state.live_snapshot = live_snapshot or (LabSnapshotSource(lab) if lab is not None else EmptySnapshot())
     app.include_router(accounts_router)
     app.include_router(session_router)
