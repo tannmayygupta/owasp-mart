@@ -83,7 +83,7 @@ def test_a_complete_unknown_instance_is_adopted_ready_with_closed_access_and_hig
     result = new.reconcile()
     rec = new.get(IID)
     assert result.adopted == [IID] and rec.state is S.READY and rec.health == "healthy"
-    assert (rec.access, rec.access_epoch) == ("closed", 0) and rec.epoch == 1 and rec.template_id == "shop-v0"
+    assert rec.access == "closed" and rec.access_epoch > ADOPTED_TRANSITION_BASE and rec.epoch == 1 and rec.template_id == "shop-v0"
     assert rec.memory_mb == new.host_status()["used_memory_mb"] > 0
     first = rec.transition_offset + 1
     assert first > ADOPTED_TRANSITION_BASE

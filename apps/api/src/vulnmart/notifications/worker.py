@@ -91,8 +91,10 @@ class RelayLoop:
 
 def build_email_service(settings: Settings, sessions: Any, settings_port: Any, *, provider: EmailProvider | None = None,
                         recipients: RecipientLookup | None = None, renderer: Renderer | None = None,
-                        now: Callable[..., Any] | None = None) -> EmailOutboxService:
-    extra = {"now": now} if now else {}
+                        now: Callable[..., Any] | None = None, address_opener: Callable[[str, str], str] | None = None) -> EmailOutboxService:
+    extra: dict[str, Any] = {"now": now} if now else {}
+    if address_opener is not None:
+        extra["address_opener"] = address_opener
     if recipients is None:
         if settings.env in ("staging", "production"):
             # fail closed: until story P-11 provides the account lookup, a deployed worker would turn every mail into `failed`

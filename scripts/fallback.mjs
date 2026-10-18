@@ -22,7 +22,9 @@ import { COMPOSE_FILE, MSG_DOCKER_DOWN, dockerRunning, portFree, run } from './d
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PROJECT = 'vulnmart-fallback';
 export const LAB_PORT = 8100;
-export const STATE_DIR = path.join(os.tmpdir(), PROJECT);
+// one folder per user, mode 700: on a shared machine another user cannot plant a state file that down would act on (review finding D10)
+const USER_TAG = (() => { try { return os.userInfo().username.replace(/[^A-Za-z0-9_.-]/g, '_') || 'user'; } catch { return 'user'; } })();
+export const STATE_DIR = path.join(os.tmpdir(), `${PROJECT}-${USER_TAG}`);
 export const STATE_FILE = path.join(STATE_DIR, 'state.json');
 export const TOKEN_FILE = path.join(STATE_DIR, 'demo-token');
 export const USAGE = 'node scripts/fallback.mjs up [--no-web] [--lab] | check | down';
@@ -102,7 +104,16 @@ function killTree(pid) {
   }
 }
 
-const readState = () => (existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, 'utf8')) : null);
+// A state file that cannot be read (an up that was killed half way) is { corrupt: true }: down still removes the stack with the default profiles.
+const readState = () => {
+  if (!existsSync(STATE_FILE)) return null;
+  try {
+    const st = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    return st && typeof st === 'object' && !Array.isArray(st) ? st : { corrupt: true };
+  } catch {
+    return { corrupt: true };
+  }
+};
 
 // ---------- commands ----------
 export async function up(o) {
@@ -113,7 +124,7 @@ export async function up(o) {
   const clash = collisions(ps.stdout);
   if (clash.length) return console.error(`FAIL containers of another VulnMart stack exist (${clash.join(', ')}); the Compose file uses fixed names. Remove them first (nothing was started).`), 1;
   if (o.lab && !existsSync(path.join(ROOT, 'apps', 'api', 'src', 'vulnmart', 'lab'))) return console.error('FAIL --lab needs the lab runtime (story 1, apps/api/src/vulnmart/lab), which is not in this tree. Run without --lab.'), 1;
-  mkdirSync(STATE_DIR, { recursive: true });
+  mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
   writeFileSync(STATE_FILE, JSON.stringify({ project: PROJECT, profiles: profilesFor(o), lab: o.lab, labPid: null }));
   console.log(`starting platform stack (project ${PROJECT}, profiles ${profilesFor(o).join(' + ')}); the first run builds images and takes minutes`);
   const r = compose(profilesFor(o), ['up', '-d', '--wait', '--quiet-pull']);
@@ -128,6 +139,7 @@ export async function up(o) {
     const out = openSync(path.join(STATE_DIR, 'lab-runtime.log'), 'a');
     const child = spawn('uv', labArgs(), { cwd: ROOT, env: { ...process.env, ...labEnv(token) }, stdio: ['ignore', out, out], windowsHide: true, detached: process.platform !== 'win32' });
     writeFileSync(STATE_FILE, JSON.stringify({ project: PROJECT, profiles: profilesFor(o), lab: true, labPid: child.pid, noWeb: o.noWeb }));
+    child.on('error', (e) => console.error(`FAIL the lab runtime could not start (${e.code || e.message}); is uv installed? The platform stack stays up; run down to remove it.`));
     child.unref();
   }
   writeFileSync(STATE_FILE, JSON.stringify({ ...readState(), noWeb: o.noWeb }));
@@ -160,8 +172,9 @@ export async function check() {
 
 export async function down() {
   const st = readState();
-  const profiles = st?.profiles ?? ['platform', 'web'];
-  if (st?.labPid) killTree(st.labPid);
+  const known = (p) => Array.isArray(p) && p.length > 0 && p.every((x) => ['platform', 'web', 'lab'].includes(x));
+  const profiles = known(st?.profiles) ? st.profiles : ['platform', 'web'];
+  if (Number.isInteger(st?.labPid) && st.labPid > 1) killTree(st.labPid); // only a real process id: never 0, 1 or a negative number (killTree uses the group)
   const r = compose(profiles, ['down', '-v', '--remove-orphans', '--timeout', '2']);
   rmSync(STATE_DIR, { recursive: true, force: true });
   const left = run('docker', ['ps', '-aq', '--filter', `label=com.docker.compose.project=${PROJECT}`]).stdout.trim();

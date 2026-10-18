@@ -1,0 +1,74 @@
+# vm-p: the site (the demo console and the API behind the origin secret) and the private TLS listener of the lab (events and state reports).
+# The site certificate comes from the files that lego writes; the private listener's certificate was made by the private CA (docs/runbooks/live-deploy.md).
+{
+	admin unix//tmp/caddy-admin.sock
+	auto_https off
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 60s
+			idle 2m
+		}
+	}
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>headers>X-Origin-Secret delete
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			resp_headers>Set-Cookie delete
+		}
+	}
+}
+
+:443 {
+	tls /certs/fullchain.pem /certs/privkey.pem
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		-Server
+	}
+
+	# The API: this server adds the origin secret itself (the console is served from here, so the browser is on the same origin). Nothing else reaches the API.
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			header_up X-Origin-Secret {file./run/secrets/origin_secret}
+			header_up X-Edge-Forwarded-For {http.request.header.X-Forwarded-For}
+		}
+	}
+
+	handle /healthz {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv/console
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Only the two internal routes and only POST. This is server TLS (the callers check this certificate against the private CA), not mutual TLS: the callers do not present a
+# certificate. What protects the listener is (1) the network: only the labs subnet reaches this port (security group and network ACL, tested in
+# infra/terraform/aws/tests) and (2) the signature of every request (event key per instance, report key for state reports). Mutual TLS is a recorded follow-up.
+:9444 {
+	tls /run/pki/ingest.pem /run/pki/ingest.key
+	@internal {
+		method POST
+		path /internal/v1/events /internal/v1/orch/state
+	}
+	handle @internal {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
+	handle {
+		respond 404
+	}
+}

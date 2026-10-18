@@ -22,7 +22,7 @@ from vulnmart.ingest.stores import (
 )
 from vulnmart.ports.attempts import AttemptPort, AttemptState
 from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, FlagRateLimited, InstanceMissing
-from vulnmart.ports.reports import CHALLENGE_KEYS
+from vulnmart.ports.reports import CHALLENGE_KEYS, Milestone
 
 MAX_INCORRECT = 5
 WINDOW_S = 600
@@ -47,13 +47,20 @@ class FlagSubmitService:
         self._misses: dict[tuple[str, str], deque[datetime]] = defaultdict(deque)  # in memory; the real store is Akshay's
 
     def _retry_after(self, key: tuple[str, str], now: datetime) -> int | None:
-        """Seconds to wait when the limit is reached, else None. Drops misses older than the window."""
-        q = self._misses[key]
-        while q and q[0] <= now - timedelta(seconds=self.window_s):
-            q.popleft()
-        if len(q) < self.max_incorrect:
+        """Seconds to wait when the limit is reached, else None. The misses come from the stored submission log when it can say
+        (so a restart or a second process does not reset the budget); otherwise from memory, dropping those older than the window."""
+        since = now - timedelta(seconds=self.window_s)
+        stored = getattr(self.log, "incorrect_since", None)
+        if stored is not None:
+            times = [t for t in stored(key[0], key[1], since) if t > since]
+        else:
+            q = self._misses[key]
+            while q and q[0] <= since:
+                q.popleft()
+            times = list(q)
+        if len(times) < self.max_incorrect:
             return None
-        return math.ceil((q[0] + timedelta(seconds=self.window_s) - now).total_seconds())
+        return math.ceil((times[0] + timedelta(seconds=self.window_s) - now).total_seconds())
 
     def submit_flag(self, attempt_id: str, challenge_key: str, text: str) -> FlagSubmissionResult:
         """Raises AttemptNotFound, AttemptGone, AttemptStateInvalid (not running), ChallengeNotFound, InstanceMissing,
@@ -68,6 +75,9 @@ class FlagSubmitService:
             raise InstanceMissing("the attempt has no instance")
         now = self.clock()
         key = (attempt_id, challenge_key)
+        repeat = self._repeat_of_credit(attempt_id, challenge_key, info, text)
+        if repeat is not None:
+            return FlagSubmissionResult("correct", repeat)  # IF-2: before the rate limit, records nothing new
         with self._lock:
             wait = self._retry_after(key, now)
             if wait is not None:
@@ -78,6 +88,22 @@ class FlagSubmitService:
                 self._misses[key].append(now)
             self.log.record(attempt_id, challenge_key, "correct" if correct else "incorrect", now)
         return FlagSubmissionResult("correct" if correct else "incorrect", credit)
+
+    def _repeat_of_credit(self, attempt_id: str, challenge_key: str, info, text: object) -> str | None:
+        """`credited` or `held` when the right value is pasted again for a challenge that already has that credit; else None."""
+        credited = self.milestones.best(attempt_id, challenge_key) is Milestone.M3
+        held = (not credited) and self.milestones.is_held(attempt_id, challenge_key)
+        if not (credited or held):
+            return None
+        if not isinstance(text, str) or not text.strip() or len(text) > MAX_TEXT:
+            return None
+        try:
+            check = classify_digest(self.checker, self.directory, info, epoch=info.epoch, candidate=text.strip(), claimed=challenge_key)
+        except (ValueError, UnicodeEncodeError):
+            return None
+        if check.flag_class is FlagClass.CORRECT and check.challenge_key == challenge_key:
+            return "credited" if credited else "held"
+        return None
 
     def _check(self, info, challenge_key: str, text: object, now: datetime) -> tuple[bool, str]:
         if not isinstance(text, str) or not text.strip() or len(text) > MAX_TEXT:

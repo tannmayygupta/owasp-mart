@@ -64,11 +64,54 @@ class MilestoneStore(Protocol):
         """Record a capture that waits for a human (the activity gate said no). True when new."""
         ...
 
+    def is_held(self, attempt_id: str, challenge_key: str) -> bool:
+        """True while a capture of this challenge waits for a human decision."""
+        ...
+
+    def held_for(self, attempt_id: str) -> dict[str, datetime]:
+        """The challenge keys of the attempt that wait for a decision, with the instant each was held."""
+        ...
+
+    def clear_held(self, attempt_id: str, challenge_key: str) -> None:
+        """A decision was made: the capture no longer waits."""
+        ...
+
+    def captures(self, attempt_id: str) -> dict[str, datetime]:
+        """The challenges of the attempt credited at M3 (a capture), with the instant of the credit."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class IntegrityRow:
+    attempt_id: str
+    kind: IntegrityType
+    explanation: str
+    challenge_key: str | None = None
+    flag_id: int = 0  # the row number, the source of the public id `g-...`
+    status: str = "open"  # open | accepted | rejected
+    created_at: datetime | None = None
+    decided_at: datetime | None = None
+    decision_note: str | None = None
+    decided_by: str | None = None
+
+
+class FlagAlreadyDecided(Exception):
+    """An integrity flag has one decision; a second is refused."""
+
 
 @runtime_checkable
 class IntegritySink(Protocol):
-    def add(self, attempt_id: str, kind: IntegrityType, explanation: str, dedupe_key: str) -> bool:
+    def add(self, attempt_id: str, kind: IntegrityType, explanation: str, dedupe_key: str, challenge_key: str | None = None,
+            at: datetime | None = None) -> bool:
         """Write one integrity flag, once per `(attempt_id, dedupe_key)`. True when written."""
+        ...
+
+    def of(self, attempt_id: str, kind: IntegrityType | None = None) -> list[IntegrityRow]:
+        """The flags of an attempt, oldest first."""
+        ...
+
+    def decide(self, attempt_id: str, flag_id: int, decision: str, note: str, by: str, at: datetime) -> IntegrityRow:
+        """Record the one decision (`accept` or `reject`). Raises KeyError for an unknown flag, FlagAlreadyDecided for a second."""
         ...
 
 
@@ -77,6 +120,10 @@ class InstanceDirectory(Protocol):
     def get(self, instance_id: str) -> InstanceInfo | None: ...
 
     def for_attempt(self, attempt_id: str) -> InstanceInfo | None: ...
+
+    def remove(self, instance_id: str) -> None:
+        """Forget an instance that never became ready (its start failed)."""
+        ...
 
     def recent(self, challenge_key: str, template_id: str, within_s: int) -> Mapping[str, int]:
         """Live and recently ended instances of a template and challenge: instance id to its current epoch, at most 200."""
@@ -145,12 +192,21 @@ class InMemoryMilestoneStore:
             self.held[(attempt_id, challenge_key)] = at
             return True
 
+    def is_held(self, attempt_id: str, challenge_key: str) -> bool:
+        with self._lock:
+            return (attempt_id, challenge_key) in self.held
 
-@dataclass(frozen=True, slots=True)
-class IntegrityRow:
-    attempt_id: str
-    kind: IntegrityType
-    explanation: str
+    def held_for(self, attempt_id: str) -> dict[str, datetime]:
+        with self._lock:
+            return {ck: at for (aid, ck), at in self.held.items() if aid == attempt_id}
+
+    def clear_held(self, attempt_id: str, challenge_key: str) -> None:
+        with self._lock:
+            self.held.pop((attempt_id, challenge_key), None)
+
+    def captures(self, attempt_id: str) -> dict[str, datetime]:
+        with self._lock:
+            return {ck: at for (aid, ck), (m, at) in self.items.items() if aid == attempt_id and m is Milestone.M3}
 
 
 class InMemoryIntegritySink:
@@ -159,16 +215,31 @@ class InMemoryIntegritySink:
         self._keys: set[tuple[str, str]] = set()
         self.rows: list[IntegrityRow] = []
 
-    def add(self, attempt_id: str, kind: IntegrityType, explanation: str, dedupe_key: str) -> bool:
+    def add(self, attempt_id: str, kind: IntegrityType, explanation: str, dedupe_key: str, challenge_key: str | None = None,
+            at: datetime | None = None) -> bool:
         with self._lock:
             if (attempt_id, dedupe_key) in self._keys:
                 return False
             self._keys.add((attempt_id, dedupe_key))
-            self.rows.append(IntegrityRow(attempt_id, kind, explanation))
+            self.rows.append(IntegrityRow(attempt_id, kind, explanation, challenge_key, flag_id=len(self.rows) + 1, created_at=at))
             return True
 
     def of(self, attempt_id: str, kind: IntegrityType | None = None) -> list[IntegrityRow]:
-        return [r for r in self.rows if r.attempt_id == attempt_id and (kind is None or r.kind is kind)]
+        with self._lock:
+            return [r for r in self.rows if r.attempt_id == attempt_id and (kind is None or r.kind is kind)]
+
+    def decide(self, attempt_id: str, flag_id: int, decision: str, note: str, by: str, at: datetime) -> IntegrityRow:
+        from dataclasses import replace
+
+        with self._lock:
+            for i, row in enumerate(self.rows):
+                if row.attempt_id == attempt_id and row.flag_id == flag_id:
+                    if row.status != "open":
+                        raise FlagAlreadyDecided(flag_id)
+                    self.rows[i] = replace(row, status="accepted" if decision == "accept" else "rejected", decided_at=at,
+                                           decision_note=note, decided_by=by)
+                    return self.rows[i]
+        raise KeyError(flag_id)
 
 
 @dataclass(slots=True)
@@ -178,11 +249,17 @@ class InMemoryInstanceDirectory:
     items: dict[str, InstanceInfo] = field(default_factory=dict)
 
     def add(self, info: InstanceInfo) -> InstanceInfo:
+        # one instance per attempt: a replacement for a lost instance takes the place of the old one
+        for old in [i for i, v in self.items.items() if v.attempt_id == info.attempt_id and i != info.instance_id]:
+            del self.items[old]
         self.items[info.instance_id] = info
         return info
 
     def get(self, instance_id: str) -> InstanceInfo | None:
         return self.items.get(instance_id)
+
+    def remove(self, instance_id: str) -> None:
+        self.items.pop(instance_id, None)
 
     def for_attempt(self, attempt_id: str) -> InstanceInfo | None:
         return next((i for i in self.items.values() if i.attempt_id == attempt_id), None)

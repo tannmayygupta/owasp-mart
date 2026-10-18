@@ -7,6 +7,7 @@
 // Node built-ins only (the production image has no dependencies).
 import crypto from 'node:crypto';
 import http from 'node:http';
+import https from 'node:https';
 
 export const RELAY_PATH = '/internal/v1/events';
 export const MAX_EVENT_BYTES = 16 * 1024;
@@ -71,11 +72,14 @@ export function parseIngestUrl(text) {
   return u;
 }
 
-export function createRelay({ ingestUrl, rateMax = 120, rateWindowMs = 10000, timeoutMs = 10000, now = () => Date.now(), maxBytes = MAX_EVENT_BYTES, log = () => {} } = {}) {
+// ingestCa: the PEM of the CA that signed the ingest's certificate. An https ingest URL needs it (the link is private but the certificate is
+// checked all the same: a name or a CA that does not match fails the call); without it only an http URL is accepted, as before. httpsClient is a test seam.
+export function createRelay({ ingestUrl, ingestCa = '', rateMax = 120, rateWindowMs = 10000, timeoutMs = 10000, now = () => Date.now(), maxBytes = MAX_EVENT_BYTES, log = () => {}, httpsClient = https } = {}) {
   const target = parseIngestUrl(ingestUrl);
   const limiter = createRateLimiter({ max: rateMax, windowMs: rateWindowMs, now });
-  const client = target.protocol === 'https:' ? null : http; // https is not needed in the lab (private link); refuse rather than guess
-  if (client === null) throw new Error('only an http ingest URL is supported (a private link; TLS belongs to the link)');
+  const secure = target.protocol === 'https:';
+  if (secure && !String(ingestCa).trim()) throw new Error('an https ingest URL needs the CA of its certificate (EDGE_INGEST_CA_FILE); only an http URL is supported without it');
+  const client = secure ? httpsClient : http;
 
   function problem(res, code, extra = {}, headers = {}) {
     if (res.headersSent || res.destroyed) return;
@@ -90,7 +94,8 @@ export function createRelay({ ingestUrl, rateMax = 120, rateWindowMs = 10000, ti
     let finished = false;
     const done = (fn) => { if (!finished) { finished = true; clearTimeout(timer); fn(); } };
     const up = client.request({
-      hostname: target.hostname, port: target.port || 80, method: 'POST', path: RELAY_PATH,
+      hostname: target.hostname, port: target.port || (secure ? 443 : 80), method: 'POST', path: RELAY_PATH,
+      ...(secure ? { ca: ingestCa, minVersion: 'TLSv1.2' } : {}),
       headers: { 'content-type': 'application/json', 'content-length': body.length, [SIGNATURE_HEADER]: req.headers[SIGNATURE_HEADER] },
     }, (r) => {
       const chunks = [];

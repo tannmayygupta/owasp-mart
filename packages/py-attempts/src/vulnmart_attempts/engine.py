@@ -26,7 +26,9 @@ log = logging.getLogger(__name__)
 Events = Callable[[dict[str, Any]], None]
 
 MAX_RETRIES = 10
-DESTROY_CLAIM_LEASE_SECONDS = 60  # a claim whose owner crashed is taken over after this long
+DESTROY_CLAIM_LEASE_SECONDS = 300  # a claim whose owner crashed is taken over after this long (a destroy can take a while: finding B11)
+READY_AT_TOLERANCE_SECONDS = 300
+FREEZE_PATIENCE = timedelta(minutes=5)  # how long after its first failure a freeze may hold up the destroy
 
 
 class ResetLimitReached(Exception):
@@ -85,7 +87,7 @@ class AttemptEngine:
     # ------------------------------------------------------------------ public calls
 
     def create(self, user_id: str, template_id: str, consent_id: str, rules: Rules | None = None,
-               instance_id: str | None = None, attempt_id: str | None = None) -> AttemptRecord:
+               instance_id: str | None = None, attempt_id: str | None = None, org_id: str | None = None) -> AttemptRecord:
         """A `ready` attempt. One attempt per user per template: a second call returns the first."""
         existing = self._store.find(user_id, template_id)
         if existing is not None:
@@ -94,6 +96,7 @@ class AttemptEngine:
         rec = AttemptRecord(
             id=attempt_id or uuid.uuid4().hex, user_id=user_id, template_id=template_id, consent_id=consent_id,
             created_at=now, rules=rules or Rules(), state=AttemptState.READY, instance_id=instance_id, ready_at=now,
+            org_id=org_id,
         )
         try:
             return self._store.add(rec)
@@ -106,9 +109,61 @@ class AttemptEngine:
     def get(self, attempt_id: str) -> AttemptRecord:
         return self._load(attempt_id)
 
+    def ids(self) -> list[str]:
+        return self._store.ids()
+
+    def for_user(self, user_id: str) -> list[AttemptRecord]:
+        return self._store.for_user(user_id)
+
+    def in_states(self, *states: AttemptState) -> list[AttemptRecord]:
+        return self._store.in_states(*states)
+
+    def find(self, user_id: str, template_id: str) -> AttemptRecord | None:
+        """The one attempt of this user for this template, if any."""
+        return self._store.find(user_id, template_id)
+
+    def set_org(self, attempt_id: str, org_id: str) -> AttemptRecord:
+        """Record the organisation of a candidate attempt, once; a later call keeps the first."""
+        for _ in range(MAX_RETRIES):
+            rec = self._load(attempt_id)
+            if rec.org_id is not None:
+                return rec
+            try:
+                return self._save(rec, org_id=org_id)
+            except Conflict:
+                continue
+        raise Conflict("set_org: too many conflicts")
+
+    def set_instance(self, attempt_id: str, instance_id: str) -> AttemptRecord:
+        """Point the attempt at a new instance (the old one was lost and replaced). The clock and the reset count do not change."""
+        for _ in range(MAX_RETRIES):
+            rec = self._load(attempt_id)
+            if rec.instance_id == instance_id:
+                return rec
+            try:
+                return self._save(rec, instance_id=instance_id)
+            except Conflict:
+                continue
+        raise Conflict("set_instance: too many conflicts")
+
+    def mark_purged(self, attempt_id: str) -> AttemptRecord:
+        """The platform's deletion workflow purged the attempt's data: the attempt is gone for every reader."""
+        for _ in range(MAX_RETRIES):
+            rec = self._load(attempt_id)
+            if rec.purged_at is not None:
+                return rec
+            try:
+                return self._save(rec, purged_at=self._clock())
+            except Conflict:
+                continue
+        raise Conflict("mark_purged: too many conflicts")
+
     def instance_ready(self, attempt_id: str, at: datetime, instance_id: str | None = None) -> AttemptRecord:
         """D-80: the clock starts when the instance is ready. Repeated calls return the same record."""
         require_aware(at, "at")
+        now = self._clock()
+        if abs((at - now).total_seconds()) > READY_AT_TOLERANCE_SECONDS:
+            at = now  # the clock is the server's: a stale or future instant from a caller never moves the deadline (finding B8)
         for _ in range(MAX_RETRIES):
             rec = self._load(attempt_id)
             if rec.state == AttemptState.RUNNING:
@@ -128,6 +183,9 @@ class AttemptEngine:
         for _ in range(MAX_RETRIES):
             rec = self._load(attempt_id)
             now = self._clock()
+            if (rec.state == AttemptState.SUBMITTED and rec.deadline_at is not None and rec.submitted_at == rec.deadline_at
+                    and now <= rec.deadline_at + timedelta(seconds=rec.rules.grace_seconds)):
+                return rec  # the tick already submitted it at the deadline; a submit inside the grace window gets the same answer (finding B3)
             if rec.state != AttemptState.RUNNING or not accepts_request(now, rec.times, rec.rules):
                 raise InvalidTransition(rec.state, AttemptState.SUBMITTED)
             try:
@@ -199,7 +257,19 @@ class AttemptEngine:
         for _ in range(MAX_RETRIES):
             rec = self._load(attempt_id)
             if rec.state == AttemptState.WITHDRAWN:
-                return rec
+                if rec.delete_after is not None:
+                    return rec
+                # withdrawn, then undone: a new request starts a new undo window (review finding B5)
+                now = self._clock()
+                try:
+                    new = self._save(rec, withdrawn_at=now, delete_after=now + timedelta(days=rec.rules.withdrawal_undo_days), undone_at=None)
+                except Conflict:
+                    continue
+                self._emit("attempt_withdrawn", new, delete_after=_iso(new.delete_after))  # type: ignore[arg-type]
+                return new
+            if rec.state == AttemptState.EXPIRED:
+                self._advance(attempt_id)  # the tick's own step is between expired and submitted; let it finish (review finding B4)
+                continue
             target = move(rec.state, AttemptState.WITHDRAWN)
             if rec.instance_id is not None and not rec.destroyed and not destroyed_here:
                 self._instances.destroy(rec.instance_id)
@@ -286,10 +356,14 @@ class AttemptEngine:
         if rec.state == AttemptState.EXPIRED:
             return self._submit_expired(rec)
         if rec.state == AttemptState.SUBMITTED:
+            if not rec.destroyed and destroy_due(now, rec.times):
+                # a freeze that keeps failing must not keep an instance alive for ever: after the patience the instance goes anyway
+                # (review finding B2); until then a failed freeze blocks the destroy, so a live instance is never cut off unfrozen
+                gave_up = rec.freeze_failed_at is not None and now >= rec.freeze_failed_at + FREEZE_PATIENCE
+                if rec.access == "frozen" or gave_up:
+                    return self._destroy(rec, now)
             if rec.access != "frozen" and not rec.destroyed:
                 return self._freeze(rec)
-            if not rec.destroyed and destroy_due(now, rec.times):
-                return self._destroy(rec, now)
             return False
         if rec.state == AttemptState.REPORTED:
             # reported before the freeze window ended: the instance still has to be destroyed (review finding B1)
@@ -317,8 +391,7 @@ class AttemptEngine:
             new = self._save(rec, warnings_sent=tuple(rec.warnings_sent) + tuple(due))
         except Conflict:
             return True  # reload and decide again; the winner sent them
-        for minutes in due:
-            self._emit("time_warning_sent", new, minutes_left=minutes)
+        self._emit("time_warning_sent", new, minutes_left=min(due))  # a late first tick tells the urgent one only (finding B10)
         return True
 
     def _expire(self, rec: AttemptRecord) -> bool:
@@ -347,6 +420,11 @@ class AttemptEngine:
                 self._instances.freeze(rec.instance_id)
             except Exception:
                 log.exception("freeze failed for attempt %s; retried next tick", rec.id)
+                if rec.freeze_failed_at is None:
+                    try:
+                        self._save(rec, freeze_failed_at=self._clock())  # the patience of the destroy counts from here (finding B2)
+                    except Conflict:
+                        pass
                 return False
         try:
             self._save(rec, access="frozen")

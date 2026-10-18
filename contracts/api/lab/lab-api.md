@@ -75,7 +75,7 @@ The browser sees exactly the values of the orchestrator contract (handoff H-78);
 ## 4. Behaviour of the routes
 
 - **Request instance.** Body `{"kind": "learner"}`. 202 with state `requested`; it advances on its own to `ready` (poll `getInstance` or use the live stream). A second request while the user holds an instance: 409 `INST-QUOTA-REACHED` (numbers are OI-21). Candidate instances are created by the platform, not here.
-- **Open.** In state `ready`, `active` or `idle` with access `open`: 200 with `{url, expires_at}`; the URL is `https://<instance host>/_vm/enter?t=<ticket>`, single use, about 60 seconds (architecture 03 section 3). Otherwise 409 `INST-NOT-READY`.
+- **Open.** In state `ready`, `active` or `idle` with access `open`: 200 with `{url, expires_at}`; the URL is `https://<instance host>/_vm/enter?t=<ticket>` (the ticket is `payload.signature`, gate-ticket.md section 2), single use, about 60 seconds (architecture 03 section 3). Otherwise 409 `INST-NOT-READY`.
 - **Reset.** Body `{"confirm": true}`. From `ready`, `active` or `idle`: 202, epoch plus one, state `resetting`. Any other state, an instance whose access is frozen, or an attempt that is not running (for example after submit): 409 `INST-INVALID-STATE`. Milestones already earned stay (FR-SES-09). The reset limit per template is OI-25.
 - **Stop.** 202 for a new stop, 200 when already `stopping` or `destroyed`; 409 `INST-INVALID-STATE` when the instance is frozen or its attempt is not running. The freeze after submit is never undone by a timer step.
 - **Start (pending OI-22).** From `ready` to `running`; the server sets `started_at` and `deadline_at`. Other states: 409 `ATT-INVALID-STATE`.

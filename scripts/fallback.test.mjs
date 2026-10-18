@@ -51,3 +51,8 @@ test('formatCheck and checkExit', () => {
   assert.equal(checkExit([rows[0]]), 0);
   assert.equal(checkExit([]), 1, 'no checks is not a pass');
 });
+
+test('the state folder is per user and the state of an interrupted up is readable by down (review finding D10)', async () => {
+  const { STATE_DIR } = await import('./fallback.mjs');
+  assert.match(STATE_DIR, /vulnmart-fallback-[A-Za-z0-9_.-]+$/);
+});

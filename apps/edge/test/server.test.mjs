@@ -34,7 +34,7 @@ before(async () => {
   fs.writeFileSync(secretFile, `${SECRET}\n`);
   sidecarSeen = [];
   sidecar = http.createServer((rq, rs) => {
-    sidecarSeen.push({ url: rq.url, cookie: rq.headers.cookie, host: rq.headers.host });
+    sidecarSeen.push({ url: rq.url, cookie: rq.headers.cookie, host: rq.headers.host, vm: Object.keys(rq.headers).filter((k) => k.startsWith('x-vm-')) });
     rs.writeHead(200, { 'content-type': 'text/plain', 'set-cookie': 'shop=1; Path=/' });
     rs.end('shop-a');
   });
@@ -66,6 +66,15 @@ test('admin push, ticket exchange, cookie, proxy: the owner reaches the shop and
   assert.equal(last.url, '/products?q=1');
   assert.equal(last.cookie, 'theme=dark');
   assert.equal(last.host, host(ID_A));
+});
+
+test('a client header of the x-vm-* family never reaches the sidecar (review finding C10)', async () => {
+  assert.equal((await push(ID_A, record(ID_A, ownerA))).status, 204);
+  const enter = await req(srv.ports.player, { p: `/_vm/enter?t=${ticket(ID_A, ownerA)}`, headers: { host: host(ID_A) } });
+  const cookie = enter.headers['set-cookie'][0].split(';')[0];
+  const page = await req(srv.ports.player, { p: '/x', headers: { host: host(ID_A), cookie, 'x-vm-session-kind': 'bot', 'X-VM-Instance': 'other', 'x-forwarded-for': '1.2.3.4' } });
+  assert.equal(page.status, 200);
+  assert.deepEqual(sidecarSeen.at(-1).vm, []);
 });
 
 test('refusals do not touch the sidecar: no cookie, other owner, other host, replayed ticket, bad host', async () => {

@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-18T11:20:32.754Z",
+  "base": "https://tanmay-platform-prod.duckdns.org",
+  "rows": [
+    {
+      "name": "platform health through the site",
+      "ok": true,
+      "detail": "HTTP 200 1766 ms"
+    },
+    {
+      "name": "API liveness through the site",
+      "ok": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "an API call without a session is refused",
+      "ok": true,
+      "detail": "HTTP 401"
+    },
+    {
+      "name": "sign up, confirm by mail, sign in",
+      "ok": true,
+      "detail": "learner ready"
+    },
+    {
+      "name": "catalogue lists the eleven challenges",
+      "ok": true,
+      "detail": "11 items"
+    },
+    {
+      "name": "request an instance",
+      "ok": false,
+      "detail": "HTTP 429"
+    },
+    {
+      "name": "the instance becomes ready and the clock starts",
+      "ok": false,
+      "detail": "240 s from the request"
+    }
+  ]
+}

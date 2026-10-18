@@ -43,9 +43,9 @@ test('exception, refused side: every other service is refused the socket in ever
     '- type: bind\n        source: /\n        target: /host',
   ];
   for (const f of forms) {
-    const out = bad(`services:\n  orchestrator:\n    volumes:\n      ${f}\n`);
+    const out = bad(`services:\n  worker:\n    volumes:\n      ${f}\n`);
     assert.equal(out.length, 1, f);
-    assert.match(out[0], /Docker socket mount is not allowed.*service orchestrator/, f);
+    assert.match(out[0], /Docker socket mount is not allowed.*service worker/, f);
   }
   assert.match(bad(`services:\n  docker-proxy-2:\n    volumes: ["${SOCK}:${SOCK}:ro"]\n`)[0], /service docker-proxy-2/);
   assert.deepEqual(bad('services:\n  a:\n    volumes:\n      - ./data:/data\n      - named:/n\n'), []);
@@ -257,4 +257,12 @@ test('lab ports: the committed compose file has edge-caddy as its only lab servi
   assert.deepEqual(doc.services['edge-caddy'].ports, ['443:443']);
   assert.equal(doc.services['edge-gate'].ports, undefined);
   assert.deepEqual(checkFiles([path.join(ROOT, 'infra', 'compose', 'compose.yaml')]), []);
+});
+test('the rules of a lab service hold without the profile: dropping `profiles: ["lab"]` does not switch them off (review finding D4)', () => {
+  const published = bad('services:\n  edge-gate:\n    image: x\n    ports: ["8080:8080"]\n');
+  assert.ok(published.some((p) => /must never be published/.test(p)), published.join('\n'));
+  const orch = bad('services:\n  orchestrator:\n    image: x\n    ports: ["0.0.0.0:9443:8443"]\n');
+  assert.ok(orch.length > 0, 'the orchestrator port rule still applies');
+  const other = bad('services:\n  edge-caddy:\n    image: x\n    ports: ["80:80"]\n');
+  assert.ok(other.length > 0);
 });

@@ -1,6 +1,7 @@
 """The attempt record, the `AttemptStore` Protocol (compare-and-set on a version) and an in-memory store for tests and the demo."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Protocol
@@ -50,6 +51,9 @@ class AttemptRecord:
     delete_after: datetime | None = None  # withdrawn_at + 7 days; cleared by an undo
     undone_at: datetime | None = None
     deleted_at: datetime | None = None
+    org_id: str | None = None  # the organisation of a candidate attempt; None for learner practice
+    purged_at: datetime | None = None  # the platform's deletion workflow purged the data (the attempt is gone)
+    freeze_failed_at: datetime | None = None  # the first freeze that failed; the destroy waits for the freeze only for a while after it
 
     @property
     def times(self) -> AttemptTimes:
@@ -62,6 +66,21 @@ class AttemptRecord:
         )
 
 
+DUE_STATES = (AttemptState.RUNNING, AttemptState.EXPIRED, AttemptState.SUBMITTED, AttemptState.REPORTED, AttemptState.CANCELLED)
+
+
+def select_due(records: "Iterable[AttemptRecord]", now: datetime) -> list[AttemptRecord]:
+    """The attempts that may need work, by deadline (the rule every store shares): running, expired, submitted, reported or cancelled and
+    not yet destroyed, or withdrawn with a deletion date."""
+    rows = [
+        r for r in records
+        if (r.state in DUE_STATES and not (r.destroyed and r.state != AttemptState.RUNNING))
+        or (r.state == AttemptState.WITHDRAWN and r.delete_after is not None)
+    ]
+    epoch = datetime.fromtimestamp(0, tz=now.tzinfo)
+    return sorted(rows, key=lambda r: (r.deadline_at is None, r.deadline_at or epoch, r.id))
+
+
 class AttemptStore(Protocol):
     def get(self, attempt_id: str) -> AttemptRecord | None: ...
 
@@ -71,6 +90,18 @@ class AttemptStore(Protocol):
 
     def add(self, record: AttemptRecord) -> AttemptRecord:
         """Insert a new record (version 0). Raises Conflict if the id or the (user, template) pair exists."""
+        ...
+
+    def ids(self) -> list[str]:
+        """The id of every attempt, oldest first."""
+        ...
+
+    def for_user(self, user_id: str) -> list[AttemptRecord]:
+        """Every attempt of the user, newest first."""
+        ...
+
+    def in_states(self, *states: AttemptState) -> list[AttemptRecord]:
+        """Every attempt in one of the states, oldest first."""
         ...
 
     def put_if_version(self, record: AttemptRecord, expected_version: int) -> AttemptRecord:
@@ -108,6 +139,19 @@ class InMemoryAttemptStore:
             self._by_key[key] = record.id
             return stored
 
+    def ids(self) -> list[str]:
+        with self._lock:
+            return list(self._by_id)
+
+    def in_states(self, *states: AttemptState) -> list[AttemptRecord]:
+        with self._lock:
+            return [r for r in self._by_id.values() if r.state in states]
+
+    def for_user(self, user_id: str) -> list[AttemptRecord]:
+        with self._lock:
+            rows = [r for r in self._by_id.values() if r.user_id == user_id]
+        return sorted(rows, key=lambda r: (r.created_at, r.id), reverse=True)
+
     def put_if_version(self, record: AttemptRecord, expected_version: int) -> AttemptRecord:
         with self._lock:
             current = self._by_id.get(record.id)
@@ -118,13 +162,5 @@ class InMemoryAttemptStore:
             return stored
 
     def due(self, now: datetime) -> list[AttemptRecord]:
-        wanted = (AttemptState.RUNNING, AttemptState.EXPIRED, AttemptState.SUBMITTED, AttemptState.REPORTED,
-                  AttemptState.CANCELLED)
         with self._lock:
-            rows = [
-                r for r in self._by_id.values()
-                if (r.state in wanted and not (r.destroyed and r.state != AttemptState.RUNNING))
-                or (r.state == AttemptState.WITHDRAWN and r.delete_after is not None)
-            ]
-        epoch = datetime.fromtimestamp(0, tz=now.tzinfo)
-        return sorted(rows, key=lambda r: (r.deadline_at is None, r.deadline_at or epoch, r.id))
+            return select_due(self._by_id.values(), now)

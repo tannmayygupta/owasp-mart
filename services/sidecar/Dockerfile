@@ -18,11 +18,12 @@ RUN corepack pnpm install --prod --frozen-lockfile --ignore-workspace
 # ---- crs-detect: the detection-only Coraza and Core Rule Set helper (story 6.5, D-70). Go is not installed on the dev PC; this stage is the build. ----
 # golang:1.25-bookworm, pinned by digest (resolved 2026-10-17). Static binary: no cgo, no libc, trimmed and stripped.
 FROM golang:1.25-bookworm@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS crs-builder
+ARG TARGETARCH
 WORKDIR /src
 COPY crs/go.mod crs/go.sum ./
 RUN go mod download && go mod verify
 COPY crs/main.go crs/directives.conf ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o /out/crs-detect .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags "-s -w" -o /out/crs-detect .
 
 # ---- runtime: distroless non-root Node 24 ----
 FROM gcr.io/distroless/nodejs24-debian12:nonroot@sha256:14d42e2511532589a7c7e01a753667a74fcc96266e137e8125006b87b0c32d0a

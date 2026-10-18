@@ -91,7 +91,8 @@ class StateReportStore:
                 return Recorded(new=False, possible=(report.from_state, report.to_state) in TRANSITIONS, moved=False)
             possible = (report.from_state, report.to_state) in TRANSITIONS
             top = self._state.get(report.instance_id)
-            moved = possible and (top is None or (report.epoch, report.transition) > (top[0], top[1]))
+            # `destroyed` is the end: no later report resurrects an instance (review finding A7)
+            moved = possible and (top is None or (top[2] is not InstanceState.DESTROYED and (report.epoch, report.transition) > (top[0], top[1])))
             if moved:
                 self._state[report.instance_id] = (report.epoch, report.transition, report.to_state)
             return Recorded(new=True, possible=possible, moved=moved)

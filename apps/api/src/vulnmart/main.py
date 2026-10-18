@@ -6,6 +6,7 @@ the browser routes of IF-1. Today that is the public `GET /api/v1/health` of `co
 """
 from __future__ import annotations
 
+import os
 import secrets
 import time
 from collections.abc import Mapping
@@ -16,7 +17,7 @@ from fastapi.responses import JSONResponse
 from vulnmart.accounts.api import router as accounts_router
 from vulnmart.accounts.directory import UserDirectory
 from vulnmart.accounts.admins import AdminService
-from vulnmart.accounts.fieldkeys import FieldKeys
+from vulnmart.accounts.fieldkeys import FieldKeys, from_settings as fieldkeys_from_settings
 from vulnmart.accounts.me_api import router as me_router
 from vulnmart.accounts.mfa import MfaService
 from vulnmart.accounts.mfa_api import router as mfa_router
@@ -33,6 +34,9 @@ from vulnmart.kernel.ratelimit import InMemoryRateLimiter, RateLimiter, ValkeyRa
 from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_checks
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
+from vulnmart.lab.runtime import LabRuntime
+from vulnmart.lab.tickets import TicketMinter, minter_from_environ
+from vulnmart.assessments.service import AssessmentService
 from vulnmart.orgs.service import CompanyService
 from vulnmart.privacy.api import router as consent_router
 from vulnmart.privacy.consent import ConsentService
@@ -65,14 +69,9 @@ def _sessions_from(settings: Settings, ports) -> SessionService | None:
 
 
 def field_keys_from(settings: Settings) -> FieldKeys:
-    """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
-    secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
-    secret = settings.field_key_secret()
-    if secret is None:
-        if settings.env in ("staging", "production"):
-            raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
-        secret = secrets.token_bytes(32)
-    return FieldKeys.from_secret(secret)
+    """The field key of the accounts module (seals TOTP secrets and the address of an invited candidate in the mail outbox, keys the hash of recovery codes).
+    See `accounts.fieldkeys.from_settings`."""
+    return fieldkeys_from_settings(settings)
 
 
 def _limiter_from(settings: Settings) -> RateLimiter:
@@ -86,6 +85,32 @@ def _limiter_from(settings: Settings) -> RateLimiter:
     return InMemoryRateLimiter()
 
 
+def _lab_from_environ() -> LabRuntime | None:
+    """The lab runtime when `VULNMART_LAB_RUNTIME=1` (the platform process then serves the lab routes and the event receiver)."""
+    if os.environ.get("VULNMART_LAB_RUNTIME") != "1":
+        return None
+    from vulnmart.lab.runtime import build_lab_runtime
+
+    return build_lab_runtime(os.environ)
+
+
+def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> None:
+    """The IF-2 lab routes, the IF-4 event receiver, the orchestrator report receiver and, only on request, the token-guarded demo routes."""
+    from vulnmart.ingest.route import install_event_route
+    from vulnmart.lab.api import router as lab_router
+    from vulnmart.lab.state_reports import install_state_reports
+
+    app.state.lab = lab
+    app.state.lab_tickets = tickets or minter_from_environ(os.environ)
+    app.include_router(lab_router)
+    install_event_route(app, lab.handler)
+    install_state_reports(app, lab, os.environ)
+    if os.environ.get("VULNMART_LAB_DEMO") == "1":
+        from vulnmart.lab.demo_routes import install_demo_routes
+
+        install_demo_routes(app, lab, os.environ.get("VULNMART_LAB_DEMO_TOKEN", ""))
+
+
 def create_app(
     checks: Mapping[str, Check] | None = None,
     timeout: float | None = None,
@@ -97,6 +122,8 @@ def create_app(
     sessions: SessionService | None = None,
     policy: PasswordPolicy | None = None,
     self_service: SelfService | None = None,
+    lab: LabRuntime | None = None,
+    lab_tickets: TicketMinter | None = None,
     mfa: MfaService | None = None,
     consent: ConsentService | None = None,
     consent_targets: ConsentTargets | None = None,
@@ -104,7 +131,13 @@ def create_app(
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits)."""
     settings = settings or get_settings()
-    app = create_service_app("api", checks=checks, settings=settings, timeout=timeout, configure_logs=configure_logs)
+    lab = lab if lab is not None else _lab_from_environ()
+    lifespan = None
+    if lab is not None:
+        from vulnmart.lab.background import lab_lifespan
+
+        lifespan = lab_lifespan(lab, float(os.environ.get("VULNMART_LAB_TICK_S", "10")))
+    app = create_service_app("api", checks=checks, settings=settings, timeout=timeout, configure_logs=configure_logs, lifespan=lifespan)
     app.state.settings = settings
     app.state.ports = build_ports(settings)
     policy = policy or make_policy(settings)  # fails to start in staging or production with the breach check off
@@ -139,10 +172,16 @@ def create_app(
                                                FileAnchorSink(settings.audit_anchor_file) if settings.audit_anchor_file else None)
     else:
         app.state.audit_anchors = None
+    # Assessment templates and invites (story P-20): no route yet (IF-1 has none for recruiters, story 5.3); the invite story (P-21) and the dashboards use this.
+    app.state.assessments = (AssessmentService(ports.sessions, app.state.companies, ports.audit, ports.scope, ports.settings, field_keys or field_keys_from(settings),
+                                               public_origin=settings.public_origin)
+                             if app.state.companies is not None else None)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)
     app.include_router(me_router)
+    if lab is not None:
+        _mount_lab(app, lab, lab_tickets)
     app.include_router(mfa_router)
     app.include_router(consent_router)
 

@@ -236,8 +236,24 @@ jobs:
 
   api:
     name: api tests
-    timeout-minutes: 10
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
+    # A real Postgres, so the database tests (migrations, grants, row-level security, the lab stores, the key service) run here and are not skipped.
+    # Same image as the Compose file. The throwaway values below are for this job only.
+    services:
+      postgres:
+        image: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+        env:
+          POSTGRES_USER: vulnmart
+          POSTGRES_PASSWORD: ci-owner-throwaway
+          POSTGRES_DB: vulnmart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vulnmart -d vulnmart" --health-interval 3s --health-timeout 3s --health-retries 30
+    env:
+      VULNMART_TEST_POSTGRES_DSN: postgresql://vulnmart:ci-owner-throwaway@localhost:5432/postgres
+      VULNMART_TEST_APP_DSN: postgresql://vulnmart_app:ci-app-throwaway@localhost:5432/vulnmart
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The fake orchestrator of the tests (contracts/mocks) is Node and imports js-yaml (story 1.16), so the workspace must be installed.
@@ -250,6 +266,10 @@ jobs:
         with:
           version: 0.12.23
       - run: uv sync --frozen --package vulnmart-api
+      - name: create the app role of the Postgres service
+        run: |
+          sudo apt-get install -y --no-install-recommends postgresql-client >/dev/null
+          PGPASSWORD=ci-owner-throwaway VULNMART_APP_DB_PASSWORD=ci-app-throwaway psql -h localhost -U vulnmart -d vulnmart -v ON_ERROR_STOP=1 -f infra/compose/postgres/initdb/10-app-role.sql
       - run: uv run --frozen --package vulnmart-api pytest apps/api
 
   compose:
