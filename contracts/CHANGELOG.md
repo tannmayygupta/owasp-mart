@@ -241,7 +241,8 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Table owners (DB), `contracts/db/`
 
-### 1.1.0 (2026-10-18, Tanmay, story 9.1)
+### 2.0.0 (2026-10-18, Tanmay, story 9.1)
+- BREAKING: declared only because the checker of the base commit reports every change to `table-owners.yaml` as breaking (it cannot compare that file); the content change is additive. This pull request teaches the checker to compare the rows (new row: additive; removed row or another owner: breaking), so later additions need no major step.
 - Additive: five rows in `table-owners.yaml` for tables the lab needs that architecture 04 did not list: `held_captures`, `review_audit` (owner scoring), `attempt_events` (attempts), `bot_visits`, `security_events` (ingest). Created by migration `0010` (stream L); to be confirmed by Akshay.
 - The schema is unchanged.
 - no mock change: nothing runs against the table-owners list (`noMock` in the registry).

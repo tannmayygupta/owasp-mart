@@ -54,6 +54,7 @@ class Server:
 def key_file(tmp_path):
     f = tmp_path / "gate.key"
     f.write_text(SECRET + "\n", encoding="utf-8")
+    f.chmod(0o600)  # the reader refuses a group- or world-readable key file on POSIX (CI runs on Linux)
     return str(f)
 
 
@@ -138,6 +139,7 @@ def test_a_missing_or_short_key_file_is_refused_at_start(tmp_path, server):
         GatePort(server.url, str(tmp_path / "none"))
     f = tmp_path / "short.key"
     f.write_text("tooshort", encoding="utf-8")
+    f.chmod(0o600)
     with pytest.raises(ValueError):
         GatePort(server.url, str(f))
 
