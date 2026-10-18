@@ -8,6 +8,8 @@ import * as giftcards from '../challenges/c02-gift-card-codes.mjs';
 import { searchCatalog } from '../challenges/c03a-catalog-search.mjs';
 import { noteTicketMarkup } from '../challenges/c03b-ticket-xss.mjs';
 import { quickRefund, refundStatement } from '../challenges/c04-quick-refund.mjs';
+import { createPendingOrder } from '../challenges/c08-payment-webhook.mjs';
+import { isLocked, recordAuth } from '../challenges/c09-logging-failures.mjs';
 
 // Map a service error to an HTTP response; rethrow anything unexpected.
 function handleError(err, res) {
@@ -73,6 +75,12 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
     res.json(refundStatement(db, req.user, req.params.id));
   }));
 
+  // C08 (Integrity Failures): create a pending-payment order and stop at "Pay"
+  // (the webhook confirms it). The signature-bypass weakness is in the webhook.
+  app.post('/api/orders/pending', requireCustomer, hj((req, res) => {
+    res.json(createPendingOrder(db, req.user, { ship: { line1: req.body?.line1, city: req.body?.city, country: req.body?.country } }));
+  }));
+
   // Catalogue
   app.get('/shop', h((req, res) => {
     const q = req.query.q ?? '';
@@ -89,6 +97,14 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
   app.post('/login', h((req, res) => {
     // Any role may log in; route guards (requireCustomer / requireRole) enforce
     // what each role may reach. A suspended account cannot sign in.
+    // C09: the WEB login always goes through the security pipeline — every attempt
+    // is written as a security event and the account locks after a threshold. The
+    // legacy mobile route is what skips this (vulnerable build).
+    const found = req.body.email ? db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(String(req.body.email).toLowerCase()) : null;
+    if (isLocked(db, found?.id)) {
+      emit('auth.attempt', { route: 'web', account_id: found ? String(found.id) : 'unknown', result: 'locked' });
+      return res.status(429).render('login', { error: 'Too many attempts. Try again in a few minutes.' });
+    }
     const user = authenticate(db, req.body.email, req.body.password);
     const active = !!user && user.status === 'active';
     // IF-4 auth.attempt: every login attempt. `result` keeps an unknown
@@ -99,6 +115,7 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
       { route: 'web', account_id: user ? String(user.id) : 'unknown', result: active ? 'success' : user ? 'rejected' : 'unknown' },
       { user_id: user ? String(user.id) : null },
     );
+    recordAuth(db, { userId: found?.id, success: active, route: 'web', emit });
     if (!active) {
       return res.status(401).render('login', { error: 'Wrong email or password.' });
     }

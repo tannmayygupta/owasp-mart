@@ -240,7 +240,7 @@ test('rendered cloud-init parses as YAML, carries the plain-text host files unch
   const v = {
     sshd_conf: b64('sshd-hardening.conf'), firewall_sh: b64('vulnmart-firewall.sh'), docker_sh: b64('vulnmart-install-docker.sh'), baseline_sh: b64('vulnmart-baseline.sh'),
     docker_daemon: b64('docker-daemon.json'), keepalive_py: b64('vulnmart-keepalive.py'), keepalive_unit: b64('vulnmart-keepalive.service'), egress_sh: indent6('vulnmart-egress.sh'),
-    egress_unit: b64('vulnmart-egress.service'), certs_sh: indent6('vulnmart-certs.sh'), certs_unit: indent6('vulnmart-certs.service'), certs_timer: indent6('vulnmart-certs.timer'),
+    egress_unit: b64('vulnmart-egress.service'), certs_sh: indent6('vulnmart-certs.sh'), reload_caddy_sh: indent6('vulnmart-reload-caddy.sh'), certs_unit: indent6('vulnmart-certs.service'), certs_timer: indent6('vulnmart-certs.timer'),
     lego_pin: indent6('lego.pin.json'), lego_install_sh: indent6('vulnmart-install-lego.sh'),
     egress_env: JSON.stringify('VPC_CIDR=10.0.0.0/16\nVPC_RESOLVER=10.0.0.2\nPLATFORM_SUBNET=10.0.0.0/24\nLABS_HOST_SUBNET=10.0.1.0/24\nLABS_DOCKER_SUBNETS="172.17.0.0/16 172.30.0.0/16"\nINGEST_PORT=9444\n'),
     private_cidr: '10.0.0.0/16', ntp_server: '169.254.169.123', keepalive_enabled: 'no',
@@ -249,7 +249,7 @@ test('rendered cloud-init parses as YAML, carries the plain-text host files unch
   assert.equal(new Set(JSON.parse(v.ssh_keys_json)).size, 3, 'the keys are distinct');
   const text = readFileSync(path.join(ROOT, 'infra', 'hosts', 'cloud-init.yaml.tftpl'), 'utf8').replace(/\$\{(\w+)\}/g, (_, k) => { assert.ok(k in v, `unknown template variable ${k}`); return v[k]; });
   const doc = yaml.load(text);
-  const plain = { '/usr/local/sbin/vulnmart-egress.sh': 'vulnmart-egress.sh', '/usr/local/sbin/vulnmart-certs.sh': 'vulnmart-certs.sh', '/etc/systemd/system/vulnmart-certs.service': 'vulnmart-certs.service', '/etc/systemd/system/vulnmart-certs.timer': 'vulnmart-certs.timer', '/etc/vulnmart/lego.pin.json': 'lego.pin.json', '/usr/local/sbin/vulnmart-install-lego.sh': 'vulnmart-install-lego.sh' };
+  const plain = { '/usr/local/sbin/vulnmart-egress.sh': 'vulnmart-egress.sh', '/usr/local/sbin/vulnmart-certs.sh': 'vulnmart-certs.sh', '/usr/local/sbin/vulnmart-reload-caddy.sh': 'vulnmart-reload-caddy.sh', '/etc/systemd/system/vulnmart-certs.service': 'vulnmart-certs.service', '/etc/systemd/system/vulnmart-certs.timer': 'vulnmart-certs.timer', '/etc/vulnmart/lego.pin.json': 'lego.pin.json', '/usr/local/sbin/vulnmart-install-lego.sh': 'vulnmart-install-lego.sh' };
   for (const [remote, file] of Object.entries(plain)) {
     const entry = doc.write_files.find((w) => w.path === remote);
     assert.ok(entry, `${remote} is in write_files`);

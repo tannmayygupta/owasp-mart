@@ -1,0 +1,52 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-18 from the T-stream task file (docs/dev/dev3-sahil.md); one
+# story per task (T-27..T-29 = C09..C11) plus a refactor sweep. Each challenge is
+# one isolated vulnerable path with an exploit test (pass on the vulnerable build,
+# fail on the fixed build).
+
+[[entry]]
+id = 1
+type = "story"
+title = "C09 Logging and Alerting Failures (legacy login route not logged)"
+description = "A legacy mobile login route with no security event, no lockout and no rate limit in the vulnerable build, while the web login logs + locks; the fix puts the legacy route through the same pipeline. CWE-778. Flag in support case notes."
+verify = "The brute force on the legacy route takes over the dormant support agent with zero security events on the vulnerable build (and reads the case-notes flag); the fixed route logs + locks."
+covers = ["FR-CHL-10"]
+after = []
+hitl = false
+risk = "high"
+# Waits on T-10 (events) and T-15 (staff flows) — done.
+
+[[entry]]
+id = 2
+type = "story"
+title = "C10 Server-Side Request Forgery (seller image import)"
+description = "The seller product-image import fetches a user-supplied URL; the vulnerable build has no allow-list, so it reaches internal addresses (SSRF, CWE-918); the fix blocks private/host-gateway targets. Flag from the internal metadata mock."
+verify = "The fetcher cannot reach the host gateway or host.docker.internal on the fixed build; the exploit reaches an internal target on the vulnerable build."
+covers = ["FR-CHL-11"]
+after = []
+hitl = false
+risk = "high"
+# Waits on T-11 (metadata mock) and T-17 (seller flows) — done.
+
+[[entry]]
+id = 3
+type = "story"
+title = "C11 Mishandling of Exceptional Conditions (KYC check fails open)"
+description = "The seller-store KYC check calls the KYC mock; the vulnerable build treats a provider error as a pass (fail-open, CWE-636), so a store is auto-approved; the fix fails closed. Flag shown only when the store was approved by the fail-open path."
+verify = "The flag shows only when the store was approved by the fail-open path on the vulnerable build; the fixed build fails closed."
+covers = ["FR-CHL-12"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-11 (KYC mock) and T-17 (seller flows) — done.
+
+[[entry]]
+id = 4
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what this epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3]
+hitl = false
+risk = "low"

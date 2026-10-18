@@ -1,40 +1,49 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c05
-title: "Security Misconfiguration"
-status: stub
+title: Security Misconfiguration
+status: complete
 owasp:
-  "2021": "A05"
-  "2025": "A02"
+  "2021": A05
+  "2025": A02
 cwe:
-  primary: "CWE-489"
-  related: ["CWE-209"]
-attack: ["T1190", "T1595.003"]
+  primary: CWE-489
+  related:
+    - CWE-209
+attack:
+  - T1190
+  - T1595.003
 difficulty: 2
 tier: Easy
 flag:
   placement: sentinel-table
   delivery: sentinel
-start_state: "any authenticated customer (placeholder seed)"
+start_state: none (anonymous visitor)
 milestones:
   m1:
-    summary: "a verbose error was served to the player"
-    signal: null
+    summary: a verbose error was served to the player
+    signal: shop.verbose_error with handler = c05_api
   m2:
-    summary: "an unauthenticated /_ops/ diagnostics page was served"
-    signal: null
+    summary: an unauthenticated /_ops/ diagnostics page was served
+    signal: ops.page_served (path /_ops/ or any child), client class not internal
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: proxy.flag_seen on /_ops/diagnostics plus ops.page_served path = /_ops/diagnostics
 hints:
   - level: 1
-    text: null
+    text: Break something on purpose and read the error closely.
   - level: 2
-    text: null
+    text: The error shows a file path. An internal tools area is mounted near it.
   - level: 3
-    text: null
+    text: Request the diagnostics page of the operations area with no login and read the config values.
 exploit_test: challenges/tests/c05
 fixed_build: challenges/fixed/c05
+brief: A debug operations console and verbose errors were shipped to production; the diagnostics page needs no login.
+write_up:
+  vulnerable: A debug route shipped to production with a verbose error handler.
+  fix: >-
+    Do not ship debug routes; management endpoints on a separate port or localhost; generic errors with a correlation
+    id; no secrets in dumps; a release hardening checklist.
+decoys:
+  - the diagnostics object holds synthetic values only (no real config)

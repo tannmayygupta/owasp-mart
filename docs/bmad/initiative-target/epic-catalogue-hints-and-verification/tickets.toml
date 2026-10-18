@@ -1,0 +1,51 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-18 from the T-stream task file (docs/dev/dev3-sahil.md); one
+# story per task (T-30 catalogue content, T-31 release gate + independence, T-32
+# deployed verification) plus a refactor sweep.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations"
+description = "Fill the IF-7 catalogue for all 11 challenges: both OWASP tags, CWE and ATT&CK ids, difficulty tier, a flag-free brief, the three hint levels, the write-up outline and the decoy locations."
+verify = "Every challenge entry shows its tags and tier and a brief that never contains a flag; the catalogue validates."
+covers = ["FR-CHL-01", "FR-CHL-14", "FR-CHL-15", "FR-CHL-17"]
+after = []
+hitl = false
+risk = "low"
+# Waits on T-19..T-29 (all challenges) — done.
+
+[[entry]]
+id = 2
+type = "story"
+title = "Cross-challenge tests and exploit tests as a CI release gate"
+description = "A release gate that runs the 11 exploit self-tests (pass on the vulnerable build, fail on the fixed build) and blocks a release on any failure, plus cross-challenge independence tests (solving one challenge captures no other flag)."
+verify = "A failing exploit test blocks a release and the independence tests pass."
+covers = ["FR-CHL-13", "FR-CHL-16"]
+after = [1]
+hitl = false
+risk = "medium"
+# Waits on T-30.
+
+[[entry]]
+id = 3
+type = "story"
+title = "Deployed verification on the instance VM"
+description = "Run all 11 exploit tests against a deployed instance on vm-i: each passes on the vulnerable build and fails on the fixed build. Needs Tanmay's deployment (L-12, L-15, L-17) and the live VM."
+verify = "All 11 exploit tests pass on the vulnerable build and fail on the fixed build on the deployed instance."
+covers = ["FR-CHL-13"]
+after = [1, 2]
+hitl = true
+risk = "medium"
+unknown = "Waits on Tanmay's deployment (L-12, L-15, L-17) and live vm-i access; a developer runbook step, not runnable from the shop repo."
+
+[[entry]]
+id = 4
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what this epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2, 3]
+hitl = false
+risk = "low"

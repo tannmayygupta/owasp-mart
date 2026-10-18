@@ -133,14 +133,33 @@
       "items": false
     },
     "exploit_test": {
-      "description": "Path to the challenge's exploit test (pass on vulnerable, fail on fixed).",
+      "description": "Logical reference to the challenge's exploit test (pass on vulnerable, fail on fixed). The real self-test folder is this key with a descriptive suffix (challenges/tests/cNN-<name>); see challenges/catalog/README.md.",
       "type": "string",
       "pattern": "^challenges/tests/c(0[1-9]|1[01])$"
     },
     "fixed_build": {
-      "description": "Path to the challenge's fixed-build reference.",
+      "description": "Logical reference to the challenge's fixed-build. The fixed/vulnerable split is one codebase gated by the env flag VM_CHALLENGE_<KEY> (default/unset is the fixed build); see challenges/catalog/README.md.",
       "type": "string",
       "pattern": "^challenges/fixed/c(0[1-9]|1[01])$"
+    },
+    "brief": {
+      "description": "A short, player-facing description of the challenge. Never contains a flag (T-30).",
+      "type": "string"
+    },
+    "write_up": {
+      "description": "The vulnerable idea and the fix, in short (T-30).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vulnerable", "fix"],
+      "properties": {
+        "vulnerable": { "type": "string" },
+        "fix": { "type": "string" }
+      }
+    },
+    "decoys": {
+      "description": "Decoy / foil locations for this challenge (where a plausible non-flag value sits). Empty when the challenge has none (T-30).",
+      "type": "array",
+      "items": { "type": "string" }
     }
   },
   "$defs": {

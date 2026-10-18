@@ -1,40 +1,50 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c01
-title: "Broken Access Control"
-status: stub
+title: Broken Access Control
+status: complete
 owasp:
-  "2021": "A01"
-  "2025": "A01"
+  "2021": A01
+  "2025": A01
 cwe:
-  primary: "CWE-639"
-  related: ["CWE-862", "CWE-863"]
-attack: ["T1190", "T1078"]
+  primary: CWE-639
+  related:
+    - CWE-862
+    - CWE-863
+attack:
+  - T1190
+  - T1078
 difficulty: 2
 tier: Easy
 flag:
   placement: database-seed
   delivery: db
-start_state: "logged in as a low-privilege store staff account (placeholder: staff.harbor)"
+start_state: logged in as the seeded Harbor seller staff (staff.harbor); no onboarding needed
 milestones:
   m1:
-    summary: "the server returned another store’s order to the player"
-    signal: null
+    summary: the server returned another store’s order to the player
+    signal: app event shop.cross_store_order_read (caller store differs from the order store), first one
   m2:
-    summary: "the player read several foreign orders or the target store’s order"
-    signal: null
+    summary: the player read several foreign orders or the target store’s order
+    signal: platform counts distinct order_id in shop.cross_store_order_read (>= 3), or order_store is the target store
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: proxy.flag_seen on /api/seller/orders/{orderNo} from a session whose store is not the target
 hints:
   - level: 1
-    text: null
+    text: Your order list shows only your own store. Look at how one order is identified when you open it.
   - level: 2
-    text: null
+    text: Order numbers run in sequence. Does the server check which store an order belongs to?
   - level: 3
-    text: null
+    text: Ask for an order number that is not in your list, and read the buyer note of a competitor order.
 exploit_test: challenges/tests/c01
 fixed_build: challenges/fixed/c01
+brief: A seller order-detail endpoint checks that you are a seller, but not that the order is yours. Read a competitor order.
+write_up:
+  vulnerable: Order lookup by order number only; no store-ownership check.
+  fix: >-
+    Scope the lookup to the caller store (WHERE order_no = ? AND store_id = :caller) or a deny-by-default policy layer;
+    per-endpoint test that a second tenant gets 403/404.
+decoys:
+  - other seeded orders hold fake buyer notes and no secrets

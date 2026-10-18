@@ -1,40 +1,49 @@
-# VulnMart challenge catalogue stub (IF-7 v0.1). Status: stub.
-# Tags copied from docs/design/challenge-specs.md (verification status recorded there;
-# official-site re-check and full brief/write-up/decoys are T-30). Flag placement and
-# delivery are provisional and confirmed in this challenge's own story.
+# VulnMart challenge catalogue (IF-7 v0.1). Status: complete (T-30).
+# Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c06
-title: "Vulnerable and Outdated Components"
-status: stub
+title: Vulnerable and Outdated Components
+status: complete
 owasp:
-  "2021": "A06"
-  "2025": "A03"
+  "2021": A06
+  "2025": A03
 cwe:
-  primary: "CWE-1395"
-  related: ["CWE-1321"]
-attack: ["T1190"]
+  primary: CWE-1395
+  related:
+    - CWE-1321
+attack:
+  - T1190
 difficulty: 4
 tier: Hard
 flag:
   placement: file-import-service
   delivery: file
-start_state: "a seller able to run catalogue imports (placeholder seed)"
+start_state: a seller import of a product; the import service runs per-job with no network or database
 milestones:
   m1:
-    summary: "the player sent import options containing a prototype-style key"
-    signal: null
+    summary: the player sent import options containing a prototype-style key
+    signal: the import worker reports proto_check = polluted (prototype pollution occurred)
   m2:
-    summary: "prototype pollution really happened in the import job"
-    signal: null
+    summary: prototype pollution really happened in the import job
+    signal: the preview reflects an injected prototype property
   m3:
-    summary: "flag captured"
-    signal: null
+    summary: flag captured
+    signal: the worker exits; the pollution does not escape the per-job process
 hints:
   - level: 1
-    text: null
+    text: The import preview merges your fields over the defaults. What keys can change an object's prototype?
   - level: 2
-    text: null
+    text: A naive recursive merge copies every key, including __proto__.
   - level: 3
-    text: null
+    text: Send a product with a nested __proto__ object in the import.
 exploit_test: challenges/tests/c06
 fixed_build: challenges/fixed/c06
+brief: >-
+  The product-import merge is a naive recursive merge that lets a __proto__ key pollute the prototype (contained in a
+  per-job process).
+write_up:
+  vulnerable: A recursive deep-merge with no dangerous-key filter (prototype pollution).
+  fix: >-
+    The safe merge that drops __proto__/constructor/prototype and bounds depth; freeze or null-prototype the target;
+    keep the import in a sandboxed, network-less per-job process.
+decoys: []

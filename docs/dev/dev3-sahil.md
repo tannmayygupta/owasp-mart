@@ -257,7 +257,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 
 Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the release gate and deployed verification.
 
-- [ ] **T-25. C07 Authentication Failures (weak password-reset code)**
+- [x] **T-25. C07 Authentication Failures (weak password-reset code)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C07 on the finance account; the reset mailbox is unreadable by the player.
@@ -266,7 +266,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The exploit test passes and fails as required.
   - Handoffs: H-51 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-26. C08 Software or Data Integrity Failures (unsigned payment webhook)**
+- [x] **T-26. C08 Software or Data Integrity Failures (unsigned payment webhook)**
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C08 with an unsigned payment webhook that releases a sentinel flag only on an unsigned sandbox event.
@@ -275,7 +275,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The exploit test passes and fails as required.
   - Handoffs: H-52 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
+- [x] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C09 so that the attack leaves zero events in the shop's own events.
@@ -284,7 +284,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The proof of "attack happened, zero events recorded" comes from the shop's own events and the exploit test passes and fails as required.
   - Handoffs: H-53 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-28. C10 Server-Side Request Forgery (seller image import)**
+- [x] **T-28. C10 Server-Side Request Forgery (seller image import)**
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C10 with a seller image import that can reach only the fake metadata service.
@@ -293,7 +293,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The fetcher cannot reach the host gateway or `host.docker.internal` and the exploit test passes and fails as required.
   - Handoffs: H-28, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-29. C11 Mishandling of Exceptional Conditions (KYC check fails open)**
+- [x] **T-29. C11 Mishandling of Exceptional Conditions (KYC check fails open)**
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C11 with a seller KYC check that fails open and a sentinel flag.
@@ -302,7 +302,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The flag shows only when the store was approved by the fail-open path and the exploit test passes and fails as required.
   - Handoffs: H-55 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
+- [x] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
   - Epic: `epic-catalogue-hints-and-verification`
   - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
   - EARLY PR: yes. P-26 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -312,7 +312,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: Every challenge page shows its tags and tier and a brief that never contains a flag.
   - Handoffs: H-42, H-43 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-31. Cross-challenge tests and exploit tests as a CI release gate**
+- [x] **T-31. Cross-challenge tests and exploit tests as a CI release gate**
   - Epic: `epic-catalogue-hints-and-verification`
   - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
   - Build: Prove that solving one challenge captures no other flag, and run the 11 exploit tests in CI as a release gate.

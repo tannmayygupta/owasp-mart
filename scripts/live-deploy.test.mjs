@@ -45,3 +45,5 @@ test('the demo template only changes the memory of the six roles and keeps every
   assert.throws(() => demoTemplate({ components: [{ role: 'strange' }] }), /do not know/);
   assert.equal(example.components[0].memory_mb, 512, 'the example is not touched');
 });
+
+test('hooks is a command', () => { assert.equal(parseArgs(['hooks']).cmd, 'hooks'); });
