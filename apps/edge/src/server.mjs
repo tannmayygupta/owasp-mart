@@ -151,7 +151,12 @@ export async function main(env = process.env) {
   const keys = { current: readKeyFile(need('EDGE_KEY_CURRENT_FILE')) };
   const previous = env.EDGE_KEY_PREVIOUS_FILE ? readKeyFile(env.EDGE_KEY_PREVIOUS_FILE, { optional: true }) : undefined;
   if (previous) keys.previous = previous;
-  const int = (name, d) => (env[name] ? Number(env[name]) : d);
+  const int = (name, d) => {
+    if (!env[name]) return d;
+    const n = Number(env[name]);
+    if (!Number.isInteger(n) || n < 0) throw new Error(`${name} must be a non-negative integer`); // review finding C6
+    return n;
+  };
   const s = await startServer({
     zone: need('EDGE_ZONE'), keys, adminSecretFile: need('EDGE_ADMIN_SECRET_FILE'), ingestUrl: need('EDGE_INGEST_URL'),
     playerHost: await resolveBindHost(env.EDGE_PLAYER_BIND_HOST ?? '0.0.0.0'),

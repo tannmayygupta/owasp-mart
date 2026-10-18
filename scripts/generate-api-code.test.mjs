@@ -58,7 +58,7 @@ test('a stale file is found by --check, written by the plain run, and CRLF alone
   assert.equal(await main(['--ts', ts, '--py', py], c.io), 0);
   assert.match(c.out.join('\n'), /wrote .*api\.d\.ts/);
   assert.match(c.out.join('\n'), /unchanged .*api\.py/);
-  assert.equal(read(ts), read(DEFAULT_TS));
+  assert.equal(read(ts).replace(/\r\n/g, '\n'), read(DEFAULT_TS).replace(/\r\n/g, '\n')); // a Windows checkout may hold CRLF
   fs.writeFileSync(ts, read(ts).replace(/\n/g, '\r\n'));
   fs.writeFileSync(py, read(py).replace(/\n/g, '\r\n'));
   c = capture();

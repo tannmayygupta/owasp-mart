@@ -186,6 +186,9 @@ class LabRuntime:
             rec = self.engine.create(user_id, template, consent_id=f"demo-consent-{secrets.token_hex(4)}")
             if rec.state.value == "running" and rec.instance_id:
                 return StartedAttempt(rec.id, rec.instance_id, rec.state.value)
+            if rec.state.value != "ready":
+                # submitted, cancelled, withdrawn, reported: no new instance (review finding A1)
+                raise AttemptStateInvalid("the attempt cannot be started in its state")
             if org_id:
                 self.org_of_attempt[rec.id] = org_id
                 self.attempts.set_org(rec.id, org_id)
@@ -197,11 +200,19 @@ class LabRuntime:
                                     hostname=f"{instance_id.lower()}.{self._suffix}", limits=self._limits,
                                     owner_hash=self.keys.owner_hash(user_id))
             self.host.create(request)
-            self._wait_ready(instance_id)
-            self.host.set_access(instance_id, Access.OPEN, 1)
-            self.directory.add(InstanceInfo(instance_id, rec.id, template, 1, tuple(self.challenge_keys)))
-            self.epochs.set(instance_id, 1)
-            started = self.engine.instance_ready(rec.id, self.clock(), instance_id)
+            try:
+                self._wait_ready(instance_id)
+                self.host.set_access(instance_id, Access.OPEN, 1)
+                self.directory.add(InstanceInfo(instance_id, rec.id, template, 1, tuple(self.challenge_keys)))
+                self.epochs.set(instance_id, 1)
+                started = self.engine.instance_ready(rec.id, self.clock(), instance_id)
+            except Exception:
+                # no leaked instance when a later step fails (review finding A2); _wait_ready already destroys on timeout
+                try:
+                    self.host.destroy(instance_id)
+                except Exception:
+                    log.exception("cleanup of %s failed", instance_id)
+                raise
             return StartedAttempt(started.id, instance_id, started.state.value)
 
     def _wait_ready(self, instance_id: str) -> None:

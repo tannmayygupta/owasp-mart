@@ -101,3 +101,16 @@ def test_withdrawal_destroys_the_instance_and_deletes_after_seven_days():
     clock.advance(days=2)
     rt.tick()
     assert rt.state(s.attempt_id)["state"] == "deleted"
+
+
+def test_start_after_withdrawal_is_refused_and_creates_no_instance():
+    # review finding A1: a second start used to build and open an instance, then fail at instance_ready
+    clock, host = FakeClock(T0), FakeInstanceHost()
+    rt = build_lab_runtime({}, host=host, clock=clock)
+    s = rt.start_attempt("u-1")
+    rt.withdraw(s.attempt_id)
+    before = len(host.list()) if hasattr(host, "list") else None
+    with pytest.raises(AttemptStateInvalid):
+        rt.start_attempt("u-1")
+    if before is not None:
+        assert len(host.list()) == before

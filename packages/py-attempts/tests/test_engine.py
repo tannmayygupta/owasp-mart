@@ -79,6 +79,22 @@ def test_manual_submit_in_time_freezes_and_destroys_later():
     assert r.engine.get(run.id).destroyed
 
 
+def test_reported_before_freeze_ends_still_destroys_instance():
+    # review finding B1: reported while frozen, the instance used to leak because tick never revisited it
+    r = Rig()
+    run = r.started()
+    r.clock.set(at(30))
+    r.engine.submit(run.id)
+    r.clock.set(at(32))
+    assert r.engine.mark_reported(run.id, held_open=0).state == S.REPORTED
+    r.engine.tick()
+    assert r.instances.destroy_calls == []
+    r.clock.set(at(45))
+    r.engine.tick()
+    assert r.instances.destroy_calls == ["i1"]
+    assert r.engine.get(run.id).destroyed
+
+
 def test_submit_within_grace_allowed_after_grace_refused():
     r = Rig()
     run = r.started()

@@ -136,6 +136,8 @@ function scanInstance(instanceId, report) {
     images.add(JSON.parse(inspect.toString('utf8'))[0].Image);
     // `docker logs` replays the container's stdout on stdout and its stderr on stderr: scan both
     const r = spawnSync('docker', ['logs', id], { maxBuffer: 1024 * 1024 * 512 });
+    // an unreadable log must not count as a clean one (review finding D5)
+    if (r.error || r.status !== 0) throw new Error(`docker logs failed for ${label}: ${r.error ? r.error.message : `exit ${r.status}`}`);
     const logs = Buffer.concat([r.stdout || Buffer.alloc(0), r.stderr || Buffer.alloc(0)]);
     report.scanned.push(`logs ${label}`);
     report.hits.push(...scanBuffer(logs, `docker logs ${label}`));

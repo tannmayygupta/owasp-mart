@@ -118,12 +118,13 @@ class InMemoryAttemptStore:
             return stored
 
     def due(self, now: datetime) -> list[AttemptRecord]:
-        wanted = (AttemptState.RUNNING, AttemptState.EXPIRED, AttemptState.SUBMITTED, AttemptState.CANCELLED)
+        wanted = (AttemptState.RUNNING, AttemptState.EXPIRED, AttemptState.SUBMITTED, AttemptState.REPORTED,
+                  AttemptState.CANCELLED)
         with self._lock:
             rows = [
                 r for r in self._by_id.values()
                 if (r.state in wanted and not (r.destroyed and r.state != AttemptState.RUNNING))
                 or (r.state == AttemptState.WITHDRAWN and r.delete_after is not None)
             ]
-        far = datetime.max.replace(tzinfo=now.tzinfo)
-        return sorted(rows, key=lambda r: (r.deadline_at or far, r.id))
+        epoch = datetime.fromtimestamp(0, tz=now.tzinfo)
+        return sorted(rows, key=lambda r: (r.deadline_at is None, r.deadline_at or epoch, r.id))

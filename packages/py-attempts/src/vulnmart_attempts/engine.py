@@ -291,6 +291,11 @@ class AttemptEngine:
             if not rec.destroyed and destroy_due(now, rec.times):
                 return self._destroy(rec, now)
             return False
+        if rec.state == AttemptState.REPORTED:
+            # reported before the freeze window ended: the instance still has to be destroyed (review finding B1)
+            if not rec.destroyed and destroy_due(now, rec.times):
+                return self._destroy(rec, now)
+            return False
         if rec.state == AttemptState.CANCELLED:
             return False if rec.destroyed else self._destroy(rec, now)
         if rec.state == AttemptState.WITHDRAWN:
