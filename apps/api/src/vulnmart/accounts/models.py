@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKeyConstraint, Index, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKeyConstraint, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from vulnmart.kernel.db import Base
@@ -81,18 +81,53 @@ class UserSession(Base):
     ip_trunc: Mapped[str | None] = mapped_column(String(64))
     ua_class: Mapped[str | None] = mapped_column(String(16))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mfa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # when a second factor was proved in this session (an admin needs it, FR-ACC-07)
 
 
 class EmailToken(Timestamps, Base):
     __tablename__ = "email_tokens"
     __table_args__ = (
-        CheckConstraint("purpose IN ('verify', 'reset')", name="purpose"),
+        CheckConstraint("purpose IN ('verify', 'reset', 'mfa')", name="purpose"),
         ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE", name="fk_email_tokens_user_id_users"),
         Index("ix_email_tokens_user_id_purpose", "user_id", "purpose"),
     )
 
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)  # SHA-256 hex of the token
     user_id: Mapped[str] = mapped_column(String(32), nullable=False)
-    purpose: Mapped[str] = mapped_column(String(8), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(8), nullable=False)  # `mfa` is the 5-minute ticket between the password and the second factor (P-15)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")  # wrong codes tried with an `mfa` ticket (five at most)
+
+
+class MfaCredential(Timestamps, Base):
+    """The TOTP credential of an account (architecture 04): one per user. `enabled_at` is null while the enrolment is pending (the secret was
+    shown but no code from the app has confirmed it). The secret is sealed with the field key and bound to the account (`accounts/fieldkeys.py`).
+    `last_used_step` is the time step of the last accepted code: an older or equal step is refused, so a code works once."""
+
+    __tablename__ = "mfa_credentials"
+    __table_args__ = (
+        CheckConstraint("type IN ('totp')", name="type"),
+        ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE", name="fk_mfa_credentials_user_id_users"),
+    )
+
+    user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    type: Mapped[str] = mapped_column(String(8), nullable=False, server_default="totp")
+    secret_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_step: Mapped[int | None] = mapped_column(BigInteger)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class RecoveryCode(Timestamps, Base):
+    """A one-time recovery code, kept only as a keyed hash (`FieldKeys.recovery_hash`, which includes the account id, so the hash is the key)."""
+
+    __tablename__ = "recovery_codes"
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE", name="fk_recovery_codes_user_id_users"),
+        Index("ix_recovery_codes_user_id", "user_id"),
+    )
+
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(32), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -15,7 +15,10 @@ from fastapi.responses import JSONResponse
 
 from vulnmart.accounts.api import router as accounts_router
 from vulnmart.accounts.admins import AdminService
+from vulnmart.accounts.fieldkeys import FieldKeys
 from vulnmart.accounts.me_api import router as me_router
+from vulnmart.accounts.mfa import MfaService
+from vulnmart.accounts.mfa_api import router as mfa_router
 from vulnmart.accounts.password_api import router as password_router
 from vulnmart.accounts.passwords import PasswordPolicy, make_policy
 from vulnmart.accounts.self_service import SelfService
@@ -54,6 +57,17 @@ def _sessions_from(settings: Settings, ports) -> SessionService | None:
     return SessionService(ports.sessions, ports.settings, key)
 
 
+def field_keys_from(settings: Settings) -> FieldKeys:
+    """The field key of the accounts module (seals TOTP secrets, keys the hash of recovery codes). Staging and production do not start without a
+    secret; dev and test make a random one for this process, so second-factor secrets made there do not survive a restart."""
+    secret = settings.field_key_secret()
+    if secret is None:
+        if settings.env in ("staging", "production"):
+            raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
+        secret = secrets.token_bytes(32)
+    return FieldKeys.from_secret(secret)
+
+
 def _limiter_from(settings: Settings) -> RateLimiter:
     """Valkey counters when an address is set; in-process counters otherwise (dev and tests only: not shared between processes)."""
     if settings.valkey_url:
@@ -76,6 +90,7 @@ def create_app(
     sessions: SessionService | None = None,
     policy: PasswordPolicy | None = None,
     self_service: SelfService | None = None,
+    mfa: MfaService | None = None,
 ) -> FastAPI:
     """Build the API. Tests pass fake `checks`, their own `settings` and, for the account routes, a service and a limiter;
     production reads the environment (the account routes need a database address, and Valkey for the rate limits)."""
@@ -94,10 +109,14 @@ def create_app(
     ports = app.state.ports
     app.state.roles = RoleService(ports.sessions, ports.audit, app.state.session_service) if ports.sessions else None
     app.state.admins = AdminService(ports.sessions, ports.settings, ports.audit, public_origin=settings.public_origin, policy=policy) if ports.sessions else None
+    field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key
+    app.state.mfa_service = mfa or (MfaService(ports.sessions, field_keys, ports.audit, app.state.session_service)
+                                    if ports.sessions is not None and app.state.session_service is not None else None)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)
     app.include_router(me_router)
+    app.include_router(mfa_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs
     # one round of checks, not one per call (the answer itself is never cached by anyone else: no-store).

@@ -160,14 +160,14 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: A reset link works once and expires, weak passwords are refused and a user can change their details.
   - Handoffs: H-127, H-130, H-132 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-15. Multi-factor login**
+- [x] **P-15. Multi-factor login**  (API level: no enrolment or sign-in page, those are dashboards work; OI-13 stays open)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: not planned yet; created when you incept `epic-accounts-and-sessions` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `3.5` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Multi-factor login as the requirement specifies.
   - Covers: FR-ACC-07
   - Waits on: P-12.
   - Done when: MFA enrolment and login work in tests, and recovery is covered.
-  - Handoffs: H-130, H-134 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-130, H-134 (answered here), H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-16. Consent screen, consent record, minimum data and 18-and-over**
   - Epic: `epic-privacy-audit-and-keys`
@@ -188,7 +188,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Covers: FR-PRV-10, 12
   - Waits on: P-12. Open in part: OI-28. Tanmay's flag and evidence tasks use your KeyPort.
   - Done when: Every sensitive action writes an audit entry and the key service encrypts and decrypts in a test.
-  - Handoffs: H-08, H-09, H-10, H-21, H-132 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-08, H-09, H-10, H-21, H-132, H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-18. Recruiter signup and company approval**
   - Epic: `epic-companies-and-approval`
@@ -266,7 +266,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Covers: FR-DSH-01, 04, FR-HNT-01, 02
   - Waits on: P-22, Tanmay's scoring (L-23) and the catalogue (T-30). Open in part: OI-15.
   - Done when: Both dashboards show live data on the deployed site and candidate hints are off by default.
-  - Handoffs: H-134 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - Handoffs: H-134, H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [ ] **P-27. Recruiter dashboard, live monitor and hints used**
   - Epic: `epic-dashboards-and-exports`

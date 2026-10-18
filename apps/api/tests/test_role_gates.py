@@ -139,5 +139,6 @@ def test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an
     state_changing = {path for path, methods in schema.items() if set(methods) - {"get", "head", "options"} and not path.startswith("/api/v1/_test")}
     assert "/api/v1/session" in schema and "get" in schema["/api/v1/session"], "the schema really lists the included routers"
     assert state_changing == {"/api/v1/accounts", "/api/v1/accounts/verify-email", "/api/v1/accounts/verify-email/resend", "/api/v1/session",
-                              "/api/v1/password-reset/request", "/api/v1/password-reset/confirm", "/api/v1/me", "/api/v1/me/password"}
+                              "/api/v1/password-reset/request", "/api/v1/password-reset/confirm", "/api/v1/me", "/api/v1/me/password",
+                              "/api/v1/session/mfa", "/api/v1/me/mfa", "/api/v1/me/mfa/confirm"}
     assert not any("admin" in p for p in state_changing), "no route can create an admin (FR-ACC-11): admins come from a seed command or an admin"

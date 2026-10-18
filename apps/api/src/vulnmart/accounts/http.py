@@ -143,6 +143,14 @@ def session_service(request: Request) -> SessionService:
     return service
 
 
+def mfa_service(request: Request):
+    service = getattr(request.app.state, "mfa_service", None)
+    if service is None:
+        logger.error("second-factor routes called but the service is not configured (no database address)")
+        raise ProblemError(ErrorCode.REQ_INTERNAL)
+    return service
+
+
 def limiter_call(fn, *args):
     """Run a rate limiter call; a store failure refuses the request (fail closed) instead of letting it through."""
     try:
