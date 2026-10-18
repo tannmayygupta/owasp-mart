@@ -1,0 +1,59 @@
+........................................................................ [  3%]
+........................................................................ [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 42%]
+........................................................................ [ 45%]
+........................................................................ [ 49%]
+..............s......................................................... [ 53%]
+........................................................................ [ 57%]
+........................................................................ [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 72%]
+........................................................................ [ 76%]
+........................................................................ [ 80%]
+........................................................................ [ 84%]
+........................................................................ [ 87%]
+..............F......................................................... [ 91%]
+........................................................................ [ 95%]
+........................................................................ [ 99%]
+.............                                                            [100%]
+================================== FAILURES ===================================
+_ test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an_admin _
+
+sessions = sessionmaker(class_='Session', bind=Engine(sqlite://), autoflush=True, expire_on_commit=False)
+clock = <test_session_api.Clock object at 0x000001B361E8C230>
+
+    def test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an_admin(sessions, clock):
+        with client(make_app(sessions, clock)) as c:
+            assert c.post("/api/v1/accounts", json=SIGNUP).status_code == 202
+            # the generated schema lists every route, including those of included routers
+            schema = c.app.openapi()["paths"]
+        with sessions() as s:
+            assert [(u.account_type) for u in s.scalars(select(User))] == ["participant"]
+        state_changing = {path for path, methods in schema.items() if set(methods) - {"get", "head", "options"} and not path.startswith("/api/v1/_test")}
+        assert "/api/v1/session" in schema and "get" in schema["/api/v1/session"], "the schema really lists the included routers"
+>       assert state_changing == {"/api/v1/accounts", "/api/v1/accounts/verify-email", "/api/v1/accounts/verify-email/resend", "/api/v1/session",
+                                  "/api/v1/password-reset/request", "/api/v1/password-reset/confirm", "/api/v1/me", "/api/v1/me/password",
+                                  "/api/v1/session/mfa", "/api/v1/me/mfa", "/api/v1/me/mfa/confirm"}
+E       AssertionError: assert {'/api/v1/acc.../me/mfa', ...} == {'/api/v1/acc...confirm', ...}
+E         
+E         Extra items in the left set:
+E         '/api/v1/consent'
+E         Use -v to get more diff
+
+apps\api\tests\test_role_gates.py:141: AssertionError
+---------------------------- Captured stderr call -----------------------------
+%(levelname)-5.5s [%(name)s] %(message)s
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:64 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-17, P-22)
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+1 failed, 1883 passed, 1 skipped in 473.19s (0:07:53)

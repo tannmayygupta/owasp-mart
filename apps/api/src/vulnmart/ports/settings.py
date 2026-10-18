@@ -20,6 +20,8 @@ SETTINGS: dict[str, int | bool | str] = {
     "learner_evidence_days": 30,  # FR-PRV-06
     "candidate_retention_days": 180,  # FR-PRV-04
     "consent_withdraw_undo_days": 7,  # FR-PRV-08
+    "consent_record_extra_months": 12,  # FR-PRV-02, OI-37 (developer's answer 2026-10-18; [LAWYER] review pending): the short consent record outlives the assessment record by this
+    "rate_consent_per_user_per_hour": 30,  # FR-PRV-02 (placeholder): consent decisions from one account; a person decides once per attempt
     "flag_submit_per_minute": 10,  # FR-FLG (placeholder)
     "rate_login_per_ip_per_hour": 60,  # FR-ACC-10 (placeholder): every login attempt from one visitor address
     "login_failures_per_window": 10,  # FR-ACC-08, FR-ACC-10 (placeholder): wrong passwords for one address before it waits

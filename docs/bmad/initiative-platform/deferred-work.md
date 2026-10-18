@@ -110,3 +110,15 @@
 ## Deferred from: code review of story-dashboards-skeleton-with-the-same-origin-proxy-local-plan (2026-10-12)
 
 - The health page's own client call is not run in a real browser under the CSP (no browser harness yet); the e2e test fetches the same URL and checks the CSP. Add a browser test with the first dashboards story that needs one.
+
+## Deferred from: story-consent-screen-consent-record-minimum-data-and-18-and-over-plan (2026-10-18)
+
+- The consent page (dashboards): the unticked agree box, the Start and Decline buttons, reading the notice from getConsentNotice and sending the version and hash back.
+- No attempt in state `consent` exists until the invite flow (P-21); the running API uses an empty `ConsentTargets`, so every attempt id is 404. The real port, and the step out of `consent` in stream L's `AttemptPort` (handoff H-136).
+- The contract, architecture 04 section 10.1 and `AttemptPort.cancel` disagree about where a decline ends the attempt (`cancelled` or `withdrawn`).
+- Withdrawal (P-25): a new row with action `withdrawn`; the withdraw route, the 7-day undo and the recruiter mail.
+- The notice wording is a draft; a lawyer has not reviewed it (OI-33). A new wording needs a new version line in `privacy/notice.py` (the old line stays).
+- OI-37 is answered (assessment retention plus 12 months, `consent_record_extra_months`) but not yet written into `initial.md`; the purge that shrinks an expired record to hash and version (P-24) and the pseudonymisation on deletion (P-25) are UPDATEs the application role cannot do: a decision for P-24 (handoff H-136).
+- `audit_seq` links to the in-memory audit stand-in until P-17, so it points at nothing durable yet.
+- The inventory test lists the columns of the tables of streams P; the lab's tables (attempts, evidence, events) are inventoried by stream L's stories.
+- The rate limit on decisions (30 an hour per account) is a placeholder.

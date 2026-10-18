@@ -1,0 +1,51 @@
+? platform and web profiles on a real Docker engine
+  ? up: exits 0, the migrations ran first, and all five services are healthy (966.9882ms)
+  ? healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (339.6798ms)
+  ? the page is served and the API is also reachable directly on its own port (313.9586ms)
+  ? API errors follow the IF-8 format through the web origin: unknown route and wrong method (136.0741ms)
+  ? origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (526.6819ms)
+  ? page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (361.6568ms)
+  ? caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (1658.2156ms)
+  ? mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (33393.5125ms)
+  ? mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost) (10313.9523ms)
+  ? accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (10394.2826ms)
+  ? sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good (6620.5208ms)
+  ? password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work (8873.5651ms)
+  ? admins (P-13): the seed command makes an admin with no learner role who signs in without admin powers, a second seed changes nothing, signup cannot make an admin (6481.2468ms)
+  ? mfa (P-15): an admin enrols an authenticator app, then needs the code (or a recovery code, once) to sign in; a code cannot be replayed (4438.8427ms)
+  ? consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record (3444.3437ms)
+  ? ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (618.0974ms)
+  ? hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (379.0828ms)
+  ? web has no secrets or flags in its environment (67.2429ms)
+  ? Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (8181.3069ms)
+  ? Valkey down: public health 503 degraded, /readyz names valkey; recovers (7795.8919ms)
+  ? down: `node scripts/dev.mjs down` leaves no platform or web container behind (5553.2712ms)
+? platform and web profiles on a real Docker engine (155413.6763ms)
+? tests 21
+? suites 1
+? pass 20
+? fail 1
+? cancelled 0
+? skipped 0
+? todo 0
+? duration_ms 155693.0334
+
+? failing tests:
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:571:3
+? consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record (3444.3437ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  404 !== 401
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:584:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 404,
+    expected: 401,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

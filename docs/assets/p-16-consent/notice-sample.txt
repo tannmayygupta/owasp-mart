@@ -1,0 +1,37 @@
+version: 2026-10-18.1
+sha256: 7716b6c5c0f4d85d99660e3de281d7b2f48db0f45ed95f978bc5a632c89ea447
+company: Example Company Ltd
+retention_days_shown: 180
+--- text as shown (DRAFT wording, not reviewed by a lawyer, OI-33) ---
+Before you start: what this assessment records
+
+Example Company Ltd has invited you to take this assessment on VulnMart. Example Company Ltd decides how the results are used. VulnMart runs the test shop and keeps the records for them.
+
+What is recorded
+- Your name and email address.
+- Your answers and write-ups.
+- The requests you send inside the test shop that capture a flag.
+- Times: when you started, when you submitted and when each answer came in.
+- Which hints you opened.
+- Your IP address and browser type.
+
+What is not recorded
+- Your screen, your webcam or your microphone.
+- Anything you do outside the test shop: other tabs, other programs, other websites.
+
+Why
+The records let Example Company Ltd judge your work and let us check that the assessment ran fairly and that nobody tampered with it.
+
+Who sees it
+- The recruiters of Example Company Ltd that invited you.
+- Platform administrators, only when needed to run the service, and every such access is logged.
+
+How long it is kept
+Your assessment data is deleted 180 days after the assessment. A short record of this decision (which text you saw, when you decided, and a scrambled fingerprint of your address and browser) is kept for 12 months longer, so that we can show that you were asked.
+
+Your choices
+You can see your data, download it, ask for it to be deleted and withdraw your consent. Withdrawing takes one click.
+
+Please do not use a real password or real personal data inside the test shop. Use made-up values.
+
+You must be 18 or over to use VulnMart. Starting the assessment means you agree to this notice. Declining ends the invitation and nothing is started.

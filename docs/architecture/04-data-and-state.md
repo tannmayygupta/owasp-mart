@@ -53,7 +53,7 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 | `assessment_templates` | `id`, `org_id`, `title`, `time_limit_min`, `hints_mode`, `hint_cost_pct`, `reset_limit`, `invite_expiry_days`, `retention_days`, `settings jsonb` | A template used by started attempts is frozen: attempts copy the rules at start (FR-ASM-01) |
 | `template_challenges` | `template_id`, `challenge_key` | |
 | `invites` | `id`, `org_id`, `template_id`, `email_ci`, `token_hash`, `state`, `expires_at`, `superseded_by` | State machine below. Token is at least 128 bits, stored as a hash (FR-ASM-02) |
-| `consent_records` | `id`, `user_id`, `org_id`, `template_id`, `notice_version`, `notice_text_sha256`, `notice_text_snapshot`, `retention_days_shown`, `controller_name_shown`, `action` (`granted`, `declined`, `withdrawn`), `at`, `ip_hash`, `ua_hash`, `method`, `audit_seq` | **Append-only** (no UPDATE or DELETE grant). `audit_seq` links into the audit chain (FR-PRV-02) |
+| `consent_records` | `id`, `user_id`, `attempt_id`, `org_id`, `template_id`, `notice_version`, `notice_text_sha256`, `notice_text_snapshot`, `retention_days_shown`, `controller_name_shown`, `action` (`granted`, `declined`, `withdrawn`), `at`, `ip_hash`, `ua_hash`, `method`, `audit_seq` | **Append-only** (no UPDATE or DELETE grant). `audit_seq` links into the audit chain (FR-PRV-02) |
 
 ### 2.5 Attempts and instances (stream L)
 
