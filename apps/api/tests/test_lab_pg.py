@@ -1,4 +1,4 @@
-"""Stream L, migration 0010, against a real Postgres 18: the lab stores of `vulnmart.lab.pg`, the whole assessment loop on them, and a
+"""Stream L, migration 0011, against a real Postgres 18: the lab stores of `vulnmart.lab.pg`, the whole assessment loop on them, and a
 restart (a second runtime on the same database) that keeps every attempt, score, held capture and event.
 
 Skipped unless VULNMART_TEST_POSTGRES_DSN and VULNMART_TEST_APP_DSN are set (see test_kernel_postgres.py). The stores run as the app

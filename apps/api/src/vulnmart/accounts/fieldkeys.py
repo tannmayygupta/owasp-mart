@@ -63,3 +63,17 @@ class FieldKeys:
         """A keyed hash of a visitor address or browser string (a consent record keeps this, never the value): the same input gives the same
         hash, so two records of one visitor can be compared, but a copy of the table cannot be reversed by hashing every IPv4 address."""
         return hmac.new(self._context_key, f"{kind}:{value}".encode(), hashlib.sha256).hexdigest()
+
+
+def from_settings(settings) -> FieldKeys:
+    """The field keys of this process: staging and production do not start without a secret (`VULNMART_FIELD_SECRET` or `_FILE`); dev and test make a random one
+    for this process, so what was sealed there does not survive a restart (and a second process, such as the mail worker, would not open it: give both the same
+    secret). Used by the API and by the mail worker."""
+    import secrets
+
+    secret = settings.field_key_secret()
+    if secret is None:
+        if settings.env in ("staging", "production"):
+            raise RuntimeError(f"VULNMART_ENV={settings.env} needs a field key (VULNMART_FIELD_SECRET or VULNMART_FIELD_SECRET_FILE)")
+        secret = secrets.token_bytes(32)
+    return FieldKeys.from_secret(secret)

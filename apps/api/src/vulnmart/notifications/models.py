@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, Integer, String, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from vulnmart.kernel.db import Base
@@ -34,7 +34,9 @@ class EmailOutbox(Timestamps, Base):
 
     id: Mapped[int] = mapped_column(Id, primary_key=True, autoincrement=True)  # the outbox order, which delivery keeps
     template: Mapped[str] = mapped_column(String(64), nullable=False)
-    to_user_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    to_user_id: Mapped[str] = mapped_column(String(32), nullable=False)  # a user id, or an invite id (`i-...`) when the person has no account yet
+    # The address of a person with no account (an invited candidate), sealed with the field key and bound to `to_user_id`; cleared once the mail left.
+    to_address_sealed: Mapped[str | None] = mapped_column(Text)
     params: Mapped[Any] = mapped_column(JsonValue, nullable=False)
     state: Mapped[str] = mapped_column(String(8), nullable=False, server_default="pending")
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

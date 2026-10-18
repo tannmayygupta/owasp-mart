@@ -1,4 +1,4 @@
-"""The lab runtime's stores on Postgres (stream L, migration 0010, models in `vulnmart.lab.models`).
+"""The lab runtime's stores on Postgres (stream L, migration 0011, models in `vulnmart.lab.models`).
 
 Every class here implements the Protocol of its in-memory twin and keeps its rules (idempotent writes, the better milestone wins, a
 replay stores nothing, no flag and no pasted text is ever written). Each call is one short transaction on its own connection, so any

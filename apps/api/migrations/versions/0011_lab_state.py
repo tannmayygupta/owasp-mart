@@ -1,7 +1,7 @@
 """The stored state of the lab runtime (stream L, architecture 04 sections 2.5 and 2.6).
 
-Revision ID: 0010
-Revises: 0009
+Revision ID: 0011
+Revises: 0010
 Created: 2026-10-18 (sprint 4 production readiness)
 Owner modules: attempts, instances, ingest, scoring, flags (contracts/db/table-owners.yaml); models in vulnmart/lab/models.py.
 
@@ -18,8 +18,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0010"
-down_revision = "0009"
+revision = "0011"
+down_revision = "0010"
 branch_labels = None
 depends_on = None
 

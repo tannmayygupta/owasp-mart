@@ -209,13 +209,14 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Done when: A recruiter never sees another company's data in tests and invite caps are enforced.
   - Handoffs: H-138 (partly answered here), H-139 (see docs/dev/HANDOFFS.md; read them when you plan P-20 and P-21)
 
-- [ ] **P-20. Assessment template, creating and sending invites, invite lifecycle**
+- [x] **P-20. Assessment template, creating and sending invites, invite lifecycle**  (service level, no routes (story 5.3); the invite mail arrives on the local stack at an address with no account; OI-14 and OI-15 answered: template settings)
   - Epic: `epic-assessments-and-invites`
-  - BMAD story: not planned yet; created when you incept `epic-assessments-and-invites` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `6.1` in `epic-assessments-and-invites` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Assessment template, create and send invites by email, invite lifecycle states.
   - Covers: FR-ASM-01, 02, 03
   - Waits on: P-10, P-19.
   - Done when: A recruiter creates an assessment and sends an invite and the invite email arrives.
+  - Handoffs: H-139, H-140 (see docs/dev/HANDOFFS.md; read them when you plan P-21)
 
 - [ ] **P-21. Accepting invites, re-invite after a fault and bulk invites**
   - Epic: `epic-assessments-and-invites`

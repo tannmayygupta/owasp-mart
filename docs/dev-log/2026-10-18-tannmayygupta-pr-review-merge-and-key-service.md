@@ -12,8 +12,8 @@ Before opening the pull request I merged main into the branch and reviewed the r
 A pull request that merges two migration histories with the same id, or two key implementations that disagree about where keys live, would break the first real deployment and weaken the privacy design (keys apart from data, shredding without touching data).
 
 ## What was built
-- Merge of origin/main (6 commits, Akshay's P-15, P-16, P-17) with conflicts resolved: CHANGELOG (both kept), main.py (lab mount plus mfa and consent routers), test_kernel_settings (new head 0010 and the union of tables), test_kernel_postgres (dynamic head).
-- Lab-state migration renamed 0005 to 0008, and again to 0010 when main gained its own 0008 and 0009 (P-18, P-19), now revising 0007.
+- Merge of origin/main (6 commits, Akshay's P-15, P-16, P-17) with conflicts resolved: CHANGELOG (both kept), main.py (lab mount plus mfa and consent routers), test_kernel_settings (new head 0011 and the union of tables), test_kernel_postgres (dynamic head).
+- Lab-state migration renamed 0005 to 0008, then to 0010 when main gained its own 0008 and 0009 (P-18, P-19), then to 0011 when main gained 0010 (P-20) while CI was running, now revising 0007.
 - attempts added to the data inventory of tests/test_data_minimum.py (P-16 test failed without it: the table holds a user id).
 - The lab runtime now takes its keys from `key_port_from(Settings())` (DbKeyPort over vm_keystore). `vulnmart.lab.keys` (StoredKeyPort) is deleted; its tests are replaced by tests on a real keystore database (test_lab_pg.py `keystore_engine`), and Akshay's tests already cover the key service itself.
 - Deployment: platform compose runs `python -m vulnmart.kernel.migrate` (creates vm_keystore and its role), the API gets VULNMART_KEYSTORE_DSN, KEK and the three masters as files; deploy-secrets makes event_master, flag_key, owner_key, kek and keystore_password; live-deploy stages them.
@@ -27,7 +27,7 @@ A pull request that merges two migration histories with the same id, or two key 
 Two migrations with revision id 0005 (renamed mine). The privacy inventory test failing on attempts (added). A first guess at the test database user failed; the real credentials come from the container's environment.
 
 ## Deployed result (same day, after the developer approved stopping vm-p and recreating its database)
-- vm-p stopped, its Postgres volume removed, the new build started: migrate job created the schema to head 0010 and the keystore database vm_keystore (own role); the data database holds no key table (0 of deks and shredded), vm_keystore holds deks, keystore_schema and shredded.
+- vm-p stopped, its Postgres volume removed, the new build started: migrate job created the schema to head 0011 and the keystore database vm_keystore (own role); the data database holds no key table (0 of deks and shredded), vm_keystore holds deks, keystore_schema and shredded.
 - First start failed: VULNMART_ENV=production needs a field key since Akshay's MFA code (P-15) was merged. Added field_secret (64 hex, made by deploy-secrets, mounted in api and worker). Second start healthy.
 - Deployed journey (scripts/e2e-live.mjs): 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run6-new-key-service.json).
 - Suites after the key switch: npm test 1030 passed, 2 skipped; orchestrator 467 passed; py-attempts 357 passed; apps/api run with Postgres enabled (see the pull request).
@@ -59,10 +59,10 @@ Not fixed tonight, with the reason:
 - Merged tree before the key switch: apps/api 2061 passed, 4 skipped.
 - After the key switch and before these fixes: apps/api 2060 passed, 4 skipped; npm test 1030 passed (2 skipped); orchestrator 467; py-attempts 357.
 - After the fixes and the second merge of main (P-18, P-19; the lab migration moved to 0010): apps/api 2186 passed, 4 skipped, 1 failed (Akshay's test_company_members rule that a table with org_id is scoped or listed on purpose; attempts is now listed on purpose with the reason, and that test file plus test_data_minimum re-ran: 55 passed; the full suite was not repeated after that one-line change). npm test 1030 passed, 2 skipped; orchestrator 467 passed; py-attempts 357 passed.
-- Deployed (vm-p database recreated on the final build, head 0010): scripts/e2e-live.mjs 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run7-final-build.json). The new erase-on-withdrawal path is proved by the Postgres tests, not on the deployed system (it needs the seven-day undo window to pass).
+- Deployed (vm-p database recreated on the final build, head 0011): scripts/e2e-live.mjs 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run7-final-build.json). The new erase-on-withdrawal path is proved by the Postgres tests, not on the deployed system (it needs the seven-day undo window to pass).
 
 ## Deployed result (after the developer approved stopping vm-p and recreating its database)
-- vm-p stopped, its Postgres volume removed, the new build started: the migrate job created the schema to head 0010 and the keystore database vm_keystore (own role); the data database holds no key table, vm_keystore holds deks, keystore_schema and shredded.
+- vm-p stopped, its Postgres volume removed, the new build started: the migrate job created the schema to head 0011 and the keystore database vm_keystore (own role); the data database holds no key table, vm_keystore holds deks, keystore_schema and shredded.
 - First start failed: VULNMART_ENV=production needs a field key since Akshay's MFA code (P-15) was merged. Added field_secret. Second start healthy.
 - Deployed journey (scripts/e2e-live.mjs): 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run6-new-key-service.json).
 

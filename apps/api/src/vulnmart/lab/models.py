@@ -1,5 +1,5 @@
 """Lab tables (architecture 04 sections 2.5 and 2.6; owners `attempts`, `instances`, `ingest`, `scoring`, `flags`): the stored
-state of the lab runtime. Stream L (Tanmay), migration 0010.
+state of the lab runtime. Stream L (Tanmay), migration 0011.
 
 What each table keeps, and what no table keeps:
 - `attempts`: the attempt record of `vulnmart_attempts` (the full record in `record`, the columns the engine searches by outside it).

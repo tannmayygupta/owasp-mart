@@ -25,6 +25,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
 
 import vulnmart.accounts.models  # noqa: F401
+import vulnmart.assessments.models  # noqa: F401
 import vulnmart.kernel.models  # noqa: F401
 import vulnmart.notifications.models  # noqa: F401
 import vulnmart.orgs.models  # noqa: F401
@@ -93,7 +94,7 @@ def test_the_app_role_owns_nothing_and_cannot_bypass_row_level_security(db):
     app.dispose()
     assert tuple(row) == (False, False)
     assert "vulnmart_app" not in owners
-    assert forced == ["dpa_acceptances", "join_requests", "org_members", "organizations"]
+    assert forced == ["assessment_templates", "dpa_acceptances", "invites", "join_requests", "org_members", "organizations", "template_challenges"]
 
 
 def test_row_level_security_shows_only_the_organisation_of_the_transaction(db):
