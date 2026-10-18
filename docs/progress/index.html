@@ -60,7 +60,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <div class="cards">
 <div class="card"><h3><a href="#lab">Lab: Tanmay</a></h3><p>Builds the part that starts a private copy of the shop for each person, keeps it isolated, detects the attacks, and scores the attempt.</p><p class="summary">26 done, 2 being implemented, 3 next, of 31 tasks.</p></div>
 <div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">20 done, 1 being implemented, 11 next, of 32 tasks.</p></div>
-<div class="card"><h3><a href="#target">Target: Sahil</a></h3><p>Builds the online shop that is deliberately vulnerable, with its 11 challenges, hints and the tests that prove each one can be solved.</p><p class="summary">16 done, 0 being implemented, 16 next, of 32 tasks.</p></div>
+<div class="card"><h3><a href="#target">Target: Sahil</a></h3><p>Builds the online shop that is deliberately vulnerable, with its 11 challenges, hints and the tests that prove each one can be solved.</p><p class="summary">24 done, 0 being implemented, 8 next, of 32 tasks.</p></div>
 </div>
 <h2>Contracts between the streams</h2>
 <p>Each stream builds against written agreements, so the three people can work at the same time. Names and owners only.</p>
@@ -231,7 +231,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <section id="target">
 <h2>Target stream: Sahil</h2>
 <p>Builds the online shop that is deliberately vulnerable, with its 11 challenges, hints and the tests that prove each one can be solved.</p>
-<p class="summary"><strong>16 done, 0 being implemented, 16 next, 32 tasks in total.</strong></p>
+<p class="summary"><strong>24 done, 0 being implemented, 8 next, 32 tasks in total.</strong></p>
 <p class="source">source: docs/dev/dev3-sahil.md (working tree)</p>
 <h3>Sprint 1 <span class="dates">(2026-10-08 to 2026-10-14)</span></h3>
 <ul class="tasks">
@@ -257,14 +257,14 @@ ul.tasks{list-style:none;padding:0;margin:0}
 </ul>
 <h3>Sprint 3 <span class="dates">(2026-10-22 to 2026-10-28)</span></h3>
 <ul class="tasks">
-<li class="task next"><div class="head"><span class="tid">T-17</span> <span class="ttitle">Seller flows</span> <span class="status">Next</span></div><p class="build">Seller store registration and approval, products, fulfilment and staff.</p><p class="waits">Waits on: T-14. Open in part: OI-20.</p></li>
-<li class="task next"><div class="head"><span class="tid">T-18</span> <span class="ttitle">Refunds, disputes, commissions and payouts</span> <span class="status">Next</span></div><p class="build">The correct marketplace money model with refunds, disputes, proportional commission reversal, append-only ledger.</p><p class="waits">Waits on: T-17. Open in part: OI-19.</p></li>
-<li class="task next"><div class="head"><span class="tid">T-19</span> <span class="ttitle">C01 Broken Access Control (cross-store order read)</span> <span class="status">Next</span></div><p class="build">Build C01 as designed with its flag, milestones, hints, write-up and exploit test.</p><p class="waits">Waits on: T-14, T-17.</p></li>
-<li class="task next"><div class="head"><span class="tid">T-20</span> <span class="ttitle">C02 Cryptographic Failures (gift-card codes from a weak hash)</span> <span class="status">Next</span></div><p class="build">Build C02 as designed with its flag, milestones, hints, write-up and exploit test.</p><p class="waits">Waits on: T-14.</p></li>
-<li class="task next"><div class="head"><span class="tid">T-21</span> <span class="ttitle">C03 Injection (SQL injection and stored XSS)</span> <span class="status">Next</span></div><p class="build">Build C03 parts A and B: SQL injection against a read-only catalogue file and stored XSS visited by the bot.</p><p class="waits">Waits on: T-11, T-13, T-14; check SQLite ATTACH and load_extension.</p></li>
-<li class="task next"><div class="head"><span class="tid">T-22</span> <span class="ttitle">C04 Insecure Design (refund total beyond the amount paid)</span> <span class="status">Next</span></div><p class="build">Build C04 as a separate quick-refund path on top of the correct model.</p><p class="waits">Waits on: T-18.</p></li>
-<li class="task next"><div class="head"><span class="tid">T-23</span> <span class="ttitle">C05 Security Misconfiguration (unauthenticated diagnostics page)</span> <span class="status">Next</span></div><p class="build">Build C05 with a diagnostics page that shows only a synthetic object.</p><p class="waits">Waits on: T-15.</p></li>
-<li class="task next"><div class="head"><span class="tid">T-24</span> <span class="ttitle">C06 Vulnerable Components (prototype pollution in the import service)</span> <span class="status">Next</span></div><p class="build">Build C06 with the old lodash in the isolated import service; confirm the pollution input works on Node 24.</p><p class="waits">Waits on: T-12.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-17</span> <span class="ttitle">Seller flows</span> <span class="status">Done</span></div><p class="build">Seller store registration and approval, products, fulfilment and staff.</p><p class="waits">Waits on: T-14. Open in part: OI-20.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-18</span> <span class="ttitle">Refunds, disputes, commissions and payouts</span> <span class="status">Done</span></div><p class="build">The correct marketplace money model with refunds, disputes, proportional commission reversal, append-only ledger.</p><p class="waits">Waits on: T-17. Open in part: OI-19.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-19</span> <span class="ttitle">C01 Broken Access Control (cross-store order read)</span> <span class="status">Done</span></div><p class="build">Build C01 as designed with its flag, milestones, hints, write-up and exploit test.</p><p class="waits">Waits on: T-14, T-17.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-20</span> <span class="ttitle">C02 Cryptographic Failures (gift-card codes from a weak hash)</span> <span class="status">Done</span></div><p class="build">Build C02 as designed with its flag, milestones, hints, write-up and exploit test.</p><p class="waits">Waits on: T-14.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-21</span> <span class="ttitle">C03 Injection (SQL injection and stored XSS)</span> <span class="status">Done</span></div><p class="build">Build C03 parts A and B: SQL injection against a read-only catalogue file and stored XSS visited by the bot.</p><p class="waits">Waits on: T-11, T-13, T-14; check SQLite ATTACH and load_extension.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-22</span> <span class="ttitle">C04 Insecure Design (refund total beyond the amount paid)</span> <span class="status">Done</span></div><p class="build">Build C04 as a separate quick-refund path on top of the correct model.</p><p class="waits">Waits on: T-18.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-23</span> <span class="ttitle">C05 Security Misconfiguration (unauthenticated diagnostics page)</span> <span class="status">Done</span></div><p class="build">Build C05 with a diagnostics page that shows only a synthetic object.</p><p class="waits">Waits on: T-15.</p></li>
+<li class="task done"><div class="head"><span class="tid">T-24</span> <span class="ttitle">C06 Vulnerable Components (prototype pollution in the import service)</span> <span class="status">Done</span></div><p class="build">Build C06 with the old lodash in the isolated import service; confirm the pollution input works on Node 24.</p><p class="waits">Waits on: T-12.</p></li>
 </ul>
 <h3>Sprint 4 <span class="dates">(2026-10-29 to 2026-11-04)</span></h3>
 <ul class="tasks">
