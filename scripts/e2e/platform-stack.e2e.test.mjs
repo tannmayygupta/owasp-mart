@@ -1378,6 +1378,85 @@ describe('platform and web profiles on a real Docker engine', () => {
     }
   }, { timeout: 180000 });
 
+  // Story P-24: the retention scheduler on the real stack. It runs inside the API process (Compose turns it on) and ran every job once at start; the admin's view of the last run
+  // of each job (`Scheduler.status`) shows them; an aged learner is warned by a real mail through the worker, and after the warning period deleted with the account and its
+  // pseudonym; an aged invite the candidate never started is deleted by the candidate retention job; published event rows past their week are cleared. The jobs are run on demand
+  // inside the API container with the application role (`app.state.scheduler.run`), so the test does not wait a day; the dates are set with psql as the owner role.
+  test('retention (P-24): the scheduler ran at start, the admin sees the runs, an aged learner is warned and deleted, an aged invite goes, old event rows are cleared', async () => {
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app', 'sch = app.state.scheduler', 'c, a = app.state.companies, app.state.assessments',
+        'from vulnmart.ports.scope import Scope, Role', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const JOBS = ['invite_expiry', 'invite_purge', 'candidate_retention', 'consent_purge', 'learner_warning', 'learner_retention', 'evidence_retention', 'account_housekeeping', 'log_purge', 'live_cleanup', 'audit_anchor'];
+
+    // every job ran when the API started, and the admin's view shows the last run of each
+    for (let i = 0; i < 60 && Number(psql(`SELECT count(DISTINCT job) FROM job_runs WHERE status = 'succeeded' AND job IN (${JOBS.map((j) => `'${j}'`).join(',')})`)) < JOBS.length; i += 1) await sleep(1000);
+    const status = py('print(json.dumps({s.name: [s.last_status, s.last_detail, s.last_success_at is not None, s.next_due_at.isoformat()] for s in sch.status()}))');
+    assert.deepEqual(Object.keys(status).sort(), [...JOBS].sort());
+    for (const [name, [state, detail, ok]] of Object.entries(status)) assert.ok(state === 'succeeded' && ok && detail, `${name}: ${state} ${detail}`);
+    assert.equal(psql(`SELECT count(*) FROM job_runs WHERE status = 'failed' AND started_at > now() - interval '1 hour'`), '0', 'no job failed');
+
+    // an aged learner: the warning mail really arrives, then the account goes
+    const email = `e2e-retain-${RUN}@example.com`;
+    const learner = `u-${('R' + RUN.toUpperCase().replace(/[^A-Z2-7]/g, 'A')).padEnd(16, 'A').slice(0, 16)}`;
+    psql(`INSERT INTO users (id, account_type, email, email_ci, password_hash, display_name, status, email_verified_at, last_login_at, created_at) VALUES ('${learner}', 'participant', '${email}', '${email}', 'x', 'Old Learner', 'active', now(), now() - interval '340 days', now() - interval '400 days')`);
+    psql(`INSERT INTO user_roles (user_id, role, account_type) VALUES ('${learner}', 'learner', 'participant')`);
+    assert.equal(py('print(json.dumps(sch.run("learner_warning")))'), true);
+    assert.equal(psql(`SELECT retention_warned_at IS NOT NULL FROM users WHERE id = '${learner}'`), 't');
+    const warning = await mailFor(email, 'will be deleted soon');
+    assert.ok(warning, 'the warning mail arrived');
+    assert.match(warning.Text, /deleted on \d{4}-\d{2}-\d{2}/);
+    assert.match(warning.Text, /sign in/i);
+    assert.doesNotMatch(warning.Text, /\b(law|legal|required)\b/i, 'no legal duty is claimed');
+    assert.equal(psql(`SELECT count(*) FROM email_outbox WHERE template = 'learner.retention_warning' AND to_user_id = '${learner}'`), '1');
+    // not yet: a day later the learner is still there; with the dates moved on, the account and its pseudonym are gone
+    py('sch.run("learner_retention")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE id = '${learner}'`), '1', 'warned today: not deleted today');
+    psql(`UPDATE users SET last_login_at = now() - interval '400 days', retention_warned_at = now() - interval '40 days' WHERE id = '${learner}'`);
+    psql(`INSERT INTO subject_map (subject_id, user_id) VALUES ('s-${learner.slice(2)}', '${learner}')`);
+    py('sch.run("learner_retention")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE id = '${learner}'`), '0', 'the account is deleted');
+    assert.equal(psql(`SELECT count(*) FROM user_roles WHERE user_id = '${learner}'`), '0');
+    assert.equal(psql(`SELECT count(*) FROM subject_map WHERE user_id = '${learner}'`), '0', 'the audit pseudonym is forgotten');
+    assert.ok(Number(psql(`SELECT count(*) FROM audit_log WHERE action = 'retention.learner_deleted'`)) >= 1, 'the deletion is in the audit log');
+
+    // a company, a template that keeps records for 30 days, an invite the candidate never opens, aged 40 days: the candidate retention job deletes it
+    const domain = `retain-${RUN}.example`;
+    const ownerEmail = `owner@${domain}`;
+    const adminEmail = `e2e-retain-admin-${RUN}@example.com`;
+    const seeded = docker('exec', '-e', 'VULNMART_SEED_ADMIN_PASSWORD=a long admin password 123', NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Retain Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    py(`c.signup_recruiter(email="${ownerEmail}", password="correct horse battery staple", display_name="E2E Retainer", company_name="Retain Ltd")`, 'print(json.dumps(True))');
+    const ownerMail = await mailFor(ownerEmail, 'Confirm your email');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(ownerMail.Text)[1] })).status, 200);
+    const ownerId = psql(`SELECT id FROM users WHERE email_ci = '${ownerEmail}'`);
+    const orgId = psql(`SELECT id FROM organizations WHERE domain_claim = '${domain}'`);
+    py(`c.approve(Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN})), "${orgId}")`, `t = c.terms_for("${ownerId}")`, `c.accept_terms("${ownerId}", t.version, t.sha256)`, 'print(json.dumps(True))');
+    const made = py(`o = Scope(user_id="${ownerId}", org_id="${orgId}", roles=frozenset({Role.RECRUITER, Role.ORG_OWNER}))`,
+      'tpl = a.create_template(o, {"title": "E2E retention", "challenge_keys": ["C01"], "retention_days": 30})',
+      `inv = a.create_invite(o, tpl.template_id, "never-${RUN}@example.org")`, 'print(json.dumps({"invite": inv.invite_id}))');
+    assert.equal(psql(`SELECT count(*) FROM invites WHERE id = '${made.invite}'`), '1');
+    py('sch.run("candidate_retention")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM invites WHERE id = '${made.invite}'`), '1', 'a new invite is not due');
+    psql(`UPDATE invites SET created_at = now() - interval '40 days' WHERE id = '${made.invite}'`);
+    py('sch.run("candidate_retention")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM invites WHERE id = '${made.invite}'`), '0', 'the aged invite is deleted');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE action = 'retention.candidate_deleted' AND details LIKE '%${orgId}%'`), '1');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details LIKE '%never-${RUN}%'`), '0', 'no address in the audit log');
+
+    // published event rows past their week are cleared, and the run is recorded
+    psql(`INSERT INTO domain_events (type, payload, created_at, published_at) VALUES ('attempt.milestone_reached', '{}'::jsonb, now() - interval '9 days', now() - interval '8 days')`);
+    const before = psql(`SELECT count(*) FROM domain_events WHERE published_at < now() - interval '7 days'`);
+    assert.ok(Number(before) >= 1);
+    py('sch.run("live_cleanup")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM domain_events WHERE published_at < now() - interval '7 days'`), '0');
+    assert.equal(psql(`SELECT count(*) FROM job_runs WHERE status = 'failed' AND started_at > now() - interval '1 hour'`), '0');
+  }, { timeout: 300000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

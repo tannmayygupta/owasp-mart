@@ -9,6 +9,7 @@ These terms apply when {{company}} invites candidates to an assessment on VulnMa
 Roles
 - {{company}} decides why and how the results of its candidates are used. {{company}} is the controller of that data.
 - VulnMart runs the assessment and stores the candidate's data for {{company}}. VulnMart is the processor of that data.
+- For the practice data of a learner who uses VulnMart without an assessment, VulnMart is the controller. {{company}} has no part in that data and never sees it.
 
 What VulnMart does
 - It processes candidate data only to run the assessment, to show the results to {{company}} and to keep the records the candidate was told about.

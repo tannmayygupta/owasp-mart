@@ -243,9 +243,9 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
   - Waits on: P-19, P-22.
   - Done when: A user cannot subscribe to another user's or company's stream.
 
-- [ ] **P-24. Retention scheduler, retention rules and log rules**
+- [x] **P-24. Retention scheduler, retention rules and log rules**  (service level: no admin route, the status data exists (`Scheduler.status`); the lab erases attempts through `LabRuntime.erase`; raw container logs are the lab's; the periods are the requirements' numbers, not legally reviewed (OI-33))
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: not planned yet; created when you incept `epic-privacy-audit-and-keys` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `4.3` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Retention and auto-delete jobs for candidates and learners, evidence data rules, controller and processor roles, IP and browser details, system logs, synthetic data only.
   - Covers: FR-PRV-04, 05, 06, 07, 14, 15, 16, 17, 18
   - Waits on: P-17, P-21.

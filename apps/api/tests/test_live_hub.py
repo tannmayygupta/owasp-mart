@@ -9,6 +9,7 @@ import os
 import threading
 import time
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 
@@ -154,6 +155,38 @@ def test_the_store_drops_what_is_older_than_max_age(make_store):
     new = store.append(s, 3, event())
     assert [e.id for e in run(store.read({s: "0-0"}, 50))] == [mid, new]
     assert run(store.facts([s])).trimmed[s] == old
+
+
+def test_a_sweep_clears_a_stream_that_has_been_idle_longer_than_the_maximum_age_and_remembers_what_it_removed(make_store):
+    clock = Clock()
+    store = make_store(max_age_ms=60_000, clock=clock)
+    older, idle, active = stream_name(), stream_name(), stream_name()
+    before = store.append(older, 1, event())
+    clock.now += 1
+    first = store.append(idle, 1, event())
+    clock.now += 30
+    kept = store.append(active, 1, event())
+    clock.now += 45  # the idle stream's newest entry is 76 s old, the active one's 45 s
+    assert store.sweep(datetime.fromtimestamp(clock.now, UTC)) == 2, "the first stream is idle too"
+    assert run(store.read({idle: "0-0", active: "0-0"}, 50))[0].id == kept, "only the active stream still has its entry"
+    facts = run(store.facts([idle, active]))
+    assert facts.trimmed == {idle: first, active: None}
+    assert store.sweep(datetime.fromtimestamp(clock.now, UTC)) == 0, "nothing more to clear"
+    hub = LiveHub(store, fast())
+    behind = run(collect(hub, [idle], before, max_s=2.0))
+    assert b'"reason":"id_too_old"' in behind[0], "a client from before the sweep is told to resync, not left with a silent gap"
+    up_to_date = run(collect(hub, [idle], first, max_s=0.4))
+    assert not any(b"resync" in c for c in up_to_date), "a client that held the newest id lost nothing"
+
+
+def test_a_sweep_leaves_a_busy_stream_and_an_empty_store_alone(make_store):
+    clock = Clock()
+    store = make_store(max_age_ms=60_000, clock=clock)
+    assert store.sweep(datetime.fromtimestamp(clock.now, UTC)) == 0
+    s = stream_name()
+    store.append(s, 1, event())
+    clock.now += 30
+    assert store.sweep(datetime.fromtimestamp(clock.now, UTC)) == 0 and len(run(store.read({s: "0-0"}, 50))) == 1
 
 
 def test_facts_of_a_store_with_nothing_in_it_are_empty(make_store):

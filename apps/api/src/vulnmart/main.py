@@ -10,6 +10,7 @@ import os
 import secrets
 import time
 from collections.abc import Mapping
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -118,6 +119,37 @@ def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> N
         install_demo_routes(app, lab, os.environ.get("VULNMART_LAB_DEMO_TOKEN", ""))
 
 
+def _combined(*lifespans):
+    """Several lifespans as one: started in order, stopped in reverse."""
+    @asynccontextmanager
+    async def combined(app: FastAPI):
+        async with AsyncExitStack() as stack:
+            for one in lifespans:
+                await stack.enter_async_context(one(app))
+            yield
+
+    return combined
+
+
+def _scheduler_lifespan(interval: float):
+    """Runs the retention scheduler (story P-24) beside the API while it serves, when `app.state.scheduler` was built (it needs the database)."""
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        from vulnmart.privacy.retention.scheduler import SchedulerLoop
+
+        scheduler = getattr(app.state, "scheduler", None)
+        loop = SchedulerLoop(scheduler, interval) if scheduler is not None else None
+        if loop is not None:
+            loop.start()
+        try:
+            yield
+        finally:
+            if loop is not None:
+                loop.stop()
+
+    return lifespan
+
+
 def create_app(
     checks: Mapping[str, Check] | None = None,
     timeout: float | None = None,
@@ -146,11 +178,14 @@ def create_app(
     settings = settings or get_settings()
     lab = lab if lab is not None else _lab_from_environ()
     attempts = attempts if attempts is not None else (lab.attempts if lab is not None else None)  # the lab in this process is the attempt port of the consent routes (story P-21)
-    lifespan = None
+    lifespans = []
     if lab is not None:
         from vulnmart.lab.background import lab_lifespan
 
-        lifespan = lab_lifespan(lab, float(os.environ.get("VULNMART_LAB_TICK_S", "10")))
+        lifespans.append(lab_lifespan(lab, float(os.environ.get("VULNMART_LAB_TICK_S", "10"))))
+    if settings.scheduler_enabled:
+        lifespans.append(_scheduler_lifespan(settings.scheduler_interval_seconds))
+    lifespan = _combined(*lifespans) if lifespans else None
     app = create_service_app("api", checks=checks, settings=settings, timeout=timeout, configure_logs=configure_logs, lifespan=lifespan)
     app.state.settings = settings
     app.state.ports = build_ports(settings)
@@ -199,6 +234,17 @@ def create_app(
     app.state.live_hub = LiveHub(store, live_config) if store is not None else None
     app.state.live_authoriser = live_authoriser or StreamAuthoriser(app.state.companies.active_company_of if app.state.companies is not None else None)
     app.state.live_snapshot = live_snapshot or (LabSnapshotSource(lab) if lab is not None else EmptySnapshot())
+    # Retention and housekeeping jobs (story P-24): built here, started by `_scheduler_lifespan` when `VULNMART_SCHEDULER_ENABLED` is on. The lab in this process
+    # erases attempts (`lab.erase`); without one a job that needs it fails visibly instead of deleting around it.
+    app.state.scheduler = None
+    if ports.sessions is not None and app.state.assessments is not None:
+        from vulnmart.privacy.subjects import SubjectService
+        from vulnmart.privacy.retention.build import build_scheduler
+
+        app.state.scheduler = build_scheduler(sessions=ports.sessions, assessments=app.state.assessments, settings=ports.settings, audit=ports.audit,
+                                              subjects=SubjectService(ports.audit_sessions) if ports.audit_sessions is not None else None,
+                                              eraser=lab.erase if lab is not None else None, anchors=app.state.audit_anchors,
+                                              streams=store if isinstance(store, ValkeyStreamStore) else None, public_origin=settings.public_origin)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)

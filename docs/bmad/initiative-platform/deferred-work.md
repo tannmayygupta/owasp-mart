@@ -207,3 +207,17 @@
 - The standing check is a few queries per connection per re-check; at the connection cap that is about 70 checks a second per process (placeholders, OI-25), and the cap is per process.
 - The authorisation tests that need a company use the real services on SQLite and the Postgres suite of P-22; a Postgres test of the company stream with row-level security was not added (the stream reads no company table).
 - A new company state (for example an archived one) takes the live view away only if `active_company_of` stops returning the company.
+
+
+## Deferred from: story-retention-scheduler-retention-rules-and-log-rules-plan (2026-10-19)
+
+- No route shows the last run of each job to an admin (`Scheduler.status` has the data); the admin area (P-28, P-30) adds it. A failed job is recorded, audited (`job.failed`) and logged; no email goes to the admins (OI-12, OI-34 are open).
+- A company deleting a candidate earlier and a candidate's or learner's own deletion request with the 7-day undo are P-25; the retention jobs are written so those steps can be reused (H-144).
+- Raw container logs (7 days, FR-PRV-06) are the lab's and the orchestrator's and are not deleted by anything built here. The evidence rule uses the lab's destroy claim (or the end of the attempt) as the destroy time, because the lab keeps no later instant.
+- The legal review of the retention periods, the 18+ rule and the one-year log rule against erasure (OI-33, FR-PRV-19) has not happened; the periods are the requirements' numbers and the settings hold them.
+- A learner who also took part in an assessment keeps the account (and so the e-mail address and name) until the assessment data is deleted by its own date; only the practice data goes at 12 months.
+- The application role can still insert a row into `audit_checkpoint` (it always could); the anchors kept outside the database are what proves the log was not cut short.
+- Mail rows older than 12 months are purged with the logs, although FR-PRV-15 names security and system logs only; the sealed address of a mail that never left is cleared after 30 days.
+- The seed check finds addresses on non-reserved domains, numbers that pass the card check and well-known secret formats; it cannot tell a real person's name from an invented one, and it covers the shop's seed folders and the migrations, not future seed files in other folders.
+- Companies that accepted the data-processing terms before version 2026-10-19.1 must accept again before they invite.
+- The scheduler's intervals are after the last success, not clock times (a restart runs what is due at once); a dead run holds its job for up to an hour; raw per-job metrics are not exported.
