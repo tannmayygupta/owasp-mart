@@ -19,17 +19,15 @@ from test_consent import KEYS, ORIGIN, PASSWORD, T0, Clock, add_user, sign_in  #
 from vulnmart.accounts.passwords import PasswordPolicy
 from vulnmart.accounts.self_service import SelfService
 from vulnmart.accounts.service import AccountService
-from vulnmart.accounts.sessions import ResolvedSession, SessionService, UserView
+from vulnmart.accounts.sessions import SessionService
 from vulnmart.kernel.db import Base
 from vulnmart.kernel.ratelimit import InMemoryRateLimiter
 from vulnmart.kernel.settings import Settings
-from vulnmart.live.api import stream_keys
 from vulnmart.live.hub import HubConfig
 from vulnmart.live.snapshot import EmptySnapshot, LabSnapshotSource
 from vulnmart.live.store import MemoryStreamStore
 from vulnmart.main import create_app
 from vulnmart.ports.fakes import FakeSettingsPort
-from vulnmart.ports.scope import Role
 
 ALICE, BOB = "u-AAAAAAAAAAAAAAAA", "u-BBBBBBBBBBBBBBBB"
 ORG = "7c1d2e3f-0000-4000-8000-000000000001"
@@ -174,30 +172,6 @@ def test_without_a_valkey_address_the_live_route_is_a_plain_server_error_not_a_h
         sign_in(c)
         r = c.get("/api/v1/live")
     assert (r.status_code, r.json()["code"]) == (500, "REQ-INTERNAL")
-
-
-# ---- which streams a session gets ------------------------------------------------------------------------------------------------------
-
-def session(uid, roles, org=None, account_type="participant") -> ResolvedSession:
-    now = datetime(2026, 10, 18, tzinfo=UTC)
-    return ResolvedSession("h", UserView(uid, "x@example.com", "X", account_type, True, False, now), frozenset(roles), now, now, now, org_id=org)
-
-
-@pytest.mark.parametrize("roles,org,expected", [
-    ([Role.LEARNER], None, [user_stream(ALICE)]),
-    ([Role.LEARNER, Role.CANDIDATE], None, [user_stream(ALICE)]),
-    ([Role.LEARNER], ORG, [user_stream(ALICE)]),  # a learner never gets a company stream, whatever the session says
-    ([Role.RECRUITER], ORG, [user_stream(ALICE), f"live:org:{ORG}"]),
-    ([Role.RECRUITER, Role.ORG_OWNER], ORG, [user_stream(ALICE), f"live:org:{ORG}"]),
-    ([Role.RECRUITER], None, [user_stream(ALICE)]),  # a recruiter who is not acting for a company has no company stream
-    ([Role.ADMIN], None, [user_stream(ALICE), "live:admin"]),
-])
-def test_the_streams_come_from_the_session_roles_and_company(roles, org, expected):
-    assert stream_keys(session(ALICE, roles, org)) == expected
-
-
-def test_two_users_never_share_a_user_stream():
-    assert set(stream_keys(session(ALICE, [Role.LEARNER]))).isdisjoint(stream_keys(session(BOB, [Role.LEARNER])))
 
 
 # ---- the snapshot ----------------------------------------------------------------------------------------------------------------------

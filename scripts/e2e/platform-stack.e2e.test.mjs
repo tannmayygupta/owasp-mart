@@ -1179,6 +1179,205 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(psql(`SELECT count(*) FROM domain_events WHERE payload->'data'->>'attempt_id' = '${otherId}' AND published_at IS NOT NULL`), '1');
   }, { timeout: 240000 });
 
+  // Story P-23: the stream is authorised per user (a second user cannot read the first one's events, with or without their ids), it ends when the session ends, and it
+  // runs over HTTP/2 through the real Caddy image: one TLS connection carries the stream, a second stream of the same user and ordinary API calls at once.
+  const H2_CADDY = 'vulnmart-h2-caddy';
+  const DEV_SECRET = process.env.VULNMART_DEV_ORIGIN_SECRET ?? 'vulnmart-dev-origin-secret-not-a-secret';
+  const signedIn = async (label) => {
+    const email = `e2e-${label}-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: `E2E ${label}`, age_declaration: true })).status, 202);
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 200);
+    return { cookie: /(__Host-vm_session=[^;]+)/.exec(login.headers.getSetCookie()[0])[1], csrf: (await login.json()).csrf_token, email };
+  };
+  const rowFor = (psql, attempt, milestone) => psql(`INSERT INTO domain_events (type, payload, created_at) VALUES ('attempt.milestone_reached', '${JSON.stringify({
+    schema_version: 1, type: 'attempt.milestone_reached', occurred_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+    data: { attempt_id: attempt, mode: 'learner', challenge_key: 'C01', milestone } })}'::jsonb, now())`);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // frames of an SSE body as they arrive over fetch or http2: a list of { id, event, data, comment }
+  const frameParser = () => {
+    let buffer = '';
+    const seen = [];
+    return {
+      seen,
+      feed(text) {
+        buffer += text;
+        let at;
+        while ((at = buffer.indexOf('\n\n')) >= 0) {
+          const block = buffer.slice(0, at);
+          buffer = buffer.slice(at + 2);
+          const item = { at: Date.now() };
+          for (const line of block.split('\n')) {
+            if (line.startsWith(': ')) item.comment = line.slice(2);
+            else if (line.startsWith('id: ')) item.id = line.slice(4);
+            else if (line.startsWith('event: ')) item.event = line.slice(7);
+            else if (line.startsWith('data: ')) item.data = JSON.parse(line.slice(6));
+          }
+          seen.push(item);
+        }
+      },
+    };
+  };
+
+  test('stream authorisation (P-23): another user never reads your events, with or without their ids, and a logout ends the stream', async () => {
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql).stdout.trim();
+    const upper = RUN.toUpperCase().replace(/[^A-Z2-7]/g, 'A');
+    const alice = await signedIn('auth-a');
+    const bob = await signedIn('auth-b');
+    const idOf = (s) => psql(`SELECT id FROM users WHERE email_ci = '${s.email}'`);
+    const [aliceId, bobId] = [idOf(alice), idOf(bob)];
+    const aliceAttempt = `a-${('P' + upper).padEnd(16, 'A').slice(0, 16)}`;
+    const bobAttempt = `a-${('Q' + upper).padEnd(16, 'A').slice(0, 16)}`;
+    psql(`INSERT INTO attempts (id, user_id, template_id, org_id, state, version, record) VALUES ('${aliceAttempt}', '${aliceId}', 't-pa-${RUN}', NULL, 'running', 0, '{}'::jsonb), ('${bobAttempt}', '${bobId}', 't-pb-${RUN}', NULL, 'running', 0, '{}'::jsonb)`);
+
+    const open = async (cookie, lastEventId) => {
+      const controller = new AbortController();
+      const res = await fetch(`${ORIGIN}/api/v1/live`, { headers: { cookie, ...(lastEventId ? { 'last-event-id': lastEventId } : {}) }, signal: controller.signal });
+      const parser = frameParser();
+      let ended = false;
+      const decoder = new TextDecoder();
+      const pump = (async () => {
+        const reader = res.body?.getReader();
+        try {
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            parser.feed(decoder.decode(value, { stream: true }));
+          }
+        } catch { /* aborted */ }
+        ended = true;
+      })();
+      return { res, seen: parser.seen, isEnded: () => ended, close: () => { controller.abort(); return pump; } };
+    };
+    const waitFor = async (predicate, ms = 10000) => { const stop = Date.now() + ms; while (Date.now() < stop) { if (predicate()) return true; await sleep(25); } return false; };
+
+    // each user's own events arrive, the other's never do
+    const a = await open(alice.cookie);
+    const b = await open(bob.cookie);
+    assert.ok(await waitFor(() => a.seen.length > 0 && b.seen.length > 0, 5000), 'both streams are open');
+    rowFor(psql, aliceAttempt, 'M1');
+    rowFor(psql, bobAttempt, 'M2');
+    assert.ok(await waitFor(() => a.seen.some((f) => f.event) && b.seen.some((f) => f.event), 8000), 'each received an event');
+    assert.deepEqual(a.seen.filter((f) => f.event).map((f) => f.data.data.attempt_id), [aliceAttempt]);
+    assert.deepEqual(b.seen.filter((f) => f.event).map((f) => f.data.data.attempt_id), [bobAttempt]);
+    const bobFirstId = b.seen.find((f) => f.event).id;
+    await b.close();
+    await a.close();
+
+    // Alice presents Bob's event id (a place in time) and a cookie of her own: she gets her events after that point, never Bob's
+    rowFor(psql, bobAttempt, 'M3');
+    rowFor(psql, aliceAttempt, 'M3');
+    await sleep(1500);
+    const replay = await open(alice.cookie, bobFirstId);
+    assert.ok(await waitFor(() => replay.seen.some((f) => f.event), 8000));
+    await sleep(500);
+    assert.deepEqual(replay.seen.filter((f) => f.event).map((f) => [f.data.data.attempt_id, f.data.data.milestone]), [[aliceAttempt, 'M3']], 'only her own event after that point');
+    assert.ok(!replay.seen.some((f) => f.data?.data?.attempt_id === bobAttempt), "Bob's events never reach Alice, whatever id she presents");
+    await replay.close();
+
+    // another site's cookie, no cookie, a forged cookie: no stream
+    for (const cookie of ['', '__Host-vm_session=' + 'A'.repeat(43)]) {
+      const refused = await fetch(`${ORIGIN}/api/v1/live`, { headers: cookie ? { cookie } : {}, signal: AbortSignal.timeout(10000) });
+      assert.equal(refused.status, 401, `cookie "${cookie.slice(0, 20)}"`);
+      assert.equal((await refused.json()).code, 'AUTH-SESSION-REQUIRED');
+    }
+
+    // a logout ends an open stream (the hub looks at the session every 30 s)
+    const open2 = await open(alice.cookie);
+    assert.ok(await waitFor(() => open2.seen.length > 0, 5000));
+    const out = await call('DELETE', '/api/v1/session', { headers: { cookie: alice.cookie, 'x-csrf-token': alice.csrf } });
+    assert.equal(out.status, 204);
+    const stopped = Date.now();
+    assert.ok(await waitFor(() => open2.isEnded(), 45000), 'the stream ended after the logout');
+    console.log(`# live: stream ended ${Date.now() - stopped} ms after the logout (the session is checked every 30 s)`);
+    assert.ok(!open2.seen.some((f) => f.event === 'stream.resync'), 'a closed session is not a resync');
+    const after = await fetch(`${ORIGIN}/api/v1/live`, { headers: { cookie: alice.cookie }, signal: AbortSignal.timeout(10000) });
+    assert.equal(after.status, 401, 'the old cookie opens nothing');
+  }, { timeout: 240000 });
+
+  test('live updates over HTTP/2 (P-23): one connection carries six streams and ordinary calls through the real Caddy image', async () => {
+    const http2 = await import('node:http2');
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql).stdout.trim();
+    const upper = RUN.toUpperCase().replace(/[^A-Z2-7]/g, 'A');
+    const user = await signedIn('h2');
+    const userId = psql(`SELECT id FROM users WHERE email_ci = '${user.email}'`);
+    const attempt = `a-${('H' + upper).padEnd(16, 'A').slice(0, 16)}`;
+    psql(`INSERT INTO attempts (id, user_id, template_id, org_id, state, version, record) VALUES ('${attempt}', '${userId}', 't-h2-${RUN}', NULL, 'running', 0, '{}'::jsonb)`);
+    docker('rm', '-f', H2_CADDY);
+    const started = docker('run', '-d', '--name', H2_CADDY, '--network', 'vulnmart_default', '-p', '127.0.0.1:8443:8443', '-e', `ORIGIN_SECRET=${DEV_SECRET}`,
+      '-v', `${path.join(ROOT, 'infra', 'caddy', 'Caddyfile.live-h2')}:/etc/caddy/Caddyfile:ro`, 'caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d');
+    assert.equal(started.status, 0, started.stderr);
+    let client;
+    try {
+      const connect = async () => {
+        for (let i = 0; i < 60; i += 1) {
+          try {
+            const session = http2.connect('https://127.0.0.1:8443', { rejectUnauthorized: false, servername: 'localhost' });
+            await new Promise((resolve, reject) => { session.once('connect', resolve); session.once('error', reject); });
+            return session;
+          } catch { await sleep(500); }
+        }
+        throw new Error('Caddy did not come up');
+      };
+      client = await connect();
+      client.on('error', () => {});
+      assert.equal(client.alpnProtocol, 'h2', 'HTTP/2 was negotiated');
+
+      const request = (pathName, headers = {}) => new Promise((resolve) => {
+        const req = client.request({ ':path': pathName, cookie: user.cookie, ...headers });
+        const parser = frameParser();
+        const out = { headers: null, body: '', seen: parser.seen, ended: false, close: () => req.close() };
+        req.setEncoding('utf8');
+        req.on('response', (h) => { out.headers = h; resolve(out); });
+        req.on('data', (d) => { out.body += d; parser.feed(d); });
+        req.on('end', () => { out.ended = true; });
+        req.on('error', () => { out.ended = true; });
+      });
+      const waitFor = async (predicate, ms = 10000) => { const stop = Date.now() + ms; while (Date.now() < stop) { if (predicate()) return true; await sleep(25); } return false; };
+
+      // six streams of one user on one TLS connection (the per-user cap is six)
+      const streams = [];
+      for (let i = 0; i < 6; i += 1) streams.push(await request('/api/v1/live'));
+      for (const s of streams) {
+        assert.equal(s.headers[':status'], 200);
+        assert.match(s.headers['content-type'], /^text\/event-stream/);
+        assert.equal(s.headers['cache-control'], 'private, no-store');
+        assert.equal(s.headers['x-accel-buffering'], 'no');
+        assert.equal(s.headers.connection, undefined, 'no connection-specific header in an HTTP/2 answer');
+        assert.equal(s.headers['transfer-encoding'], undefined);
+        assert.equal(s.headers['content-encoding'], undefined, 'the stream is not compressed');
+      }
+      assert.ok(await waitFor(() => streams.every((s) => s.seen.some((f) => f.comment === 'stream open')), 5000), 'the first frame reached every stream at once');
+
+      // a seventh is refused with a hint, and an ordinary call on the same connection is answered while the six are open
+      const seventh = await request('/api/v1/live');
+      assert.equal(seventh.headers[':status'], 429);
+      assert.equal(seventh.headers['retry-after'], '5');
+      const t0 = Date.now();
+      const snapshot = await request('/api/v1/live/snapshot');
+      await waitFor(() => snapshot.ended, 5000);
+      assert.equal(snapshot.headers[':status'], 200);
+      assert.deepEqual(Object.keys(JSON.parse(snapshot.body)).sort(), ['attempts', 'instances', 'server_time']);
+      console.log(`# live: a call on the same HTTP/2 connection while six streams are open took ${Date.now() - t0} ms`);
+
+      // an event reaches all six
+      const sentAt = Date.now();
+      rowFor(psql, attempt, 'M1');
+      assert.ok(await waitFor(() => streams.every((s) => s.seen.some((f) => f.event)), 8000), 'all six streams received the event');
+      const slowest = Math.max(...streams.map((s) => s.seen.find((f) => f.event).at)) - sentAt;
+      console.log(`# live: one event row to six HTTP/2 streams through Caddy ${slowest} ms`);
+      assert.ok(slowest < 3000);
+      for (const s of streams) assert.equal(s.seen.filter((f) => f.event).length, 1);
+      for (const s of streams) s.close();
+    } finally {
+      client?.close();
+      docker('rm', '-f', H2_CADDY);
+    }
+  }, { timeout: 180000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);
