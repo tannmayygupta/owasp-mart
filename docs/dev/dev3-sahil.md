@@ -191,7 +191,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Waits on: T-14. Open in part: OI-20.
   - Done when: A seller registers, waits for approval, lists products and fulfils orders; a pending seller cannot publish.
 
-- [ ] **T-18. Refunds, disputes, commissions and payouts**
+- [x] **T-18. Refunds, disputes, commissions and payouts**
   - Epic: `epic-shop-seller-and-money`
   - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: The correct marketplace money model with refunds, disputes, proportional commission reversal, append-only ledger.

@@ -5,6 +5,7 @@
 import { requireRole } from './middleware.mjs';
 import { ForbiddenError, NotFoundError, ValidationError } from '../domain/shop-service.mjs';
 import * as seller from '../domain/seller-service.mjs';
+import * as money from '../domain/money-service.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -27,12 +28,21 @@ export function registerSellerRoutes(app, db) {
     back(res, 'Store registered', 'Your store is pending admin approval. You can edit its profile and draft products while you wait, but cannot publish until it is approved.');
   }));
 
-  // Dashboard: the store, its products and its order items.
+  // Dashboard: the store, its products, its order items and its refund requests.
   app.get('/seller', SELLER, h((req, res) => res.render('seller/dashboard', {
     store: seller.getMyStore(db, req.user),
     products: seller.listMyProducts(db, req.user),
     items: seller.listStoreOrderItems(db, req.user),
+    refunds: money.listRefunds(db, req.user),
   })));
+
+  // Refunds: a seller may approve (up to its limit) or reject refunds on its own
+  // store (T-18). Processing the payout is staff/finance only.
+  app.post('/seller/refunds/:id/approve', SELLER, h((req, res) => {
+    money.approveRefund(db, req.user, req.params.id, { amount: req.body.amount ? Number(req.body.amount) : undefined });
+    res.redirect('/seller');
+  }));
+  app.post('/seller/refunds/:id/reject', SELLER, h((req, res) => { money.rejectRefund(db, req.user, req.params.id); res.redirect('/seller'); }));
 
   // Store profile (owner only).
   app.post('/seller/store', OWNER, h((req, res) => {

@@ -4,5 +4,12 @@
 {% for p in payouts %}<tr><td>{{ p.id }}</td><td>{{ p.store_id }}</td><td>{{ p.net_cents | cents }}</td><td>{{ p.status }}</td>
 <td><form class="inline" method="post" action="/staff/payouts/{{ p.id }}/approve"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Approve</button></form></td>
 </tr>{% else %}<tr><td colspan="5" class="muted">No payouts.</td></tr>{% endfor %}</table>
+<h3>Accrue a payout</h3>
+<form class="inline" method="post" action="/staff/payouts/accrue">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input name="store_id" type="number" min="1" placeholder="store id" required>
+  <input name="period" placeholder="YYYY-MM" required>
+  <button>Accrue</button>
+</form>
 <h3>Commissions</h3><p class="muted">{{ commissions|length }} commission rows.</p>
 {% endblock %}

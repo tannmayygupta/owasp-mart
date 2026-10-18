@@ -47,4 +47,16 @@
     </td>
   </tr>{% else %}<tr><td colspan="6" class="muted">No orders yet.</td></tr>{% endfor %}</table>
 </section>
+
+<section>
+  <h2>Refund requests</h2>
+  <table><tr><th>#</th><th>Item</th><th>Amount</th><th>Status</th><th></th></tr>
+  {% for r in refunds %}<tr>
+    <td>{{ r.id }}</td><td>{{ r.order_item_id }}</td><td>{{ r.amount_cents | cents }}</td><td>{{ r.status }}</td>
+    <td>{% if r.status == 'requested' %}
+      <form class="inline" method="post" action="/seller/refunds/{{ r.id }}/approve"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="number" name="amount" min="1" placeholder="amount (cents)"><button>Approve</button></form>
+      <form class="inline" method="post" action="/seller/refunds/{{ r.id }}/reject"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Reject</button></form>
+    {% endif %}</td>
+  </tr>{% else %}<tr><td colspan="5" class="muted">No refund requests.</td></tr>{% endfor %}</table>
+</section>
 {% endblock %}

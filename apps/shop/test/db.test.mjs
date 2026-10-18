@@ -14,6 +14,7 @@ const EXPECTED_TABLES = [
   'carts', 'cart_items', 'coupons', 'orders', 'order_items', 'payments',
   'commissions', 'payouts', 'refunds', 'disputes', 'tickets', 'ticket_messages',
   'notifications', 'uploads', 'audit_log', 'security_events', 'alerts',
+  'commission_reversals', // added in migration 0002 (T-18 money model)
 ];
 
 function tablesIn(db) {
@@ -25,7 +26,7 @@ function tablesIn(db) {
 test('migrate creates every expected table on a fresh database', () => {
   const db = openDb(':memory:');
   const applied = migrate(db);
-  assert.deepEqual(applied, [1], 'migration 1 applied');
+  assert.deepEqual(applied, [1, 2], 'migrations 1 and 2 applied');
   const tables = tablesIn(db);
   for (const t of EXPECTED_TABLES) assert.ok(tables.has(t), `table ${t} should exist`);
   assert.ok(tables.has('_migrations'), '_migrations ledger exists');
@@ -37,9 +38,9 @@ test('about 20 domain tables exist (FR-SHP-02)', () => {
 
 test('re-running migrate is a no-op', () => {
   const db = openDb(':memory:');
-  assert.deepEqual(migrate(db), [1]);
+  assert.deepEqual(migrate(db), [1, 2]);
   assert.deepEqual(migrate(db), [], 'second run applies nothing');
-  assert.equal(migrationFiles().length, 1, 'one migration file so far');
+  assert.equal(migrationFiles().length, 2, 'two migration files so far');
 });
 
 test('money columns are integer cents, not floats', () => {
