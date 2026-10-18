@@ -262,6 +262,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Challenge catalogue (IF-7), `contracts/catalog/` and `challenges/catalog/`
 
+### 1.1.0 (2026-10-18, Sahil, story T-30)
+- Additive: three optional fields on a challenge entry — `brief` (a short player-facing description, never a flag), `write_up` (`{ vulnerable, fix }`) and `decoys` (string array of foil locations). Existing entries stay valid; a stub omits them. No mock change (the catalogue is data read by validators, nothing runs against it). Not breaking (new optional properties; `exploit_test` and `fixed_build` patterns unchanged — they stay logical references, with `challenges/catalog/README.md` noting the real self-test folders are `challenges/tests/cNN-<name>` and the fixed build is the `VM_CHALLENGE_<KEY>` env flag). `validate-catalog.mjs` now also requires a `complete` entry to have non-null milestone signals, non-null hints and a brief.
+- All 11 `challenges/catalog/cNN.yaml` entries are now `status: complete` (T-30): milestone detection signals, the three hint texts, a flag-free brief, the vulnerable/fix write-up and decoy locations, filled from `docs/design/challenge-specs.md`.
+
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.

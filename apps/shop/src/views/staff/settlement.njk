@@ -1,0 +1,9 @@
+{% extends "layout.njk" %}{% block title %}Settlement settings{% endblock %}{% block body %}
+<h1>Settlement settings</h1>
+<p class="muted">Finance only. These values configure payouts to sellers.</p>
+<table>
+  <tr><th>Settlement reference</th><td>{{ reference }}</td></tr>
+  <tr><th>Payout schedule</th><td>Weekly (Mondays)</td></tr>
+  <tr><th>Currency</th><td>USD</td></tr>
+</table>
+{% endblock %}

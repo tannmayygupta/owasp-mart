@@ -1,0 +1,8 @@
+{% extends "layout.njk" %}{% block title %}Payouts{% endblock %}{% block body %}
+<h1>Payouts — {{ store.name }}</h1>
+<p class="muted">Store status: {{ store.status }}</p>
+{% if flag %}<p>Settlement activation reference: <strong>{{ flag }}</strong></p>{% endif %}
+<table><tr><th>#</th><th>Period</th><th>Net</th><th>Status</th></tr>
+{% for p in payouts %}<tr><td>{{ p.id }}</td><td>{{ p.period }}</td><td>{{ p.net_cents | cents }}</td><td>{{ p.status }}</td></tr>
+{% else %}<tr><td colspan="4" class="muted">No payouts yet.</td></tr>{% endfor %}</table>
+{% endblock %}
