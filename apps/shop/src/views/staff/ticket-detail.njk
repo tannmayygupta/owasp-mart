@@ -1,0 +1,15 @@
+{% extends "layout.njk" %}{% block title %}Ticket {{ ticket.id }}{% endblock %}{% block body %}
+<h1>Ticket {{ ticket.id }}: {{ ticket.subject }}</h1>
+<p class="muted">Status: {{ ticket.status }}</p>
+<div class="messages">
+{% for m in messages %}
+  <div class="msg" data-message-id="{{ m.id }}">
+    <div class="meta muted">#{{ m.id }} by user {{ m.author_id }} at {{ m.created_at }}</div>
+    {# body_html is precomputed by the C03B challenge render helper: escaped in the
+       fixed build, raw HTML in the vulnerable build. This is the one | safe spot. #}
+    <div class="body">{{ m.body_html | safe }}</div>
+  </div>
+{% else %}<p class="muted">No messages.</p>{% endfor %}
+</div>
+<p><a href="/staff/tickets">Back to tickets</a></p>
+{% endblock %}

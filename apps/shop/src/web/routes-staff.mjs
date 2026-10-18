@@ -5,6 +5,7 @@ import { requireRole } from './middleware.mjs';
 import { ForbiddenError, NotFoundError, ValidationError } from '../domain/shop-service.mjs';
 import * as staff from '../domain/staff-service.mjs';
 import * as money from '../domain/money-service.mjs';
+import { renderTicketMessageHtml } from '../challenges/c03b-ticket-xss.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -20,9 +21,20 @@ const FINANCE = requireRole('finance', 'admin');
 const ADMIN = requireRole('admin');
 const back = (res, title, message) => res.render('message', { title, message });
 
-export function registerStaffRoutes(app, db) {
+export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {} } = {}) {
+  void emit;
   // Support: tickets, disputes, review moderation, order read.
   app.get('/staff/tickets', SUPPORT, h((req, res) => res.render('staff/tickets', { tickets: staff.listTickets(db, req.user) })));
+
+  // C03 part B: the support console ticket detail. Each message body is passed
+  // through the challenge render helper (FIXED escapes it; VULNERABLE leaves raw
+  // HTML — the stored XSS the support bot would then open). The precomputed HTML
+  // is inserted by the view with `| safe`, the one deliberate unescaped spot.
+  app.get('/staff/tickets/:id', SUPPORT, h((req, res) => {
+    const ticket = staff.getTicketWithMessages(db, req.user, req.params.id);
+    const messages = ticket.messages.map((m) => ({ ...m, body_html: renderTicketMessageHtml(m.body, { challenges }) }));
+    res.render('staff/ticket-detail', { ticket, messages });
+  }));
   app.post('/staff/tickets/:id/reply', SUPPORT, h((req, res) => { staff.replyTicket(db, req.user, req.params.id, req.body.body); res.redirect('/staff/tickets'); }));
   app.post('/staff/tickets/:id/assign', SUPPORT, h((req, res) => { staff.assignTicket(db, req.user, req.params.id, req.body.assignee_id); res.redirect('/staff/tickets'); }));
   app.post('/staff/tickets/:id/resolve', SUPPORT, h((req, res) => { staff.resolveTicket(db, req.user, req.params.id); res.redirect('/staff/tickets'); }));

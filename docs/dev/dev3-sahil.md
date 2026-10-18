@@ -217,7 +217,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: The exploit test passes on the vulnerable build and fails on the fixed one.
   - Handoffs: H-46 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-21. C03 Injection (SQL injection and stored XSS)**
+- [x] **T-21. C03 Injection (SQL injection and stored XSS)**
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C03 parts A and B: SQL injection against a read-only catalogue file and stored XSS visited by the bot.

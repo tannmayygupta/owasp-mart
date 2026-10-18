@@ -5,6 +5,8 @@ import { setSession, clearSession, newCsrfToken } from './session.mjs';
 import { requireCustomer } from './middleware.mjs';
 import * as shop from '../domain/shop-service.mjs';
 import * as giftcards from '../challenges/c02-gift-card-codes.mjs';
+import { searchCatalog } from '../challenges/c03a-catalog-search.mjs';
+import { noteTicketMarkup } from '../challenges/c03b-ticket-xss.mjs';
 
 // Map a service error to an HTTP response; rethrow anything unexpected.
 function handleError(err, res) {
@@ -34,8 +36,19 @@ const hj = (fn) => async (req, res, next) => {
   try { await fn(req, res); } catch (e) { try { handleJsonError(e, res); } catch (u) { next(u); } }
 };
 
-export function registerRoutes(app, db, emit = () => {}, { challenges = {} } = {}) {
+export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getCatalogDb = null } = {}) {
   app.get('/', (_req, res) => res.redirect('/shop'));
+
+  // C03 part A (Injection): product search over the separate read-only catalog
+  // store. Anonymous (no account needed). The store is built on first use (and
+  // cached) so instance mode does not touch the db before the snapshot is ready.
+  let catalogDb = null;
+  const catalog = () => (catalogDb ??= (getCatalogDb ? getCatalogDb() : null));
+  app.get('/api/products/search', hj((req, res) => {
+    const store = catalog();
+    const results = store ? searchCatalog(store, req.query.q ?? '', { challenges, emit }) : [];
+    res.json({ results });
+  }));
 
   // C02 (Cryptographic Failures): gift-card wallet. Buy a card (simulated
   // payment) and redeem a code. The code-derivation weakness lives entirely in
@@ -122,6 +135,10 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {} } = {
   }));
   app.post('/tickets', requireCustomer, h((req, res) => {
     const id = shop.createTicket(db, req.user, req.body.subject, req.body.body);
+    // C03 part B signal: a stored ticket message that carries an HTML tag. The
+    // message is stored as data in both builds; only the support-console render
+    // differs (see the challenge module + staff ticket-detail view).
+    noteTicketMarkup(req.body.body, { challenges, emit, ticketId: id, userId: req.user.id });
     res.redirect(`/tickets/${id}`);
   }));
   app.get('/tickets/:id', requireCustomer, h((req, res) => res.render('ticket', { ticket: shop.getTicket(db, req.user, req.params.id) })));

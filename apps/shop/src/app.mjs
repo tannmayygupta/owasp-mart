@@ -14,6 +14,7 @@ import { loadUser, checkCsrf } from './web/middleware.mjs';
 import { registerRoutes } from './web/routes.mjs';
 import { registerStaffRoutes } from './web/routes-staff.mjs';
 import { registerSellerRoutes } from './web/routes-seller.mjs';
+import { buildCatalogStore } from './challenges/c03a-catalog-search.mjs';
 
 // Build id and catalogue version are supplied by the environment at run time.
 // They default to "dev" so the skeleton answers even outside an instance.
@@ -73,8 +74,12 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
     });
     app.use(loadUser(db));
     app.use(checkCsrf);
-    registerRoutes(app, db, emit, { challenges });
-    registerStaffRoutes(app, db);
+    // C03 part A searches a SEPARATE read-only catalog store (no users/orders),
+    // so even a successful injection cannot reach anything but merchandising data.
+    // Built lazily on first search (after readiness) so instance mode, where the
+    // snapshot db opens only after the marker, does not touch it at construction.
+    registerRoutes(app, db, emit, { challenges, getCatalogDb: () => buildCatalogStore(db) });
+    registerStaffRoutes(app, db, { emit, challenges });
     registerSellerRoutes(app, db, { emit, challenges });
   }
 

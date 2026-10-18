@@ -53,6 +53,14 @@ export function listTickets(db, actor) {
   requireCan(actor, 'manage_tickets');
   return db.prepare('SELECT * FROM tickets ORDER BY id DESC').all();
 }
+// A ticket with its messages, for the support console detail view (C03 part B).
+export function getTicketWithMessages(db, actor, ticketId) {
+  requireCan(actor, 'manage_tickets');
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(parseId(ticketId));
+  if (!ticket) throw new NotFoundError('ticket not found');
+  const messages = db.prepare('SELECT id, author_id, body, created_at FROM ticket_messages WHERE ticket_id = ? ORDER BY id').all(ticket.id);
+  return { ...ticket, messages };
+}
 export function replyTicket(db, actor, ticketId, body) {
   requireCan(actor, 'manage_tickets');
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(parseId(ticketId));
