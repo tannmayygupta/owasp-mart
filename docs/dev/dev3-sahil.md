@@ -312,7 +312,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: Every challenge page shows its tags and tier and a brief that never contains a flag.
   - Handoffs: H-42, H-43 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-31. Cross-challenge tests and exploit tests as a CI release gate**
+- [x] **T-31. Cross-challenge tests and exploit tests as a CI release gate**
   - Epic: `epic-catalogue-hints-and-verification`
   - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
   - Build: Prove that solving one challenge captures no other flag, and run the 11 exploit tests in CI as a release gate.
