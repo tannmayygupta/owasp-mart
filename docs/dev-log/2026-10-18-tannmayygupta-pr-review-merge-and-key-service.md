@@ -77,3 +77,9 @@ Five jobs failed. The CI is stricter than my machine (Linux, a real Postgres, th
 - The backup script and runbook dump only the vulnmart database. The wrapped keys live in vm_keystore: a backup of data without the keys cannot be decrypted, and a backup that keeps the keys defeats shredding. The team must decide (the keystore runbook is Akshay's).
 - Flags and event keys changed with the new masters; the old test attempts are gone with the old database.
 - The fixes above are not yet on the deployed vm-p (see the pull request for the redeploy).
+
+## After the merge (pull request 30 merged into main, merge commit a2a9204)
+- CI of the pull request ended green (18 checks passed, 0 failed) on the third push; main had moved twice more while CI ran (P-18, P-19, P-20), so the lab migration finished as 0011 (single head 0011).
+- Full local runs on the merged tree: apps/api 2292 passed, 4 skipped (Valkey); the other suites are as listed above.
+- vm-p was recreated a last time from the merged code (build, ship, new database, head 0011): scripts/e2e-live.mjs 29 PASS, 0 FAIL (docs/assets/production-readiness/e2e-run8-merged-main.json). A first attempt stopped at check 15 with "fetch failed" (a network blip from this PC); the retry passed all 29.
+- Access problem met: the developer's ISP address changed three times during the day (223.x, 106.192.x, 106.215.x), so the single-address SSH and HTTPS allow-list in infra/terraform/aws went stale and the hosts looked down. Each time it was fixed by updating `ssh_source_cidrs` in the (untracked) terraform.tfvars and running `terraform apply` (13 network rules replaced, nothing else). Lasting fix to decide: AWS Systems Manager Session Manager (no inbound port) or a fixed address.

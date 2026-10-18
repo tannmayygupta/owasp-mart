@@ -22,3 +22,5 @@ vm-p was recreated on the final build of the pull request (key service, head 001
 ## CI of the pull request
 The first CI run of pull request 30 failed in five jobs; each is fixed (see the dev-log 2026-10-18-tannmayygupta-pr-review-merge-and-key-service.md). The Postgres service now runs the database tests in CI.
 Second CI run: contract rules and the orchestrator key-file tests needed two more fixes (same dev-log).
+
+Pull request 30 is merged into main; vm-p runs the merged code (journey 29 of 29, e2e-run8-merged-main.json).
