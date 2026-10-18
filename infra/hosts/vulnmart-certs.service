@@ -10,5 +10,5 @@ Type=oneshot
 EnvironmentFile=/etc/vulnmart/certs.env
 ExecStart=/usr/local/sbin/vulnmart-certs.sh renew
 TimeoutStartSec=30min
-# After the run (the files are replaced by then), tell the origin Caddy to reload through its admin socket (unix socket in the container's tmpfs, never a port). The leading "-" means a failed reload (container not running yet, no docker) never fails the unit; the journal still shows the error. The container is named by compose project vulnmart-origin, service caddy (infra/caddy/compose.p.yaml).
-ExecStartPost=-/usr/bin/docker exec vulnmart-origin-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --address unix//tmp/caddy-admin.sock
+# After the run (the files are replaced by then): restart this host's Caddy container when the certificate files changed. Caddy reads certificate files only at start, so a reload through an admin socket (the old hook, aimed at a container name that does not exist) never served a renewed certificate. The leading "-" means a failure never fails the unit; the journal shows it.
+ExecStartPost=-/usr/local/sbin/vulnmart-reload-caddy.sh

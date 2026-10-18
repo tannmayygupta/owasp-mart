@@ -58,6 +58,10 @@ write_files:
     permissions: "0755"
     content: |
       ${certs_sh}
+  - path: /usr/local/sbin/vulnmart-reload-caddy.sh
+    permissions: "0755"
+    content: |
+      ${reload_caddy_sh}
   - path: /etc/systemd/system/vulnmart-certs.service
     permissions: "0644"
     content: |
