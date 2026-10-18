@@ -1,8 +1,5 @@
 #!/bin/sh
-# Run by vulnmart-certs.service after every certificate run (story L-10 follow-up from the audit of 2026-10-18).
-# Caddy reads its certificate files once, when it starts, so a renewed certificate is only served after Caddy restarts. This script restarts the Caddy container
-# of THIS host (vm-p: vulnmart-caddy, vm-i: vulnmart-edge-caddy) when, and only when, the files in the folder it serves changed since the last run.
-# The first run only records the state. Exit 0 always except when a restart was needed and failed (the journal shows it).
+# After each certificate run: restart this host's Caddy only if the served certificate files changed (Caddy reads them at start). First run records the state.
 set -eu
 CERT_DIR="${CADDY_CERT_DIR:-/opt/vulnmart/certs/live}"
 STATE_DIR="${VULNMART_STATE_DIR:-/var/lib/vulnmart}"

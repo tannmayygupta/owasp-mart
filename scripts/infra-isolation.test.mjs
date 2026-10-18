@@ -88,11 +88,12 @@ test('egress script on the labs host: DOCKER-USER jump, allowlist order, final D
     const dropLink = at('-d 169.254.0.0/16 -j DROP');
     const dropVpc = at('-d 10.0.0.0/16 -j DROP');
     const dropHost = at('-d 10.0.1.37/32 -j DROP');
-    const https = at('-p tcp --dport 443 -j ACCEPT');
-    assert.ok(ingest > 0 && ingest < dropLink && dropLink < dropVpc && dropVpc < dropHost && dropHost < https, `order: ${chain.join(' | ')}`);
+    const peers = ['172.17.0.0/16', '172.30.0.0/16'].map((sub) => at(`-d ${sub} -j DROP`));
+    assert.ok(ingest > 0 && ingest < dropLink && dropLink < dropVpc && dropVpc < dropHost && peers.every((p) => p > dropHost), `order: ${chain.join(' | ')}`);
+    assert.ok(!chain.some((l) => /--dport 443\b/.test(l)), 'no port 443 for containers (audit blocker B4)');
     assert.equal(chain.at(-1), '-j DROP', 'the final rule is DROP');
     assert.ok(!chain.some((l) => /--dport 80\b/.test(l)), 'no port 80 for containers');
-    assert.ok(!chain.some((l) => /ACCEPT/.test(l) && !/--dport (53|123|9444|443)\b/.test(l)), 'only the allowlist is accepted');
+    assert.ok(!chain.some((l) => /ACCEPT/.test(l) && !/--dport (53|123|9444)\b/.test(l)), 'only the allowlist is accepted');
     for (const sub of ['172.17.0.0/16', '172.30.0.0/16']) {
       assert.ok(st.includes(`DOCKER-USER -s ${sub} -j VULNMART-LABS`), `jump for ${sub}`);
       assert.ok(st.includes(`INPUT -s ${sub} -m conntrack --ctstate NEW -j DROP`), `INPUT drop for ${sub}`);

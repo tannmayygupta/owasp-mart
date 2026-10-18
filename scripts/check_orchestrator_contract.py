@@ -33,7 +33,7 @@ TEXT = "orchestrator-api.md"
 OPERATIONS = {
     ("post", "/v1/instances"), ("get", "/v1/instances"), ("get", "/v1/instances/{instance_id}"),
     ("post", "/v1/instances/{instance_id}/reset"), ("post", "/v1/instances/{instance_id}/access"),
-    ("post", "/v1/instances/{instance_id}/destroy"), ("get", "/v1/host"), ("post", "/internal/v1/orch/state"),
+    ("post", "/v1/instances/{instance_id}/destroy"), ("post", "/v1/instances/{instance_id}/activity"), ("get", "/v1/host"), ("post", "/internal/v1/orch/state"),
 }
 SECRET_NAMES = {"flags", "flag", "decoys", "decoy", "flag_digests", "sha256", "seed", "event_key", "value", "owner_hash"}
 FREE_FORM = "<free-form object>"

@@ -298,6 +298,13 @@ class HttpInstanceHost:
             raise ValidationFailed("access is open, frozen or closed", field="/access") from exc
         return self._status(self._call("POST", path, body={"access": value, "access_epoch": access_epoch})[1])
 
+    def record_activity(self, instance_id: str, at: datetime | None = None) -> InstanceStatus:
+        when = at if at is not None else datetime.now(UTC)
+        if when.tzinfo is None:
+            raise ValidationFailed("at carries a time zone", field="/at")
+        body = {"at": when.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        return self._status(self._call("POST", f"/v1/instances/{_path_id(instance_id)}/activity", body=body)[1])
+
     def destroy(self, instance_id: str) -> Outcome:
         return self._outcome(*self._call("POST", f"/v1/instances/{_path_id(instance_id)}/destroy", ok=(200, 202)))
 

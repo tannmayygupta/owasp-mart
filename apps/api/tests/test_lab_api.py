@@ -16,7 +16,7 @@ import yaml
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
-from support import ROOT
+from support import ROOT, play
 from test_password_reset import EMAIL, ORIGIN, Clock, add_user, client, clock, log_in, sessions  # noqa: F401 - fixtures shared with the account tests
 from vulnmart.accounts.service import AccountService
 from vulnmart.accounts.passwords import PasswordPolicy
@@ -150,6 +150,7 @@ def test_a_post_needs_a_json_body_of_exactly_the_documented_shape(world, ada):
 
 def test_a_learner_starts_opens_pastes_a_flag_hints_resets_and_submits(world, ada):
     iid, aid = start(world, ada)
+    play(world.lab, iid)
     assert re.fullmatch(r"i-[A-Z2-7]{16}", iid) and re.fullmatch(r"a-[A-Z2-7]{16}", aid)
 
     got = ada.get(f"/api/v1/instances/{iid}")
@@ -308,6 +309,7 @@ def test_an_unknown_or_repeated_query_parameter_and_a_big_limit_are_422_with_a_p
 
 def test_more_than_five_incorrect_pastes_in_ten_minutes_are_429_even_for_the_right_value(world, ada):
     iid, aid = start(world, ada)
+    play(world.lab, iid)
     for _ in range(5):
         assert ada.post(f"/api/v1/attempts/{aid}/flags", {"challenge_key": "C04", "flag": "VM{WRONGWRONGWRONGWRONGWRONG}"}).status_code == 200
     r = ada.post(f"/api/v1/attempts/{aid}/flags", {"challenge_key": "C04", "flag": world.lab.keys.flag(iid, "C04", 1)})

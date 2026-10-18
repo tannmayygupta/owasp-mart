@@ -155,7 +155,7 @@ test('parseArgs and redaction', () => {
 });
 
 test('labs chain (finding D1): the jump alone is not enough, the content must hold the drops and end in a DROP', () => {
-  const good = readFileSync(path.join(FIX, 'good', FILES.labsChain), 'utf8');
+  const good = readFileSync(path.join(FIX, 'good', FILES.labsChain), 'utf8').replace(/\r\n/g, '\n'); // a Windows checkout may hold CRLF
   assert.equal(auditLabsChain(good)[0].status, 'PASS');
   assert.equal(auditLabsChain('-N VULNMART-LABS\n')[0].status, 'FAIL');
   assert.equal(auditLabsChain('')[0].status, 'FAIL');
@@ -163,6 +163,10 @@ test('labs chain (finding D1): the jump alone is not enough, the content must ho
   assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 169\.254\.0\.0\/16 -j DROP\n/, ''))[0].detail, /metadata/);
   assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 10\.0\.0\.0\/16 -j DROP\n/, ''))[0].detail, /private network range/);
   assert.match(auditLabsChain(good.replace('-A VULNMART-LABS -d 169.254.0.0/16 -j DROP', '-A VULNMART-LABS -j RETURN\n-A VULNMART-LABS -d 169.254.0.0/16 -j DROP'))[0].detail, /blanket RETURN/);
+  // audit blocker B4
+  assert.match(auditLabsChain(good.replace('-A VULNMART-LABS -j DROP', '-A VULNMART-LABS -p tcp -m tcp --dport 443 -j ACCEPT\n-A VULNMART-LABS -j DROP'))[0].detail, /tcp 443 to every destination/);
+  assert.match(auditLabsChain(good.replace(/-A VULNMART-LABS -d 172\.\d+\.0\.0\/16 -j DROP\n/g, ''))[0].detail, /between the container subnets/);
+  assert.equal(auditLabsChain(good.replace('-A VULNMART-LABS -j DROP', '-A VULNMART-LABS -p tcp -d 10.0.0.9/32 --dport 443 -j ACCEPT\n-A VULNMART-LABS -j DROP'))[0].status, 'PASS', 'a 443 rule that names its destination is not the open one');
 });
 
 test('inspect (finding D2): added capabilities, host IPC, devices, unconfined profiles, a bind of a path below a sensitive one, a lookalike proxy name', () => {

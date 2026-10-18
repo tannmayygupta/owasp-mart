@@ -7,6 +7,7 @@ import sys
 import pytest
 from fastapi.testclient import TestClient
 
+from support import play
 from vulnmart.ingest.route import install_event_route
 from vulnmart.kernel.service import create_service_app
 from vulnmart.lab.demo_routes import PREFIX, install_demo_routes
@@ -52,6 +53,7 @@ def test_the_whole_loop_over_http():
     body = started.json()
     aid, iid = body["attempt_id"], body["instance_id"]
     assert body["state"] == "running"
+    play(runtime, iid)
     flag = runtime.keys.flag(iid, "C01", 1)
     wrong = client.post(f"{PREFIX}/attempts/{aid}/flags", json={"challenge_key": "C01", "text": "VM{AAAAAAAAAAAAAAAAAAAAAAAA}"}, headers=H)
     assert wrong.json() == {"result": "incorrect", "credit": "none"}
