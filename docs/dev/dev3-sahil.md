@@ -293,7 +293,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The fetcher cannot reach the host gateway or `host.docker.internal` and the exploit test passes and fails as required.
   - Handoffs: H-28, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **T-29. C11 Mishandling of Exceptional Conditions (KYC check fails open)**
+- [x] **T-29. C11 Mishandling of Exceptional Conditions (KYC check fails open)**
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C11 with a seller KYC check that fails open and a sentinel flag.

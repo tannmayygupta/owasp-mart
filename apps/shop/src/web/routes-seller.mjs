@@ -8,6 +8,7 @@ import * as seller from '../domain/seller-service.mjs';
 import * as money from '../domain/money-service.mjs';
 import { getSellerOrderByNo } from '../challenges/c01-cross-store-order.mjs';
 import { importImageFromUrl } from '../challenges/c10-ssrf-import.mjs';
+import { registerStoreWithKyc, sellerPayoutsView } from '../challenges/c11-kyc-failopen.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -29,6 +30,15 @@ export function registerSellerRoutes(app, db, { emit = () => {}, challenges = {}
     seller.registerStore(db, req.user, { name: req.body.name, kyc_text: req.body.kyc_text });
     back(res, 'Store registered', 'Your store is pending admin approval. You can edit its profile and draft products while you wait, but cannot publish until it is approved.');
   }));
+
+  // C11 (Mishandling Exceptional Conditions): KYC-gated seller registration. A
+  // provider error fails closed (fixed) or auto-approves (vulnerable). The flag is
+  // on the Payouts page, shown only for a store approved by the KYC fallback.
+  app.post('/sell/register', requireRole('customer', 'seller_owner'), h((req, res) => {
+    const out = registerStoreWithKyc(db, req.user, { name: req.body.name, tax_id: req.body.tax_id }, { challenges, emit });
+    back(res, 'Store registration', out.verbose ? `Pending review. ${out.verbose}` : `Registration ${out.outcome}.`);
+  }));
+  app.get('/seller/payouts', SELLER, h((req, res) => res.render('seller/payouts', sellerPayoutsView(db, req.user))));
 
   // Dashboard: the store, its products, its order items and its refund requests.
   app.get('/seller', SELLER, h((req, res) => res.render('seller/dashboard', {
