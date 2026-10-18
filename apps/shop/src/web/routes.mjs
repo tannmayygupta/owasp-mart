@@ -4,6 +4,10 @@ import { authenticate } from '../identity/accounts.mjs';
 import { setSession, clearSession, newCsrfToken } from './session.mjs';
 import { requireCustomer } from './middleware.mjs';
 import * as shop from '../domain/shop-service.mjs';
+import * as giftcards from '../challenges/c02-gift-card-codes.mjs';
+import { searchCatalog } from '../challenges/c03a-catalog-search.mjs';
+import { noteTicketMarkup } from '../challenges/c03b-ticket-xss.mjs';
+import { quickRefund, refundStatement } from '../challenges/c04-quick-refund.mjs';
 
 // Map a service error to an HTTP response; rethrow anything unexpected.
 function handleError(err, res) {
@@ -22,8 +26,52 @@ const h = (fn) => async (req, res, next) => {
   }
 };
 
-export function registerRoutes(app, db, emit = () => {}) {
+// JSON error mapper for the /api endpoints (they must not render HTML pages).
+function handleJsonError(err, res) {
+  if (err instanceof shop.ForbiddenError) return res.status(403).json({ error: 'forbidden' });
+  if (err instanceof shop.NotFoundError) return res.status(404).json({ error: err.message });
+  if (err instanceof shop.ValidationError) return res.status(400).json({ error: err.message });
+  throw err;
+}
+const hj = (fn) => async (req, res, next) => {
+  try { await fn(req, res); } catch (e) { try { handleJsonError(e, res); } catch (u) { next(u); } }
+};
+
+export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getCatalogDb = null } = {}) {
   app.get('/', (_req, res) => res.redirect('/shop'));
+
+  // C03 part A (Injection): product search over the separate read-only catalog
+  // store. Anonymous (no account needed). The store is built on first use (and
+  // cached) so instance mode does not touch the db before the snapshot is ready.
+  let catalogDb = null;
+  const catalog = () => (catalogDb ??= (getCatalogDb ? getCatalogDb() : null));
+  app.get('/api/products/search', hj((req, res) => {
+    const store = catalog();
+    const results = store ? searchCatalog(store, req.query.q ?? '', { challenges, emit }) : [];
+    res.json({ results });
+  }));
+
+  // C02 (Cryptographic Failures): gift-card wallet. Buy a card (simulated
+  // payment) and redeem a code. The code-derivation weakness lives entirely in
+  // the challenge module; these are thin JSON adapters.
+  app.post('/api/wallet/buy', requireCustomer, hj((req, res) => {
+    const out = giftcards.buyCard(db, req.user, { amount_cents: req.body?.amount_cents ? Number(req.body.amount_cents) : undefined }, { challenges });
+    res.json(out);
+  }));
+  app.post('/api/wallet/redeem', requireCustomer, hj((req, res) => {
+    const out = giftcards.redeem(db, req.user, req.body?.code, { challenges, emit });
+    res.json(out);
+  }));
+
+  // C04 (Insecure Design): the quick-refund path + its statement. The cumulative
+  // invariant lives in the challenge module; these are thin JSON adapters.
+  app.post('/api/orders/:id/refunds', requireCustomer, hj((req, res) => {
+    const out = quickRefund(db, req.user, req.params.id, { amount: req.body?.amount ? Number(req.body.amount) : undefined, idempotencyKey: req.body?.idempotency_key || undefined }, { challenges, emit });
+    res.json(out);
+  }));
+  app.get('/api/orders/:id/refund-statement', requireCustomer, hj((req, res) => {
+    res.json(refundStatement(db, req.user, req.params.id));
+  }));
 
   // Catalogue
   app.get('/shop', h((req, res) => {
@@ -98,6 +146,10 @@ export function registerRoutes(app, db, emit = () => {}) {
   }));
   app.post('/tickets', requireCustomer, h((req, res) => {
     const id = shop.createTicket(db, req.user, req.body.subject, req.body.body);
+    // C03 part B signal: a stored ticket message that carries an HTML tag. The
+    // message is stored as data in both builds; only the support-console render
+    // differs (see the challenge module + staff ticket-detail view).
+    noteTicketMarkup(req.body.body, { challenges, emit, ticketId: id, userId: req.user.id });
     res.redirect(`/tickets/${id}`);
   }));
   app.get('/tickets/:id', requireCustomer, h((req, res) => res.render('ticket', { ticket: shop.getTicket(db, req.user, req.params.id) })));

@@ -13,6 +13,9 @@ import { configureViews } from './web/views.mjs';
 import { loadUser, checkCsrf } from './web/middleware.mjs';
 import { registerRoutes } from './web/routes.mjs';
 import { registerStaffRoutes } from './web/routes-staff.mjs';
+import { registerSellerRoutes } from './web/routes-seller.mjs';
+import { buildCatalogStore } from './challenges/c03a-catalog-search.mjs';
+import { registerOpsRoutes } from './challenges/c05-ops-console.mjs';
 
 // Build id and catalogue version are supplied by the environment at run time.
 // They default to "dev" so the skeleton answers even outside an instance.
@@ -32,7 +35,7 @@ const ALWAYS_READY = () => true;
 // without it the shop is always-ready (tests / local runs). Pass { emit } to post
 // app events to the sidecar on built flows (T-09, IF-4); without it emission is a
 // no-op (local runs and tests that do not assert on events).
-export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) {
+export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {} } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -71,9 +74,19 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {} } = {}) 
       next();
     });
     app.use(loadUser(db));
+    // C05 (Security Misconfiguration): the ops console + verbose-error endpoint
+    // are mounted before checkCsrf — they are anonymous and the verbose-error
+    // probe posts raw JSON (no form token). All behaviour is build-gated in the
+    // challenge module (404 + generic errors in the fixed/default build).
+    registerOpsRoutes(app, db, { challenges, emit });
     app.use(checkCsrf);
-    registerRoutes(app, db, emit);
-    registerStaffRoutes(app, db);
+    // C03 part A searches a SEPARATE read-only catalog store (no users/orders),
+    // so even a successful injection cannot reach anything but merchandising data.
+    // Built lazily on first search (after readiness) so instance mode, where the
+    // snapshot db opens only after the marker, does not touch it at construction.
+    registerRoutes(app, db, emit, { challenges, getCatalogDb: () => buildCatalogStore(db) });
+    registerStaffRoutes(app, db, { emit, challenges });
+    registerSellerRoutes(app, db, { emit, challenges });
   }
 
   // Terminal handler: unknown routes return a JSON body, never a stack trace

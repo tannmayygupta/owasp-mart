@@ -1,0 +1,41 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Incepted 2026-10-17 from the T-stream task file (docs/dev/dev3-sahil.md); one
+# story per task (T-17, T-18) plus a refactor sweep. The task file marks T-17
+# "open in part: OI-20" and T-18 "open in part: OI-19"; both are resolved by
+# docs/design/challenge-specs.md (initial.md, "Resolves PRD open items: ... OI-19
+# (C04 versus the refund model), OI-20"), so neither story carries an unknown.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Seller flows"
+description = "Seller store registration and approval, product listing, order fulfilment and seller staff, following the RS-G permission matrix. Correct flow only; the C10/C11 weaknesses come later as isolated paths."
+verify = "A seller registers, waits for approval, lists products and fulfils orders; a pending seller cannot publish."
+covers = ["FR-SHP-06"]
+after = []
+hitl = false
+risk = "medium"
+# Waits on T-14 (epic-shop-core-and-roles 3.3, customer flows), done and merged (PR #14).
+
+[[entry]]
+id = 2
+type = "story"
+title = "Refunds, disputes, commissions and payouts"
+description = "The correct money model: seller bears refunds, proportional commission reversal on partial refunds, append-only ledger, idempotency keys on refunds; refunded total never above the amount paid on any path."
+verify = "A partial refund reverses commission in proportion and payout net matches the FR-SHP-10 formula; refunded total never exceeds the amount paid on any path."
+covers = ["FR-SHP-10"]
+after = [1]
+hitl = false
+risk = "medium"
+# Waits on T-17 (entry 1). The C04 quick-refund weakness is NOT this story (epic-challenges-c01-c04).
+
+[[entry]]
+id = 3
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up what this epic's plans and review findings deferred; scope is set when it starts."
+verify = "Deferred review findings are closed or recorded and CI is green."
+covers = []
+after = [1, 2]
+hitl = false
+risk = "low"

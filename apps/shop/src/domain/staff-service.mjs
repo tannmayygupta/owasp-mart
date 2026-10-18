@@ -30,9 +30,14 @@ function transition(machine, from, to) {
 
 export function viewOrder(db, actor, orderId) {
   requireCan(actor, 'view_order', {});
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(parseId(orderId));
-  if (!order) throw new NotFoundError('order not found');
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id);
+  const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(parseId(orderId));
+  if (!row) throw new NotFoundError('order not found');
+  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(row.id);
+  // buyer_note is NEVER in the support/finance order view — it is the seller-only
+  // field C01's flag lives in, and the permission matrix lets support read any
+  // order, so leaking it here would hand a C09 solve the C01 flag.
+  const { buyer_note, ...order } = row;
+  void buyer_note;
   if (requiresRedaction(actor.role, 'view_order')) {
     // Finance sees amounts, never personal data (names/addresses).
     const { ship_line1, ship_line2, ship_city, ship_region, ship_postal, ship_country, customer_id, ...safe } = order;
@@ -47,6 +52,14 @@ export function viewOrder(db, actor, orderId) {
 export function listTickets(db, actor) {
   requireCan(actor, 'manage_tickets');
   return db.prepare('SELECT * FROM tickets ORDER BY id DESC').all();
+}
+// A ticket with its messages, for the support console detail view (C03 part B).
+export function getTicketWithMessages(db, actor, ticketId) {
+  requireCan(actor, 'manage_tickets');
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(parseId(ticketId));
+  if (!ticket) throw new NotFoundError('ticket not found');
+  const messages = db.prepare('SELECT id, author_id, body, created_at FROM ticket_messages WHERE ticket_id = ? ORDER BY id').all(ticket.id);
+  return { ...ticket, messages };
 }
 export function replyTicket(db, actor, ticketId, body) {
   requireCan(actor, 'manage_tickets');

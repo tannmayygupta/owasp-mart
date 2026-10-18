@@ -3,7 +3,7 @@ title: 'Review the instance contract and event schema as consumer'
 type: 'chore'
 ticket: '3'
 created: '2026-10-09'
-status: built
+status: done
 baseline_revision: 'a8cb691'
 route: 'full'
 route_source: 'pinned'
