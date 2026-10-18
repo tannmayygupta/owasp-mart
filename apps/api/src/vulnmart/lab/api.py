@@ -43,7 +43,7 @@ from vulnmart.ports.errors import (
     InstanceStateInvalid,
     PortError,
 )
-from vulnmart.ports.instance_host import Access, InstanceNotFound, InstanceState, OrchestratorError
+from vulnmart.ports.instance_host import Access, Busy, InstanceNotFound, InstanceState, OrchestratorError
 from vulnmart.ports.scope import Role
 from vulnmart.problem import ProblemError
 
@@ -140,9 +140,12 @@ def call(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
     except InstanceNotFound:
         raise ProblemError(ErrorCode.INST_NOT_FOUND) from None
+    except Busy:
+        # the host has no capacity or the orchestrator is busy: tell the browser to try again (429), not that the platform broke
+        raise ProblemError(ErrorCode.REQ_RATE_LIMITED, headers={"Retry-After": "15"}) from None
     except OrchestratorError:
         log.exception("the orchestrator refused or did not answer")
-        raise ProblemError(ErrorCode.INST_START_FAILED) from None
+        raise ProblemError(ErrorCode.REQ_INTERNAL) from None  # INST-START-FAILED is the code of a failed instance, not an HTTP answer
 
 
 async def run(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:

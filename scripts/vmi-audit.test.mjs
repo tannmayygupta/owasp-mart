@@ -170,6 +170,9 @@ test('inspect (finding D2): added capabilities, host IPC, devices, unconfined pr
   const one = (over) => auditInspect(JSON.stringify([{ ...base, ...over, HostConfig: { ...base.HostConfig, ...(over.HostConfig ?? {}) } }]))[0];
   assert.equal(one({}).status, 'PASS');
   assert.match(one({ HostConfig: { CapAdd: ['SYS_ADMIN'] } }).detail, /adds capabilities/);
+  assert.equal(one({ Name: '/vulnmart-edge-caddy', HostConfig: { CapAdd: ['CAP_NET_BIND_SERVICE'] } }).status, 'PASS', 'the edge Caddy may bind 443');
+  assert.match(one({ Name: '/vulnmart-edge-caddy', HostConfig: { CapAdd: ['CAP_NET_BIND_SERVICE', 'NET_RAW'] } }).detail, /NET_RAW/);
+  assert.match(one({ Name: '/vulnmart-edge-gate', HostConfig: { CapAdd: ['CAP_NET_BIND_SERVICE'] } }).detail, /adds capabilities/, 'no other container may');
   assert.match(one({ HostConfig: { IpcMode: 'host' } }).detail, /host IPC/);
   assert.match(one({ HostConfig: { Devices: [{ PathOnHost: '/dev/sda' }] } }).detail, /host devices/);
   assert.match(one({ HostConfig: { SecurityOpt: ['no-new-privileges', 'seccomp=unconfined'] } }).detail, /unconfined/);

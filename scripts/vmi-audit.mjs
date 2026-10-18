@@ -199,7 +199,10 @@ export function auditInspect(text) {
     // what a container may also be given besides `privileged` (review finding D2)
     if (hc.IpcMode === 'host') findings.push(`${n}: host IPC namespace`);
     if (hc.UsernsMode === 'host') findings.push(`${n}: host user namespace`);
-    if ((hc.CapAdd ?? []).length) findings.push(`${n}: adds capabilities (${hc.CapAdd.join(', ')})`);
+    // the one addition that is by design: the two Caddy containers bind 443 (NET_BIND_SERVICE); every other container may add nothing
+    const bindsPorts = /^vulnmart-(edge-)?caddy$/.test(n);
+    const extra = (hc.CapAdd ?? []).filter((x) => !(bindsPorts && String(x).replace(/^CAP_/i, '').toUpperCase() === 'NET_BIND_SERVICE'));
+    if (extra.length) findings.push(`${n}: adds capabilities (${extra.join(', ')})`);
     if ((hc.Devices ?? []).length) findings.push(`${n}: maps host devices`);
     if ((hc.SecurityOpt ?? []).some((s) => /unconfined/.test(String(s)))) findings.push(`${n}: runs unconfined (seccomp or AppArmor off)`);
     for (const m of c.Mounts ?? []) {

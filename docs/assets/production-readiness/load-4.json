@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-18T10:53:10.578Z",
+  "base": "https://tanmay-platform-prod.duckdns.org",
+  "rows": [
+    {
+      "name": "4 accounts made, confirmed and signed in",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "2 of 4 instances became ready",
+      "ok": false,
+      "detail": "first 6.2 s, median 6.2 s, p90 6.2 s, slowest 6.2 s, wall 8.049 s; failures: HTTP 500 REQ-INTERNAL | HTTP 500 REQ-INTERNAL"
+    }
+  ],
+  "load": {
+    "users": 4,
+    "ready": 2,
+    "seconds": [
+      6.2,
+      6.2
+    ]
+  }
+}

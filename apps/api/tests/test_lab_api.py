@@ -446,3 +446,73 @@ def test_the_catalogue_shows_the_eleven_challenges_without_a_flag_a_hint_or_a_te
     assert [a["attempt_id"] for a in mine.json()["items"]] == [aid] and mine.json()["items"][0]["state"] == "running"
     assert eve.get("/api/v1/me/attempts").json() == {"items": [], "has_more": False}
     problem(ada.get("/api/v1/me/attempts?limit=101"), 422, "REQ-VALIDATION")
+
+# ---- the ticket against the gate's own verifier ----
+
+def test_a_ticket_of_the_platform_is_accepted_by_the_edge_gate_verifier_with_the_key_file_as_the_gate_reads_it(tmp_path):
+    import shutil
+    import subprocess
+
+    from vulnmart.lab.tickets import read_gate_key
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    key_hex = "ab" * 32
+    key_file = tmp_path / "gate_key_current"
+    key_file.write_text(key_hex + "\n")
+    minter = TicketMinter(read_gate_key(str(key_file)), ZONE)
+    ticket = minter.mint("i-ABCDEFGHIJKLMNOP", "f" * 64, 3)
+    token = ticket.url.split("?t=")[1]
+    js = (
+        "import { verifyTicket } from './apps/edge/src/tickets.mjs';"
+        f"const r = verifyTicket({{ current: Buffer.from('{key_hex}', 'hex') }}, process.argv[1], Math.floor(Date.now() / 1000));"
+        "console.log(JSON.stringify(r));"
+    )
+    out = subprocess.run([node, "--input-type=module", "-e", js, token], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    verdict = json.loads(out.stdout)
+    assert verdict["ok"] is True, verdict
+    assert verdict["claims"]["inst"] == "i-ABCDEFGHIJKLMNOP" and verdict["claims"]["own"] == "f" * 64 and verdict["claims"]["ae"] == 3
+    # signed with the text of the file instead of its bytes: the gate refuses it (the mistake the deployment found)
+    wrong = TicketMinter(key_hex.encode(), ZONE).mint("i-ABCDEFGHIJKLMNOP", "f" * 64, 3).url.split("?t=")[1]
+    refused = subprocess.run([node, "--input-type=module", "-e", js, wrong], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    assert json.loads(refused.stdout) == {"ok": False, "reason": "signature"}
+
+
+def test_the_gate_key_file_must_be_hex_and_long_enough(tmp_path):
+    from vulnmart.lab.tickets import read_gate_key
+
+    for text in ("short", "g" * 64, "ab" * 31, ("ab" * 32) + "a"):
+        f = tmp_path / "k"
+        f.write_text(text)
+        with pytest.raises(ValueError, match="hex characters"):
+            read_gate_key(str(f))
+    f = tmp_path / "ok"
+    f.write_text("AB" * 32)
+    assert read_gate_key(str(f)) == bytes.fromhex("AB" * 32)
+    assert 0 < TicketMinter(b"k" * 32, ZONE).mint("i-AAAAAAAAAAAAAAAA", "0" * 64, 0).expires_at.timestamp() - time.time() <= 46
+
+
+def test_a_host_with_no_capacity_answers_429_with_a_retry_and_a_later_start_works_a_broken_orchestrator_is_a_clean_500(world, ada):
+    from vulnmart.ports.instance_host import Busy, OrchestratorUnavailable
+
+    real_create = world.host.create
+
+    def full(request):
+        raise Busy("the host has no capacity")
+
+    world.host.create = full
+    r = ada.post("/api/v1/instances", {"kind": "learner"})
+    problem(r, 429, "REQ-RATE-LIMITED")
+    assert r.headers["retry-after"] == "15"
+    assert [a.state.value for a in world.lab.engine.for_user("u-AAAAAAAAAAAAAAAA")] == ["ready"], "the attempt waits, nothing leaked"
+
+    def down(request):
+        raise OrchestratorUnavailable("no answer")
+
+    world.host.create = down
+    problem(ada.post("/api/v1/instances", {"kind": "learner"}), 500, "REQ-INTERNAL")
+    world.host.create = real_create
+    iid, aid = start(world, ada)  # the same attempt starts when there is room again
+    assert world.lab.engine.get(aid).state.value == "running" and iid.startswith("i-")

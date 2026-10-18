@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 from collections.abc import Callable
@@ -19,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 TICKET_PREFIX = b"vm-ticket-v1"
-TICKET_SECONDS = 60
+TICKET_SECONDS = 45  # the gate refuses a ticket that lives more than 60 s from its own clock; the margin covers a few seconds of skew between the hosts
 MIN_KEY_BYTES = 32
 KEY_FILE_VAR = "VULNMART_GATE_KEY_FILE"
 ZONE_VAR = "VULNMART_LABS_ZONE"
@@ -34,10 +35,12 @@ def read_gate_key(path: str) -> bytes:
     st = os.stat(path)
     if os.name != "nt" and st.st_mode & 0o077:
         raise ValueError(f"{KEY_FILE_VAR} file {path} has mode {st.st_mode & 0o777:03o}: it must be 0600 or stricter (chmod 600)")
-    key = Path(path).read_bytes().strip()
-    if len(key) < MIN_KEY_BYTES:
-        raise ValueError(f"the gate key must be at least {MIN_KEY_BYTES} bytes")
-    return key
+    text = Path(path).read_text(encoding="ascii", errors="replace").strip()
+    # the same reading as the gate (apps/edge/src/server.mjs readKeyFile): at least 64 hex characters, decoded to bytes. Signing with the text itself would
+    # give a ticket the gate refuses (found by the first deployed run).
+    if not re.fullmatch(r"[0-9a-fA-F]{64,}", text) or len(text) % 2:
+        raise ValueError(f"the gate key must be at least {MIN_KEY_BYTES * 2} hex characters")
+    return bytes.fromhex(text)
 
 
 @dataclass(frozen=True, slots=True)
