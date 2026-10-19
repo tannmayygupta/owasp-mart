@@ -105,6 +105,7 @@ async function newLearner(o, label) {
   const l = await c.request('POST', '/api/v1/session', { body: { email, password } });
   if (l.status !== 200 || !l.data?.csrf_token) throw new Error(`sign in answered ${l.status}`);
   c.csrf = l.data.csrf_token;
+  c.email = email; c.password = password; // kept so a test can sign in a second time (FR-SES-11)
   return c;
 }
 
@@ -147,6 +148,19 @@ export async function journey(o) {
   const host = new URL(ticket.data.url).origin;
   const page = await c.request('GET', `${host}/healthz`, { json: false });
   check('the shop answers through the gate and the sidecar', page.status === 200, `HTTP ${page.status} ${page.ms} ms`);
+
+  // FR-SES-11 / handoff H-341: a new login of the same account raises the access epoch of its instance, so the gate refuses the older tab and accepts the new login
+  const relogin = new Client(o.base);
+  const relog = await relogin.request('POST', '/api/v1/session', { body: { email: c.email, password: c.password } });
+  check('the same account signs in a second time', relog.status === 200 && !!relog.data?.csrf_token, `HTTP ${relog.status}`);
+  relogin.csrf = relog.data?.csrf_token ?? null;
+  let oldTab; for (let i = 0; i < 20; i++) { oldTab = await c.request('GET', `${host}/healthz`, { json: false }); if (oldTab.status !== 200) break; await sleep(1500); }
+  check('the older tab loses its access at the gate after the new login', [401, 403, 410].includes(oldTab.status), `HTTP ${oldTab.status}`);
+  const t2 = await relogin.request('POST', `/api/v1/instances/${iid}/open`);
+  const enter2 = await relogin.request('GET', t2.data?.url ?? `${host}/`, { json: false });
+  const page2 = await relogin.request('GET', `${host}/healthz`, { json: false });
+  check('the new login gets a new ticket and the shop answers it', t2.status === 200 && enter2.status === 302 && page2.status === 200, `ticket ${t2.status}, enter ${enter2.status}, shop ${page2.status}`);
+  for (const [k, v] of relogin.cookies) if (k.startsWith('__Host-vm_gate')) c.cookies.set(k, v); // the rest of the journey continues with the newer gate cookie
 
   // read a flag the way a player would: the response carries it, the sidecar sees it and tells the platform. The stub shop serves any planted flag at /_stub/planted-flag;
   // the real shop does not, so a player takes C05 from its unauthenticated diagnostics page (the weakness of that challenge).

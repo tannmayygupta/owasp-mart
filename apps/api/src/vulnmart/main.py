@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import os
 import secrets
+import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
@@ -100,6 +101,14 @@ def _lab_from_environ() -> LabRuntime | None:
     from vulnmart.lab.runtime import build_lab_runtime
 
     return build_lab_runtime(os.environ)
+
+
+def _login_bump(lab: LabRuntime) -> Callable[[str], None]:
+    """The login hook of the session service: the bump runs on its own thread so a slow orchestrator never delays a login (the lab retries a failure)."""
+    def hook(user_id: str) -> None:
+        threading.Thread(target=lab.bump_access_for_user, args=(user_id,), name="login-bump", daemon=True).start()
+
+    return hook
 
 
 def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> None:
@@ -208,6 +217,8 @@ def create_app(
                                           ports.settings, AccountStatusService(ports.sessions, app.state.roles, ports.audit), public_origin=settings.public_origin,
                                           end_sessions=app.state.session_service.revoke_all if app.state.session_service is not None else None)
                            if ports.sessions is not None and app.state.accounts is not None and app.state.roles is not None else None)
+    if lab is not None and app.state.session_service is not None:
+        app.state.session_service.set_login_hook(_login_bump(lab))  # a new login ends the older browser tab's access to the instance (FR-SES-11, H-341)
     if app.state.companies is not None and app.state.session_service is not None:
         app.state.session_service.set_org_resolver(app.state.companies.membership_of)  # a recruiter acts for their company in every request (story P-19)
     field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key

@@ -42,6 +42,7 @@ from vulnmart.lab.state_reports import StateReportStore
 from vulnmart.lab.stores import HintLedger, LabStores, OrgOf, memory_stores
 from vulnmart.ports.attempts import AttemptState
 from vulnmart.ports.engine_attempts import EngineAttemptPort
+from vulnmart.ports.engine_cohort import EngineCohortPort
 from vulnmart.ports.engine_reports import EngineReportPort
 from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, InstanceNotReady
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
@@ -128,6 +129,8 @@ class LabRuntime:
         self.reports = EngineReportPort(attempts=self.attempts, facts=RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None))),
                                         integrity=self.integrity, clock=self.clock,
                                         evidence=EvidenceReader(store=self.evidence_store, keys=self.keys))
+        self.cohort = EngineCohortPort(engine=self.engine, facts=RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None))),
+                                       milestones=self.milestones, active_seconds_of=self._active_seconds)  # the private cohort view (L-28); the route is stream P's
         self.checker = FlagChecker(self.keys)
         gate_kw = {"gate": gate} if gate is not None else {}
         self.milestone_engine = MilestoneEngine(log=self.events, milestones=self.milestones, integrity=self.integrity,
@@ -155,6 +158,7 @@ class LabRuntime:
                                         events=self.attempt_log.append)
         # the domain events of the live hub (H-142): attached by `_mount_lab` when the platform has a durable event port, silent otherwise
         self.live = LiveAnnouncer(clock=self.clock, record_of=self._record_or_none, score_of=self.score_rows)
+        self._bump_pending: set[str] = set()  # accounts whose access bump failed; `tick` tries again
         self._recover_windows()
     def _recover_windows(self) -> None:
         """After a restart: rebuild the open C09 windows of the running attempts from the stored events (audit blocker B5). Never raises."""
@@ -525,6 +529,19 @@ class LabRuntime:
     def withdraw(self, attempt_id: str) -> str:
         return self.attempts.withdraw(attempt_id).state.value
 
+    def undo_withdrawal(self, attempt_id: str) -> str:
+        """Inside the undo window: cancel the scheduled deletion; the attempt stays `withdrawn` (D-91). InvalidTransition when it is not withdrawn,
+        WindowClosed after the window."""
+        self.attempts.get(attempt_id)  # AttemptNotFound or AttemptGone
+        return self.engine.undo_withdrawal(attempt_id).state.value
+
+    def _active_seconds(self, attempt_id: str) -> int | None:
+        try:
+            return self.time_metrics(attempt_id).active_seconds
+        except Exception:
+            log.warning("the active time of an attempt could not be computed for the cohort view", exc_info=True)
+            return None
+
     def time_metrics(self, attempt_id: str):
         """FR-TIM-01 to 03: headline time to capture, estimated active time, resets and retries (the score never reads them)."""
         rec = self.engine.get(attempt_id)
@@ -564,8 +581,37 @@ class LabRuntime:
                 if self.engine.mark_reported(rec.id, held_open).state.value == "reported":
                     changed.append(rec.id)
         self._heal_access()
+        self._retry_bumps()
         self._erase_pending()
         return tuple(dict.fromkeys(changed))
+
+    def bump_access_for_user(self, user_id: str) -> int:
+        """FR-SES-11 (handoff H-341): a new login raises the access epoch of the account's live instances, so the gate refuses the older browser tab (it
+        holds a ticket of the old epoch) while the new login can open a new ticket. Only an instance that is ready and open is touched: a closed or
+        frozen one stays as it is. Returns how many instances were bumped. A host failure never raises: the account is retried by the next `tick`."""
+        bumped, failed = 0, False
+        for rec in self.engine.for_user(user_id):
+            if rec.state.value not in ("ready", "running") or not rec.instance_id or rec.access == "frozen":
+                continue
+            try:
+                st = self.host.get(rec.instance_id)
+                if st.state in (InstanceState.READY, InstanceState.ACTIVE, InstanceState.IDLE) and st.access is Access.OPEN:
+                    self.host.set_access(rec.instance_id, Access.OPEN, st.access_epoch + 1)
+                    bumped += 1
+            except InstanceNotFound:
+                continue
+            except Exception:
+                failed = True
+                log.warning("raising the access epoch of instance %s failed; it is retried", rec.instance_id[:10], exc_info=True)
+        if failed:
+            self._bump_pending.add(user_id)
+        else:
+            self._bump_pending.discard(user_id)
+        return bumped
+
+    def _retry_bumps(self) -> None:
+        for user_id in tuple(self._bump_pending):
+            self.bump_access_for_user(user_id)
 
     def _heal_access(self) -> None:
         """A running attempt whose instance is ready but closed (the orchestrator restarted and adopted it closed) is opened again with the

@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import Field
-from vulnmart_attempts import AttemptRecord, InvalidTransition
+from vulnmart_attempts import AttemptRecord, InvalidTransition, WindowClosed
 from vulnmart_attempts.review import NotHeld, ReviewFinal, ReviewForbidden
 from vulnmart_models.error_codes import ErrorCode
 
@@ -139,6 +139,8 @@ def call(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         raise ProblemError(exc.code) from None
     except InvalidTransition:
         raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
+    except WindowClosed:  # the undo window of a withdrawal has closed: the data is going or gone
+        raise ProblemError(ErrorCode.ATT_GONE) from None
     except ReviewFinal:  # the held capture was already decided (two reviewers, opposite answers): the same answer as a decided integrity flag
         raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
     except (ReviewForbidden, NotHeld):  # not allowed to decide it, or nothing is held: the same 404 as for anyone else
@@ -253,7 +255,7 @@ def attempt_view(rt: LabRuntime, rec: AttemptRecord) -> dict[str, Any]:
     return {"attempt_id": rec.id, "mode": mode_of(rec), "state": rec.state.value, "hints_enabled": hints_enabled(rec),
             "instance_id": rec.instance_id or (info.instance_id if info else None), "started_at": stamp(rec.started_at),
             "deadline_at": stamp(rec.deadline_at), "submitted_at": stamp(rec.submitted_at), "frozen_until": stamp(rec.frozen_until),
-            "server_time": stamp(rt.clock())}
+            "delete_after": stamp(rec.delete_after) if rec.state.value == "withdrawn" else None, "server_time": stamp(rt.clock())}
 
 
 def instance_view(rt: LabRuntime, info: InstanceInfo, rec: AttemptRecord) -> dict[str, Any]:
@@ -465,6 +467,30 @@ async def submit_attempt(attempt_id: str, request: Request, auth: Authenticated 
     if rec.state.value != "running":
         raise ProblemError(ErrorCode.ATT_INVALID_STATE)
     await run(rt.submit, rec.id)
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
+@router.post("/api/v1/attempts/{attempt_id}/withdraw", operation_id="withdrawAttempt")
+async def withdraw_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """FR-SES-10: the candidate leaves the assessment. The instance is destroyed, deletion is scheduled after the undo window, nothing scores any more."""
+    rt = lab(request)
+    rec = owned(rt, auth, attempt_id)
+    await read_json(request, ConfirmBody)
+    if rec.org_id is None:  # a learner has no assessment to withdraw from (their practice data is erased through the privacy routes)
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    await run(rt.withdraw, rec.id)
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
+@router.post("/api/v1/attempts/{attempt_id}/withdraw/undo", operation_id="undoWithdrawal")
+async def undo_withdrawal(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """FR-SES-10, D-91: inside the window the scheduled deletion is cancelled. The attempt stays `withdrawn`; it is not resumed."""
+    rt = lab(request)
+    rec = owned(rt, auth, attempt_id)
+    await no_body(request)
+    if rec.org_id is None:
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    await run(rt.undo_withdrawal, rec.id)
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
 
 

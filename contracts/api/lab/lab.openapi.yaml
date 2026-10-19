@@ -1,8 +1,8 @@
 openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
-  title: Lab API (IF-2), browser-facing fragment, contract v1.0.0
-  version: 1.0.0
+  title: Lab API (IF-2), browser-facing fragment, contract v1.1.0
+  version: 1.1.0
   description: |
     The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
     flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
@@ -218,6 +218,58 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/TooLarge' }
         '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/withdraw:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [attempts]
+      operationId: withdrawAttempt
+      summary: Withdraw from an assessment (after a confirmation)
+      description: |
+        Needs the body {"confirm": true}. Only the owner of a candidate attempt may call it (FR-SES-10); a learner attempt answers 409 ATT-INVALID-STATE.
+        Allowed in the states `ready`, `running` and `submitted` (an `expired` attempt is first moved on by the lab); `withdrawn` is answered 200 again (idempotent, the first deletion date stays);
+        every other state is 409 ATT-INVALID-STATE. The instance is destroyed at once, the attempt becomes `withdrawn` and `delete_after` says when its data is
+        deleted (the undo window, 7 days by default). Nothing is scored after a withdrawal. `undoWithdrawal` cancels the deletion inside the window.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/withdraw/undo:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [attempts]
+      operationId: undoWithdrawal
+      summary: Undo a withdrawal inside the undo window
+      description: |
+        The body is empty. Only the owner of a candidate attempt may call it. Allowed while the attempt is `withdrawn` and the scheduled deletion has not
+        happened: `delete_after` becomes null and the attempt stays `withdrawn` (D-91: the instance is gone and the attempt is not resumed; the recruiter is
+        told it was undone). A withdrawn attempt whose deletion is already null answers 200 again. 409 ATT-INVALID-STATE when the attempt is not
+        `withdrawn`; 410 ATT-GONE when the window has closed.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/Gone' }
         '422': { $ref: '#/components/responses/Invalid' }
   /api/v1/attempts/{attempt_id}/flags:
     parameters:
@@ -820,6 +872,11 @@ components:
             - { $ref: '#/components/schemas/Timestamp' }
             - { type: 'null' }
         frozen_until:
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        delete_after:
+          description: Optional. Set only while the attempt is `withdrawn` and its deletion is scheduled (the end of the undo window); null or absent otherwise.
           anyOf:
             - { $ref: '#/components/schemas/Timestamp' }
             - { type: 'null' }

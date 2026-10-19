@@ -375,7 +375,7 @@ def test_the_ports_package_holds_only_the_three_modules():
     names = sorted(p.name for p in ports.glob("*.py"))
     # InstanceHost (stream L) and, since story P-05, the IF-9 ports with their fakes (stream P's six, stream L's three as P's proposal)
     assert names == [
-        "__init__.py", "attempts.py", "audit.py", "engine_attempts.py", "engine_reports.py", "errors.py", "fake_instance_host.py",
+        "__init__.py", "attempts.py", "audit.py", "engine_attempts.py", "engine_cohort.py", "engine_reports.py", "errors.py", "fake_instance_host.py",
         "fakes.py", "http_instance_host.py", "instance_host.py", "instances.py", "keys.py", "lab_fakes.py", "outbox.py", "quota.py",
         "reports.py", "scope.py", "settings.py",
     ]
