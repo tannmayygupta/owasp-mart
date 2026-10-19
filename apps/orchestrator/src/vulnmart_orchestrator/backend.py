@@ -7,6 +7,7 @@ Docker SDK (docker-py) and does what `scripts/harness.mjs` does with the Docker 
 from __future__ import annotations
 
 import contextlib
+import ipaddress
 import socket
 import threading
 import time
@@ -251,12 +252,31 @@ del _name
 
 # ---------------------------------------------------------------- Docker SDK
 
+SANDBOX_RUNTIMES = ("runc", "runsc")  # the two runtimes the orchestrator may ask the daemon for
+# gVisor's own processes and threads (the sentry and the gofer) count against the container's pids and memory limits. Found live on vm-i (2026-10-20): with a pids limit
+# of 32 the sandbox of the volume keeper died while starting ("failed to create new OS thread, errno=11") in most tries. The template's limits are for the workload, so the
+# overhead is added on top: the workload keeps exactly the room the template gives it.
+SANDBOX_PIDS_OVERHEAD = 96
+SANDBOX_MEMORY_OVERHEAD_MB = 64
+
 class SdkBackend:
     """Docker SDK backend. Images are used as given (no pull): the release manifest pins them by digest."""
 
-    def __init__(self, client=None, *, base_url: str | None = None, edge_container: str | None = None) -> None:
+    def __init__(self, client=None, *, base_url: str | None = None, edge_container: str | None = None, runtime: str | None = None) -> None:
         import docker
 
+        if runtime not in (None, *SANDBOX_RUNTIMES):
+            raise ValueError(f"the container runtime must be one of {', '.join(SANDBOX_RUNTIMES)}, not {runtime!r}")
+        # The OCI runtime of every instance container (S-8, story L-29): None means the daemon's default (runc); `runsc` is gVisor, a user-space kernel between the
+        # instance and the host kernel. Never read from a template or a request. A daemon that does not know the runtime refuses the create, so an instance
+        # never starts un-sandboxed by accident.
+        self.runtime = runtime or None
+        # Under gVisor the container cannot use Docker's embedded name server (it lives in the network namespace that the sandbox replaces: every lookup of an alias
+        # fails, found live on vm-i 2026-10-20). So with runsc every container of the instance gets a fixed address and a hosts file that names the others.
+        self._addr: dict[str, str] = {}  # container name -> its fixed address
+        self._hosts: dict[str, tuple[tuple[str, str], ...]] = {}  # network name -> (alias, address) of every member
+        self._members: dict[str, list[str]] = {}  # network name -> its fixed-address containers (forgotten with the network)
+        self._edge_addr: dict[str, str] = {}  # network name -> the fixed address kept for the edge container (the sidecar posts events to it by name)
         self.edge_container = edge_container  # the one container connect_edge may attach (the engine sets it from --edge-container)
         self._docker = docker
         self.client = client or (docker.DockerClient(base_url=base_url) if base_url else docker.from_env())
@@ -273,21 +293,52 @@ class SdkBackend:
     def create_network(self, spec: NetworkSpec) -> None:
         self._wrap(self.client.networks.create, spec.name, driver="bridge", internal=spec.internal, labels=dict(spec.labels))
 
+    def prepare_plan(self, plan) -> None:
+        """Called by the engine once the instance network exists, before any container is created. Only with a sandbox runtime that cannot use the embedded name server:
+        reads the subnet Docker chose, gives each container on the instance network a fixed address from .10 on (low addresses stay free for the edge container that is
+        attached later) and remembers the hosts file every member gets."""
+        if self.runtime != "runsc":
+            return
+        info = self._wrap(self.client.networks.get, plan.network.name).attrs
+        configs = (info.get("IPAM") or {}).get("Config") or []
+        if not configs or not configs[0].get("Subnet"):
+            raise BackendError("the instance network has no subnet to place the containers in")
+        subnet = ipaddress.ip_network(configs[0]["Subnet"])
+        members = [c for c in plan.containers if c.network == plan.network.name]
+        if len(members) > subnet.num_addresses - 14:
+            raise BackendError("the instance network is too small for its containers")
+        hosts: list[tuple[str, str]] = []
+        if self.edge_container:  # the sidecar relays its events to the edge by the edge's container name: it needs that name in its hosts file too (found live)
+            edge_ip = str(subnet.network_address + 2)
+            self._edge_addr[plan.network.name] = edge_ip
+            hosts.append((self.edge_container, edge_ip))
+        for i, c in enumerate(members):
+            ip = str(subnet.network_address + 10 + i)
+            self._addr[c.name] = ip
+            self._members.setdefault(plan.network.name, []).append(c.name)
+            hosts.extend((alias, ip) for alias in c.aliases)
+        self._hosts[plan.network.name] = tuple(hosts)
+
     def create_volume(self, spec: VolumeSpec) -> None:
         self._wrap(self.client.volumes.create, name=spec.name, driver="local", driver_opts=spec.driver_opts, labels=dict(spec.labels))
 
     def create_container(self, spec: ContainerSpec) -> None:
         d = self._docker
+        sandboxed = self.runtime == "runsc"
+        memory_mb = spec.memory_mb + (SANDBOX_MEMORY_OVERHEAD_MB if sandboxed else 0)
+        pids_limit = spec.pids_limit + (SANDBOX_PIDS_OVERHEAD if sandboxed else 0)
         mounts = [d.types.Mount(m.target, m.volume, type="volume", read_only=m.read_only) for m in spec.mounts]
         host_config = self.api.create_host_config(
-            mem_limit=f"{spec.memory_mb}m", memswap_limit=f"{spec.memory_mb}m", nano_cpus=int(spec.cpu_limit * 1_000_000_000),
-            pids_limit=spec.pids_limit, read_only=spec.read_only, privileged=spec.privileged, cap_drop=list(spec.cap_drop),
+            mem_limit=f"{memory_mb}m", memswap_limit=f"{memory_mb}m", nano_cpus=int(spec.cpu_limit * 1_000_000_000),
+            pids_limit=pids_limit, read_only=spec.read_only, privileged=spec.privileged, cap_drop=list(spec.cap_drop),
             security_opt=list(spec.security_opt), tmpfs=dict(spec.tmpfs), mounts=mounts, network_mode=spec.network,
-            restart_policy={"Name": "no"},
+            restart_policy={"Name": "no"}, **({"runtime": self.runtime} if self.runtime else {}),
+            **({"extra_hosts": dict(self._hosts[spec.network])} if spec.name in self._addr and self._hosts.get(spec.network) else {}),
         )
         networking = None
         if spec.network != "none":
-            networking = self.api.create_networking_config({spec.network: self.api.create_endpoint_config(aliases=list(spec.aliases))})
+            fixed = {"ipv4_address": self._addr[spec.name]} if spec.name in self._addr else {}
+            networking = self.api.create_networking_config({spec.network: self.api.create_endpoint_config(aliases=list(spec.aliases), **fixed)})
         hc = None
         if spec.healthcheck:
             h = spec.healthcheck
@@ -374,6 +425,10 @@ class SdkBackend:
             self._wrap(self.api.remove_container, name, v=True, force=True)
 
     def remove_network(self, name: str) -> None:
+        self._hosts.pop(name, None)
+        self._edge_addr.pop(name, None)
+        for member in self._members.pop(name, []):
+            self._addr.pop(member, None)
         with contextlib.suppress(self._docker.errors.NotFound):
             self._wrap(self.api.remove_network, name)
 
@@ -388,8 +443,9 @@ class SdkBackend:
 
     def connect_edge(self, network: str) -> None:
         # Docker API POST /networks/{network}/connect, no aliases. The network is given by name (`vm-...`), which the socket proxy checks.
+        fixed = {"ipv4_address": self._edge_addr[network]} if network in self._edge_addr else {}  # the address the instance's hosts files name for the edge
         try:
-            self._wrap(self.api.connect_container_to_network, self._edge(), network)
+            self._wrap(self.api.connect_container_to_network, self._edge(), network, **fixed)
         except self._docker.errors.NotFound:
             raise BackendError("the edge container or the network does not exist") from None
 

@@ -18,6 +18,7 @@ the service).
 """
 from __future__ import annotations
 
+import re
 import sys
 import threading
 import time
@@ -49,6 +50,15 @@ ADOPTED_TRANSITION_BASE = 1_000_000  # transitions of an adopted instance count 
 ADOPTION_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)  # platform never drops them as repeats, also after a second restart
 RETRYABLE = (ErrorCode.START_FAILED, ErrorCode.HEALTH_TIMEOUT)  # the only failures a start retry is for (never INST-INJECT-FAILED)
 MEMORY_ADOPTION_SLACK_MB = 64 # the volume keeper container (64 MB) that every instance holds besides its template components
+
+
+_SECRET_LOOKING = re.compile(r"[Vv][Mm]\{[^}]*\}|[0-9A-Fa-f]{32,}|[A-Za-z0-9+/_=-]{40,}")
+
+
+def safe_detail(text: str, limit: int = 220) -> str:
+    """One line of a host error for the operator's log: no flag-shaped value, no long hex or key-like run, no newline, cut to `limit`."""
+    one = " ".join(str(text).split())
+    return _SECRET_LOOKING.sub("<removed>", one)[:limit]
 
 
 @dataclass
@@ -400,7 +410,10 @@ class Orchestrator:
                 return  # the destroy that cancelled the build sweeps and finishes
             except _Failure as f:
                 failure = f
-            except BackendError:
+            except BackendError as e:
+                # the operator needs to know WHICH step the host refused (found live: an instance failed in seconds under gVisor and the log said nothing). The text is
+                # the Docker error cut to a line, with anything that looks like a flag, a key or a long hex value taken out.
+                print(f"start refused by the container host for {rec.instance_id[:10]}: {safe_detail(str(e))}", file=sys.stderr, flush=True)
                 failure = _Failure(ErrorCode.START_FAILED, "the container host refused a step")
             except Exception as e:  # any other error: never leave the record in `provisioning` with objects behind
                 # only the class name: the message may carry a document, flag, seed or key
@@ -433,6 +446,9 @@ class Orchestrator:
             self._sweep(rec.instance_id, clear_epoch)
             self._check_cancel(rec)
         b.create_network(plan.network)
+        prepare = getattr(b, "prepare_plan", None)
+        if prepare is not None:  # a sandbox runtime without name resolution: fixed addresses and hosts files (backend.SdkBackend)
+            prepare(plan)
         for v in plan.volumes:
             b.create_volume(v)
         for c in plan.containers:

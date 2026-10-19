@@ -175,3 +175,15 @@ def test_the_three_options_exist_and_are_off_by_default():
     assert (a.edge_container, a.gate_url, a.gate_admin_key_file) == (None, None, None)
     a = build_parser().parse_args(["--templates-dir", "t", "--template-schema", "s", "--edge-container", "e", "--gate-url", "http://g:1", "--gate-admin-key-file", "k"])
     assert (a.edge_container, a.gate_url, a.gate_admin_key_file) == ("e", "http://g:1", "k")
+
+
+def test_the_runtime_option_defaults_to_the_environment_and_accepts_only_the_two_known_names(monkeypatch):
+    from vulnmart_orchestrator.service import build_parser
+
+    monkeypatch.delenv("VM_ORCH_RUNTIME", raising=False)
+    assert build_parser().parse_args(["--templates-dir", "t", "--template-schema", "s"]).runtime is None
+    assert build_parser().parse_args(["--templates-dir", "t", "--template-schema", "s", "--runtime", "runsc"]).runtime == "runsc"
+    monkeypatch.setenv("VM_ORCH_RUNTIME", "runsc")
+    assert build_parser().parse_args(["--templates-dir", "t", "--template-schema", "s"]).runtime == "runsc"
+    monkeypatch.setenv("VM_ORCH_RUNTIME", "")
+    assert build_parser().parse_args(["--templates-dir", "t", "--template-schema", "s"]).runtime is None, "an empty variable (compose passes it empty) means the default"

@@ -484,6 +484,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--edge-container", help="name of the edge container that is connected to every instance network (off when not given)")
     p.add_argument("--gate-url", help="base URL of the gate admin API (https, or http for a loopback host or a network alias); needs --gate-admin-key-file")
     p.add_argument("--gate-admin-key-file", help="file with the gate admin secret (same file rule as the other key files); needs --gate-url")
+    p.add_argument("--runtime", choices=("runc", "runsc"), default=(os.environ.get("VM_ORCH_RUNTIME") or None),
+                   help="OCI runtime of every instance container: runsc is gVisor (S-8). Default: the VM_ORCH_RUNTIME variable, else the daemon's default. A daemon without the runtime refuses to create instances.")
     p.add_argument("--tls-cert")
     p.add_argument("--tls-key")
     p.add_argument("--tls-ca")
@@ -549,7 +551,7 @@ def build_engine(args: argparse.Namespace, on_transition: Callable | None) -> Or
     from .backend import SdkBackend
 
     return Orchestrator(
-        SdkBackend(base_url=args.docker_host), templates, ImageAllowlist.load(args.images_manifest, allow_local_ids=args.allow_local_images),
+        SdkBackend(base_url=args.docker_host, runtime=args.runtime), templates, ImageAllowlist.load(args.images_manifest, allow_local_ids=args.allow_local_images),
         health_timeout_s=args.health_timeout_s or 60.0, injector_timeout_s=args.injector_timeout_s or 30.0,
         host_kind=args.host_kind or "vm", **common,
     )

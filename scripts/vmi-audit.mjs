@@ -233,6 +233,19 @@ export function auditInspect(text) {
   return [row(findings.length ? 'FAIL' : 'PASS', name, findings.length ? findings.join('; ') : `${p.value.length} container(s): none privileged, no host network, socket only read-only in docker-proxy, no unlisted writable binds, instances drop ALL and set no-new-privileges`)];
 }
 
+// S-8 (story L-29): when the lab is meant to run its instances in a sandbox runtime (`--expect-runtime runsc`), every instance container must have asked the
+// daemon for it. A container without it would run on the host kernel directly: this is the check that no instance quietly does.
+export function auditRuntime(text, expected) {
+  const name = 'instance-runtime';
+  const p = parseJson(text);
+  if (p.error) return [unreadable(name, p.error)];
+  if (!Array.isArray(p.value)) return [unreadable(name, 'not an array')];
+  const instances = p.value.filter((c) => c && c.HostConfig && isInstance(c));
+  const wrong = instances.filter((c) => (c.HostConfig.Runtime || 'runc') !== expected).map((c) => `${cname(c)} (${c.HostConfig.Runtime || 'runc'})`);
+  if (wrong.length) return [row('FAIL', name, `not running under ${expected}: ${wrong.join(', ')}`)];
+  return [row('PASS', name, instances.length ? `${instances.length} instance container(s), every one under ${expected}` : `no instance container is running (nothing to check); the expected runtime is ${expected}`)];
+}
+
 // ss -ltnH : every listener is loopback or one of the public ports.
 export function parseListeners(text) {
   const out = [];
@@ -279,7 +292,7 @@ export function poolBasesOf(daemonText) {
   return Array.isArray(pools) ? pools.map((x) => x?.base).filter((b) => parseCidr(b)) : [];
 }
 
-export function auditAll(inputs, { instances = DEFAULT_INSTANCES, skip = {} } = {}) {
+export function auditAll(inputs, { instances = DEFAULT_INSTANCES, skip = {}, expectRuntime = null } = {}) {
   const rows = [];
   const need = (key, names, fn) => {
     if (skip[key]) return rows.push(...names.map((n) => row('SKIP', n, skip[key])));
@@ -298,6 +311,7 @@ export function auditAll(inputs, { instances = DEFAULT_INSTANCES, skip = {} } = 
   else if (!skip.input && inputs.input != null) rows.push(...auditIptables({ dockerUser: '', input: inputs.input, poolBases: bases }).slice(1));
   need('labsChain', ['host-rule-labs-chain'], auditLabsChain);
   need('inspect', ['container-hardening'], auditInspect);
+  if (expectRuntime && inputs.inspect != null && !skip.inspect) rows.push(...auditRuntime(inputs.inspect, expectRuntime));
   need('ss', ['listening-ports'], auditListeners);
   if (skip.imds) rows.push(row('SKIP', 'imds-v2-required', skip.imds));
   else if (inputs.imds == null) rows.push(row('SKIP', 'imds-v2-required', `${FILES.imds} not provided (paste the aws output into it)`));
@@ -306,7 +320,7 @@ export function auditAll(inputs, { instances = DEFAULT_INSTANCES, skip = {} } = 
 }
 
 export function parseArgs(argv) {
-  const o = { mode: null, from: null, instances: DEFAULT_INSTANCES, out: null };
+  const o = { mode: null, from: null, instances: DEFAULT_INSTANCES, out: null, expectRuntime: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--local') o.mode = 'local';
@@ -317,6 +331,9 @@ export function parseArgs(argv) {
     } else if (a === '--instances') {
       o.instances = Number(argv[++i]);
       if (!Number.isInteger(o.instances) || o.instances < 1) return { error: '--instances needs a positive integer' };
+    } else if (a === '--expect-runtime') {
+      o.expectRuntime = argv[++i];
+      if (!['runc', 'runsc'].includes(o.expectRuntime)) return { error: '--expect-runtime is runc or runsc' };
     } else if (a === '--out') {
       o.out = argv[++i];
       if (!o.out) return { error: '--out needs a file' };
@@ -370,12 +387,12 @@ export function main(argv = process.argv.slice(2)) {
       console.error(`Folder not found: ${o.from}`);
       return 2;
     }
-    rows = auditAll(readFrom(o.from), { instances: o.instances });
+    rows = auditAll(readFrom(o.from), { instances: o.instances, expectRuntime: o.expectRuntime });
   } else {
     const inputs = readLocal();
     const skip = { dockerUser: 'Docker Desktop host has no iptables here (run on the VM)', labsChain: 'Docker Desktop host has no iptables here (run on the VM)', input: 'Docker Desktop host has no iptables here (run on the VM)', ss: 'ss is not available here (run on the VM)', imds: 'AWS metadata check is a VM step' };
     if (inputs.daemon === null) skip.daemon = "Docker Desktop keeps the daemon settings in its own settings, no daemon.json found in the user's .docker folder";
-    rows = auditAll(inputs, { instances: o.instances, skip });
+    rows = auditAll(inputs, { instances: o.instances, skip, expectRuntime: o.expectRuntime });
   }
   const table = formatTable(rows);
   const text = redactEvidence(table);

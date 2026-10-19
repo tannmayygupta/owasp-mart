@@ -69,16 +69,30 @@ export function demoTemplate(example) {
   return t;
 }
 
+/** The OCI runtime of the instance containers when the deploy is not told otherwise: gVisor (S-8, L-29). `--runtime runc` is the explicit way back. */
+export const DEFAULT_RUNTIME = 'runsc';
+
+/** The environment of the lab stack on vm-i, as the `KEY=value` words of one `env` call. */
+export function labEnv({ zone, H, runtime = DEFAULT_RUNTIME }) {
+  return [
+    `VULNMART_LABS_ZONE=${zone}`, `VULNMART_ORCH_BIND=${H.i.priv}`, `VULNMART_EDGE_INGEST_URL=https://${H.p.priv}:9444`, 'VULNMART_EDGE_CERTS=/opt/vulnmart/certs/live',
+    'VULNMART_EDGE_SECRETS=/opt/vulnmart/lab/secrets', 'VULNMART_ORCH_DIR=/opt/vulnmart/lab/orchestrator', `VULNMART_ORCH_REPORT_URL=https://${H.p.priv}:9444`, `VULNMART_ORCH_CAPACITY_MB=${DEMO_CAPACITY_MB}`,
+    // the OCI runtime of the instance containers: the host needs infra/hosts/vulnmart-install-gvisor.sh first; `runc` leaves the daemon default
+    ...(runtime === 'runsc' ? ['VULNMART_ORCH_RUNTIME=runsc'] : []),
+  ].join(' ');
+}
+
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
   const o = { cmd, dryRun: false };
-  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--dry-run]' };
+  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--runtime runsc|runc] [--dry-run]' };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--dry-run') o.dryRun = true;
-    else if (['--secrets', '--zone', '--platform-host'].includes(a)) {
+    else if (['--secrets', '--zone', '--platform-host', '--runtime'].includes(a)) {
       if (rest[i + 1] === undefined) return { error: `${a} needs a value` };
-      o[{ '--secrets': 'secrets', '--zone': 'zone', '--platform-host': 'platformHost' }[a]] = rest[++i];
+      o[{ '--secrets': 'secrets', '--zone': 'zone', '--platform-host': 'platformHost', '--runtime': 'runtime' }[a]] = rest[++i];
+      if (a === '--runtime' && !['runsc', 'runc'].includes(o.runtime)) return { error: '--runtime is runsc (gVisor) or runc' };
     } else return { error: `unknown argument ${a}` };
   }
   return o;
@@ -210,12 +224,12 @@ ${[...new Set(Object.values(ROLE_IMAGE))].map((img) => `sudo docker tag ${img} l
   stage(host, [{ local: tmp, name: 'images.json' }], '/opt/vulnmart/lab/orchestrator', OWNER, '400');
   fs.rmSync(tmp, { force: true });
   log('start the lab stack');
-  const env = [
-    `VULNMART_LABS_ZONE=${zone}`, `VULNMART_ORCH_BIND=${H.i.priv}`, `VULNMART_EDGE_INGEST_URL=https://${H.p.priv}:9444`, 'VULNMART_EDGE_CERTS=/opt/vulnmart/certs/live',
-    'VULNMART_EDGE_SECRETS=/opt/vulnmart/lab/secrets', 'VULNMART_ORCH_DIR=/opt/vulnmart/lab/orchestrator', `VULNMART_ORCH_REPORT_URL=https://${H.p.priv}:9444`, `VULNMART_ORCH_CAPACITY_MB=${DEMO_CAPACITY_MB}`,
-  ].join(' ');
+  const runtime = o.runtime ?? DEFAULT_RUNTIME;
+  const env = labEnv({ zone, H, runtime });
   sshScript(host, 'lab-up.sh', `set -eu
-cd /opt/vulnmart/lab/repo
+${runtime === 'runsc' ? `# instances run in gVisor (S-8, L-29): refuse to start the lab on a host that does not have the runtime, never fall back to runc by accident
+sudo docker info --format '{{json .Runtimes}}' | grep -q '"runsc"' || { echo "this host has no runsc runtime: run infra/hosts/vulnmart-install-gvisor.sh first (docs/runbooks/sandbox-gvisor.md), or deploy with --runtime runc" >&2; exit 1; }
+` : ''}cd /opt/vulnmart/lab/repo
 sudo env ${env} docker compose -f infra/compose/compose.yaml -f infra/compose/lab.reports.yaml --profile lab up -d --no-build --pull missing --wait docker-proxy edge-gate edge-caddy orchestrator
 # the orchestrator reads templates and the image manifest once at start, and compose does not restart it for a changed bind-mounted file
 sudo docker restart vulnmart-orchestrator >/dev/null

@@ -28,6 +28,7 @@ function stubDocker({ answer, profile = (x) => x, daemon = true, leftovers = 0, 
     if (a === 'run') { objects++; return ok('id'); }
     if (a === 'network' && b === 'inspect') return ok(JSON.stringify([args[2] === 'bridge' ? { IPAM: { Config: [{ Gateway: '172.17.0.1' }] } } : { Internal: true, IPAM: { Config: [{ Subnet: sameSubnet || !args[2].endsWith('-b') ? '172.30.0.0/24' : '172.31.0.0/24', Gateway: '172.30.0.1' }] } }]));
     if (a === 'inspect') {
+      if (args[1].endsWith('-sidecar')) return ok(JSON.stringify([{ NetworkSettings: { Networks: { [netA]: { IPAddress: '172.30.0.5' } } } }]));
       if (args[1].endsWith('-peer')) return ok(JSON.stringify([{ NetworkSettings: { Networks: { [args[1].replace('-peer', '-b')]: { IPAddress: '172.31.0.2' } } } }]));
       return ok(JSON.stringify([profile(GOOD_PROBE(netA))]));
     }
@@ -265,4 +266,27 @@ test('--runtime (S-8): every probe container gets it, the report says which, a b
     assert.equal(main(['--runtime', bad], { log: () => {}, err: (e) => err.push(e), docker: stubDocker({ answer: allBlocked }) }), 2, bad);
     assert.match(err.join(''), /--runtime/);
   }
+});
+
+
+test('under gVisor (--runtime runsc) the containers get the sandbox overhead and the control is reached by address, not by an alias that cannot resolve there', () => {
+  const d = stubDocker({ answer: allBlocked });
+  const { exitCode, report } = runProbe({ docker: d, image: 'img', nonce: 't9', runtime: 'runsc' });
+  assert.equal(exitCode, 0, JSON.stringify(report));
+  assert.equal(report.runtime, 'runsc');
+  assert.equal(report.control_by, 'address');
+  const runs = d.calls.filter((c) => c[0] === 'run');
+  assert.equal(runs.length, 3);
+  for (const r of runs) {
+    assert.equal(r[r.indexOf('--runtime') + 1], 'runsc');
+    assert.equal(r[r.indexOf('--pids-limit') + 1], '128', 'the sandbox needs room for its own threads');
+    assert.equal(r[r.indexOf('--memory') + 1], '128m');
+  }
+  const exec = d.calls.find((c) => c[0] === 'exec' && c[2] === 'node' && c[3] === '-e' && c[4]?.includes('JSON.parse'));
+  assert.ok(JSON.parse(exec[5]).find((t) => t.control).host === '172.30.0.5', 'the control is the sidecar address');
+  const plain = stubDocker({ answer: allBlocked });
+  const normal = runProbe({ docker: plain, image: 'img', nonce: 't8' });
+  assert.equal(normal.report.control_by, undefined);
+  assert.equal(plain.calls.find((c) => c[0] === 'run')[plain.calls.find((c) => c[0] === 'run').indexOf('--pids-limit') + 1], '32', 'runc keeps the 32 of the profile');
+  assert.equal(JSON.parse(plain.calls.find((c) => c[0] === 'exec' && c[4]?.includes('JSON.parse'))[5]).find((t) => t.control).host, 'sidecar');
 });

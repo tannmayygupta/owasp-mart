@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "runtime": "runsc",
+  "image": "node:24.21.0-alpine",
+  "boundary": "user-space kernel",
+  "host_kernel_release": "7.0.0-1014-aws",
+  "facts": {
+    "kernel_release": "4.19.0-gvisor",
+    "proc_version": "Linux version 4.19.0-gvisor #1 SMP Sun Jan 10 15:06:54 PST 2016",
+    "dmesg_first": "[   0.000000] Starting gVisor...",
+    "kcore_read": "refused",
+    "modules_listed": "0",
+    "debugfs_listed": "0",
+    "mount_tmpfs": "mount: permission denied (are you root?)",
+    "user_namespace": "allowed",
+    "cap_eff": "0000000000000000",
+    "processes_visible": "4",
+    "dev_nodes": "16",
+    "shared_socket": "works"
+  },
+  "problems": []
+}

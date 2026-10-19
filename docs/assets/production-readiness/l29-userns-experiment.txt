@@ -1,0 +1,9 @@
+L-29 / S-8: user-namespace remapping, tried on a throwaway second Docker daemon on vm-i, 2026-10-20 (the live daemon was not touched; the second daemon, its data directory and its dockremap user were removed afterwards and checked gone).
+Command: dockerd --host unix:///run/docker-userns.sock --data-root /var/lib/docker-userns --userns-remap=default --bridge=none --iptables=false ...
+second daemon up: 29.9.0
+userns options: [name=apparmor,profile=default name=seccomp,profile=builtin name=userns name=cgroupns]
+subuid: dockremap:100000:65536
+Test: a tmpfs volume owned by uid 65532 (exactly how the orchestrator makes the instance volumes), written by a container running as 65532 with the instance profile.
+  under the remapping daemon:  write-FAILED  (sh: can't create /data/f: Permission denied)
+  on the live daemon:          write-ok
+Reading: under remapping, container uid 65532 is host uid 165532, which does not own the volume. Every instance volume and every placement would have to be re-owned, and the injector, the shop and the sidecar would fail to write their own files.

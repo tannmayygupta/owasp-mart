@@ -83,10 +83,14 @@ export function evaluate(targets, answers, { profileFailures = [] } = {}) {
   return { ok: problems.length === 0, rows, control: control ?? 'no-answer', open, problems };
 }
 
-function hardenedArgs(name, network, image, label, extra = []) {
+// gVisor's own processes and threads count against the limits (found live, story L-29): the same overhead the orchestrator adds (apps/orchestrator backend.py).
+export const SANDBOX_PIDS = 32 + 96;
+export const SANDBOX_MEMORY_MB = 64 + 64;
+
+function hardenedArgs(name, network, image, label, extra = [], sandboxed = false) {
   return ['run', '-d', '--name', name, '--label', label, '--network', network, ...extra,
     '--user', RUN_USER, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true',
-    '--memory', '64m', '--cpus', '0.5', '--pids-limit', '32', '--stop-timeout', '0',
+    '--memory', sandboxed ? `${SANDBOX_MEMORY_MB}m` : '64m', '--cpus', '0.5', '--pids-limit', String(sandboxed ? SANDBOX_PIDS : 32), '--stop-timeout', '0',
     '--tmpfs', '/tmp:rw,noexec,nosuid,nodev,size=1m,uid=65532,gid=65532,mode=0750', '--entrypoint', 'node', image];
 }
 
@@ -133,7 +137,7 @@ export function runProbe({ docker: rawDocker = cliDocker, image, timeoutMs = 300
     }
     const start = (name, net, js, extra) => {
       // Optional container runtime (S-8, story 4.4): the same probe under another runtime, for example gVisor's runsc.
-      const r = docker([...hardenedArgs(name, net, chosen, label, [...(runtime ? ['--runtime', runtime] : []), ...extra]), '-e', js]);
+      const r = docker([...hardenedArgs(name, net, chosen, label, [...(runtime ? ['--runtime', runtime] : []), ...extra], runtime === 'runsc'), '-e', js]);
       if (r.code !== 0) throw new Error(`container start failed (${name}): ${r.stderr.trim().split('\n').pop()}`);
     };
     // host.docker.internal does not resolve on Linux without this mapping; with it the target is meaningful there too.
@@ -173,15 +177,20 @@ export function runProbe({ docker: rawDocker = cliDocker, image, timeoutMs = 300
     if (!probeSubnets.length || !peerSubnets.length) profileFailures.push('subnets of the probe and peer networks are unknown');
     else if (peerSubnets.some((s) => probeSubnets.includes(s))) profileFailures.push('the peer network has the same subnet as the probe network');
 
+    // Under gVisor Docker's embedded name server does not work (an alias never resolves, found live), so the control is reached by its address there; the question the
+    // control answers is the same: can a container reach a sibling on its own network.
+    const sidecarInfo = runtime === 'runsc' ? parse(docker(['inspect', names.sidecar]))?.[0] : null;
+    const controlHost = runtime === 'runsc' ? sidecarInfo?.NetworkSettings?.Networks?.[netA]?.IPAddress : 'sidecar';
+    if (!controlHost) throw new Error('could not read the address of the control container from Docker');
     const targets = buildTargets({ gateway, docker0, peerIp });
-    const all = [...targets, { name: 'control-sidecar-alias', host: 'sidecar', port: LISTEN_PORT, control: true }];
+    const all = [...targets, { name: 'control-sidecar-alias', host: controlHost, port: LISTEN_PORT, control: true }];
     const ex = docker(['exec', names.probe, 'node', '-e', PROBE_JS, JSON.stringify(all), String(timeoutMs)], { timeout: 120000 });
     const answers = parse(ex);
     if (ex.code !== 0) throw new Error(`the probe program in the container failed (exit ${ex.code})`);
     if (!Array.isArray(answers) || answers.length !== all.length) throw new Error(`the probe program gave no complete answer (expected ${all.length} entries)`);
     const verdict = evaluate(targets, answers, { profileFailures });
     exitCode = verdict.ok ? 0 : 1;
-    report = { ok: verdict.ok, image: chosen, ...(runtime ? { runtime } : {}), profile: { user: RUN_USER, internal: netInfo?.Internal === true, failures: profileFailures }, subnets: { probe: probeSubnets, peer: peerSubnets, ...(probeSubnet || peerSubnet ? { custom: true } : {}) }, host_docker_internal: 'mapped with --add-host host.docker.internal:host-gateway', control: verdict.control, targets: verdict.rows.map(({ name, state, open }) => ({ name, state, open })), problems: verdict.problems };
+    report = { ok: verdict.ok, image: chosen, ...(runtime ? { runtime } : {}), ...(runtime === 'runsc' ? { control_by: 'address' } : {}), profile: { user: RUN_USER, internal: netInfo?.Internal === true, failures: profileFailures }, subnets: { probe: probeSubnets, peer: peerSubnets, ...(probeSubnet || peerSubnet ? { custom: true } : {}) }, host_docker_internal: 'mapped with --add-host host.docker.internal:host-gateway', control: verdict.control, targets: verdict.rows.map(({ name, state, open }) => ({ name, state, open })), problems: verdict.problems };
   } catch (e) {
     report = { ok: false, error: e.message };
     exitCode = 1;

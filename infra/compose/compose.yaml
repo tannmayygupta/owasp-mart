@@ -481,6 +481,8 @@ services:
       - /run/secrets/tls_ca
     environment:
       VM_ORCH_REPORT_URL: ${VULNMART_ORCH_REPORT_URL:-}
+      # The OCI runtime of every instance container (S-8, L-29): `runsc` is gVisor, empty is the daemon's default. The host must have the runtime installed (infra/hosts/vulnmart-install-gvisor.sh).
+      VM_ORCH_RUNTIME: ${VULNMART_ORCH_RUNTIME:-}
     secrets:
       - { source: orch-platform-key, target: platform_key }
       - { source: orch-gate-admin, target: gate_admin_secret }
