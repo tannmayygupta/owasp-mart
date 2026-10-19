@@ -47,6 +47,8 @@ No ADR. The numbers are the orchestrator's own documented defaults (`lifecycle.p
 - Cleaning the instances the load check left was refused by the permission system (cancelling attempts on the live platform), so the new script exists for the developer to run; they hold five of seven slots until it is run or 24 hours pass.
 - The live withdraw proof could not run on the final deploy because of the full capacity (`Busy`); it ran 11 of 11 before, on the code before the last change.
 
+- The contract rules job refused the pull request because any change to a workflow needs a new `registry change:` line in `contracts/CHANGELOG.md` (the engine section): added, saying it is a workflow change only.
+
 ## Security notes
 No flag is printed by the scan; the cleanup script only touches throwaway accounts.
 

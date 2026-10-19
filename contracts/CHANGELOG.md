@@ -293,6 +293,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
+### 2026-10-19 (Tanmay, story L-19: flag scan of every image in CI)
+- registry change: the `check` job of `.github/workflows/images.yml` now builds each image with `--load` and runs `node scripts/scan-flags.mjs --image` on it, and the path filter lists `scripts/scan-flags.mjs`. Workflow change only: no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract or any rule.
+
 ### 2026-10-18 (Sahil, Sprint 3 — exploit-runner installs workspace deps)
 - registry change: the `exploit runner` CI job in `.github/workflows/ci.yml` now runs `pnpm/action-setup` and `pnpm install --frozen-lockfile` before the challenge tests, because the Sprint 3 challenge self-tests boot the real shop app (express/nunjucks) whereas the earlier `_example` test used only node built-ins. Workflow change only — no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract, or any rule.
 
