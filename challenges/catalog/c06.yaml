@@ -18,7 +18,7 @@ tier: Hard
 flag:
   placement: file-import-service
   delivery: file
-start_state: a seller import of a product; the import service runs per-job with no network or database
+start_state: "Sign in as the seller owner owner.harbor@vulnmart.test with the password vulnmart-seed-demo (Harbor Crafts), then open the seller dashboard and its bulk import preview."
 milestones:
   m1:
     summary: the player sent import options containing a prototype-style key

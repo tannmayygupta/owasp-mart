@@ -136,6 +136,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 1.2.0 (2026-10-20, Tanmay, story L-30 player experience)
+- Additive: `ChallengeProgress` gets three optional members: `brief` (what the challenge is about), `start` (how to begin: the documented demo account to sign in with and where to look) and `write_up` (the weakness and the fix; only for the owner of a practice attempt once the challenge is captured, never in an assessment, never a flag). The route `listChallenges` fills them from the catalogue. Nothing a client sends changed.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs`; example `examples/valid/challenges.json`. Generated code and bundle regenerated.
+- registry change: none to `contracts/registry.json`; `contracts/COMPAT.md` lists IF-2 at 1.2.0 and IF-7 at 1.2.0.
+
 ### 1.1.0 (2026-10-19, Tanmay, story L-26 routes; for Akshay to confirm, handoff H-353)
 - Additive: `POST /api/v1/attempts/{attempt_id}/withdraw` (`withdrawAttempt`, body `{ "confirm": true }`) and `POST /api/v1/attempts/{attempt_id}/withdraw/undo` (`undoWithdrawal`, empty body), both 200 with the `Attempt`; only the owner of a candidate attempt; a learner attempt, a wrong state is 409 `ATT-INVALID-STATE`, an unknown or foreign attempt is 404, a closed undo window is 410 `ATT-GONE` (no new error code). New optional field `Attempt.delete_after` (the end of the undo window while the attempt is `withdrawn` and its deletion is scheduled, otherwise null).
 - Why in this contract and not in IF-1: the lab already serves the attempt routes and owns the state machine and the undo window (D-91); the decision text "cancel, withdraw and purge are IF-1" of `lab-api.md` is changed by this entry for withdraw and undo only. Cancel (a recruiter's action) and purge stay with the platform.
@@ -285,6 +290,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Challenge catalogue (IF-7), `contracts/catalog/` and `challenges/catalog/`
 
+### 1.2.0 (2026-10-20, Tanmay, story L-30 player experience; for Sahil to confirm)
+- Data only, no schema change: the `start_state` text of C01 to C11 now tells the player how to begin (the documented demo account and its password, or "no account", and where to look), because a player who opens the shop has nothing else to go on. The accounts are the seeded demo accounts of `apps/shop/seed/contributions/010-challenge-accounts.mjs` and the baseline owner; they are not secrets. No flag, placement or test path is in any text.
+
 ### 1.1.0 (2026-10-18, Sahil, story T-30)
 - Additive: three optional fields on a challenge entry — `brief` (a short player-facing description, never a flag), `write_up` (`{ vulnerable, fix }`) and `decoys` (string array of foil locations). Existing entries stay valid; a stub omits them. No mock change (the catalogue is data read by validators, nothing runs against it). Not breaking (new optional properties; `exploit_test` and `fixed_build` patterns unchanged — they stay logical references, with `challenges/catalog/README.md` noting the real self-test folders are `challenges/tests/cNN-<name>` and the fixed build is the `VM_CHALLENGE_<KEY>` env flag). `validate-catalog.mjs` now also requires a `complete` entry to have non-null milestone signals, non-null hints and a brief.
 - All 11 `challenges/catalog/cNN.yaml` entries are now `status: complete` (T-30): milestone detection signals, the three hint texts, a flag-free brief, the vulnerable/fix write-up and decoy locations, filled from `docs/design/challenge-specs.md`.
@@ -300,6 +308,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Full content (briefs, write-ups, decoys, filled hints, official-site id re-check) is T-30; each challenge's real milestone signals and confirmed flag placement come with its own story.
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
+
+### 2026-10-20 (Tanmay, story L-30: COMPAT.md follows IF-2 1.2.0 and IF-7 1.2.0)
+- registry change: `contracts/COMPAT.md` lists IF-2 and IF-7 at 1.2.0; the rows of @tannmayygupta for them are `approved` on 2026-10-20 (the developer's standing instruction for their own rows), the others are `pending`. No contract file, registry entry or rule changed.
 
 ### 2026-10-19 (Tanmay, story L-09: own sign-offs)
 - registry change: the Approvals rows of `@tannmayygupta` in `contracts/COMPAT.md` are set to `approved` on 2026-10-19 at the versions listed there, on the developer's instruction in chat. No contract file, registry entry or rule changed.

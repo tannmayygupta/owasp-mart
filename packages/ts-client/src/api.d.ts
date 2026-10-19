@@ -1442,6 +1442,15 @@ export interface components {
             hints_used: number;
             /** @description False when the attempt has hints off. */
             hints_available: boolean;
+            /** @description Optional. What the challenge is about, in a few plain words (the catalogue text; never a flag). */
+            brief?: string;
+            /** @description Optional. How to begin, for example the demo account to sign in with and where to look. The accounts are documented demo accounts of the lab shop, not real credentials. */
+            start?: string;
+            /** @description Optional. Present only for the owner of a practice attempt once the challenge is captured (M3); never in an assessment. The weakness and the fix. */
+            write_up?: {
+                vulnerable: string;
+                fix: string;
+            };
         };
         ChallengeProgressList: {
             items: components["schemas"]["ChallengeProgress"][];

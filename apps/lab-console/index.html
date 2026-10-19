@@ -15,6 +15,10 @@
   <p id="banner" role="status" hidden></p>
 
   <section id="auth" hidden>
+    <div class="card intro">
+      <h2>Practice attacking a real web shop, safely</h2>
+      <p>Each learner gets a private copy of an online shop with eleven planted weaknesses from the OWASP Top 10. Attack it with your own tools (Burp Suite, a browser, curl), find the flag of each weakness (it looks like <code>VM{...}</code>), paste it here and the lab scores it. Your copy and your flags are yours alone.</p>
+    </div>
     <div class="tabs"><button id="tab-login" type="button" class="on">Sign in</button><button id="tab-signup" type="button">Create account</button></div>
     <form id="login-form" autocomplete="on">
       <label>Email <input name="email" type="email" required autocomplete="username"></label>
@@ -37,6 +41,9 @@
   </section>
 
   <section id="lab" hidden>
+    <ol id="steps" class="steps" aria-label="Your progress">
+      <li id="step-1">Start your lab</li><li id="step-2">Open the shop</li><li id="step-3">Find a flag</li><li id="step-4">Check it here</li>
+    </ol>
     <div class="grid">
       <div class="card">
         <h2>Your instance</h2>
@@ -52,27 +59,43 @@
         </dl>
         <div id="instance-actions" class="row" hidden>
           <button id="open" type="button">Open the shop</button>
-          <button id="reset" type="button">Reset</button>
-          <button id="stop" type="button">Stop</button>
-          <button id="submit" type="button">Finish and submit</button>
+          <button id="copy" type="button" class="ghost" title="A fresh one-time link for Burp's browser or another browser">Copy link for Burp</button>
+          <button id="reset" type="button" class="ghost">Reset</button>
+          <button id="stop" type="button" class="ghost">Stop</button>
+          <button id="submit" type="button" class="ghost">Finish and submit</button>
+        </div>
+        <div id="link-box" hidden>
+          <p class="hint">One-time link, valid for about a minute. Paste it into the browser you attack from (Burp's browser, for example); the shop then sets its cookie and every later request is an ordinary HTTPS request to your instance.</p>
+          <input id="link" readonly aria-label="One-time link to your instance">
         </div>
       </div>
       <div class="card">
         <h2>Score</h2>
         <p class="big"><span id="score">0</span><small> / 1000</small></p>
+        <div class="bar" aria-hidden="true"><div id="bar-fill"></div></div>
+        <p id="captured" class="hint"></p>
         <p id="score-note"></p>
-        <button id="report" type="button" hidden>Show my report</button>
+        <button id="report" type="button" class="ghost" hidden>Show my report</button>
         <pre id="report-box" hidden></pre>
       </div>
     </div>
 
+    <details class="card help">
+      <summary>Attacking with Burp Suite (or another proxy)</summary>
+      <ol>
+        <li>Start Burp Suite, open <b>Proxy</b>, then <b>Open browser</b> (Burp's own browser already trusts Burp). Or point your browser at Burp's listener (127.0.0.1:8080) and install Burp's certificate.</li>
+        <li>Press <b>Copy link for Burp</b> above and paste the link into that browser's address bar within a minute. It works once; it signs your browser into your instance.</li>
+        <li>Browse the shop. Every request and answer shows up in <b>HTTP history</b>: send them to Repeater, change an order number, a field or a header, and watch what the server lets you do.</li>
+        <li>Each challenge below says how to begin (for example which demo account to sign in with) and has three hints that you can reveal one by one.</li>
+        <li>When you find a flag (<code>VM{...}</code>) paste it into its challenge. Reset gives you a fresh shop and new flags; the old ones stop counting.</li>
+      </ol>
+      <p class="hint">Only attack your own instance. It is built to be broken; nothing else is.</p>
+    </details>
+
     <div class="card">
       <h2>Challenges</h2>
-      <p class="hint">Find a flag in the shop (it looks like <code>VM{...}</code>), paste it here, and the lab scores it. Hints cost nothing in practice mode.</p>
-      <table>
-        <thead><tr><th>Key</th><th>Challenge</th><th>Tier</th><th>Progress</th><th>Hints</th><th>Points</th><th>Flag</th></tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
+      <p class="hint">Open a challenge to read what it is about, how to begin and the hints. Hints cost nothing in practice mode.</p>
+      <div id="rows" class="challenges"></div>
       <p id="flag-answer" role="status"></p>
     </div>
 

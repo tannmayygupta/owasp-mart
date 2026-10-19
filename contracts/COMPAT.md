@@ -13,11 +13,11 @@ Every version listed here must be an entry of the contract's own section in `con
 | IF-1 | 1.1.0 | P | `contracts/api/platform/` |
 | IF-3 | 1.0.0 | P | `contracts/domain-events/` |
 | IF-8 | 1.0.0 | P | `contracts/errors/` |
-| IF-2 | 1.1.0 | L | `contracts/api/lab/` |
+| IF-2 | 1.2.0 | L | `contracts/api/lab/` |
 | IF-4 | 1.0.0 | L | `contracts/events/` |
 | IF-5 | 1.1.0 | L | `contracts/orchestrator/` |
 | IF-6 | 1.0.0 | L | `contracts/instance/` |
-| IF-7 | 1.1.0 | T | `contracts/catalog/` |
+| IF-7 | 1.2.0 | T | `contracts/catalog/` |
 | DB | 2.1.0 | P | `contracts/db/` |
 | GATE | 1.0.0 | L | `contracts/edge/` |
 
@@ -34,8 +34,8 @@ Contract | Stream | Handle | Role | Version | Date | Status
 IF-1 | P | @akshaay29 | owner | 1.1.0 | - | pending
 IF-3 | P | @akshaay29 | owner | 1.0.0 | - | pending
 IF-8 | P | @akshaay29 | owner | 1.0.0 | - | pending
-IF-2 | L | @tannmayygupta | owner | 1.1.0 | 2026-10-19 | approved
-IF-2 | P | @akshaay29 | consumer | 1.1.0 | - | pending
+IF-2 | L | @tannmayygupta | owner | 1.2.0 | 2026-10-20 | approved
+IF-2 | P | @akshaay29 | consumer | 1.2.0 | - | pending
 IF-4 | L | @tannmayygupta | owner | 1.0.0 | 2026-10-19 | approved
 IF-4 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
 IF-4 | P | @akshaay29 | consumer | 1.0.0 | - | pending
@@ -44,9 +44,9 @@ IF-5 | P | @akshaay29 | consumer | 1.1.0 | - | pending
 IF-6 | L | @tannmayygupta | owner | 1.0.0 | 2026-10-19 | approved
 IF-6 | L | @tannmayygupta | consumer | 1.0.0 | 2026-10-19 | approved
 IF-6 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
-IF-7 | T | @sahillroy | owner | 1.1.0 | - | pending
-IF-7 | P | @akshaay29 | consumer | 1.1.0 | - | pending
-IF-7 | L | @tannmayygupta | consumer | 1.1.0 | 2026-10-19 | approved
+IF-7 | T | @sahillroy | owner | 1.2.0 | - | pending
+IF-7 | P | @akshaay29 | consumer | 1.2.0 | - | pending
+IF-7 | L | @tannmayygupta | consumer | 1.2.0 | 2026-10-20 | approved
 DB | P | @akshaay29 | owner | 2.1.0 | - | pending
 DB | L | @tannmayygupta | consumer | 2.1.0 | 2026-10-19 | approved
 DB | T | @sahillroy | consumer | 2.1.0 | - | pending

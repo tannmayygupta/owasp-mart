@@ -544,11 +544,19 @@ async def list_challenges(attempt_id: str, request: Request, auth: Authenticated
 
     def build() -> list[dict[str, Any]]:
         out = []
+        practice = rec.org_id is None and is_owner(auth, rec)  # a write-up is for a learner of their own practice, never in an assessment
         for key in rt.challenge_keys:
             best = rt.milestones.best(rec.id, key)
-            out.append({"challenge_key": key, "best_milestone": best.value, "solved": best.value == "M3",
-                        "held": rt.milestones.is_held(rec.id, key), "hints_used": len(rt.hints.levels(rec.id, key)),
-                        "hints_available": hints_enabled(rec)})
+            entry = rt.catalog.get(key)
+            solved = best.value == "M3"
+            item = {"challenge_key": key, "best_milestone": best.value, "solved": solved,
+                    "held": rt.milestones.is_held(rec.id, key), "hints_used": len(rt.hints.levels(rec.id, key)),
+                    "hints_available": hints_enabled(rec)}
+            if entry is not None and (entry.brief or entry.start):
+                item["brief"], item["start"] = entry.brief, entry.start
+            if entry is not None and entry.write_up and solved and practice:
+                item["write_up"] = {"vulnerable": entry.write_up[0], "fix": entry.write_up[1]}
+            out.append(item)
         return out
 
     return json_ok({"items": await run(build), "has_more": False})

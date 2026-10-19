@@ -20,7 +20,7 @@ tier: Medium
 flag:
   placement: database-seed
   delivery: db
-start_state: a seeded or self-registered customer; buying a card uses the simulated payment
+start_state: "Sign in as the customer player.customer@vulnmart.test with the password player-customer-demo-b2, or register your own customer account. Buying a gift card uses the simulated payment, no real money."
 milestones:
   m1:
     summary: the player tried a well-formed gift-card code that is not their own

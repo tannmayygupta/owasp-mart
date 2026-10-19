@@ -46,3 +46,4 @@ Stream L work. Where a part belongs to another stream (the invite and company fl
 - 2026-10-20: L-12 closed, hello stack deployed from CI images to both VMs and the laptop, docs/dev-log/2026-10-20-tannmayygupta-l12-hello-stack-deployed.md
 - 2026-10-20: L-25 closed, docs/dev-log/2026-10-20-tannmayygupta-l25-platform-events.md
 - 2026-10-20: L-29 closed, instances run in gVisor, docs/dev-log/2026-10-20-tannmayygupta-l29-gvisor-sandbox.md
+- 2026-10-20: player experience of the lab console built (IF-2 1.2.0), docs/dev-log/2026-10-20-tannmayygupta-player-experience.md

@@ -2,7 +2,7 @@
 // It is a stand-in for the learner dashboards of stream P (P-26): it only calls the documented browser routes of IF-1 and IF-2 on its own origin.
 // Everything the server sends is put on the page with textContent, never as HTML.
 const $ = (id) => document.getElementById(id);
-const state = { csrf: null, user: null, attempt: null, instance: null, catalog: [], poll: null, timer: null };
+const state = { csrf: null, user: null, attempt: null, instance: null, catalog: [], poll: null, timer: null, opened: new Set(), details: {}, hints: {}, progress: [] };
 
 // ---------- the API ----------
 async function api(method, path, body) {
@@ -43,6 +43,7 @@ async function boot() {
   $('logout').addEventListener('click', onLogout);
   $('start').addEventListener('click', onStart);
   $('open').addEventListener('click', onOpen);
+  $('copy').addEventListener('click', onCopy);
   $('reset').addEventListener('click', onReset);
   $('stop').addEventListener('click', onStop);
   $('submit').addEventListener('click', onSubmit);
@@ -85,7 +86,8 @@ async function onLogin(ev) {
 async function onLogout() {
   try { await api('DELETE', '/api/v1/session'); } catch { /* the session may be gone already */ }
   clearInterval(state.poll); clearInterval(state.timer);
-  Object.assign(state, { csrf: null, user: null, attempt: null, instance: null });
+  Object.assign(state, { csrf: null, user: null, attempt: null, instance: null, opened: new Set(), details: {}, hints: {}, progress: [] });
+  $('link-box').hidden = true;
   show('auth'); tab('login'); banner('Signed out.', 'ok');
 }
 
@@ -146,33 +148,105 @@ function render() {
   $('submit').disabled = a?.state !== 'running';
   $('start').disabled = false;
   $('report').hidden = !a || !['submitted', 'reported', 'running'].includes(a.state) || a.state === 'ready';
+  $('copy').disabled = !ready;
+  steps();
   tickClock();
+}
+
+// the four steps of a first session, from what the lab already knows
+function steps() {
+  const a = state.attempt; const i = state.instance;
+  const started = Boolean(a) && Boolean(i) && !['destroyed', 'failed'].includes(i.state);
+  const some = state.progress.some((p) => p.best_milestone !== 'none');
+  const captured = state.progress.some((p) => p.solved);
+  const done = [started, state.opened.has('shop') || some || captured, some || captured, captured];
+  const nowIdx = done.findIndex((d) => !d);
+  [1, 2, 3, 4].forEach((n) => { $(`step-${n}`).className = done[n - 1] ? 'done' : (n - 1 === nowIdx ? 'now' : ''); });
 }
 
 async function loadProgress() {
   const id = state.attempt.attempt_id;
   const [score, progress] = await Promise.all([api('GET', `/api/v1/attempts/${id}/score`), api('GET', `/api/v1/attempts/${id}/challenges`)]);
+  state.progress = progress.items;
   $('score').textContent = String(score.score);
+  const got = progress.items.filter((p) => p.solved).length;
+  $('bar-fill').style.width = `${Math.min(100, Math.round(score.score / 10))}%`;
+  $('captured').textContent = `${got} of ${progress.items.length} challenges captured`;
   $('score-note').textContent = score.per_challenge.some((c) => c.held) ? 'A capture is waiting for a human review and is not counted yet.' : '';
   const pts = Object.fromEntries(score.per_challenge.map((c) => [c.challenge_key, c.points]));
   const info = Object.fromEntries(state.catalog.map((c) => [c.challenge_key, c]));
-  const rows = $('rows'); rows.replaceChildren();
-  for (const p of progress.items) {
-    const tr = document.createElement('tr');
-    const cell = (text) => { const td = document.createElement('td'); td.textContent = text; tr.appendChild(td); return td; };
-    cell(p.challenge_key); cell(info[p.challenge_key]?.title || '-'); cell(info[p.challenge_key]?.tier || '-');
-    const prog = cell(''); const pill = document.createElement('span'); pill.className = `pill ${p.solved ? 'ok' : p.held ? 'held' : ''}`; pill.textContent = p.held ? 'held for review' : p.solved ? 'captured' : p.best_milestone === 'none' ? 'not yet' : p.best_milestone; prog.appendChild(pill);
-    const hints = cell(''); const hb = document.createElement('button'); hb.type = 'button'; hb.className = 'ghost'; hb.textContent = `Hint (${p.hints_used}/3)`; hb.disabled = p.hints_used >= 3 || state.attempt.state !== 'running';
-    hb.addEventListener('click', () => unlockHint(p.challenge_key, p.hints_used + 1)); hints.appendChild(hb);
-    cell(String(pts[p.challenge_key] ?? 0));
-    const flag = cell(''); const row = document.createElement('div'); row.className = 'row';
-    const inp = document.createElement('input'); inp.placeholder = 'VM{...}'; inp.maxLength = 200; inp.autocomplete = 'off'; inp.disabled = state.attempt.state !== 'running' || p.solved;
-    const go = document.createElement('button'); go.type = 'button'; go.textContent = 'Check'; go.disabled = inp.disabled;
-    go.addEventListener('click', () => submitFlag(p.challenge_key, inp));
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitFlag(p.challenge_key, inp); });
-    row.append(inp, go); flag.appendChild(row);
-    rows.appendChild(tr);
+  const rows = $('rows');
+  for (const p of progress.items) renderChallenge(rows, p, info[p.challenge_key], pts[p.challenge_key] ?? 0);
+  steps();
+}
+
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const HINT_NAMES = ['A nudge', 'A direction', 'Nearly the answer'];
+
+// One <details> per challenge, kept across refreshes (open state, typed flag and revealed hints survive the polling).
+function renderChallenge(rows, p, info, points) {
+  const key = p.challenge_key;
+  let d = rows.querySelector(`details[data-key="${key}"]`);
+  if (!d) {
+    d = el('details', 'ch'); d.dataset.key = key;
+    if (state.opened.has(key)) d.open = true;
+    d.addEventListener('toggle', () => { if (d.open) { state.opened.add(key); loadDetail(key); loadHints(key); } else state.opened.delete(key); });
+    const sum = el('summary');
+    sum.append(el('span', 'key', key), el('span', 'title'), el('span', 'pill tier'), el('span', 'pill prog'), el('span', 'pts'));
+    d.append(sum, el('div', 'ch-body'));
+    rows.appendChild(d);
   }
+  const sum = d.querySelector('summary');
+  sum.querySelector('.title').textContent = info?.title || key;
+  const tier = sum.querySelector('.tier'); tier.textContent = info?.tier || '-'; tier.className = `pill tier tier-${info?.tier || ''}`;
+  const prog = sum.querySelector('.prog'); prog.className = `pill prog ${p.solved ? 'ok' : p.held ? 'held' : ''}`;
+  prog.textContent = p.held ? 'held for review' : p.solved ? 'captured' : p.best_milestone === 'none' ? 'not yet' : p.best_milestone;
+  sum.querySelector('.pts').textContent = `${points} pts`;
+  const body = d.querySelector('.ch-body');
+  const typed = body.querySelector('input.flag')?.value ?? '';
+  body.replaceChildren();
+  const more = state.details[key];
+  const tags = el('div', 'tags');
+  for (const t of [info?.owasp_2021 && `OWASP 2021 ${info.owasp_2021}`, info?.owasp_2025 && `OWASP 2025 ${info.owasp_2025}`, more?.cwe_primary]) if (t) tags.appendChild(el('span', 'tag', t));
+  if (tags.childElementCount) body.appendChild(tags);
+  if (p.brief) body.appendChild(el('p', '', p.brief));
+  if (p.start) { const b = el('div', 'box start'); b.append(el('b', '', 'How to begin'), el('span', '', p.start)); body.appendChild(b); }
+  // the three hints, revealed one at a time and kept on the page once revealed
+  const hints = state.hints[key] || [];
+  for (let level = 1; level <= 3; level++) {
+    const row = el('div', 'hintrow'); const h = hints.find((x) => x.level === level);
+    row.appendChild(el('span', 'lvl', `Hint ${level}: ${HINT_NAMES[level - 1]}`));
+    if (h?.unlocked && h.text) row.appendChild(el('span', 'txt', h.text));
+    else {
+      const btn = el('button', 'ghost', level === p.hints_used + 1 ? 'Reveal' : 'Locked');
+      btn.type = 'button'; btn.disabled = level !== p.hints_used + 1 || state.attempt.state !== 'running' || !p.hints_available;
+      btn.addEventListener('click', () => unlockHint(key, level));
+      row.appendChild(btn);
+    }
+    body.appendChild(row);
+  }
+  const flagRow = el('div', 'flagrow');
+  const inp = el('input', 'flag'); inp.placeholder = 'VM{...}'; inp.maxLength = 200; inp.autocomplete = 'off'; inp.value = typed; inp.setAttribute('aria-label', `Flag for ${key}`);
+  inp.disabled = state.attempt.state !== 'running' || p.solved;
+  const go = el('button', '', 'Check'); go.type = 'button'; go.disabled = inp.disabled;
+  go.addEventListener('click', () => submitFlag(key, inp));
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitFlag(key, inp); });
+  flagRow.append(inp, go); body.appendChild(flagRow);
+  if (p.write_up) {
+    const w = el('div', 'box win'); w.append(el('b', '', 'Captured. What was wrong'), el('span', '', p.write_up.vulnerable));
+    const f = el('div', 'box win'); f.append(el('b', '', 'How to fix it'), el('span', '', p.write_up.fix));
+    body.append(w, f);
+  }
+}
+
+async function loadDetail(key) {
+  if (state.details[key]) return;
+  try { state.details[key] = await api('GET', `/api/v1/challenges/${key}`); } catch { state.details[key] = {}; }
+  await loadProgress();
+}
+async function loadHints(key) {
+  if (!state.attempt || !['running', 'submitted'].includes(state.attempt.state)) return;
+  try { state.hints[key] = (await api('GET', `/api/v1/attempts/${state.attempt.attempt_id}/challenges/${key}/hints`)).items; await loadProgress(); } catch { /* hints may be off */ }
 }
 
 async function loadTimeline() {
@@ -195,8 +269,18 @@ async function onStart() {
 async function onOpen() {
   const w = window.open('about:blank', '_blank'); // opened first so the browser allows it, filled after the ticket arrives
   if (w) w.opener = null; // the lab shop is vulnerable on purpose (XSS challenges): it must not reach this tab through window.opener
-  try { const t = await api('POST', `/api/v1/instances/${state.instance.instance_id}/open`); if (w) w.location.href = t.url; else banner('Allow pop-ups for this site, then press Open again.', 'bad'); }
+  try { const t = await api('POST', `/api/v1/instances/${state.instance.instance_id}/open`); state.opened.add('shop'); if (w) w.location.href = t.url; else banner('Allow pop-ups for this site, then press Open again.', 'bad'); steps(); }
   catch (e) { if (w) w.close(); banner(say(e.code), 'bad'); }
+}
+// A fresh one-time link for a browser that is not this one (Burp's browser): shown and copied, never opened here.
+async function onCopy() {
+  try {
+    const t = await api('POST', `/api/v1/instances/${state.instance.instance_id}/open`);
+    $('link').value = t.url; $('link-box').hidden = false; state.opened.add('shop');
+    try { await navigator.clipboard.writeText(t.url); banner('Link copied. Paste it into your attack browser within a minute; it works once.', 'ok'); }
+    catch { banner('Copy the link below and paste it into your attack browser within a minute; it works once.', 'ok'); $('link').select(); }
+    steps();
+  } catch (e) { banner(say(e.code), 'bad'); }
 }
 async function onReset() {
   if (!confirm('Reset gives you a fresh shop and new flags. Flags you found before stop working. Continue?')) return;
@@ -221,7 +305,7 @@ async function submitFlag(key, input) {
 async function unlockHint(key, level) {
   try {
     const h = await api('POST', `/api/v1/attempts/${state.attempt.attempt_id}/challenges/${key}/hints/${level}/unlock`);
-    $('flag-answer').textContent = `${key} hint ${h.level}: ${h.text}`; await refresh();
+    state.hints[key] = (state.hints[key] || []).filter((x) => x.level !== h.level).concat(h); $('flag-answer').textContent = `${key} hint ${h.level} revealed.`; await refresh();
   } catch (e) { $('flag-answer').textContent = say(e.code); }
 }
 async function onReport() {

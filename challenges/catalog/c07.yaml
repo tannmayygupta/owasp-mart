@@ -19,7 +19,7 @@ tier: Easy
 flag:
   placement: database-seed
   delivery: db
-start_state: a seeded customer (or none); the finance mailbox address is on the public Contact page
+start_state: "No account needed. The finance mailbox address is on the public Contact page; the shop's password reset does the rest."
 milestones:
   m1:
     summary: the player requested a password reset for the finance account
