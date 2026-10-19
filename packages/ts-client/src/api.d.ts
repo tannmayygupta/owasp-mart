@@ -1291,7 +1291,7 @@ export interface components {
             deadline_at: components["schemas"]["Timestamp"] | null;
             submitted_at: components["schemas"]["Timestamp"] | null;
             frozen_until: components["schemas"]["Timestamp"] | null;
-            /** @description Optional. Set only while the attempt is `withdrawn` and its deletion is scheduled (the end of the undo window); null or absent otherwise. */
+            /** @description Optional. Present only while the attempt is `withdrawn` (the end of the undo window when the deletion is scheduled, null once the withdrawal was undone). Absent in every other state. */
             delete_after?: components["schemas"]["Timestamp"] | null;
             /** @description The server clock; the browser timer is cosmetic (FR-SES-02). */
             server_time: components["schemas"]["Timestamp"];

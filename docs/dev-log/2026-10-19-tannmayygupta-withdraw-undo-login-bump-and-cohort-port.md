@@ -52,6 +52,8 @@ The withdraw and undo routes are in IF-2 (the lab owns the state machine and the
 - Docker on vm-p needs sudo (`sudo docker exec`); the plain `ssh` of the shell uses another key, the project scripts use the Windows OpenSSH client.
 - The load check left five instances running on vm-i. Cleaning them with a cancel of the attempts was refused by the permission system (cancelling attempts on the live platform), so they free themselves by the idle and duration limits; until then the demo site may answer 429 when more than two people start an instance at once.
 
+- CI found that `scripts/e2e/lab.e2e.test.mjs` pins the key set of an attempt answer. `delete_after` is now present only while the attempt is `withdrawn` (null once undone) in the real API, the mock and the contract text (IF-2 1.1.0, optional field), and the bundle and clients were regenerated. Re-run after the fix: `node --test` of the three e2e files and the fake lab 53 of 53; `apps/api` lab tests 272 passed; contract rules 18 PASS.
+
 ## Security notes
 No flag value appears anywhere. The withdraw route answers 404 for another account and for a deleted attempt, the same as a missing one. The login hook never fails a login and runs on its own thread.
 

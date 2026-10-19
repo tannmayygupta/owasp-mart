@@ -146,7 +146,7 @@ export function createFakeLab(options = {}) {
     error_code: r.errorCode, requested_at: r.requestedAt, ready_at: r.readyAt, expires_at: r.expiresAt, updated_at: r.updatedAt });
   const attemptView = (a) => ({ attempt_id: a.id, mode: a.mode, state: a.state, hints_enabled: a.hintsEnabled, instance_id: a.instanceId,
     started_at: a.startedAt, deadline_at: a.deadlineAt, submitted_at: a.submittedAt, frozen_until: a.frozenUntil,
-    delete_after: a.state === 'withdrawn' ? (a.deleteAfter ?? null) : null, server_time: stamp() });
+    ...(a.state === 'withdrawn' ? { delete_after: a.deleteAfter ?? null } : {}), server_time: stamp() });
   const costPct = (a, level) => (a.mode === 'candidate' ? level * 10 : 0);
   const hintText = (key, level) => `Fake hint level ${level} for ${key} (mock text, not a real hint).`;
   function points(a, key) {

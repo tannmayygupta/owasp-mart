@@ -693,7 +693,7 @@ class Attempt(BaseModel):
     delete_after: Annotated[
         Timestamp | None,
         Field(
-            description='Optional. Set only while the attempt is `withdrawn` and its deletion is scheduled (the end of the undo window); null or absent otherwise.'
+            description='Optional. Present only while the attempt is `withdrawn` (the end of the undo window when the deletion is scheduled, null once the withdrawal was undone). Absent in every other state.'
         ),
     ] = None
     server_time: Annotated[

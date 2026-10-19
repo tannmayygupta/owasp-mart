@@ -252,10 +252,13 @@ def json_ok(body: Any, status: int = 200) -> JSONResponse:
 
 def attempt_view(rt: LabRuntime, rec: AttemptRecord) -> dict[str, Any]:
     info = rt.directory.for_attempt(rec.id)
-    return {"attempt_id": rec.id, "mode": mode_of(rec), "state": rec.state.value, "hints_enabled": hints_enabled(rec),
+    view = {"attempt_id": rec.id, "mode": mode_of(rec), "state": rec.state.value, "hints_enabled": hints_enabled(rec),
             "instance_id": rec.instance_id or (info.instance_id if info else None), "started_at": stamp(rec.started_at),
             "deadline_at": stamp(rec.deadline_at), "submitted_at": stamp(rec.submitted_at), "frozen_until": stamp(rec.frozen_until),
-            "delete_after": stamp(rec.delete_after) if rec.state.value == "withdrawn" else None, "server_time": stamp(rt.clock())}
+            "server_time": stamp(rt.clock())}
+    if rec.state.value == "withdrawn":  # optional in IF-2 1.1.0: only a withdrawn attempt carries it (null once the withdrawal is undone)
+        view["delete_after"] = stamp(rec.delete_after)
+    return view
 
 
 def instance_view(rt: LabRuntime, info: InstanceInfo, rec: AttemptRecord) -> dict[str, Any]:
