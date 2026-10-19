@@ -12,7 +12,7 @@ from vulnmart_attempts import FakeClock
 from support import play
 from vulnmart.ingest.verify import sign_body
 from vulnmart.lab.runtime import LabRuntime, RuntimeFacts, build_lab_runtime, new_instance_id
-from vulnmart.ports.errors import AttemptStateInvalid
+from vulnmart.ports.errors import AttemptGone, AttemptStateInvalid
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
 from vulnmart.ports.instance_host import Access, InstanceState
 
@@ -458,3 +458,15 @@ def test_the_instance_limits_are_an_hour_idle_and_four_hours_for_a_learner_and_c
     lim = rt._limits_for(rec)
     assert lim.idle_minutes == 120 and lim.max_minutes == max(240, rec.rules.time_limit_minutes + 30)
     assert rt._limits_for(rt.engine.get(learner.attempt_id)) == rt._limits
+
+
+def test_erase_is_safe_to_repeat_as_the_deletion_workflow_and_the_retention_job_both_call_it():
+    """Handoff H-145 (story P-25): a deletion request and the retention job call the same `LabRuntime.erase`, possibly twice for one attempt."""
+    rt, _, _ = make_runtime()
+    started = rt.start_attempt("u-1", org_id="o-1")
+    rt.withdraw(started.attempt_id)
+    rt.erase(started.attempt_id)
+    rt.erase(started.attempt_id)  # the second call finds the key gone and the attempt already purged
+    assert rt.engine.get(started.attempt_id).purged_at is not None
+    with pytest.raises(AttemptGone):
+        rt.attempts.get(started.attempt_id)  # the platform's port refuses a purged attempt
