@@ -6,6 +6,7 @@ organisation and its purge.
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -29,9 +30,13 @@ def attempt_rules(invite_rules: Mapping[str, Any] | None) -> Rules:
     return Rules.from_dict(data)
 
 
+PLATFORM_EVENTS = ("invite_created", "invite_opened", "consent_given")  # FR-TIM-04 events whose instants the platform knows
+
+
 class EngineAttemptPort:
-    def __init__(self, engine: AttemptEngine) -> None:
+    def __init__(self, engine: AttemptEngine, log: Any = None) -> None:
         self._engine = engine
+        self._log = log  # the ids-only attempt log (FR-TIM-04); without one the history of an invite is not written
 
     def set_org(self, attempt_id: str, org_id: str) -> None:
         self._record(attempt_id)
@@ -54,10 +59,25 @@ class EngineAttemptPort:
         return rec
 
     def create_from_consent(self, *, user_id: str, org_id: str | None, template_id: str, invite_id: str, consent_id: str,
-                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None) -> Attempt:
-        """A `ready` attempt under the invite's rules; a second call for the same user and template returns the first (idempotent)."""
+                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None, history: Mapping[str, Any] | None = None) -> Attempt:
+        """A `ready` attempt under the invite's rules; a second call for the same user and template returns the first (idempotent). `history` carries the instants the
+        platform knows (`invite_created`, `invite_opened`, `consent_given`); they go into the attempt log with their real times, each at most once."""
         rec = self._engine.create(user_id, template_id, consent_id, rules=attempt_rules(rules), attempt_id=attempt_id, org_id=org_id)
+        self._journal_history(rec.id, history)
         return self._view(rec)
+
+    def _journal_history(self, attempt_id: str, history: Mapping[str, Any] | None) -> None:
+        """Best effort: a failing log never undoes the creation of the attempt."""
+        if not history or self._log is None:
+            return
+        try:
+            have = {e["event"] for e in self._log.read(attempt_id)}
+            for name in PLATFORM_EVENTS:
+                at = history.get(name)
+                if at is not None and name not in have:
+                    self._log.append({"event": name, "attempt_id": attempt_id, "at": at.isoformat()})
+        except Exception:
+            logging.getLogger("vulnmart.ports").warning("writing the invite history of an attempt failed", exc_info=True)
 
     def get(self, attempt_id: str) -> Attempt:
         return self._view(self._record(attempt_id))

@@ -584,3 +584,55 @@ def test_withdrawal_is_for_candidates_only_and_a_closed_undo_window_is_gone(worl
     world.clock.advance(days=8)  # the window closed; the tick has not erased it yet
     late = Session(world, OTHER_EMAIL)
     problem(late.post(f"/api/v1/attempts/{cand.attempt_id}/withdraw/undo"), 410, "ATT-GONE")
+
+
+def test_a_recruiters_view_of_the_report_and_the_evidence_is_logged_and_noted_in_the_view_history_and_the_owner_is_not_a_company(sessions, clock):
+    """FR-TIM-04 `recruiter_viewed_report` and FR-PRV-11 / handoff H-145: every path that shows a candidate's data to a company records the view."""
+    from types import SimpleNamespace
+
+    from vulnmart.accounts.http import Authenticated, authenticated, authenticated_with_csrf
+    from vulnmart.ports.scope import Role, Scope
+
+    add_user(sessions)
+    world = World(sessions, clock)
+    started = world.lab.start_attempt("u-AAAAAAAAAAAAAAAA", org_id="org-1")
+    aid = started.attempt_id
+    notes = []
+
+    class History:
+        fail = False
+
+        def record(self, **kw):
+            if self.fail:
+                raise RuntimeError("the database is away")
+            notes.append(kw)
+            return True
+
+    class Companies:
+        def company_name_of(self, user_id, org_id):
+            return "Acme Ltd" if org_id == "org-1" else None
+
+    history = History()
+    world.app.state.view_history, world.app.state.companies = history, Companies()
+
+    def act_as(user_id: str, role: Role, org: str | None):
+        scope = Scope(user_id=user_id, org_id=org, roles=frozenset({role}))
+        auth = Authenticated("t" * 40, SimpleNamespace(user=SimpleNamespace(id=user_id), roles=frozenset({role}), scope=scope))
+        world.app.dependency_overrides[authenticated] = lambda: auth
+        world.app.dependency_overrides[authenticated_with_csrf] = lambda: auth
+        return TestClient(world.app, base_url="https://testserver", raise_server_exceptions=False)
+
+    viewed = lambda: [e for e in world.lab.attempt_log.read(aid) if e["event"] == "recruiter_viewed_report"]  # noqa: E731
+    recruiter = act_as("u-RECRUITER", Role.RECRUITER, "org-1")
+    assert recruiter.get(f"/api/v1/attempts/{aid}/report").status_code == 200
+    assert [(e["viewer_id"]) for e in viewed()] == ["u-RECRUITER"]
+    assert notes == [{"candidate_user_id": "u-AAAAAAAAAAAAAAAA", "org_id": "org-1", "org_name": "Acme Ltd", "action": "viewed"}]
+    assert recruiter.get(f"/api/v1/attempts/{aid}/evidence").status_code == 200
+    assert len(notes) == 2 and len(viewed()) == 1, "the evidence is a view of the candidate's data, but not a second `recruiter_viewed_report` line"
+    owner = act_as("u-AAAAAAAAAAAAAAAA", Role.CANDIDATE, None)
+    assert owner.get(f"/api/v1/attempts/{aid}/report").status_code == 404, "a candidate does not read the company's report (OI-15)"
+    assert len(notes) == 2 and len(viewed()) == 1, "so nothing is noted for the candidate"
+    history.fail = True
+    recruiter = act_as("u-RECRUITER", Role.RECRUITER, "org-1")  # the overrides are shared: the owner call above replaced them
+    assert recruiter.get(f"/api/v1/attempts/{aid}/report").status_code == 200, "a failing note never blocks the read"
+    assert len(viewed()) == 2

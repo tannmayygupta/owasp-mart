@@ -316,6 +316,12 @@ class CompanyService:
                 member = session.scalar(select(OrgMember).where(OrgMember.user_id == user_id, OrgMember.status == "active"))
         return None if member is None else (str(member.org_id), member.role)
 
+    def company_name_of(self, user_id: str, org_id: str) -> str | None:
+        """The name of the company the person works for, read under that company's scope (the view history keeps the name as it was at the time)."""
+        with self._as(user_id, org_id):
+            with self._sessions() as session:
+                return session.scalar(select(Organization.name).where(Organization.id == uuid.UUID(org_id)))
+
     def standing(self, user_id: str) -> Standing:
         brief = self._directory.brief(user_id)
         if brief is None or brief.account_type != "recruiter":

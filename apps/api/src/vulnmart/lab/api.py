@@ -244,6 +244,25 @@ def reviewable(rt: LabRuntime, auth: Authenticated, attempt_id: str) -> AttemptR
     return not_gone(rec)
 
 
+def note_company_view(request: Request, rt: LabRuntime, auth: Authenticated, rec: AttemptRecord, *, report: bool) -> None:
+    """A recruiter of the owning company looks at a candidate's data (the report, the evidence): the attempt log gets a line with the viewer's id only (FR-TIM-04,
+    `recruiter_viewed_report`) and the candidate's view history an entry with the company's name (FR-PRV-11, handoff H-145). The candidate looking at their own data is
+    not a view by a company. Never raises: a failing note never blocks the read."""
+    if rec.org_id is None or is_owner(auth, rec):
+        return
+    try:
+        user_id = auth.session.user.id
+        if report:
+            rt.journal("recruiter_viewed_report", rec.id, viewer_id=user_id)
+        history = getattr(request.app.state, "view_history", None)
+        if history is not None:
+            companies = getattr(request.app.state, "companies", None)
+            name = (companies.company_name_of(user_id, rec.org_id) if companies is not None else None) or "a company"
+            history.record(candidate_user_id=rec.user_id, org_id=rec.org_id, org_name=name, action="viewed")
+    except Exception:
+        log.warning("noting a company's view of an attempt failed", exc_info=True)
+
+
 def json_ok(body: Any, status: int = 200) -> JSONResponse:
     return JSONResponse(body, status_code=status, headers=NO_STORE)
 
@@ -575,6 +594,7 @@ async def list_evidence(attempt_id: str, request: Request, auth: Authenticated =
     params = query(request, ("limit",))
     limit = parse_limit(params, 100, 100)
     rec = reviewable(rt, auth, attempt_id)
+    await run(note_company_view, request, rt, auth, rec, report=False)
 
     def build() -> tuple[list[dict[str, Any]], bool]:
         items = rt.reports.evidence(rec.id)
@@ -634,6 +654,7 @@ async def get_report(attempt_id: str, request: Request, auth: Authenticated = De
     rt = lab(request)
     query(request, ())
     rec = reviewable(rt, auth, attempt_id)
+    await run(note_company_view, request, rt, auth, rec, report=True)
 
     def build() -> dict[str, Any]:
         total, rows = score_rows(rt, rec)

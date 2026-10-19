@@ -331,6 +331,7 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | LE-28 | Daily backup, off-host copy and a restore (touches LE-5, LE-8, L-24) | Done: backup unit, timer, pull script, restore 39 of 39 tables and 45 of 45 users; copy to cloud storage not built | docs/assets/production-readiness/l24-backup-live.json; docs/runbooks/backup-and-restore.md |
 | LE-29 | No flag pattern in a running instance's logs, inspect output or image (touches FR-FLG-08, L-19) | Done: scan of vm-i clean; CI scan green | docs/assets/production-readiness/l19-vmi-scan.txt |
 | LE-30 | CI-built images are deployed to both VMs and the laptop by a person (touches LE-4, L-12) | Done: hello stack, all checks PASS twice, digest verified | docs/dev-log/2026-10-20-tannmayygupta-l12-hello-stack-deployed.md; docs/assets/production-readiness/l12-hello-deploy.txt |
+| LE-31 | Every FR-TIM-04 event is written; a company's view of a candidate's data is recorded (touches FR-TIM-04, FR-PRV-11, L-25) | Done by tests; live run of the invite and consent events waits for stream P's web routes | docs/dev-log/2026-10-20-tannmayygupta-l25-platform-events.md |
 
 
 ## Live updates (P stream)
