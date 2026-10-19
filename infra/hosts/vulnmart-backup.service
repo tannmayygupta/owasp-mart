@@ -1,0 +1,12 @@
+[Unit]
+Description=VulnMart daily backup of the platform databases (dump, read-back check, 7-day retention)
+After=docker.service
+Wants=docker.service
+OnFailure=vulnmart-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vulnmart-backup.sh run
+TimeoutStartSec=20min
+# After a good run the alert of an earlier failure goes away.
+ExecStartPost=-/usr/local/sbin/vulnmart-alert.sh clear %n

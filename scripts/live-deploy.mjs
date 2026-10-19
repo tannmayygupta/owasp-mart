@@ -277,8 +277,16 @@ function hooks(H) {
     log(`hooks on ${label}`);
     stage(h.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-reload-caddy.sh'), name: 'vulnmart-reload-caddy.sh' }], '/usr/local/sbin', 'root:root', '755', '755');
     stage(h.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-certs.service'), name: 'vulnmart-certs.service' }], '/etc/systemd/system', 'root:root', '644', '755');
-    sshScript(h.pub, 'hooks.sh', 'set -eu\nsudo systemctl daemon-reload\nsudo /usr/local/sbin/vulnmart-reload-caddy.sh\nsudo systemctl cat vulnmart-certs.service | grep ExecStartPost\n');
+    // the alert of a failed job (L-10, L-24): the script and the template unit that a failing unit calls through OnFailure=
+    stage(h.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-alert.sh'), name: 'vulnmart-alert.sh' }], '/usr/local/sbin', 'root:root', '755', '755');
+    stage(h.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-alert@.service'), name: 'vulnmart-alert@.service' }], '/etc/systemd/system', 'root:root', '644', '755');
+    sshScript(h.pub, 'hooks.sh', 'set -eu\nsudo systemctl daemon-reload\nsudo /usr/local/sbin/vulnmart-reload-caddy.sh\nsudo systemctl cat vulnmart-certs.service | grep -E "ExecStartPost|OnFailure"\n');
   }
+  // the daily backup of the platform databases, on vm-p only (L-24)
+  log('backup timer on vm-p');
+  stage(H.p.pub, [{ local: path.join(ROOT, 'infra', 'hosts', 'vulnmart-backup.sh'), name: 'vulnmart-backup.sh' }], '/usr/local/sbin', 'root:root', '755', '755');
+  stage(H.p.pub, ['vulnmart-backup.service', 'vulnmart-backup.timer'].map((n) => ({ local: path.join(ROOT, 'infra', 'hosts', n), name: n })), '/etc/systemd/system', 'root:root', '644', '755');
+  sshScript(H.p.pub, 'backup.sh', 'set -eu\nsudo systemctl daemon-reload\nsudo systemctl enable --now vulnmart-backup.timer\nsystemctl list-timers vulnmart-backup.timer --no-pager | head -3\n');
   log('PASS the renewal hook is installed on both hosts');
   // the firewall of the labs host (audit blocker B4): the script that builds the VULNMART-LABS chain, then the service that runs it
   log('egress rules on vm-i');

@@ -1,0 +1,4 @@
+scan-flags: 2 source(s) scanned
+  scanned: file runtime.txt
+  scanned: tar shop.tar
+scan-flags: CLEAN, no flag pattern found

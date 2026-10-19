@@ -4,6 +4,8 @@ After=network-online.target
 Wants=network-online.target
 # A host without /etc/vulnmart/certs.env (not configured yet) skips the run instead of failing.
 ConditionPathExists=/etc/vulnmart/certs.env
+# A failed renewal leaves ALERT-vulnmart-certs.service in /var/lib/vulnmart and a critical journal line (L-10); scripts/live-ops-check.mjs reads it.
+OnFailure=vulnmart-alert@%n.service
 
 [Service]
 Type=oneshot
@@ -12,3 +14,4 @@ ExecStart=/usr/local/sbin/vulnmart-certs.sh renew
 TimeoutStartSec=30min
 # After the run (the files are replaced by then): restart this host's Caddy container when the certificate files changed. Caddy reads certificate files only at start, so a reload through an admin socket (the old hook, aimed at a container name that does not exist) never served a renewed certificate. The leading "-" means a failure never fails the unit; the journal shows it.
 ExecStartPost=-/usr/local/sbin/vulnmart-reload-caddy.sh
+ExecStartPost=-/usr/local/sbin/vulnmart-alert.sh clear %n

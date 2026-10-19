@@ -326,6 +326,10 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | LE-23 | The private cohort board's platform adapter (touches FR-SCR-07, FR-SCR-08, D-93) | Partly done: adapter and tests; no route or screen yet (stream P, H-353), so not shown live | docs/dev-log/2026-10-19-tannmayygupta-withdraw-undo-login-bump-and-cohort-port.md |
 | LE-24 | Learner instances stop after 60 minutes idle or 4 hours total (touches FR-INS-04, L-14) | Built and tested; the live effect is not observed yet (the running instances were created with the old limits) | docs/dev-log/2026-10-19-tannmayygupta-instance-limits-flag-scan-and-time-metrics.md |
 | LE-25 | No flag pattern in any image layer, checked by CI (touches FR-FLG-08, L-19) | Built (pull request job and a workflow shape test); local scan of four images clean; first CI run is this pull request | docs/dev-log/2026-10-19-tannmayygupta-instance-limits-flag-scan-and-time-metrics.md |
+| LE-26 | Idle and total limits, the reaper, the reconciler after an orchestrator kill (touches FR-INS-03, 04, 05, L-14) | Done: proved live (idle 3 min and total 4 min destroyed, restart during provisioning left 0 orphans, 1 adopted, 1 failed and swept) | docs/dev-log/2026-10-19-tannmayygupta-ops-proofs-backups-alerts.md; docs/assets/production-readiness/l14-reaper-live.json, l14-kill-test-live.json |
+| LE-27 | Certificate renewal with an alert on failure (touches LE-2, L-10) | Done: forced renewal on vm-i through the real unit, alert path shown, ops check | docs/assets/production-readiness/l10-renewal-live.json |
+| LE-28 | Daily backup, off-host copy and a restore (touches LE-5, LE-8, L-24) | Done: backup unit, timer, pull script, restore 39 of 39 tables and 45 of 45 users; copy to cloud storage not built | docs/assets/production-readiness/l24-backup-live.json; docs/runbooks/backup-and-restore.md |
+| LE-29 | No flag pattern in a running instance's logs, inspect output or image (touches FR-FLG-08, L-19) | Done: scan of vm-i clean; CI scan green | docs/assets/production-readiness/l19-vmi-scan.txt |
 
 
 ## Live updates (P stream)
