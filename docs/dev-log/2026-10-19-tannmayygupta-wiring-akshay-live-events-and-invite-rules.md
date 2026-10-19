@@ -32,7 +32,7 @@ Learner hints are free, assessment hints cost (PRD section 4 and FR-SCR-03). The
 - Related lab suites together: 137 passed before the last two additions, and test_lab_runtime, test_ports_lab, test_ports_platform 110 passed.
 
 ## Evidence
-See the pull request and the deployed result below.
+Live (vm-p, after the deploy of this branch): one run of the deployed journey (31 of 31, docs/assets/production-readiness/e2e-run13-live-events.json) wrote these rows to domain_events in the real Postgres: instance.state_changed 9, attempt.state_changed 2, attempt.milestone_reached 3, attempt.flag_captured 3, attempt.score_updated 4, attempt.hint_unlocked 1. Full suites on this branch: apps/api 2499 passed, 36 skipped, 0 failed; npm test 1042 passed, 2 skipped, 0 failed.
 
 ## Problems met and how they were fixed
 `ports.outbox` is the live outbox of the platform (durable events) in a process with a database; in memory tests it is the fake, which validates the same way. The first score test expected the old learner score; updated deliberately.

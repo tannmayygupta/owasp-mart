@@ -313,7 +313,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Waits on: L-21, L-22.
   - Done when: The tests reproduce every PRD Appendix A example and held captures stay out of the score until a human decides.
   - Status 2026-10-17 (earlier status, superseded by the Closed line): the scoring function is built and reproduces all six PRD Appendix A examples (story 7.3, 221 package tests passed at that time). Not built: the `ReportPort` adapter, the fact source, held-capture review (OI-38), the recruiter screen. H-329.
-  - Audit 2026-10-18: OPEN. Reproduces all six Appendix A examples; learners are charged hint costs the UI shows as 0. Details: docs/audit/2026-10-18-lab-stream-audit.md
+  - Audit 2026-10-19: OPEN (one item). Reproduces all six Appendix A examples; the learner hint-cost defect is fixed (hints cost points only in an assessment, learners' are free; tested). Still open: template hint settings (hint cost percent, hints on or off) do not reach the attempt yet (handoff H-351 with Akshay). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-24. Backups, laptop fallback and remaining spikes**
   - Closed 2026-10-17 on local proof only: encrypted dump, checksum, restore into a scratch database with equal row counts, wrong passphrase and a flipped byte fail, laptop fallback up/check/down on this PC (docs/assets/story-8-4-backup-fallback/). NOT met: the backup to S3 and a restore on a VM (runbook steps), no real platform data was backed up.
@@ -347,7 +347,7 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Covers: FR-SES-09, 10
   - Waits on: L-14, L-22.
   - Done when: Both are recorded in the event log and handled as FR-SES-09 and FR-SES-10 require.
-  - Audit 2026-10-18: WAITING ON Akshay (H-346): no HTTP withdraw, cancel or undo route. Reset limit, withdrawal, undo and erase (key shred, purge, retry) are verified. Details: docs/audit/2026-10-18-lab-stream-audit.md
+  - Audit 2026-10-19: WAITING ON Akshay (H-346): no HTTP withdraw, cancel or undo route. Reset limit, withdrawal, undo and erase (key shred, purge, retry) are verified; the lab now announces attempt state changes to the live hub. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-27. Anti-cheat signals and held-capture review**
   - Closed 2026-10-17 after local proof: held captures stay out of the score until a named recruiter or admin of the owning organisation decides, the decision is audited and final, nobody is zeroed (library and runtime tests). The idle and too-fast numbers are placeholders (OI-25). NOT met: FR-ACH-01 and 02 (submission limit coverage, the real activity gate), the review screen, D-92 (OI-38) confirmed 2026-10-17.
