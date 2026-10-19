@@ -128,6 +128,13 @@ class SessionService:
         # For a recruiter: (company id, `owner` or `member`) of their active membership, or None. It becomes the organisation of the scope of every request
         # (story P-19). It is called after the session row is read, never inside its transaction.
         self._org_resolver = org_resolver
+        # Called with the account id after a login session was committed (FR-SES-11, handoff H-341: the lab raises the access epoch of the account's live
+        # instances so an older browser tab loses access). Best effort: a failure is logged and never fails the login.
+        self._on_login: Callable[[str], None] | None = None
+
+    def set_login_hook(self, hook: Callable[[str], None] | None) -> None:
+        """For the process wiring: the lab runtime lives beside this service, not under it."""
+        self._on_login = hook
 
     def set_org_resolver(self, resolver: Callable[[str], tuple[str, str] | None] | None) -> None:
         """For the process wiring: the company service needs this service (to end sessions) and this service needs the company service, so one is set after the other."""
@@ -185,6 +192,11 @@ class SessionService:
         resolved = self.resolve(token)
         assert resolved is not None  # created a moment ago
         self._record("auth.login", actor=user_id, subject=user_id, mfa=mfa)
+        if self._on_login is not None:
+            try:
+                self._on_login(user_id)
+            except Exception:
+                logger.warning("the login hook failed; the login stands", exc_info=True)
         return LoginResult(token=token, session=resolved)
 
     def _create(self, session: Session, user_id: str, now: datetime, absolute_expires_at: datetime, ip_trunc: str | None,

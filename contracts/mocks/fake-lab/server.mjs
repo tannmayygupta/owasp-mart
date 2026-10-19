@@ -116,7 +116,8 @@ export function createFakeLab(options = {}) {
     d.deadlineAt = stamp(Date.now() - 1 * 3600 * 1000);
     d.submittedAt = stamp(Date.now() - 70 * 60 * 1000);
     d.frozenUntil = stamp(Date.now() - 55 * 60 * 1000);
-    makeAttempt('a-EEEEEEEEEEEEEEEE', 'cam', 'candidate', 'org-1', 'withdrawn', false);
+    const e = makeAttempt('a-EEEEEEEEEEEEEEEE', 'cam', 'candidate', 'org-1', 'withdrawn', false);
+    e.deleteAfter = stamp(Date.now() + 7 * 24 * 3600 * 1000);
     makeAttempt('a-FFFFFFFFFFFFFFFF', 'cam', 'candidate', 'org-1', 'cancelled', false);
     makeAttempt('a-GGGGGGGGGGGGGGGG', 'cam', 'candidate', 'org-1', 'deleted', false);
   }
@@ -144,7 +145,8 @@ export function createFakeLab(options = {}) {
   const instanceView = (r) => ({ instance_id: r.id, attempt_id: r.attemptId, state: r.state, access: r.access, health: r.health, epoch: r.epoch,
     error_code: r.errorCode, requested_at: r.requestedAt, ready_at: r.readyAt, expires_at: r.expiresAt, updated_at: r.updatedAt });
   const attemptView = (a) => ({ attempt_id: a.id, mode: a.mode, state: a.state, hints_enabled: a.hintsEnabled, instance_id: a.instanceId,
-    started_at: a.startedAt, deadline_at: a.deadlineAt, submitted_at: a.submittedAt, frozen_until: a.frozenUntil, server_time: stamp() });
+    started_at: a.startedAt, deadline_at: a.deadlineAt, submitted_at: a.submittedAt, frozen_until: a.frozenUntil,
+    ...(a.state === 'withdrawn' ? { delete_after: a.deleteAfter ?? null } : {}), server_time: stamp() });
   const costPct = (a, level) => (a.mode === 'candidate' ? level * 10 : 0);
   const hintText = (key, level) => `Fake hint level ${level} for ${key} (mock text, not a real hint).`;
   function points(a, key) {
@@ -360,6 +362,30 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     if (r && r.state !== 'destroyed') { r.access = 'frozen'; r.updatedAt = stamp(); }
     send(res, 200, attemptView(a));
   };
+  const WITHDRAWABLE = ['ready', 'running', 'submitted'];
+  H.withdrawAttempt = ({ res, user, params, take }) => {
+    const a = owned(res, user, params.attempt_id);
+    if (!a) return;
+    const body = take();
+    if (body === false || !checkKeys(res, body, ['confirm'])) return;
+    if (body.confirm !== true) return invalid(res, '/confirm', 'confirm must be true');
+    if (a.mode !== 'candidate') return problem(res, 409, 'ATT-INVALID-STATE', 'only a candidate attempt can be withdrawn');
+    if (a.state === 'withdrawn') return send(res, 200, attemptView(a));
+    if (!WITHDRAWABLE.includes(a.state)) return problem(res, 409, 'ATT-INVALID-STATE', `withdraw is not allowed in state ${a.state}`);
+    a.state = 'withdrawn';
+    a.deleteAfter = stamp(Date.now() + 7 * 24 * 3600 * 1000);
+    const r = a.instanceId ? instances.get(a.instanceId) : null;
+    if (r && r.state !== 'destroyed') { r.state = 'destroyed'; r.access = 'closed'; r.updatedAt = stamp(); }
+    send(res, 200, attemptView(a));
+  };
+  H.undoWithdrawal = ({ res, user, params, take }) => {
+    const a = owned(res, user, params.attempt_id);
+    if (!a || take() === false) return;
+    if (a.mode !== 'candidate' || a.state !== 'withdrawn') return problem(res, 409, 'ATT-INVALID-STATE', 'only a withdrawn attempt can be restored');
+    if (a.deleteAfter && Date.parse(a.deleteAfter) <= Date.now()) return problem(res, 410, 'ATT-GONE', 'the undo window has closed');
+    a.deleteAfter = null;
+    send(res, 200, attemptView(a));
+  };
   H.submitFlag = ({ res, user, params, take }) => {
     const a = owned(res, user, params.attempt_id);
     if (!a) return;
@@ -552,6 +578,8 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     ['GET', new RegExp(`^/api/v1/attempts/${ID}$`), ['attempt_id'], 'getAttempt'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/start$`), ['attempt_id'], 'startAttempt', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/submit$`), ['attempt_id'], 'submitAttempt', 'json'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw$`), ['attempt_id'], 'withdrawAttempt', 'json'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw/undo$`), ['attempt_id'], 'undoWithdrawal', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/flags$`), ['attempt_id'], 'submitFlag', 'json'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/score$`), ['attempt_id'], 'getScore'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges$`), ['attempt_id'], 'listChallenges'],

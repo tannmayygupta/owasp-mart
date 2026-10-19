@@ -132,6 +132,12 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 1.1.0 (2026-10-19, Tanmay, story L-26 routes; for Akshay to confirm, handoff H-353)
+- Additive: `POST /api/v1/attempts/{attempt_id}/withdraw` (`withdrawAttempt`, body `{ "confirm": true }`) and `POST /api/v1/attempts/{attempt_id}/withdraw/undo` (`undoWithdrawal`, empty body), both 200 with the `Attempt`; only the owner of a candidate attempt; a learner attempt, a wrong state is 409 `ATT-INVALID-STATE`, an unknown or foreign attempt is 404, a closed undo window is 410 `ATT-GONE` (no new error code). New optional field `Attempt.delete_after` (the end of the undo window while the attempt is `withdrawn` and its deletion is scheduled, otherwise null).
+- Why in this contract and not in IF-1: the lab already serves the attempt routes and owns the state machine and the undo window (D-91); the decision text "cancel, withdraw and purge are IF-1" of `lab-api.md` is changed by this entry for withdraw and undo only. Cancel (a recruiter's action) and purge stay with the platform.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (both routes, the seed withdrawn attempt carries a deletion date). Generated code and bundle regenerated: `contracts/api/bundle/`, `packages/ts-client/src/api.d.ts`, `packages/py-models/src/vulnmart_models/api.py`. Two examples: `attempt.withdraw.request.json`, `attempt.withdrawn.json`.
+- registry change: none to `contracts/registry.json`; `contracts/COMPAT.md` lists IF-2 at 1.1.0 (the IF-2 approval rows are pending again).
+
 ### 1.0.1 (2026-10-18, Tanmay, story 9.2)
 - Fixed: the gate ticket in `openGateUrl` answers `...?t=<payload>.<signature>` (two base64url parts joined by a dot, as the API mints it and the edge gate verifies it); the `url` pattern of `Ticket`, `lab-api.md` and the valid and invalid examples now say so (the pattern had no dot, which no real ticket matches). No other schema change; nothing a client could send changed.
 - Mock changed with it: `contracts/mocks/fake-lab/server.mjs` mints the same two-part ticket. Generated code and bundle regenerated: `contracts/api/bundle/`, `packages/ts-client/src/api.d.ts`, `packages/py-models/src/vulnmart_models/api.py`.

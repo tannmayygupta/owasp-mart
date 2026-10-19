@@ -1,6 +1,6 @@
 """Check the lab API contract (IF-2) in contracts/api/lab/.
 
-Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 18 operations exist and no other; every operation
+Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 20 operations exist and no other; every operation
 declares its security; the state, access and health values equal those of IF-5; no GET answer schema or valid answer example
 can hold a secret-looking name; every valid example matches its schema; every invalid example fails at the path its manifest
 names; no real-looking flag is in the contract; the flag result names no oracle reason; every problem example is an IF-8 body (the closed schema, a registered code, its status and title). Run through `pnpm run contracts:check` (last part) or on its own:
@@ -33,6 +33,7 @@ OPERATIONS = {
     ("post", "/api/v1/instances/{instance_id}/stop"),
     ("get", "/api/v1/attempts/{attempt_id}"), ("post", "/api/v1/attempts/{attempt_id}/start"),
     ("post", "/api/v1/attempts/{attempt_id}/submit"), ("post", "/api/v1/attempts/{attempt_id}/flags"),
+    ("post", "/api/v1/attempts/{attempt_id}/withdraw"), ("post", "/api/v1/attempts/{attempt_id}/withdraw/undo"),
     ("get", "/api/v1/attempts/{attempt_id}/score"), ("get", "/api/v1/attempts/{attempt_id}/challenges"),
     ("get", "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints"),
     ("post", "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints/{level}/unlock"),
