@@ -26,6 +26,13 @@ COPY package.json pnpm-lock.yaml ./
 # Isolated, frozen single-package install (no workspace file in the build context).
 RUN corepack pnpm install --prod --frozen-lockfile --ignore-workspace
 
+# The seeded snapshot (T-08: "CI builds the snapshot once"): migrate a fresh database and run every seed contribution. The instance injector copies this file, plants the
+# per-instance flags and challenge data, and hands it to the shop (IF-6 section 5). Built here so the injector needs no migrations and no scrypt work at start.
+COPY src ./src
+COPY migrations ./migrations
+COPY seed ./seed
+RUN node seed/build-snapshot.mjs /snapshot/base.db
+
 # ---- runtime: distroless non-root Node 24 ----
 # Distroless runs as uid:gid 65532:65532 (nonroot) and has no shell, which fits a
 # read-only root filesystem and cap_drop ALL. Its ENTRYPOINT is /nodejs/bin/node
@@ -38,6 +45,7 @@ ENV NODE_ENV=production \
 COPY --from=builder /app/node_modules ./node_modules
 COPY src ./src
 COPY package.json ./
+COPY --from=builder /snapshot/base.db ./snapshot/base.db
 
 EXPOSE 3000
 

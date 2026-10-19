@@ -68,7 +68,7 @@ function mailpit(target, args) {
   return r.stdout;
 }
 
-async function verificationToken(target, email) {
+export async function verificationToken(target, email) {
   for (let i = 0; i < 20; i++) {
     const list = JSON.parse(mailpit(target, `'http://127.0.0.1:8025/api/v1/search?query=to:${encodeURIComponent(email)}'`));
     const id = list.messages?.[0]?.ID;
@@ -105,6 +105,7 @@ async function newLearner(o, label) {
   const l = await c.request('POST', '/api/v1/session', { body: { email, password } });
   if (l.status !== 200 || !l.data?.csrf_token) throw new Error(`sign in answered ${l.status}`);
   c.csrf = l.data.csrf_token;
+  c.email = email; c.password = password; // kept so a test can sign in a second time (FR-SES-11)
   return c;
 }
 
@@ -114,6 +115,10 @@ export async function journey(o) {
   check('platform health through the site', h.status === 200 && h.data?.status === 'ok', `HTTP ${h.status} ${h.ms} ms`);
   const hz = await new Client(o.base).request('GET', '/healthz');
   check('API liveness through the site', hz.status === 200, `HTTP ${hz.status}`);
+  // the page a person opens: the console is served at the root and its script and style load (a stale bind mount once left the folder empty: 404 at the root)
+  const home = await new Client(o.base).request('GET', '/', { json: false });
+  const js = await new Client(o.base).request('GET', '/app.js', { json: false });
+  check('the console page and its script are served at the root of the site', home.status === 200 && /app\.js/.test(home.text) && js.status === 200 && js.text.length > 1000, `/ ${home.status}, app.js ${js.status}`);
   const direct = await fetch(`${o.base}/api/v1/me`, { redirect: 'manual' }).catch((e) => ({ status: 0, e }));
   check('an API call without a session is refused', direct.status === 401, `HTTP ${direct.status}`);
 
@@ -144,13 +149,32 @@ export async function journey(o) {
   const page = await c.request('GET', `${host}/healthz`, { json: false });
   check('the shop answers through the gate and the sidecar', page.status === 200, `HTTP ${page.status} ${page.ms} ms`);
 
-  // read a planted flag the way a player would: the response carries it, the sidecar sees it and tells the platform
-  const planted = await c.request('GET', `${host}/_stub/planted-flag?key=C01`, { json: false });
+  // FR-SES-11 / handoff H-341: a new login of the same account raises the access epoch of its instance, so the gate refuses the older tab and accepts the new login
+  const relogin = new Client(o.base);
+  const relog = await relogin.request('POST', '/api/v1/session', { body: { email: c.email, password: c.password } });
+  check('the same account signs in a second time', relog.status === 200 && !!relog.data?.csrf_token, `HTTP ${relog.status}`);
+  relogin.csrf = relog.data?.csrf_token ?? null;
+  let oldTab; for (let i = 0; i < 20; i++) { oldTab = await c.request('GET', `${host}/healthz`, { json: false }); if (oldTab.status !== 200) break; await sleep(1500); }
+  check('the older tab loses its access at the gate after the new login', [401, 403, 410].includes(oldTab.status), `HTTP ${oldTab.status}`);
+  const t2 = await relogin.request('POST', `/api/v1/instances/${iid}/open`);
+  const enter2 = await relogin.request('GET', t2.data?.url ?? `${host}/`, { json: false });
+  const page2 = await relogin.request('GET', `${host}/healthz`, { json: false });
+  check('the new login gets a new ticket and the shop answers it', t2.status === 200 && enter2.status === 302 && page2.status === 200, `ticket ${t2.status}, enter ${enter2.status}, shop ${page2.status}`);
+  for (const [k, v] of relogin.cookies) if (k.startsWith('__Host-vm_gate')) c.cookies.set(k, v); // the rest of the journey continues with the newer gate cookie
+
+  // read a flag the way a player would: the response carries it, the sidecar sees it and tells the platform. The stub shop serves any planted flag at /_stub/planted-flag;
+  // the real shop does not, so a player takes C05 from its unauthenticated diagnostics page (the weakness of that challenge).
+  const readFlag = async (key) => {
+    const stub = await c.request('GET', `${host}/_stub/planted-flag?key=${key}`, { json: false });
+    if (stub.status === 200) return stub;
+    return key === 'C05' ? c.request('GET', `${host}/_ops/diagnostics`, { json: false }) : stub;
+  };
+  const planted = await readFlag('C05');
   const m = /VM\{[A-Z2-7]{24}\}/.exec(planted.text);
-  check('a planted flag is served by the instance', planted.status === 200 && !!m, `HTTP ${planted.status}`);
+  check('a flag is read off the shop the way a player would', planted.status === 200 && !!m, `HTTP ${planted.status}`);
   const flag = m?.[0] ?? 'VM{missing}';
   await sleep(2500);
-  const afterSeen = (await c.request('GET', `/api/v1/attempts/${aid}/challenges`)).data?.items?.find((x) => x.challenge_key === 'C01');
+  const afterSeen = (await c.request('GET', `/api/v1/attempts/${aid}/challenges`)).data?.items?.find((x) => x.challenge_key === 'C05');
   check('the sidecar saw the flag and the platform credited the challenge', afterSeen?.solved === true || afterSeen?.held === true, `${afterSeen?.best_milestone}${afterSeen?.held ? ' held' : ''}`);
   // audit blocker B1: the platform tells the orchestrator that the player is active, so the idle limit counts from play and not from "ready"
   let act; for (let i = 0; i < 45; i++) { act = (await c.request('GET', `/api/v1/instances/${iid}`)).data; if (act?.state === 'active') break; await sleep(2000); }
@@ -158,21 +182,21 @@ export async function journey(o) {
 
   const wrong = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C02', flag: 'VM{WRONGWRONGWRONGWRONGWRONG}' } });
   check('a wrong flag is incorrect', wrong.status === 200 && wrong.data?.result === 'incorrect', `credit ${wrong.data?.credit}`);
-  const right = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C01', flag } });
+  const right = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C05', flag } });
   check('the right flag is correct and credited', right.status === 200 && right.data?.result === 'correct' && right.data?.credit === 'credited', `${right.data?.result}/${right.data?.credit}`);
   const hint = await c.request('POST', `/api/v1/attempts/${aid}/challenges/C03/hints/1/unlock`);
   check('a hint unlocks', hint.status === 200 && hint.data?.unlocked === true, `HTTP ${hint.status}`);
   const score = (await c.request('GET', `/api/v1/attempts/${aid}/score`)).data;
   check('the score counts the capture', score?.score > 0, `score ${score?.score}`);
 
-  const before = (await c.request('GET', `${host}/_stub/planted-flag?key=C05`, { json: false })).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
+  const before = (await readFlag('C05')).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
   const reset = await c.request('POST', `/api/v1/instances/${iid}/reset`, { body: { confirm: true } });
   check('reset starts a new round', reset.status === 202 && reset.data?.epoch === 2, `epoch ${reset.data?.epoch}`);
   let back; for (let i = 0; i < 60; i++) { back = (await c.request('GET', `/api/v1/instances/${iid}`)).data; if (['ready', 'active', 'idle'].includes(back?.state)) break; await sleep(2000); }
   check('the instance is ready again after the reset', ['ready', 'active', 'idle'].includes(back?.state), `${back?.state}`);
   const stale = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C05', flag: before ?? 'VM{missing}' } });
   check('a flag of the old round no longer counts', stale.status === 200 && stale.data?.result === 'incorrect', `${stale.data?.result}`);
-  const fresh = (await c.request('GET', `${host}/_stub/planted-flag?key=C05`, { json: false })).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
+  const fresh = (await readFlag('C05')).text.match(/VM\{[A-Z2-7]{24}\}/)?.[0];
   check('the new round has other flags', !!fresh && fresh !== before);
   const second = await c.request('POST', `/api/v1/attempts/${aid}/flags`, { body: { challenge_key: 'C05', flag: fresh ?? 'VM{missing}' } });
   check('a flag of the new round counts', second.status === 200 && second.data?.result === 'correct', `${second.data?.result}/${second.data?.credit}`);  const tl = (await c.request('GET', `/api/v1/attempts/${aid}/timeline`)).data;

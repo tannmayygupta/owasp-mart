@@ -70,8 +70,8 @@ def test_the_whole_loop():
     assert send(rt, c03) == 202
     assert (aid, "C03") in rt.milestones.held and rt.milestones.best(aid, "C03").value == "none"
 
-    # (60 x 100 % + 90 x (100 % - 10 %)) = 141 points of 960: 1000 x 141 / 960 = 146.875, half up = 147
-    assert rt.score(aid).score == 147
+    # a learner's hints are free (PRD, FR-SCR-03 is for assessments): (60 + 90) = 150 points of 960: 1000 x 150 / 960 = 156.25, half up = 156
+    assert rt.score(aid).score == 156
 
     # reset: new epoch, the old flag no longer credits, the reset is counted, the clock is untouched
     assert rt.reset_attempt(aid) == 2
@@ -91,4 +91,4 @@ def test_the_whole_loop():
     state = rt.state(aid)
     assert state["destroyed"] is True and host.get(iid).state is InstanceState.DESTROYED
     assert state["state"] == "submitted"  # a held capture waits for a human (D-88)
-    assert rt.score(aid).score == 147  # time and the held capture never change the number
+    assert rt.score(aid).score == 156  # time and the held capture never change the number

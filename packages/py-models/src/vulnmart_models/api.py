@@ -769,6 +769,12 @@ class Attempt(BaseModel):
     deadline_at: Timestamp | None
     submitted_at: Timestamp | None
     frozen_until: Timestamp | None
+    delete_after: Annotated[
+        Timestamp | None,
+        Field(
+            description='Optional. Present only while the attempt is `withdrawn` (the end of the undo window when the deletion is scheduled, null once the withdrawal was undone). Absent in every other state.'
+        ),
+    ] = None
     server_time: Annotated[
         Timestamp,
         Field(

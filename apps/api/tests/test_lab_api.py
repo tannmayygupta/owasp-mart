@@ -540,3 +540,47 @@ def test_reviewer_refusals_become_registry_answers_not_a_500():
         with pytest.raises(ProblemError) as hit:
             call(refuse(exc))
         assert hit.value.code == code
+
+
+# ---- withdraw and undo (FR-SES-10, L-26) ----
+
+def test_a_candidate_withdraws_repeats_it_undoes_it_and_every_refusal_is_a_registry_answer(world, ada, eve):
+    uid = "u-AAAAAAAAAAAAAAAA"
+    cand = world.lab.start_attempt(uid, org_id="org-1")  # a candidate attempt of company org-1, owned by ada
+    aid, iid = cand.attempt_id, cand.instance_id
+    url = f"/api/v1/attempts/{aid}/withdraw"
+    problem(ada.post(url, {"confirm": False}), 422, "REQ-VALIDATION")
+    problem(ada.post(url, {}), 422, "REQ-VALIDATION")
+    assert ada.post(url, {"confirm": True}, csrf=False).status_code == 403
+    problem(eve.post(url, {"confirm": True}), 404, "ATT-NOT-FOUND")  # not the owner
+    problem(ada.post(url + "/undo"), 409, "ATT-INVALID-STATE")  # nothing withdrawn yet
+    first = ada.post(url, {"confirm": True})
+    assert first.status_code == 200, first.text
+    check("Attempt", first.json())
+    body = first.json()
+    assert body["state"] == "withdrawn" and body["mode"] == "candidate"
+    assert body["delete_after"] == (world.clock.now + __import__("datetime").timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert world.host.get(iid).state.value in ("stopping", "destroyed"), "the instance is destroyed at once"
+    world.clock.advance(minutes=5)
+    again = ada.post(url, {"confirm": True})
+    assert (again.status_code, again.json()["delete_after"]) == (200, body["delete_after"]), "idempotent: the first deletion date stays"
+    problem(ada.post(f"/api/v1/attempts/{aid}/flags", {"challenge_key": "C01", "flag": "x"}), 409, "ATT-INVALID-STATE")
+    undone = ada.post(url + "/undo")
+    assert undone.status_code == 200, undone.text
+    check("Attempt", undone.json())
+    assert (undone.json()["state"], undone.json()["delete_after"]) == ("withdrawn", None), "D-91: the attempt is not resumed"
+    assert ada.post(url + "/undo").status_code == 200, "undoing twice is fine"
+    assert ada.post(url + "/undo", raw=b"{}").status_code == 422, "the undo body is empty"
+
+
+def test_withdrawal_is_for_candidates_only_and_a_closed_undo_window_is_gone(world, ada):
+    iid, learner_aid = start(world, ada)
+    problem(ada.post(f"/api/v1/attempts/{learner_aid}/withdraw", {"confirm": True}), 409, "ATT-INVALID-STATE")
+    problem(ada.post(f"/api/v1/attempts/{learner_aid}/withdraw/undo"), 409, "ATT-INVALID-STATE")
+    assert world.lab.engine.get(learner_aid).state.value == "running", "the refusal changed nothing"
+    cand = world.lab.start_attempt("u-BBBBBBBBBBBBBBBB", org_id="org-1")  # eve: one attempt per user and template, so a candidate needs another user than ada
+    eve = Session(world, OTHER_EMAIL)
+    assert eve.post(f"/api/v1/attempts/{cand.attempt_id}/withdraw", {"confirm": True}).status_code == 200
+    world.clock.advance(days=8)  # the window closed; the tick has not erased it yet
+    late = Session(world, OTHER_EMAIL)
+    problem(late.post(f"/api/v1/attempts/{cand.attempt_id}/withdraw/undo"), 410, "ATT-GONE")

@@ -112,8 +112,8 @@ def test_a_hint_costs_ten_percent_of_the_challenge_and_levels_unlock_in_order():
     with pytest.raises(AttemptStateInvalid):
         rt.unlock_hint(started.attempt_id, "C01", 2)  # level 1 first
     assert rt.unlock_hint(started.attempt_id, "C01", 1) == 1
-    # C01: 60 x (100% - 10%) = 54 points of 960: 1000 x 54 / 960 = 56.25, half up = 56
-    assert rt.score(started.attempt_id).score == 56
+    # a learner's hints are free: C01 keeps its 60 points of 960: 1000 x 60 / 960 = 62.5, half up = 63
+    assert rt.score(started.attempt_id).score == 63
 
 
 def test_the_clock_runs_out_submits_freezes_destroys_and_reports():
@@ -391,3 +391,42 @@ def test_a_flag_event_inside_the_window_still_credits():
     clock.advance(minutes=5)
     assert post(rt, flag_event(rt, s.instance_id, "C02", rt.keys.flag(s.instance_id, "C02", 1), 1, clock)).status in (200, 202)
     assert rt.milestones.best(s.attempt_id, "C02").value == "M3"
+
+
+def test_a_hint_costs_points_only_in_an_assessment_and_never_in_practice():
+    """FR-SCR-03: the cost is for assessments; a learner's hints are free (PRD section 4). The UI already said cost 0 for a learner; the score now agrees."""
+    rt, clock, host = make_runtime()
+    learner = rt.start_attempt("u-practice")
+    play(rt, learner.instance_id)
+    rt.submit_flag(learner.attempt_id, "C01", rt.keys.flag(learner.instance_id, "C01", 1))
+    rt.unlock_hint(learner.attempt_id, "C01", 1)
+    free = rt.score(learner.attempt_id).score
+    candidate = rt.start_attempt("u-candidate", org_id="o-acme")
+    play(rt, candidate.instance_id)
+    rt.submit_flag(candidate.attempt_id, "C01", rt.keys.flag(candidate.instance_id, "C01", 1))
+    rt.unlock_hint(candidate.attempt_id, "C01", 1)
+    charged = rt.score(candidate.attempt_id).score
+    assert free == 63 and charged == 56, (free, charged)  # C01 is worth 60 of 960; a level-1 hint takes 10 percent of it in an assessment
+
+
+def test_an_attempt_created_from_a_consent_runs_under_the_rules_of_its_invite():
+    """H-140 and H-141: the invite carries a copy of the template's rules; the attempt must use THEM (time limit and resets), not the defaults."""
+    import pytest
+
+    from vulnmart.ports.engine_attempts import attempt_rules
+
+    rt, clock, host = make_runtime()
+    invite_rules = {"challenge_keys": ["C01", "C02"], "time_limit_min": 45, "hints_mode": "off", "hint_cost_pct": 10, "reset_limit": 1, "retention_days": 90,
+                    "invite_expiry_days": 7, "writeup_required": False, "results_visibility": "company", "flag_submissions_per_minute": 3, "template_version": 2}
+    a = rt.attempts.create_from_consent(user_id="u-cand", org_id="o-acme", template_id="shop-v0~2", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-1",
+                                        attempt_id="a-CANDIDATEATTEMPT", rules=invite_rules)
+    assert a.attempt_id == "a-CANDIDATEATTEMPT" and a.mode.value == "candidate"
+    rec = rt.engine.get(a.attempt_id)
+    assert (rec.rules.time_limit_minutes, rec.rules.reset_limit) == (45, 1) and rec.rules.grace_seconds == 60, "the rest stays as the engine's defaults"
+    assert attempt_rules(None).time_limit_minutes == 120 and attempt_rules({}).reset_limit == 3
+    with pytest.raises(ValueError):
+        attempt_rules({"time_limit_min": "45"})  # a string is not a whole number
+    with pytest.raises(ValueError):
+        attempt_rules({"time_limit_min": 10})  # the 15-minute warning cannot be later than the end
+    again = rt.attempts.create_from_consent(user_id="u-cand", org_id="o-acme", template_id="shop-v0~2", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-1", rules=invite_rules)
+    assert again.attempt_id == a.attempt_id, "a second call is the same attempt"

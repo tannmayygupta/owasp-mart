@@ -33,3 +33,6 @@ Stream L work. Where a part belongs to another stream (the invite and company fl
 ## References
 
 - parent, docs/bmad/initiative-lab/initiative-lab.md; review record docs/dev-log/2026-10-18-tannmayygupta-sprint-4-review-and-s-8.md
+- 2026-10-19: contract versions made true and the tag rule amended, docs/dev-log/2026-10-19-tannmayygupta-contract-versions-and-tag-rule.md (L-09 still open: sign-offs, handoffs, tag)
+- 2026-10-19: L-05, L-18, L-26 ticked; L-28 port built; withdraw and undo routes, login bump, live proofs, docs/dev-log/2026-10-19-tannmayygupta-withdraw-undo-login-bump-and-cohort-port.md
+- 2026-10-19: follow-up fix on the same pull request (delete_after only while withdrawn), same dev-log

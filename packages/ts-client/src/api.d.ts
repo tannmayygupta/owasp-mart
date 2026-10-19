@@ -741,6 +741,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempts/{attempt_id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw from an assessment (after a confirmation)
+         * @description Needs the body {"confirm": true}. Only the owner of a candidate attempt may call it (FR-SES-10); a learner attempt answers 409 ATT-INVALID-STATE.
+         *     Allowed in the states `ready`, `running` and `submitted` (an `expired` attempt is first moved on by the lab); `withdrawn` is answered 200 again (idempotent, the first deletion date stays);
+         *     every other state is 409 ATT-INVALID-STATE. The instance is destroyed at once, the attempt becomes `withdrawn` and `delete_after` says when its data is
+         *     deleted (the undo window, 7 days by default). Nothing is scored after a withdrawal. `undoWithdrawal` cancels the deletion inside the window.
+         */
+        post: operations["withdrawAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/withdraw/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a withdrawal inside the undo window
+         * @description The body is empty. Only the owner of a candidate attempt may call it. Allowed while the attempt is `withdrawn` and the scheduled deletion has not
+         *     happened: `delete_after` becomes null and the attempt stays `withdrawn` (D-91: the instance is gone and the attempt is not resumed; the recruiter is
+         *     told it was undone). A withdrawn attempt whose deletion is already null answers 200 again. 409 ATT-INVALID-STATE when the attempt is not
+         *     `withdrawn`; 410 ATT-GONE when the window has closed.
+         */
+        post: operations["undoWithdrawal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attempts/{attempt_id}/flags": {
         parameters: {
             query?: never;
@@ -1350,6 +1400,8 @@ export interface components {
             deadline_at: components["schemas"]["Timestamp"] | null;
             submitted_at: components["schemas"]["Timestamp"] | null;
             frozen_until: components["schemas"]["Timestamp"] | null;
+            /** @description Optional. Present only while the attempt is `withdrawn` (the end of the undo window when the deletion is scheduled, null once the withdrawal was undone). Absent in every other state. */
+            delete_after?: components["schemas"]["Timestamp"] | null;
             /** @description The server clock; the browser timer is cosmetic (FR-SES-02). */
             server_time: components["schemas"]["Timestamp"];
         };
@@ -2739,6 +2791,51 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    withdrawAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    undoWithdrawal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
             422: components["responses"]["Invalid"];
         };
     };

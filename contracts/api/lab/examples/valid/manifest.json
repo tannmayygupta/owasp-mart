@@ -11,6 +11,8 @@
   "attempt.start.json": "Attempt",
   "attempt.submit.request.json": "ConfirmRequest",
   "attempt.submitted.json": "Attempt",
+  "attempt.withdraw.request.json": "ConfirmRequest",
+  "attempt.withdrawn.json": "Attempt",
   "flags.request.json": "FlagSubmissionRequest",
   "flags.result.correct.json": "FlagSubmissionResult",
   "flags.result.correct-held.json": "FlagSubmissionResult",

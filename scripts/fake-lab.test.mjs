@@ -137,3 +137,21 @@ test('the drain timer of a finished oversize request does not kill a keep-alive 
     assert.equal((await call('GET', `/api/v1/attempts/${A_CAND}`, 'CAM')).status, 200);
   }, { drainStallMs: 300 });
 });
+
+test('withdraw and undo: a candidate withdraws (deletion scheduled), repeats it, undoes it; a learner, a missing confirm and a wrong state are refused', async () => {
+  await withLab(async ({ call }) => {
+    const C = 'a-CCCCCCCCCCCCCCCC'; // a candidate attempt of CAM in state ready
+    assert.equal((await call('POST', `/api/v1/attempts/${C}/withdraw`, 'CAM', { confirm: false })).status, 422);
+    assert.equal((await call('POST', `/api/v1/attempts/a-AAAAAAAAAAAAAAAA/withdraw`, 'ADA', { confirm: true })).status, 409, 'a learner attempt is not withdrawn');
+    assert.equal((await call('POST', `/api/v1/attempts/${C}/withdraw`, 'REX', { confirm: true })).status, 404, 'only the owner');
+    assert.equal((await call('POST', `/api/v1/attempts/${C}/withdraw/undo`, 'CAM')).status, 409, 'not withdrawn yet');
+    const first = await call('POST', `/api/v1/attempts/${C}/withdraw`, 'CAM', { confirm: true });
+    assert.equal(first.status, 200);
+    assert.equal(first.json.state, 'withdrawn');
+    assert.match(first.json.delete_after, /^\d{4}-\d\d-\d\dT/);
+    const again = await call('POST', `/api/v1/attempts/${C}/withdraw`, 'CAM', { confirm: true });
+    assert.deepEqual([again.status, again.json.delete_after], [200, first.json.delete_after], 'idempotent, the first deletion date stays');
+    const undone = await call('POST', `/api/v1/attempts/${C}/withdraw/undo`, 'CAM');
+    assert.deepEqual([undone.status, undone.json.state, undone.json.delete_after], [200, 'withdrawn', null]);
+  });
+});

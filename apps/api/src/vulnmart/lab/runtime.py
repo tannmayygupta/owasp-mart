@@ -33,6 +33,7 @@ from vulnmart.ingest.engine import MilestoneEngine
 from vulnmart.ingest.evidence import EvidenceReader, EvidenceRecorder
 from vulnmart.ingest.handler import IngestHandler
 from vulnmart.ingest.gate import RecordedActivityGate
+from vulnmart.lab.live import LiveAnnouncer
 from vulnmart.ingest.stores import ActivityGate, InstanceInfo, MilestoneStore
 from vulnmart.lab.catalog import Catalog, default_catalog_dir, load_catalog
 from vulnmart.lab.clock import OffsetClock
@@ -41,6 +42,7 @@ from vulnmart.lab.state_reports import StateReportStore
 from vulnmart.lab.stores import HintLedger, LabStores, OrgOf, memory_stores
 from vulnmart.ports.attempts import AttemptState
 from vulnmart.ports.engine_attempts import EngineAttemptPort
+from vulnmart.ports.engine_cohort import EngineCohortPort
 from vulnmart.ports.engine_reports import EngineReportPort
 from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, InstanceNotReady
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
@@ -76,19 +78,21 @@ class StartedAttempt:
 class RuntimeFacts:
     """Scoring facts from the milestone store and the hint ledger. A held capture counts at its fallback (D-86)."""
 
-    def __init__(self, milestones: MilestoneStore, hints: HintLedger) -> None:
-        self._milestones, self._hints = milestones, hints
+    def __init__(self, milestones: MilestoneStore, hints: HintLedger, charged: Callable[[str], bool] = lambda attempt_id: True) -> None:
+        # `charged(attempt_id)`: hints cost points only in an assessment (FR-SCR-03); a learner's hints are free (PRD section 4, journey step 5; audit finding)
+        self._milestones, self._hints, self._charged = milestones, hints, charged
 
     def facts(self, attempt_id: str) -> Mapping[str, Fact]:
         out: dict[str, Fact] = {}
         for ck in CHALLENGE_KEYS:
             best = ScoreMilestone[self._milestones.best(attempt_id, ck).name]
             levels = self._hints.levels(attempt_id, ck)
+            paid = levels if self._charged(attempt_id) else ()
             held = self._milestones.is_held(attempt_id, ck) and best < ScoreMilestone.M3
             if held:
-                out[ck] = Fact(milestone=ScoreMilestone.M3, hint_levels=levels, held=True, fallback=best)
-            elif best is not ScoreMilestone.NONE or levels:
-                out[ck] = Fact(milestone=best, hint_levels=levels)
+                out[ck] = Fact(milestone=ScoreMilestone.M3, hint_levels=paid, held=True, fallback=best)
+            elif best is not ScoreMilestone.NONE or paid:
+                out[ck] = Fact(milestone=best, hint_levels=paid)
         return out
 
 
@@ -122,9 +126,11 @@ class LabRuntime:
         self.engine = AttemptEngine(s.attempts, HostInstanceControl(host), self.clock, events=self._engine_event)
         self.attempts = EngineAttemptPort(self.engine)
         self.evidence_store = s.evidence
-        self.reports = EngineReportPort(attempts=self.attempts, facts=RuntimeFacts(self.milestones, self.hints),
+        self.reports = EngineReportPort(attempts=self.attempts, facts=RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None))),
                                         integrity=self.integrity, clock=self.clock,
                                         evidence=EvidenceReader(store=self.evidence_store, keys=self.keys))
+        self.cohort = EngineCohortPort(engine=self.engine, facts=RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None))),
+                                       milestones=self.milestones, active_seconds_of=self._active_seconds)  # the private cohort view (L-28); the route is stream P's
         self.checker = FlagChecker(self.keys)
         gate_kw = {"gate": gate} if gate is not None else {}
         self.milestone_engine = MilestoneEngine(log=self.events, milestones=self.milestones, integrity=self.integrity,
@@ -150,6 +156,9 @@ class LabRuntime:
         self.held_store, self.audit = s.held, s.audit
         self.review = HeldCaptureReview(self.held_store, self.audit, self.clock, default_may_review(self.org_of_attempt),
                                         events=self.attempt_log.append)
+        # the domain events of the live hub (H-142): attached by `_mount_lab` when the platform has a durable event port, silent otherwise
+        self.live = LiveAnnouncer(clock=self.clock, record_of=self._record_or_none, score_of=self.score_rows)
+        self._bump_pending: set[str] = set()  # accounts whose access bump failed; `tick` tries again
         self._recover_windows()
     def _recover_windows(self) -> None:
         """After a restart: rebuild the open C09 windows of the running attempts from the stored events (audit blocker B5). Never raises."""
@@ -169,6 +178,30 @@ class LabRuntime:
             return False
         return rec.deadline_at is None or at <= rec.deadline_at
 
+    def score_rows(self, attempt_id: str) -> tuple[int, list[dict[str, Any]]]:
+        """The score and one row per challenge (best milestone, held, hints used, points): what the API and the live events show."""
+        score = self.score(attempt_id)
+        by_key = {r.challenge_key: r for r in score.per_challenge}
+        rows = []
+        for key in self.challenge_keys:
+            r = by_key.get(key)
+            rows.append({"challenge_key": key, "best_milestone": (r.milestone.value if r else self.milestones.best(attempt_id, key).value),
+                         "held": self.milestones.is_held(attempt_id, key), "hints_used": len(self.hints.levels(attempt_id, key)),
+                         "points": r.points if r else 0})
+        return score.score, rows
+
+    def announce_instance(self, report: Any) -> None:
+        """An instance moved to a new state (the orchestrator's report): tell the live hub. Never raises."""
+        info = self.directory.get(report.instance_id)
+        if info is None:
+            return
+        rec = self._record_or_none(info.attempt_id)
+        state = report.to_state.value
+        access = "frozen" if rec is not None and getattr(rec, "access", None) == "frozen" else ("open" if state in ("ready", "active", "idle") else "closed")
+        health = getattr(report.health, "value", report.health)
+        self.live.instance(instance_id=report.instance_id, attempt_id=info.attempt_id, state=state, health=str(health), epoch=report.epoch,
+                           error_code=report.error_code, access=access)
+
     def _record_or_none(self, attempt_id: str) -> Any | None:
         try:
             return self.engine.get(attempt_id)
@@ -179,6 +212,8 @@ class LabRuntime:
         """The engine's events go to the ids-only log; a withdrawn attempt that reaches `deleted` is erased at once. The engine swallows an error of this
         sink, so a failed erase is not lost: `tick` erases every `deleted` attempt that is not yet marked purged."""
         self.attempt_log.from_engine(payload)
+        if payload.get("event") == "attempt.state_changed":
+            self.live.attempt_state(payload["attempt_id"], payload.get("from"), payload.get("to"))
         if self.stores.purge and payload.get("event") == "attempt.state_changed" and payload.get("to") == "deleted":
             try:
                 self._erase(payload["attempt_id"])
@@ -247,6 +282,9 @@ class LabRuntime:
         for credit in result.credits:
             self._journal("milestone_reached", credit.attempt_id, challenge_key=credit.challenge_key, level=credit.milestone.value,
                           instance_id=event["instance_id"])
+            self.live.milestone(credit.attempt_id, credit.challenge_key, credit.milestone.value)
+        for attempt_id in dict.fromkeys(c.attempt_id for c in result.credits):
+            self.live.score(attempt_id)
         self.evidence.observe(event, at, result)
         self.activity.record(event, at)
         self.bots.observe(event, at)
@@ -399,6 +437,8 @@ class LabRuntime:
         self._journal("flag_submitted", attempt_id, challenge_key=challenge_key, result=result.result, **extra)
         if result.credit == "credited":
             self._journal("milestone_reached", attempt_id, challenge_key=challenge_key, level="M3", **extra)
+            self.live.milestone(attempt_id, challenge_key, "M3")
+            self.live.score(attempt_id)
         return result
 
     def unlock_hint(self, attempt_id: str, challenge_key: str, level: int) -> int:
@@ -418,6 +458,8 @@ class LabRuntime:
                 raise AttemptStateInvalid("hint levels unlock in order")
             self.hints.add(attempt_id, challenge_key, level, self.clock())
             self._journal("hint_unlocked", attempt_id, challenge_key=challenge_key, level=level, cost=0)
+            self.live.hint(attempt_id, challenge_key, level)
+            self.live.score(attempt_id)
             return len(have) + 1
 
     def _begin_reset(self, attempt_id: str) -> tuple[str, int]:
@@ -487,6 +529,19 @@ class LabRuntime:
     def withdraw(self, attempt_id: str) -> str:
         return self.attempts.withdraw(attempt_id).state.value
 
+    def undo_withdrawal(self, attempt_id: str) -> str:
+        """Inside the undo window: cancel the scheduled deletion; the attempt stays `withdrawn` (D-91). InvalidTransition when it is not withdrawn,
+        WindowClosed after the window."""
+        self.attempts.get(attempt_id)  # AttemptNotFound or AttemptGone
+        return self.engine.undo_withdrawal(attempt_id).state.value
+
+    def _active_seconds(self, attempt_id: str) -> int | None:
+        try:
+            return self.time_metrics(attempt_id).active_seconds
+        except Exception:
+            log.warning("the active time of an attempt could not be computed for the cohort view", exc_info=True)
+            return None
+
     def time_metrics(self, attempt_id: str):
         """FR-TIM-01 to 03: headline time to capture, estimated active time, resets and retries (the score never reads them)."""
         rec = self.engine.get(attempt_id)
@@ -517,6 +572,8 @@ class LabRuntime:
         changed = list(self.engine.tick())
         for credit in self.milestone_engine.tick(now) or ():  # a pending M2 whose window passed
             self._journal("milestone_reached", credit.attempt_id, challenge_key=credit.challenge_key, level=credit.milestone.value)
+            self.live.milestone(credit.attempt_id, credit.challenge_key, credit.milestone.value)
+            self.live.score(credit.attempt_id)
         self.review.remind_overdue()  # an open held capture older than 7 days: a reminder, never a score change
         for rec in self.engine.in_states(AttemptState_.SUBMITTED):
             if rec.destroyed:  # the engine destroys only a `submitted` attempt
@@ -524,8 +581,37 @@ class LabRuntime:
                 if self.engine.mark_reported(rec.id, held_open).state.value == "reported":
                     changed.append(rec.id)
         self._heal_access()
+        self._retry_bumps()
         self._erase_pending()
         return tuple(dict.fromkeys(changed))
+
+    def bump_access_for_user(self, user_id: str) -> int:
+        """FR-SES-11 (handoff H-341): a new login raises the access epoch of the account's live instances, so the gate refuses the older browser tab (it
+        holds a ticket of the old epoch) while the new login can open a new ticket. Only an instance that is ready and open is touched: a closed or
+        frozen one stays as it is. Returns how many instances were bumped. A host failure never raises: the account is retried by the next `tick`."""
+        bumped, failed = 0, False
+        for rec in self.engine.for_user(user_id):
+            if rec.state.value not in ("ready", "running") or not rec.instance_id or rec.access == "frozen":
+                continue
+            try:
+                st = self.host.get(rec.instance_id)
+                if st.state in (InstanceState.READY, InstanceState.ACTIVE, InstanceState.IDLE) and st.access is Access.OPEN:
+                    self.host.set_access(rec.instance_id, Access.OPEN, st.access_epoch + 1)
+                    bumped += 1
+            except InstanceNotFound:
+                continue
+            except Exception:
+                failed = True
+                log.warning("raising the access epoch of instance %s failed; it is retried", rec.instance_id[:10], exc_info=True)
+        if failed:
+            self._bump_pending.add(user_id)
+        else:
+            self._bump_pending.discard(user_id)
+        return bumped
+
+    def _retry_bumps(self) -> None:
+        for user_id in tuple(self._bump_pending):
+            self.bump_access_for_user(user_id)
 
     def _heal_access(self) -> None:
         """A running attempt whose instance is ready but closed (the orchestrator restarted and adopted it closed) is opened again with the

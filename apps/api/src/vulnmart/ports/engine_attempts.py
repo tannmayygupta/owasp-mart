@@ -6,10 +6,27 @@ organisation and its purge.
 """
 from __future__ import annotations
 
-from vulnmart_attempts import AttemptEngine, AttemptRecord, InvalidTransition
+from collections.abc import Mapping
+from typing import Any
+
+from vulnmart_attempts import AttemptEngine, AttemptRecord, InvalidTransition, Rules
 
 from vulnmart.ports.attempts import Attempt, AttemptMode, AttemptState
 from vulnmart.ports.errors import AttemptGone, AttemptNotFound, AttemptStateInvalid
+
+
+def attempt_rules(invite_rules: Mapping[str, Any] | None) -> Rules:
+    """The engine's rules from the rules an invite carries (H-140: `Invite.rules`, copied from the template when the invite was made). Only the members the engine knows
+    are taken (`time_limit_min` and `reset_limit`); the others (hints, challenge list, retention, visibility) belong to other layers. Strict: a value of the wrong type
+    is a ValueError, never a silent default."""
+    if not invite_rules:
+        return Rules()
+    data = Rules().to_dict()
+    if "time_limit_min" in invite_rules:
+        data["time_limit_minutes"] = invite_rules["time_limit_min"]
+    if "reset_limit" in invite_rules:
+        data["reset_limit"] = invite_rules["reset_limit"]
+    return Rules.from_dict(data)
 
 
 class EngineAttemptPort:
@@ -37,9 +54,9 @@ class EngineAttemptPort:
         return rec
 
     def create_from_consent(self, *, user_id: str, org_id: str | None, template_id: str, invite_id: str, consent_id: str,
-                            attempt_id: str | None = None) -> Attempt:
-        """A `ready` attempt; a second call for the same user and template returns the first (idempotent)."""
-        rec = self._engine.create(user_id, template_id, consent_id, attempt_id=attempt_id, org_id=org_id)
+                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None) -> Attempt:
+        """A `ready` attempt under the invite's rules; a second call for the same user and template returns the first (idempotent)."""
+        rec = self._engine.create(user_id, template_id, consent_id, rules=attempt_rules(rules), attempt_id=attempt_id, org_id=org_id)
         return self._view(rec)
 
     def get(self, attempt_id: str) -> Attempt:

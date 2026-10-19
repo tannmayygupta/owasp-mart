@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import os
 import secrets
+import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
@@ -103,6 +104,14 @@ def _lab_from_environ() -> LabRuntime | None:
     return build_lab_runtime(os.environ)
 
 
+def _login_bump(lab: LabRuntime) -> Callable[[str], None]:
+    """The login hook of the session service: the bump runs on its own thread so a slow orchestrator never delays a login (the lab retries a failure)."""
+    def hook(user_id: str) -> None:
+        threading.Thread(target=lab.bump_access_for_user, args=(user_id,), name="login-bump", daemon=True).start()
+
+    return hook
+
+
 def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> None:
     """The IF-2 lab routes, the IF-4 event receiver, the orchestrator report receiver and, only on request, the token-guarded demo routes."""
     from vulnmart.ingest.route import install_event_route
@@ -110,6 +119,9 @@ def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> N
     from vulnmart.lab.state_reports import install_state_reports
 
     app.state.lab = lab
+    ports = getattr(app.state, "ports", None)
+    if ports is not None and getattr(ports, "outbox", None) is not None:
+        lab.live.attach(ports.outbox.publish)  # durable domain events for the live hub (H-142)
     app.state.lab_tickets = tickets or minter_from_environ(os.environ)
     app.include_router(lab_router)
     install_event_route(app, lab.handler)
@@ -206,6 +218,8 @@ def create_app(
                                           ports.settings, AccountStatusService(ports.sessions, app.state.roles, ports.audit), public_origin=settings.public_origin,
                                           end_sessions=app.state.session_service.revoke_all if app.state.session_service is not None else None)
                            if ports.sessions is not None and app.state.accounts is not None and app.state.roles is not None else None)
+    if lab is not None and app.state.session_service is not None:
+        app.state.session_service.set_login_hook(_login_bump(lab))  # a new login ends the older browser tab's access to the instance (FR-SES-11, H-341)
     if app.state.companies is not None and app.state.session_service is not None:
         app.state.session_service.set_org_resolver(app.state.companies.membership_of)  # a recruiter acts for their company in every request (story P-19)
     field_keys = field_keys_from(settings) if mfa is None else None  # a test that passes its own service needs no key

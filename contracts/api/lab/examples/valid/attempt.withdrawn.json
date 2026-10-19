@@ -1,0 +1,13 @@
+{
+  "attempt_id": "a-CCCCCCCCCCCCCCCC",
+  "mode": "candidate",
+  "state": "withdrawn",
+  "hints_enabled": false,
+  "instance_id": "i-CCCCCCCCCCCCCCCC",
+  "started_at": "2026-10-09T12:00:00Z",
+  "deadline_at": "2026-10-09T13:30:00Z",
+  "submitted_at": null,
+  "frozen_until": null,
+  "delete_after": "2026-10-16T12:20:00Z",
+  "server_time": "2026-10-09T12:20:00Z"
+}
