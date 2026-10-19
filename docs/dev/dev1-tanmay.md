@@ -198,6 +198,7 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-19: VERIFIED on the real shop. Readiness only after the injector marker; the orchestrator now creates instances of the REAL shop (real injector built, handoff H-350), ready in 6.1 s from the request on vm-i, 30 of 30 in the deployed journey. S-4 on the old stub numbers (median 2.1 s) is superseded by this live figure. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-14. Reset, teardown, timing defaults and reconciler**
+  - Audit 2026-10-19 (limits): the lab was putting 1440 idle and 1440 total minutes into every instance, so abandoned instances held slots for a day (the load check left five of seven slots busy after 68 minutes). Fixed in code: 60 and 240 for a learner, longer for a candidate (`LabRuntime._limits_for`, tests). NOT proved live: an instance destroyed after 60 idle minutes (needs the deploy of this change and an hour of waiting); the kill test of the Done-when is still not run.
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
   - Build: Reset with new flags, tear down at expiry or inactivity, and a reconciler that repairs any difference between recorded and real state.
@@ -262,6 +263,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-18: WAITING ON Akshay: the platform half of FR-SES-11 (login bumps the access epoch, H-341). Relay, signatures and replay checks are verified. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-19. Flag derivation, injection and secrecy**
+  - Audit 2026-10-19 (CI): the scan is now a CI step (`images.yml`: `--load`, then `node scripts/scan-flags.mjs --image` for every image of a pull request; workflow shape test). Local scan of the shop, mock-services, import-service and bot images: CLEAN. Still open: a scan of a running instance on vm-i (the script needs docker on that host) and the decoy placement list (H-331).
   - Closed 2026-10-17 after local proof: two instances get different flags, a reset invalidates the old ones (test_lab_loop.py), flag leak scan built (scripts/scan-flags.mjs). NOT met: the real KeyPort and real InstancePort (Akshay), a scan of vm-i, decoy placement in the catalogue (H-331).
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
@@ -334,6 +336,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
 Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load check and the demo rehearsal.
 
 - [ ] **L-25. Time metrics and event log**
+  - Audit 2026-10-19: the 500 is fixed (a capture dated before the start counts zero seconds, `clamp_to_start`, test). Still open: the allow-listed FR-TIM-04 events are never emitted, and the dashboard shows nothing yet (stream P).
   - Closed 2026-10-17 after local proof: headline time, estimated active time, resets and retries, ids-only allow-listed event log (96 new library tests across L-25 to L-28; runtime time_metrics tested). NOT met: a time method on the report port and the dashboard (H-346).
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")

@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-19T06:35:07.155Z",
+  "base": "https://tanmay-platform-prod.duckdns.org",
+  "rows": [
+    {
+      "name": "two throwaway learners signed in",
+      "ok": true,
+      "detail": "ids not printed"
+    },
+    {
+      "name": "a candidate attempt with an instance was made by the lab runtime of the API container",
+      "ok": false,
+      "detail": "exit 1"
+    }
+  ]
+}

@@ -15,7 +15,7 @@ import ssl
 import threading
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -57,7 +57,18 @@ ACTIVITY_REPORT_EVERY_S = 60.0  # at most one activity report per instance per m
 READY_TIMEOUT_S = 120.0
 READY_POLL_S = 1.0
 MAX_HINT_LEVEL = 3
-DEFAULT_TEMPLATE_LIMITS = Limits(memory_mb=256, cpu_limit=1.0, pids_limit=256, idle_minutes=1440, max_minutes=1440)
+# What the platform puts in `limits` of a learner instance (the orchestrator's own defaults, `lifecycle.py`): an abandoned instance frees its slot after an hour without play
+# and no instance lives longer than four hours. It was 1440 and 1440, so a closed browser tab held one of the seven slots of vm-i for a whole day (found by the load check,
+# 2026-10-19). A candidate's instance is longer, see `LabRuntime._limits_for`.
+DEFAULT_TEMPLATE_LIMITS = Limits(memory_mb=256, cpu_limit=1.0, pids_limit=256, idle_minutes=60, max_minutes=240)
+CANDIDATE_IDLE_MINUTES = 120  # a candidate may think for a while without touching the shop
+CANDIDATE_MARGIN_MINUTES = 30  # the instance outlives the template's time limit by this much (the attempt's own clock ends the assessment)
+
+
+def clamp_to_start(captures: Mapping[str, datetime], started: datetime) -> dict[str, datetime]:
+    """A capture the engine dates before the start (a clock step, a start recorded late) counts as zero seconds in, instead of failing the whole report
+    (the library refuses it with ValueError: audit 2026-10-18, L-25)."""
+    return {key: (when if when >= started else started) for key, when in captures.items()}
 
 
 def new_attempt_id() -> str:
@@ -358,7 +369,7 @@ class LabRuntime:
             instance_id = new_instance_id()
             material = build_material(self.keys, instance_id, 1, self.challenge_keys)
             request = CreateRequest(instance_id=instance_id, template_id=template, epoch=1, material=material,
-                                    hostname=f"{instance_id.lower()}.{self._suffix}", limits=self._limits,
+                                    hostname=f"{instance_id.lower()}.{self._suffix}", limits=self._limits_for(rec),
                                     owner_hash=self.keys.owner_hash(user_id))
             self.host.create(request)
             # registered at once: the owner can poll the instance while it starts, and an event of epoch 1 has a known epoch
@@ -366,6 +377,13 @@ class LabRuntime:
             self.epochs.set(instance_id, 1)
             self._starting[rec.id] = instance_id
             return rec, instance_id, 1, template
+
+    def _limits_for(self, rec: Any) -> Limits:
+        """The limits of the instance of this attempt: the learner default, or for a candidate attempt a longer idle limit and a total limit that covers the template's time limit."""
+        if not getattr(rec, "org_id", None):
+            return self._limits
+        total = max(self._limits.max_minutes, int(rec.rules.time_limit_minutes) + CANDIDATE_MARGIN_MINUTES)
+        return replace(self._limits, idle_minutes=max(self._limits.idle_minutes, CANDIDATE_IDLE_MINUTES), max_minutes=min(total, 1440))
 
     def _finish(self, rec: Any, instance_id: str, epoch: int, template: str) -> StartedAttempt:
         """The slow half, outside the lock (it waits for the orchestrator): ready, access open, directory, epoch, clock."""
@@ -549,7 +567,7 @@ class LabRuntime:
         captures = self.milestones.captures(attempt_id)
         stamps = [b.minute for b in self.activity.buckets(info.instance_id)] if info else []
         started = rec.started_at or rec.created_at
-        return time_metrics(started, captures, stamps, self.attempt_log.read(attempt_id))
+        return time_metrics(started, clamp_to_start(captures, started), stamps, self.attempt_log.read(attempt_id))
 
     def submit(self, attempt_id: str) -> str:
         self.attempts.get(attempt_id)

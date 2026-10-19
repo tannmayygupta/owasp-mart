@@ -14,6 +14,7 @@ on:
       - contracts/mocks/**
       - scripts/images-matrix.mjs
       - scripts/images-release.mjs
+      - scripts/scan-flags.mjs
       - .github/workflows/images.yml
   push:
     branches: [main]
@@ -25,6 +26,7 @@ on:
       - contracts/mocks/**
       - scripts/images-matrix.mjs
       - scripts/images-release.mjs
+      - scripts/scan-flags.mjs
       - .github/workflows/images.yml
     tags: ['v*']
   workflow_dispatch:
@@ -77,12 +79,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # --load keeps the image in the local daemon (no push, no login) so the next step can look inside it.
       - name: Build the image without pushing
         env:
+          NAME: ${{ matrix.name }}
           CONTEXT: ${{ matrix.context }}
           DOCKERFILE: ${{ matrix.dockerfile }}
           PLATFORM: ${{ matrix.platform }}
-        run: docker buildx build --platform "$PLATFORM" -f "$DOCKERFILE" "$CONTEXT"
+        run: docker buildx build --load --platform "$PLATFORM" -f "$DOCKERFILE" -t "scan/$NAME:ci" "$CONTEXT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      # Story L-19: no flag-shaped value may be baked into an image (a flag exists only in an instance, planted at start). Fails the pull request when one is found;
+      # the values are never printed.
+      - name: No flag pattern in any layer of the image
+        env:
+          NAME: ${{ matrix.name }}
+        run: node scripts/scan-flags.mjs --image "scan/$NAME:ci"
 
   # Pushes to main and tags: build natively per platform and push by digest (no tag yet).
   build:

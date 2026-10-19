@@ -163,6 +163,16 @@ test('images workflow: pull requests and main use a path filter; arm64 only behi
   assert.match(m.run, /node scripts\/images-matrix\.mjs/);
 });
 
+test('images workflow L-19: a pull request build loads the image and scans every layer for flag patterns before anything else could use it', () => {
+  const steps = images.jobs.check.steps;
+  const build = steps.findIndex((s) => /docker buildx build --load /.test(s.run ?? ''));
+  const scan = steps.findIndex((s) => /node scripts\/scan-flags\.mjs --image "scan\/\$NAME:ci"/.test(s.run ?? ''));
+  assert.ok(build >= 0, 'the image is built into the local daemon');
+  assert.ok(scan > build, 'the scan runs after the build');
+  assert.ok(steps.slice(build, scan).some((s) => s.uses?.startsWith('actions/setup-node')), 'node is set up from .node-version between them');
+  assert.ok(images.on.pull_request.paths.includes('scripts/scan-flags.mjs'), 'a change to the scanner runs the check');
+});
+
 test('every action in every workflow is pinned by a full commit SHA', () => {
   for (const f of fs.readdirSync(WORKFLOWS).filter((x) => /\.ya?ml$/.test(x))) {
     const d = yaml.load(fs.readFileSync(path.join(WORKFLOWS, f), 'utf8'));
