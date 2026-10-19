@@ -16,6 +16,9 @@ Story L-29, ADR 0056, research `docs/research/s-8-instance-sandboxing.md`. Files
 - `node scripts/live-audit.mjs --out <folder> --instances 7 --expect-runtime runsc`: rule `instance-runtime` fails when any instance container is not under runsc.
 - The deployed journey: `node scripts/e2e-live.mjs ...` (34 checks).
 
+## After the Docker restart
+The install script restarts Docker once. Containers keep running (live-restore), but a container whose port is published on the host loses it: restart the local registry (sudo docker restart vulnmart-local-registry) before the next live-deploy lab, or the image push fails with connection reset by peer.
+
 ## When something fails
 - An instance fails in a few seconds: the orchestrator log now holds "start refused by the container host ..." with the step. A runsc sandbox that dies while starting ("StartRoot ... EOF") usually means too few pids or memory; the orchestrator adds the sandbox room (backend.py `SANDBOX_PIDS_OVERHEAD`, `SANDBOX_MEMORY_OVERHEAD_MB`).
 - A name does not resolve inside an instance: expected under gVisor; the hosts file lists the aliases (backend.py `prepare_plan`). A new alias that an instance needs by name must be an alias of a component of the plan, or the edge container.

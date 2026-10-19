@@ -109,3 +109,43 @@ test('the absolute deadline drops a connection that never finishes', { skip: pro
     await new Promise((r) => server.close(r));
   }
 });
+
+
+// ---- C06 in a deployed lab (story L-30): the audit token only comes back through the pollution ----
+const TOKEN = 'VM{' + 'ABCDEFGH'.repeat(3) + '}';
+const poll = () => JSON.parse('{"product":{"title":"widget","__proto__":{"internalAudit":true}}}');
+
+test('C06: with the audit token placed, the pollution makes the preview return it; a plain job and a job with other keys do not', async () => {
+  const hit = await runJob(poll(), { auditToken: TOKEN });
+  assert.equal(hit.ok, true);
+  assert.equal(hit.auditToken, TOKEN);
+  assert.equal(hit.proto_check, 'polluted');
+  for (const job of [{ product: { title: 'Mug' } }, JSON.parse('{"product":{"title":"x","__proto__":{"somethingElse":1}}}'), { product: { internalAudit: true } }, { internalAudit: true }]) {
+    const r = await runJob(job, { auditToken: TOKEN });
+    assert.equal(r.auditToken, null, JSON.stringify(job));
+  }
+  assert.ok(!JSON.stringify(await runJob({ product: { title: 'Mug' } }, { auditToken: TOKEN })).includes(TOKEN), 'the token is nowhere in an ordinary answer');
+});
+
+test('C06: without a placed token the merge is the safe one: the same pollution does nothing and returns no token', async () => {
+  const r = await runJob(poll(), { auditToken: null });
+  assert.equal(r.ok, true);
+  assert.equal(r.auditToken, null);
+  assert.equal(r.proto_check, 'clean');
+  assert.equal(r.preview.internalAudit, undefined);
+});
+
+test('C06: the token is read from the placement file, only a plain one-word value, and a missing or odd file gives none', async () => {
+  const { readAuditToken } = await import('../src/server.mjs');
+  const fs = await import('node:fs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'c06-'));
+  const f = path.join(dir, 'C06.placement');
+  fs.writeFileSync(f, `${TOKEN}\n`);
+  assert.equal(readAuditToken(f), TOKEN);
+  fs.writeFileSync(f, 'two words');
+  assert.equal(readAuditToken(f), null);
+  fs.writeFileSync(f, '');
+  assert.equal(readAuditToken(f), null);
+  assert.equal(readAuditToken(path.join(dir, 'nope')), null);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

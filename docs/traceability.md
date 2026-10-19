@@ -333,6 +333,7 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | LE-30 | CI-built images are deployed to both VMs and the laptop by a person (touches LE-4, L-12) | Done: hello stack, all checks PASS twice, digest verified | docs/dev-log/2026-10-20-tannmayygupta-l12-hello-stack-deployed.md; docs/assets/production-readiness/l12-hello-deploy.txt |
 | LE-31 | Every FR-TIM-04 event is written; a company's view of a candidate's data is recorded (touches FR-TIM-04, FR-PRV-11, L-25) | Done by tests; live run of the invite and consent events waits for stream P's web routes | docs/dev-log/2026-10-20-tannmayygupta-l25-platform-events.md |
 | LE-32 | Instance containers run in a sandbox runtime and the host audit checks it (touches NFR-ISO-05 to 07, S-8, L-29) | Done: gVisor on vm-i, live journey 34 of 34, probes in both runtimes, audit rule `instance-runtime` | docs/dev-log/2026-10-20-tannmayygupta-l29-gvisor-sandbox.md; docs/adr/0056-instances-run-in-gvisor.md; docs/assets/production-readiness/l29-* |
+| LE-33 | Every challenge is solvable by a player on the deployed lab, flags are per learner, progress and score follow (touches FR-CHL-01 to 11, FR-FLG, FR-SCR) | Done for C01 to C11 except C03 part B: 57 of 57 live checks, score 1000 | docs/dev-log/2026-10-20-tannmayygupta-live-exploits-c06-c07-c10.md; docs/assets/production-readiness/exploits-live-all.json |
 
 
 ## Live updates (P stream)
