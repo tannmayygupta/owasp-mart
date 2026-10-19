@@ -24,25 +24,28 @@ export const IMAGES = {
   'vulnmart-edge:local': ['apps/edge/Dockerfile'],
   'vulnmart-sidecar:local': ['services/sidecar/Dockerfile', 'services/sidecar'],
   'vulnmart-stub-instance:local': ['contracts/mocks/stub-instance/Dockerfile'],
+  'vulnmart-shop:local': ['apps/shop/Dockerfile', 'apps/shop'], // the real shop; its `inject` entrypoint is the real injector (IF-6 section 5)
   'vulnmart-import-service:local': ['services/import-service/Dockerfile', 'services/import-service'],
   'vulnmart-mock-services:local': ['services/mock-services/Dockerfile', 'services/mock-services'],
   'vulnmart-bot:local': ['services/bot/Dockerfile', 'services/bot'],
 };
-export const SHIP = { p: ['vulnmart-api:prod'], i: ['vulnmart-orchestrator:local', 'vulnmart-edge:local', 'vulnmart-sidecar:local', 'vulnmart-stub-instance:local', 'vulnmart-import-service:local', 'vulnmart-mock-services:local', 'vulnmart-bot:local'] };
+export const SHIP = { p: ['vulnmart-api:prod'], i: ['vulnmart-orchestrator:local', 'vulnmart-edge:local', 'vulnmart-sidecar:local', 'vulnmart-stub-instance:local', 'vulnmart-shop:local', 'vulnmart-import-service:local', 'vulnmart-mock-services:local', 'vulnmart-bot:local'] };
 // the instance roles of the lab: which image each role runs, and what the orchestrator may pass (a request can only name a template, never an image or a command)
 export const ROLE_IMAGE = {
-  shop: 'vulnmart-stub-instance:local', injector: 'vulnmart-stub-instance:local', 'volume-keeper': 'vulnmart-stub-instance:local', sidecar: 'vulnmart-sidecar:local',
+  shop: 'vulnmart-shop:local', injector: 'vulnmart-shop:local', 'volume-keeper': 'vulnmart-stub-instance:local', sidecar: 'vulnmart-sidecar:local',
   'import-service': 'vulnmart-import-service:local', 'mock-services': 'vulnmart-mock-services:local', 'bot-controller': 'vulnmart-bot:local',
 };
 const NODE_CHECK = (js) => ['CMD', '/nodejs/bin/node', '-e', js];
 export const MANIFEST_EXTRAS = {
   entrypoints: { 'volume-keeper': ['node', '-e', 'setInterval(()=>{},1<<30)'] },
   commands: {
-    shop: ['shop'], injector: ['inject'],
+    // the shop image is distroless with `node` as its entrypoint: the shop runs its default command, the injector runs the one-shot script
+    injector: ['/app/src/instance/inject.mjs'],
     // the relay URL is the whole URL of the event route (the sidecar posts to it as given); the upstream is the origin of the shop
     sidecar: ['/app/src/main.mjs', '--relay', 'http://vulnmart-edge-gate:8081/internal/v1/events', '--upstream', 'http://shop:3000'],
   },
   healthchecks: {
+    shop: NODE_CHECK("fetch('http://127.0.0.1:3000/readyz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"),
     sidecar: NODE_CHECK("require('net').connect(8080,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"),
     'import-service': NODE_CHECK("process.exit(require('fs').statSync('/run/import/import.sock').isSocket()?0:1)"),
     'mock-services': NODE_CHECK("require('net').connect(9101,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"),
@@ -54,7 +57,7 @@ export const MANIFEST_EXTRAS = {
 // need a fraction of that, and the orchestrator admits instances by the memory the template declares, so the demo template declares less: 768 MB an instance
 // with the volume keeper instead of 1728 MB, which lets a 8 GB host hold about seven instances instead of three. Everything else (images, mounts, labels,
 // hardening) is the example's, unchanged. Use the example as it is when the real shop is deployed.
-export const DEMO_MEMORY_MB = { shop: 192, sidecar: 160, injector: 64, 'import-service': 64, 'mock-services': 96, 'bot-controller': 128 };
+export const DEMO_MEMORY_MB = { shop: 192, sidecar: 160, injector: 128, 'import-service': 64, 'mock-services': 96, 'bot-controller': 128 };
 export const DEMO_CAPACITY_MB = 5600; // vm-i has 7.7 GB; Linux, Docker and the edge need the rest
 
 export function demoTemplate(example) {
@@ -241,7 +244,8 @@ cd /opt/vulnmart/platform
 cp stage/infra/deploy/platform.compose.yaml compose.yaml
 cp stage/infra/deploy/Caddyfile.platform Caddyfile
 install -d postgres/initdb && cp stage/infra/deploy/10-app-role.sql postgres/initdb/
-rm -rf catalog console && cp -r stage/challenges/catalog catalog && cp -r stage/apps/lab-console console
+# the two folders are bind-mounted into running containers: replace their CONTENT, never the folder (a deleted and recreated folder leaves a running container with an empty, stale mount)
+mkdir -p catalog console && find catalog console -mindepth 1 -delete && cp -r stage/challenges/catalog/. catalog/ && cp -r stage/apps/lab-console/. console/
 rm -rf stage
 `);
   log('secrets');

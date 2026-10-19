@@ -289,15 +289,7 @@ def can_change(rt: LabRuntime, rec: AttemptRecord) -> bool:
 
 
 def score_rows(rt: LabRuntime, rec: AttemptRecord) -> tuple[int, list[dict[str, Any]]]:
-    score = rt.score(rec.id)
-    by_key = {r.challenge_key: r for r in score.per_challenge}
-    rows = []
-    for key in rt.challenge_keys:
-        r = by_key.get(key)
-        rows.append({"challenge_key": key, "best_milestone": (r.milestone.value if r else rt.milestones.best(rec.id, key).value),
-                     "held": rt.milestones.is_held(rec.id, key), "hints_used": len(rt.hints.levels(rec.id, key)),
-                     "points": r.points if r else 0})
-    return score.score, rows
+    return rt.score_rows(rec.id)
 
 
 def hint_view(rt: LabRuntime, rec: AttemptRecord, key: str, level: int) -> dict[str, Any]:

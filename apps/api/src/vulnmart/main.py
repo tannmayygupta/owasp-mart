@@ -109,6 +109,9 @@ def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> N
     from vulnmart.lab.state_reports import install_state_reports
 
     app.state.lab = lab
+    ports = getattr(app.state, "ports", None)
+    if ports is not None and getattr(ports, "outbox", None) is not None:
+        lab.live.attach(ports.outbox.publish)  # durable domain events for the live hub (H-142)
     app.state.lab_tickets = tickets or minter_from_environ(os.environ)
     app.include_router(lab_router)
     install_event_route(app, lab.handler)

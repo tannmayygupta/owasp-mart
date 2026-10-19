@@ -61,6 +61,35 @@ export function readFlag(flagsPath, challengeKey) {
   return found ? found.flag : null;
 }
 
+// Which challenges are exploitable in THIS instance: those whose flag the injector planted (IF-6 section 5). Before the marker nothing is (the default build is the
+// correct one), and a flags file that cannot be read means none. The object is read lazily on each use, so it is correct as soon as the shop is ready; the
+// flags file never changes inside an epoch (a reset starts a new instance process set), so the answer is cached once it is read.
+export function makeInstanceChallenges(flagsPath, { injected = isInjected, readFile = fs.readFileSync } = {}) {
+  let cache = null;
+  const load = () => {
+    if (cache) return cache;
+    if (!injected(flagsPath)) return {};
+    try {
+      const doc = JSON.parse(readFile(flagsPath, 'utf8'));
+      // C03 has two parts that are switched separately in the code (C03A search, C03B ticket markup); one flag turns both on
+      cache = Object.fromEntries(doc.flags.flatMap((f) => (f.challenge_key === 'C03' ? ['C03', 'C03A', 'C03B'] : [f.challenge_key]).map((k) => [k, 'vulnerable'])));
+      return cache;
+    } catch {
+      return {};
+    }
+  };
+  const challenges = new Proxy({}, {
+    get: (_, key) => (typeof key === 'string' ? load()[key] : undefined),
+    has: (_, key) => typeof key === 'string' && key in load(),
+    ownKeys: () => Object.keys(load()),
+    getOwnPropertyDescriptor: (_, key) => (typeof key === 'string' && key in load() ? { value: load()[key], enumerable: true, configurable: true } : undefined),
+  });
+  const flagOf = (key) => {
+    try { return injected(flagsPath) ? readFlag(flagsPath, key) ?? undefined : undefined; } catch { return undefined; }
+  };
+  return { challenges, flagOf };
+}
+
 const ts = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 // Build a schema-valid posted event body (IF-4 section 3): the wire event WITHOUT

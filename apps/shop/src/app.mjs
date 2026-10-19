@@ -38,7 +38,7 @@ const ALWAYS_READY = () => true;
 // without it the shop is always-ready (tests / local runs). Pass { emit } to post
 // app events to the sidecar on built flows (T-09, IF-4); without it emission is a
 // no-op (local runs and tests that do not assert on events).
-export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {} } = {}) {
+export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {}, flagOf = () => undefined } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -95,7 +95,7 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
     // so even a successful injection cannot reach anything but merchandising data.
     // Built lazily on first search (after readiness) so instance mode, where the
     // snapshot db opens only after the marker, does not touch it at construction.
-    registerRoutes(app, db, emit, { challenges, getCatalogDb: () => buildCatalogStore(db) });
+    registerRoutes(app, db, emit, { challenges, getCatalogDb: () => buildCatalogStore(db, { flag: flagOf('C03') }) });
     registerStaffRoutes(app, db, { emit, challenges });
     registerSellerRoutes(app, db, { emit, challenges });
   }

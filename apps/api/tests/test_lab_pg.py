@@ -475,3 +475,25 @@ def test_the_app_role_keeps_what_the_code_needs(engine):
         c.execute(text("UPDATE attempts SET version = version WHERE false"))
         c.execute(text("DELETE FROM evidence WHERE false"))
         c.execute(text("DELETE FROM security_events WHERE false"))  # the log purge of story P-24 (FR-PRV-15: security logs go after 12 months), migration 0014
+
+
+def test_create_from_consent_with_an_attempt_id_the_invite_rules_and_a_reinvite_key_work_on_postgres(engine, keystore_engine):
+    """Handoff H-141 (point 4): the accept flow of stream P calls the port with the id the consent names, the invite's rules and, for a re-invite, the key `<template>~2`."""
+    clock, host = FakeClock(T0), FakeInstanceHost()
+    keys = make_keys(keystore_engine)
+    rt = make_runtime(engine, clock, host, keys)
+    user = f"u-inv-{uuid.uuid4().hex[:8]}"
+    first_id = "a-" + "".join(__import__("random").choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", k=16))
+    second_id = "a-" + "".join(__import__("random").choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", k=16))
+    rules = {"time_limit_min": 60, "reset_limit": 2, "hints_mode": "on", "template_version": 1}
+    a = rt.attempts.create_from_consent(user_id=user, org_id="o-pg", template_id="shop-v0", invite_id="i-AAAAAAAAAAAAAAAA", consent_id=f"c-{uuid.uuid4().hex[:8]}",
+                                        attempt_id=first_id, rules=rules)
+    b = rt.attempts.create_from_consent(user_id=user, org_id="o-pg", template_id="shop-v0~2", invite_id="i-BBBBBBBBBBBBBBBB", consent_id=f"c-{uuid.uuid4().hex[:8]}",
+                                        attempt_id=second_id, rules=rules)
+    assert (a.attempt_id, b.attempt_id) == (first_id, second_id) and a.attempt_id != b.attempt_id, "a re-invite is a second attempt under the next template key"
+    reread = make_runtime(engine, clock, host, make_keys(keystore_engine)).engine  # another process, same database
+    rec = reread.get(first_id)
+    assert (rec.org_id, rec.rules.time_limit_minutes, rec.rules.reset_limit, rec.template_id) == ("o-pg", 60, 2, "shop-v0")
+    assert reread.get(second_id).template_id == "shop-v0~2"
+    assert rt.attempts.create_from_consent(user_id=user, org_id="o-pg", template_id="shop-v0", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-again",
+                                           attempt_id=first_id, rules=rules).attempt_id == first_id, "idempotent on the same user and template"
