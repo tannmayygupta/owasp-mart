@@ -264,7 +264,7 @@ def test_the_log_gets_flag_hint_and_milestone_lines_the_metrics_and_timeline_rea
     assert rt.submit_flag(s.attempt_id, "C02", "VM{ZZZZZZZZZZZZZZZZZZZZZZZZ}").result == "incorrect"
     assert rt.submit_flag(s.attempt_id, "C02", rt.keys.flag(s.instance_id, "C02", 1)).credit == "credited"
     names = [(e["event"], e.get("challenge_key"), e.get("result") or e.get("level")) for e in rt.attempt_log.read(s.attempt_id)]
-    assert names == [("session_started", None, None), ("hint_unlocked", "C01", 1), ("flag_submitted", "C02", "incorrect"),
+    assert names == [("instance_requested", None, None), ("instance_ready", None, None), ("session_started", None, None), ("hint_unlocked", "C01", 1), ("flag_submitted", "C02", "incorrect"),
                      ("flag_submitted", "C02", "correct"), ("milestone_reached", "C02", "M3")]
     assert rt.time_metrics(s.attempt_id).retries == {"C02": 2} or rt.time_metrics(s.attempt_id).retries
 
@@ -470,3 +470,17 @@ def test_erase_is_safe_to_repeat_as_the_deletion_workflow_and_the_retention_job_
     assert rt.engine.get(started.attempt_id).purged_at is not None
     with pytest.raises(AttemptGone):
         rt.attempts.get(started.attempt_id)  # the platform's port refuses a purged attempt
+
+
+def test_the_lab_writes_the_instance_and_auto_capture_events_of_the_attempt_log():
+    """FR-TIM-04 (L-25): instance_requested, instance_ready and flag_auto_detected were on the allow-list but never written."""
+    rt, clock, _ = make_runtime()
+    started = rt.start_attempt("u-1")
+    play(rt, started.instance_id)
+    flag = rt.keys.flag(started.instance_id, "C02", 1)
+    assert post(rt, flag_event(rt, started.instance_id, "C02", flag, 1, clock)).status == 202
+    names = [e["event"] for e in rt.attempt_log.read(started.attempt_id)]
+    assert names.index("instance_requested") < names.index("instance_ready"), names
+    assert "session_started" in names and "flag_auto_detected" in names, names
+    detected = [e for e in rt.attempt_log.read(started.attempt_id) if e["event"] == "flag_auto_detected"]
+    assert detected and detected[0]["challenge_key"] == "C02" and flag not in str(detected), "ids only, never the flag"

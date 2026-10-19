@@ -291,6 +291,8 @@ class LabRuntime:
         if result.stored is False:
             return  # a replay: nothing else sees it
         for credit in result.credits:
+            if event.get("type") == "proxy.flag_seen" and (event.get("data") or {}).get("kind") == "real":
+                self._journal("flag_auto_detected", credit.attempt_id, challenge_key=credit.challenge_key, instance_id=event["instance_id"])  # FR-TIM-04
             self._journal("milestone_reached", credit.attempt_id, challenge_key=credit.challenge_key, level=credit.milestone.value,
                           instance_id=event["instance_id"])
             self.live.milestone(credit.attempt_id, credit.challenge_key, credit.milestone.value)
@@ -372,6 +374,7 @@ class LabRuntime:
                                     hostname=f"{instance_id.lower()}.{self._suffix}", limits=self._limits_for(rec),
                                     owner_hash=self.keys.owner_hash(user_id))
             self.host.create(request)
+            self._journal("instance_requested", rec.id, instance_id=instance_id)  # FR-TIM-04
             # registered at once: the owner can poll the instance while it starts, and an event of epoch 1 has a known epoch
             self.directory.add(InstanceInfo(instance_id, rec.id, template, 1, tuple(self.challenge_keys)))
             self.epochs.set(instance_id, 1)
@@ -390,6 +393,7 @@ class LabRuntime:
         try:
             self._wait_ready(instance_id)
             self.host.set_access(instance_id, Access.OPEN, 1)
+            self._journal("instance_ready", rec.id, instance_id=instance_id)  # FR-TIM-04 (before the clock starts: `session_started` follows)
             started = self.engine.instance_ready(rec.id, self.clock(), instance_id)
             if started.instance_id != instance_id:  # a running attempt whose old instance died now points at the new one
                 started = self.engine.set_instance(rec.id, instance_id)
