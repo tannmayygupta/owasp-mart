@@ -218,7 +218,21 @@ test('red: a dirty working tree (also an untracked file), a branch other than ma
   }
 });
 
-test('red: a Versions table that is not all 1.0.0 fails release-labels for the tag contracts-v1.0.0 and says what to do; another tag does not need it', () => {
+test('green: a contract that already moved past 1.0.0 (1.1.0) passes release-labels when COMPAT.md lists the real version', () => {
+  const root = makeRepo();
+  try {
+    write(root, 'contracts/CHANGELOG.md', CHANGELOG.replace('### 1.0.0 (2026-10-11)', '### 1.1.0 (2026-10-15)\n- Additive: one route.\n\n### 1.0.0 (2026-10-11)'));
+    write(root, 'contracts/COMPAT.md', compat('approved', '1.1.0').replace('| X | 1.0.0 | L |', '| X | 1.1.0 | L |'));
+    sh(root, 'commit', '-qam', 'real version');
+    const r = byName(checkPreconditions(root));
+    assert.equal(r['release-labels'].ok, true);
+    assert.equal(r.versions.ok, true);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('red: a Versions table with a contract below 1.0.0 fails release-labels for the tag contracts-v1.0.0 and says what to do; another tag does not need it', () => {
   const root = makeRepo();
   try {
     write(root, 'contracts/CHANGELOG.md', CHANGELOG.replace('### 1.0.0 (2026-10-11)\n- First stable release, no content change.\n\n', ''));
@@ -226,7 +240,7 @@ test('red: a Versions table that is not all 1.0.0 fails release-labels for the t
     sh(root, 'commit', '-qam', 'not relabelled');
     const r = byName(checkPreconditions(root));
     assert.equal(r['release-labels'].ok, false);
-    assert.match(r['release-labels'].details[0], /not every contract is labelled 1\.0\.0 \(X 0\.1\.0\): relabel every contract 1\.0\.0 in a release commit first, see docs\/runbooks\/contracts-tag\.md/);
+    assert.match(r['release-labels'].details[0], /not every contract is labelled 1\.0\.0 or higher \(X 0\.1\.0\): relabel every contract 1\.0\.0 in a release commit first, see docs\/runbooks\/contracts-tag\.md/);
     assert.equal(r.versions.ok, true, 'the versions themselves match the changelog');
     assert.equal(byName(checkPreconditions(root, { tag: 'contracts-v0.9.0' }))['release-labels'].ok, true);
   } finally {

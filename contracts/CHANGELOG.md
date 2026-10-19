@@ -74,6 +74,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Edge gate (GATE), `contracts/edge/`
 
+### 1.0.0 (2026-10-19, Tanmay, release label, ADR 0029 amended)
+- First stable release, no content change (no mock change: label only; the gate is shipped and runs live on vm-i since 2026-10-17, vectors and library unchanged). The status line of `gate-ticket.md` now says 1.0.0.
+- registry change: `contracts/COMPAT.md` Versions and Approvals now list the real versions of the contracts that moved on after the first release label: IF-2 1.0.1, IF-5 1.1.0, IF-7 1.1.0, DB 2.0.0, and GATE 1.0.0 (was 0.1.0). The rows of IF-7 and DB that Sahil approved at 1.0.0 (2026-10-15) are back to `pending`, because the version changed; he approves again. No contract file other than `gate-ticket.md` (a status line) changed.
+
 ### 0.1.0 (2026-10-17, Tanmay, story L-17 gate core, ADR 0004 decided on delegation, D-60 D-63 D-68)
 - registry change: GATE is registered in `contracts/registry.json` (new contract in its own folder `contracts/edge/`, owner L, no mock by design, conformance tests under `apps/edge/test/`), and `contracts/COMPAT.md` gets its Versions row and its owner row in Approvals (`pending`).
 - First draft: `gate-ticket.md` (HMAC ticket valid 60 s and single use, host-only `__Host-vm_gate` cookie bound to instance, owner hash and access epoch, strict hostname rule `^i-[a-z2-7]{16}\.<zone>$`, access state pushed by the orchestrator with the IF-5 epoch rule, admin API under `/internal/v1/gate/`, decision order, open points) and `examples/ticket-vectors.json` (31 ticket and 12 cookie vectors with fixed throwaway keys and a fixed time).

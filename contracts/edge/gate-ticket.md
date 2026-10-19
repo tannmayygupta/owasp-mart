@@ -1,6 +1,6 @@
 # Gate contract: ticket, cookie, access state, hostname rule (GATE)
 
-Status: 0.1.0, proposed (ADR 0004 is decided on the developer's delegation, D-60; the developer confirms). Owner: stream L. Consumers: the platform API (it signs tickets, stream P) and the orchestrator (it pushes the access state, stream L). Code: `apps/edge/src/`. Vectors: `examples/ticket-vectors.json`, checked by `apps/edge/test/vectors.test.mjs`.
+Status: 1.0.0, stable (shipped; live on vm-i since 2026-10-17) (ADR 0004 is decided on the developer's delegation, D-60; the developer confirms). Owner: stream L. Consumers: the platform API (it signs tickets, stream P) and the orchestrator (it pushes the access state, stream L). Code: `apps/edge/src/`. Vectors: `examples/ticket-vectors.json`, checked by `apps/edge/test/vectors.test.mjs`.
 
 ## 1. Words
 
