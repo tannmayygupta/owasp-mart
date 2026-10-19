@@ -336,6 +336,7 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
 Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load check and the demo rehearsal.
 
 - [ ] **L-25. Time metrics and event log**
+  - Audit 2026-10-19 (events): the lab now writes instance_requested, instance_ready and flag_auto_detected; still not written: invite_created, invite_opened, consent_given, recruiter_viewed_report (stream P) and request_seen.
   - Audit 2026-10-19: the 500 is fixed (a capture dated before the start counts zero seconds, `clamp_to_start`, test). Still open: the allow-listed FR-TIM-04 events are never emitted, and the dashboard shows nothing yet (stream P).
   - Closed 2026-10-17 after local proof: headline time, estimated active time, resets and retries, ids-only allow-listed event log (96 new library tests across L-25 to L-28; runtime time_metrics tested). NOT met: a time method on the report port and the dashboard (H-346).
   - Epic: `epic-attempts-scoring-and-integrity`
