@@ -1,0 +1,9 @@
+{
+  "schema": "DeletionRequestCreate",
+  "body": {
+    "kind": "learner",
+    "user_id": "u-AAAAAAAAAAAAAAAA"
+  },
+  "path": "/user_id",
+  "rule": "no member besides kind and attempt_id; the person is the session's, never named in the body"
+}

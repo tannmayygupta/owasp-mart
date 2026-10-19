@@ -321,7 +321,7 @@ class ConsentRecord(BaseModel):
     decision: Annotated[
         Decision1,
         Field(
-            description='A withdrawal is a later route (P-25) and adds the value `withdrawn`.'
+            description='A withdrawal adds the value `withdrawn` (no route writes it yet; deletion requests, story P-25, delete the record instead).'
         ),
     ]
     recorded_at: Timestamp
@@ -332,6 +332,85 @@ class ConsentRecordList(BaseModel):
         extra='forbid',
     )
     items: Annotated[list[ConsentRecord], Field(max_length=100)]
+    has_more: bool
+
+
+class DeletionRequestId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(description='d- plus 16 Base32 characters.', pattern='^d-[A-Z2-7]{16}$'),
+    ]
+
+
+class Kind(Enum):
+    learner = 'learner'
+    candidate = 'candidate'
+
+
+class DeletionRequestCreate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Kind
+    attempt_id: AttemptId | None = None
+
+
+class Status1(Enum):
+    pending = 'pending'
+    approved = 'approved'
+    declined = 'declined'
+    cancelled = 'cancelled'
+    done = 'done'
+
+
+class DeletionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: DeletionRequestId
+    kind: Kind
+    status: Annotated[
+        Status1,
+        Field(
+            description='A learner request stays `pending` until it runs; a candidate request is `pending` until the company decides, then `approved` (waiting) or `declined`.'
+        ),
+    ]
+    requested_at: Timestamp
+    attempt_id: Annotated[str | None, Field(pattern='^a-[A-Z2-7]{16}$')]
+    company_name: Annotated[str | None, Field(max_length=120)]
+    decide_by: Timestamp | None
+    decided_at: Timestamp | None
+    execute_after: Timestamp | None
+    finished_at: Timestamp | None
+    can_undo: bool
+
+
+class DeletionRequestList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[DeletionRequest], Field(max_length=100)]
+
+
+class Action(Enum):
+    viewed = 'viewed'
+    exported = 'exported'
+
+
+class DataView(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    company_name: Annotated[str, Field(max_length=120)]
+    action: Action
+    at: Timestamp
+
+
+class DataViewList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[DataView], Field(max_length=100)]
     has_more: bool
 
 
@@ -624,7 +703,7 @@ class ErrorCode1(RootModel[str]):
     ]
 
 
-class Kind(Enum):
+class Kind2(Enum):
     learner = 'learner'
 
 
@@ -632,7 +711,7 @@ class RequestInstanceRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    kind: Kind
+    kind: Kind2
 
 
 class ConfirmRequest(BaseModel):
@@ -786,7 +865,7 @@ class ChallengeProgressList(BaseModel):
     ]
 
 
-class Kind1(Enum):
+class Kind3(Enum):
     nudge = 'nudge'
     direction = 'direction'
     near_solution = 'near_solution'
@@ -807,7 +886,7 @@ class Hint(BaseModel):
         extra='forbid',
     )
     level: Annotated[int, Field(ge=1, le=3)]
-    kind: Kind1
+    kind: Kind3
     unlocked: bool
     cost_pct: Annotated[
         int,
@@ -896,7 +975,7 @@ class Type(Enum):
     similarity = 'similarity'
 
 
-class Status1(Enum):
+class Status2(Enum):
     open = 'open'
     accepted = 'accepted'
     rejected = 'rejected'
@@ -914,7 +993,7 @@ class IntegrityFlag(BaseModel):
     type: Type
     challenge_key: ChallengeKey | None
     explanation: Annotated[str, Field(max_length=500, min_length=1)]
-    status: Status1
+    status: Status2
     held: Annotated[
         bool,
         Field(

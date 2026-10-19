@@ -258,6 +258,8 @@ def test_every_table_with_an_organisation_column_is_scoped_or_listed_here_on_pur
         "attempts": "stream L: the lab runtime and the event receiver work without a session scope, so a row-level policy would stop them; access is decided in the lab API "
                     "(the owner, or a reviewer of the company: vulnmart.lab.api reviewable, same 404 for anyone else). A follow-up may add a policy once the runtime acts with a scope",
         "consent_records": "an append-only proof that outlives the company; org_id is a plain pointer, read by the candidate (story P-16)",
+        "deletion_requests": "a person's request, read and decided by service code that checks the caller (the person, or the company named on the request); org_id is a plain pointer, never a scope (story P-25)",
+        "data_views": "the candidate reads their own history; org_id and the company name are plain values written when a company looks (story P-25)",
     }
     with_org_column = {name for name, table in Base.metadata.tables.items() if "org_id" in table.columns}
     assert with_org_column - set(ORG_SCOPED) == set(on_purpose), sorted(with_org_column - set(ORG_SCOPED) - set(on_purpose))

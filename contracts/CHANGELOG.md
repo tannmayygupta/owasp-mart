@@ -12,6 +12,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
+### 1.1.0 (2026-10-19, Akshay, story P-25, ADR 0055)
+
+- Additive, not breaking (the sign-offs of COMPAT.md stay on 1.0.0 until the owners confirm the minor label; the OpenAPI `info.version` is not changed here): four operations (`createDeletionRequest` `POST /api/v1/me/deletion-requests`, `listMyDeletionRequests` `GET` on the same path, `cancelDeletionRequest` `DELETE /api/v1/me/deletion-requests/{request_id}`, `listMyDataViews` `GET /api/v1/me/data-views`), the tag `privacy`, the schemas `DeletionRequestId`, `DeletionRequestCreate`, `DeletionRequest`, `DeletionRequestList`, `DataView`, `DataViewList`, the response `DeletionConflict` (409 `ATT-INVALID-STATE`); no new error code. The bundle (47 operations) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (three valid and three invalid request examples added; `scripts/platform-mock.test.mjs` 20 of 20).
+
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -245,6 +249,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: names and open points await Sahil's review (optional under D-37) and Akshay's note on the `EVT-*` placeholders.
 
 ## Table owners (DB), `contracts/db/`
+
+### 2.1.0 (2026-10-19, Akshay, story P-25)
+- Additive: one row in `table-owners.yaml`, `data_views` (owner privacy), created by migration `0015` (the company-level view history, FR-PRV-11); `deletion_requests` was already listed and its columns are updated in architecture 04 section 2.7. The schema is unchanged.
+- no mock change: nothing runs against the table-owners list (`noMock` in the registry).
 
 ### 2.0.0 (2026-10-18, Tanmay, story 9.1)
 - BREAKING: declared only because the checker of the base commit reports every change to `table-owners.yaml` as breaking (it cannot compare that file); the content change is additive. This pull request teaches the checker to compare the rows (new row: additive; removed row or another owner: breaking), so later additions need no major step.

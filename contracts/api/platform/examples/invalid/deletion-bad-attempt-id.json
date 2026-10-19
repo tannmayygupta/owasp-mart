@@ -1,0 +1,9 @@
+{
+  "schema": "DeletionRequestCreate",
+  "body": {
+    "kind": "candidate",
+    "attempt_id": "not-an-attempt"
+  },
+  "path": "/attempt_id",
+  "rule": "an attempt id is a- and 16 Base32 characters"
+}

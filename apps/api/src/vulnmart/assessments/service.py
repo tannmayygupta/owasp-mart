@@ -755,6 +755,13 @@ class AssessmentService:
             with self._sessions.begin() as session:
                 return session.execute(delete(Invite).where(Invite.org_id == oid, Invite.id.in_(invite_ids))).rowcount
 
+    def delete_attempt_invite(self, org_id: str, attempt_id: str) -> int:
+        """Delete the invite of one company that names this attempt (an early deletion, story P-25: the person's request approved, or the company deleting). 0 when there is none."""
+        oid = self._uuid(org_id, InviteNotFound)
+        with self._scope.acting_as(self._system(oid)):
+            with self._sessions.begin() as session:
+                return session.execute(delete(Invite).where(Invite.org_id == oid, Invite.attempt_id == attempt_id)).rowcount
+
     def expire_due(self, org_id: str) -> int:
         """Close the live invites of one company that are past their expiry. Returns how many."""
         oid = self._uuid(org_id, InviteNotFound)

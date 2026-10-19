@@ -87,7 +87,8 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `deletion_requests` | `id`, `subject_user_id`, `org_id`, `attempt_id`, `status`, `due_at`, `approved_at`, `executed_at` | FR-PRV-08, 14-day decision and 30-day execution placeholders |
+| `deletion_requests` | `id`, `kind` (`learner`, `candidate`), `user_id`, `attempt_id`, `org_id`, `status` (`pending`, `approved`, `declined`, `cancelled`, `done`), `requested_at`, `decide_by`, `escalated_at`, `decided_at`, `execute_after`, `finished_at` | FR-PRV-08, 09 (story P-25, migration 0015, ADR 0055): a learner's request is held 7 days (`execute_after`), a candidate's goes to the company (`decide_by` 14 days, placeholder) and after approval waits the same 7 days; the application role inserts, selects and updates five columns; one open request per learner and per candidate and attempt; no foreign key to `users` |
+| `data_views` | `id`, `candidate_user_id`, `org_id`, `org_name`, `action` (`viewed`, `exported`), `at` | FR-PRV-11 (story P-25): company-level view history, one entry a day per company, person and action; insert, select and delete for the application role, never update; deleted with the record and after 12 months |
 | `subject_map` | `subject_id`, `user_id` | Pseudonym mapping used by the audit log; **deleted** when a person is deleted (FR-PRV-10) |
 | `break_glass_sessions` | `id`, `admin_id`, `attempt_id`, `reason`, `started_at`, `expires_at`, `reviewed_by`, `reviewed_at`, `what_read` | FR-ADM-03 (duration OI-12) |
 | `settings` | `key`, `value`, `updated_by`, `updated_at` | Quotas, global instance cap, retention defaults, invite cap (FR-ADM-05) |
@@ -171,7 +172,7 @@ Jobs are idempotent and recorded in `job_runs`; failures alert the Admin (FR-PRV
 | Learner retention warning | Daily | Email 30 days before deletion at 12 months after last login | FR-PRV-05 |
 | Learner deletion | Daily | Delete learner data 12 months after last login; login before the date cancels | FR-PRV-05 |
 | Evidence expiry (learner) | Daily | Delete captured evidence 30 days after the instance is destroyed | FR-PRV-06 |
-| Deletion-request executor | Hourly | Execute approved requests within 30 days (placeholder); undo window of 7 days before consent-withdrawal or learner deletion runs | FR-PRV-08, 09 |
+| Deletion-request executor (`deletion_requests`) | Hourly | Execute what is due after the 7-day hold: a learner's request (practice attempts, account, pseudonym) and an approved candidate request (the lab erases the attempt, consent schedule, invite, views); mark a candidate request nobody decided in 14 days as escalated (audit entry for the admins). Built (story P-25); the 30-day execution after approval of the requirements is replaced by the 7-day hold | FR-PRV-08, 09 |
 | Invite purge | Daily | Purge expired invite tokens (hashes) | FR-PRV-18 |
 | IP and browser truncation | Daily | Truncate or drop IP and browser details after 90 days for learners | FR-PRV-14 |
 | Log purge | Daily | Purge security and system logs after 12 months; run `audit_purger` for old audit rows | FR-PRV-15, FR-PRV-10 |

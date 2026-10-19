@@ -37,6 +37,9 @@
       "name": "consent"
     },
     {
+      "name": "privacy"
+    },
+    {
       "name": "catalogue"
     },
     {
@@ -1158,6 +1161,281 @@
                           "notice_version": "2026-10-01.1",
                           "decision": "granted",
                           "recorded_at": "2026-10-11T10:00:30Z"
+                        }
+                      ],
+                      "has_more": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/deletion-requests": {
+      "post": {
+        "tags": [
+          "privacy"
+        ],
+        "operationId": "createDeletionRequest",
+        "summary": "Ask for my data to be deleted",
+        "description": "A learner (`kind: learner`) asks for the practice data and the account to be deleted: the request is held 7 days and can be undone any time before (FR-PRV-09); nothing is\nlocked meanwhile. A candidate (`kind: candidate`, with the `attempt_id` of a finished attempt of theirs) asks for the assessment record to be deleted: it goes to the company that\nholds it, which is asked to decide within 14 days (placeholder from RS-H, FR-PRV-08); an approved request waits the same 7 days, then VulnMart deletes it. A second open request of the\nsame kind (and attempt), a request for an attempt that is not over, and a learner request from an account that is not a learner are 409 ATT-INVALID-STATE; an attempt that is\nnot the caller's is 404. The registry has no deletion codes yet (ADR 0055).\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletionRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The request.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionRequest"
+                },
+                "examples": {
+                  "learner": {
+                    "value": {
+                      "request_id": "d-AAAAAAAAAAAAAAAA",
+                      "kind": "learner",
+                      "status": "pending",
+                      "requested_at": "2026-10-19T10:00:00Z",
+                      "attempt_id": null,
+                      "company_name": null,
+                      "decide_by": null,
+                      "decided_at": null,
+                      "execute_after": "2026-10-26T10:00:00Z",
+                      "finished_at": null,
+                      "can_undo": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/DeletionConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "get": {
+        "tags": [
+          "privacy"
+        ],
+        "operationId": "listMyDeletionRequests",
+        "summary": "My deletion requests",
+        "description": "The caller's own requests, newest first, with their status and dates (FR-PRV-08, the candidate sees the status of the request).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requests.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionRequestList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "request_id": "d-AAAAAAAAAAAAAAAA",
+                          "kind": "candidate",
+                          "status": "pending",
+                          "requested_at": "2026-10-19T10:00:00Z",
+                          "attempt_id": "a-CANDIDATEATTEMPT",
+                          "company_name": "Acme Security Ltd",
+                          "decide_by": "2026-11-02T10:00:00Z",
+                          "decided_at": null,
+                          "execute_after": null,
+                          "finished_at": null,
+                          "can_undo": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/deletion-requests/{request_id}": {
+      "delete": {
+        "tags": [
+          "privacy"
+        ],
+        "operationId": "cancelDeletionRequest",
+        "summary": "Undo a deletion request",
+        "description": "Stops an open request (pending, or approved and waiting) before it runs (FR-PRV-09). The answer is the request with status `cancelled`. A request that is not the caller's is 404; one\nthat is already done, declined or undone is 409 ATT-INVALID-STATE.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DeletionRequestId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request, now cancelled.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionRequest"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "request_id": "d-AAAAAAAAAAAAAAAA",
+                      "kind": "learner",
+                      "status": "cancelled",
+                      "requested_at": "2026-10-19T10:00:00Z",
+                      "attempt_id": null,
+                      "company_name": null,
+                      "decide_by": null,
+                      "decided_at": null,
+                      "execute_after": "2026-10-26T10:00:00Z",
+                      "finished_at": "2026-10-20T08:00:00Z",
+                      "can_undo": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/DeletionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/data-views": {
+      "get": {
+        "tags": [
+          "privacy"
+        ],
+        "operationId": "listMyDataViews",
+        "summary": "Who viewed my data",
+        "description": "Company-level view history of the caller's own data, newest first: the company, the action (`viewed` or `exported`) and the time (FR-PRV-11). Never a recruiter's name or anything\nabout the person who looked; the same company doing the same thing within a day is one entry. `has_more` says whether more exist.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The history.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataViewList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "company_name": "Acme Security Ltd",
+                          "action": "viewed",
+                          "at": "2026-10-19T09:30:00Z"
                         }
                       ],
                       "has_more": false
@@ -2909,7 +3187,7 @@
             "pattern": "^\\d{4}-\\d{2}-\\d{2}\\.\\d{1,3}$"
           },
           "decision": {
-            "description": "A withdrawal is a later route (P-25) and adds the value `withdrawn`.",
+            "description": "A withdrawal adds the value `withdrawn` (no route writes it yet; deletion requests, story P-25, delete the record instead).",
             "enum": [
               "granted",
               "declined",
@@ -2934,6 +3212,188 @@
             "maxItems": 100,
             "items": {
               "$ref": "#/components/schemas/ConsentRecord"
+            }
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DeletionRequestId": {
+        "type": "string",
+        "description": "d- plus 16 Base32 characters.",
+        "pattern": "^d-[A-Z2-7]{16}$"
+      },
+      "DeletionRequestCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ],
+        "description": "A candidate request names the attempt; a learner request does not.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "learner",
+              "candidate"
+            ]
+          },
+          "attempt_id": {
+            "$ref": "#/components/schemas/AttemptId"
+          }
+        }
+      },
+      "DeletionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request_id",
+          "kind",
+          "status",
+          "requested_at",
+          "attempt_id",
+          "company_name",
+          "decide_by",
+          "decided_at",
+          "execute_after",
+          "finished_at",
+          "can_undo"
+        ],
+        "properties": {
+          "request_id": {
+            "$ref": "#/components/schemas/DeletionRequestId"
+          },
+          "kind": {
+            "enum": [
+              "learner",
+              "candidate"
+            ]
+          },
+          "status": {
+            "description": "A learner request stays `pending` until it runs; a candidate request is `pending` until the company decides, then `approved` (waiting) or `declined`.",
+            "enum": [
+              "pending",
+              "approved",
+              "declined",
+              "cancelled",
+              "done"
+            ]
+          },
+          "requested_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "attempt_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^a-[A-Z2-7]{16}$"
+          },
+          "company_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120
+          },
+          "decide_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decided_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execute_after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "can_undo": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DeletionRequestList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/DeletionRequest"
+            }
+          }
+        }
+      },
+      "DataView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "company_name",
+          "action",
+          "at"
+        ],
+        "properties": {
+          "company_name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "action": {
+            "enum": [
+              "viewed",
+              "exported"
+            ]
+          },
+          "at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "DataViewList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/DataView"
             }
           },
           "has_more": {
@@ -4575,6 +5035,32 @@
                 }
               },
               "invalid_state": {
+                "value": {
+                  "type": "urn:vulnmart:error:ATT-INVALID-STATE",
+                  "title": "This action is not allowed in the attempt's current state.",
+                  "status": 409,
+                  "code": "ATT-INVALID-STATE",
+                  "request_id": "req-0a1b2c3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "DeletionConflict": {
+        "description": "The caller already has an open request of this kind, the request is not open any more, the attempt is not over, or the account is not a learner (ATT-INVALID-STATE).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "examples": {
+              "default": {
                 "value": {
                   "type": "urn:vulnmart:error:ATT-INVALID-STATE",
                   "title": "This action is not allowed in the attempt's current state.",

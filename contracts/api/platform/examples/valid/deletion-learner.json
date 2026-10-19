@@ -1,0 +1,6 @@
+{
+  "schema": "DeletionRequestCreate",
+  "body": {
+    "kind": "learner"
+  }
+}
