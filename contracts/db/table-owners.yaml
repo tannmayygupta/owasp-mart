@@ -27,6 +27,7 @@ tables:
   - { table: template_challenges, owner: assessments }
   - { table: invites, owner: assessments }
   - { table: consent_records, owner: privacy, note: "Append-only: no UPDATE or DELETE grant (FR-PRV-02)." }
+  - { table: data_views, owner: privacy, note: "Insert, select and delete, never update (story P-25, FR-PRV-11)." }
   # 2.5 attempts and instances (L)
   - { table: attempts, owner: attempts, note: "To confirm by Tanmay." }
   - { table: instance_hosts, owner: instances, note: "To confirm by Tanmay." }

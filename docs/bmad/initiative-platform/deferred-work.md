@@ -221,3 +221,14 @@
 - The seed check finds addresses on non-reserved domains, numbers that pass the card check and well-known secret formats; it cannot tell a real person's name from an invented one, and it covers the shop's seed folders and the migrations, not future seed files in other folders.
 - Companies that accepted the data-processing terms before version 2026-10-19.1 must accept again before they invite.
 - The scheduler's intervals are after the last success, not clock times (a restart runs what is due at once); a dead run holds its job for up to an hour; raw per-job metrics are not exported.
+
+## Deferred from: story-deletion-workflow-7-day-undo-and-who-viewed-me-plan (2026-10-19)
+
+- No email confirms a decision or a deletion to the parties, and the company gets no reminder before the 14-day deadline (FR-PRV-08, OI-12); the escalation is an audit entry only.
+- The company's side (`for_company`, `decide`, `company_delete`) has no routes until the recruiter routes of story 5.3.
+- Nothing records into the view history yet: the dashboard (P-27) and the exports (P-29) must call `ViewHistory.record` (H-145).
+- The `withdrawn` value of the consent record is still written by nothing; a candidate's withdrawal is their deletion request.
+- The registry has no deletion error codes (the existing `ATT-NOT-FOUND` and `ATT-INVALID-STATE` are used); a `PRV` family is the cleaner design.
+- The learner's account stays usable during the 7 days (no lock, no banner).
+- The periods (7 and 14 days) are not legally reviewed (OI-33); VulnMart's 30-day execution after approval is replaced by the 7-day hold plus the hourly job.
+- A candidate who also took part as a learner keeps the account when the learner request runs; the account is removed when no assessment data is left (the retention job or a later request).

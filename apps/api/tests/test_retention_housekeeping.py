@@ -119,7 +119,7 @@ def test_the_logs_are_purged_after_twelve_months_and_the_sealed_address_of_a_dea
                           updated_at=now - timedelta(days=29)))
         s.add(EmailOutbox(template="candidate.invite", to_user_id="i-PENDING", to_address_sealed="v1.sealed", params={}, state="pending", attempts=0, next_attempt_at=now,
                           updated_at=now - timedelta(days=60)))
-    assert LogPurge(sessions, FakeSettingsPort()).run(now) == "0 audit entries, 1 security events, 1 job runs, 1 mails purged; 1 sealed addresses cleared"
+    assert LogPurge(sessions, FakeSettingsPort()).run(now) == "0 audit entries, 0 view entries, 1 security events, 1 job runs, 1 mails purged; 1 sealed addresses cleared"
     with sessions() as s:
         assert [e.kind for e in s.scalars(select(SecurityEvent))] == ["new"]
         assert sorted(j.job for j in s.scalars(select(JobRun))) == ["new", "running"], "a run that never finished is not a log to purge"

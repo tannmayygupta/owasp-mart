@@ -16,6 +16,7 @@ from vulnmart.kernel.audit import AuditAnchors
 from vulnmart.live.store import StreamWriter
 from vulnmart.ports.audit import AuditPort
 from vulnmart.ports.settings import SettingsPort
+from vulnmart.privacy.deletion import DeletionService
 from vulnmart.privacy.subjects import SubjectService
 
 from .candidates import CandidateRetention
@@ -29,7 +30,7 @@ DAY, HOUR = timedelta(days=1), timedelta(hours=1)
 
 def build_scheduler(*, sessions: sessionmaker[Session], assessments: AssessmentService, settings: SettingsPort, audit: AuditPort, subjects: SubjectService | None,
                     eraser: Callable[[str], None] | None, anchors: AuditAnchors | None, streams: StreamWriter | None, public_origin: str,
-                    now: Callable[[], datetime] | None = None) -> Scheduler:
+                    now: Callable[[], datetime] | None = None, deletion: DeletionService | None = None) -> Scheduler:
     records = SqlAttemptRecords(sessions)
     candidates = CandidateRetention(sessions, assessments, records, settings, audit, eraser)
     learners = LearnerRetention(sessions, records, settings, audit, subjects, eraser, public_origin=public_origin)
@@ -46,6 +47,8 @@ def build_scheduler(*, sessions: sessionmaker[Session], assessments: AssessmentS
         Job("log_purge", DAY, LogPurge(sessions, settings).run),
         Job("live_cleanup", HOUR, LiveCleanup(sessions, settings, streams).run),
     ]
+    if deletion is not None:
+        jobs.append(Job("deletion_requests", HOUR, deletion.run))  # story P-25: due requests after the undo window, late company decisions
     if anchors is not None:
         jobs.append(Job("audit_anchor", DAY, anchor_audit(anchors)))
     return Scheduler(sessions, jobs, audit, **({"now": now} if now is not None else {}))

@@ -29,6 +29,7 @@ from vulnmart.live.models import DomainEvent
 from vulnmart.live.store import StreamWriter
 from vulnmart.notifications.models import EmailOutbox
 from vulnmart.ports.settings import SettingsPort
+from vulnmart.privacy.models import DataView
 
 from .candidates import months
 from .records import SqlAttemptRecords
@@ -86,12 +87,13 @@ class LogPurge:
             audit = 0
             if session.get_bind().dialect.name == "postgresql":
                 audit = session.execute(text("SELECT purge_audit_log(:b)"), {"b": cutoff}).scalar_one()
+            views = session.execute(delete(DataView).where(DataView.at < cutoff)).rowcount
             events = session.execute(delete(SecurityEvent).where(SecurityEvent.created_at < cutoff)).rowcount
             runs = session.execute(delete(JobRun).where(JobRun.finished_at.is_not(None), JobRun.finished_at < cutoff)).rowcount
             mails = session.execute(delete(EmailOutbox).where(EmailOutbox.state == "sent", EmailOutbox.sent_at < cutoff)).rowcount
             cleared = session.execute(update(EmailOutbox).where(EmailOutbox.state == "failed", EmailOutbox.to_address_sealed.is_not(None),
                                                                 EmailOutbox.updated_at < failed_before).values(to_address_sealed=None)).rowcount
-        return f"{audit} audit entries, {events} security events, {runs} job runs, {mails} mails purged; {cleared} sealed addresses cleared"
+        return f"{audit} audit entries, {views} view entries, {events} security events, {runs} job runs, {mails} mails purged; {cleared} sealed addresses cleared"
 
 
 class ConsentPurge:

@@ -351,6 +351,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/deletion-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My deletion requests
+         * @description The caller's own requests, newest first, with their status and dates (FR-PRV-08, the candidate sees the status of the request).
+         */
+        get: operations["listMyDeletionRequests"];
+        put?: never;
+        /**
+         * Ask for my data to be deleted
+         * @description A learner (`kind: learner`) asks for the practice data and the account to be deleted: the request is held 7 days and can be undone any time before (FR-PRV-09); nothing is
+         *     locked meanwhile. A candidate (`kind: candidate`, with the `attempt_id` of a finished attempt of theirs) asks for the assessment record to be deleted: it goes to the company that
+         *     holds it, which is asked to decide within 14 days (placeholder from RS-H, FR-PRV-08); an approved request waits the same 7 days, then VulnMart deletes it. A second open request of the
+         *     same kind (and attempt), a request for an attempt that is not over, and a learner request from an account that is not a learner are 409 ATT-INVALID-STATE; an attempt that is
+         *     not the caller's is 404. The registry has no deletion codes yet (ADR 0055).
+         */
+        post: operations["createDeletionRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/deletion-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo a deletion request
+         * @description Stops an open request (pending, or approved and waiting) before it runs (FR-PRV-09). The answer is the request with status `cancelled`. A request that is not the caller's is 404; one
+         *     that is already done, declined or undone is 409 ATT-INVALID-STATE.
+         */
+        delete: operations["cancelDeletionRequest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/data-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who viewed my data
+         * @description Company-level view history of the caller's own data, newest first: the company, the action (`viewed` or `exported`) and the time (FR-PRV-11). Never a recruiter's name or anything
+         *     about the person who looked; the same company doing the same thing within a day is one entry. `has_more` says whether more exist.
+         */
+        get: operations["listMyDataViews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/challenges": {
         parameters: {
             query?: never;
@@ -1105,7 +1175,7 @@ export interface components {
             attempt_id: components["schemas"]["AttemptId"];
             notice_version: string;
             /**
-             * @description A withdrawal is a later route (P-25) and adds the value `withdrawn`.
+             * @description A withdrawal adds the value `withdrawn` (no route writes it yet; deletion requests, story P-25, delete the record instead).
              * @enum {unknown}
              */
             decision: "granted" | "declined" | "withdrawn";
@@ -1113,6 +1183,45 @@ export interface components {
         };
         ConsentRecordList: {
             items: components["schemas"]["ConsentRecord"][];
+            has_more: boolean;
+        };
+        /** @description d- plus 16 Base32 characters. */
+        DeletionRequestId: string;
+        /** @description A candidate request names the attempt; a learner request does not. */
+        DeletionRequestCreate: {
+            /** @enum {unknown} */
+            kind: "learner" | "candidate";
+            attempt_id?: components["schemas"]["AttemptId"];
+        };
+        DeletionRequest: {
+            request_id: components["schemas"]["DeletionRequestId"];
+            /** @enum {unknown} */
+            kind: "learner" | "candidate";
+            /**
+             * @description A learner request stays `pending` until it runs; a candidate request is `pending` until the company decides, then `approved` (waiting) or `declined`.
+             * @enum {unknown}
+             */
+            status: "pending" | "approved" | "declined" | "cancelled" | "done";
+            requested_at: components["schemas"]["Timestamp"];
+            attempt_id: string | null;
+            company_name: string | null;
+            decide_by: components["schemas"]["Timestamp"] | null;
+            decided_at: components["schemas"]["Timestamp"] | null;
+            execute_after: components["schemas"]["Timestamp"] | null;
+            finished_at: components["schemas"]["Timestamp"] | null;
+            can_undo: boolean;
+        };
+        DeletionRequestList: {
+            items: components["schemas"]["DeletionRequest"][];
+        };
+        DataView: {
+            company_name: string;
+            /** @enum {unknown} */
+            action: "viewed" | "exported";
+            at: components["schemas"]["Timestamp"];
+        };
+        DataViewList: {
+            items: components["schemas"]["DataView"][];
             has_more: boolean;
         };
         Owasp: string;
@@ -1551,6 +1660,16 @@ export interface components {
         };
         /** @description The notice the person saw is not the current one (ATT-CONSENT-STALE), or the attempt is not in state consent (ATT-INVALID-STATE). */
         ConsentConflict: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The caller already has an open request of this kind, the request is not open any more, the attempt is not over, or the account is not a learner (ATT-INVALID-STATE). */
+        DeletionConflict: {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
                 [name: string]: unknown;
@@ -2234,6 +2353,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConsentRecordList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    listMyDeletionRequests: {
+        parameters: {
+            query?: {
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requests. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionRequestList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    createDeletionRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeletionRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description The request. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionRequest"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["DeletionConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    cancelDeletionRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: components["schemas"]["DeletionRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request, now cancelled. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionRequest"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["DeletionConflict"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listMyDataViews: {
+        parameters: {
+            query?: {
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The history. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataViewList"];
                 };
             };
             401: components["responses"]["Unauthenticated"];

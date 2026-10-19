@@ -61,3 +61,60 @@ class SubjectMap(Base):
     subject_id: Mapped[str] = mapped_column(String(18), primary_key=True)  # `s-` and 16 Base32 characters
     user_id: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+REQUEST_KINDS = ("learner", "candidate")
+REQUEST_STATUSES = ("pending", "approved", "declined", "cancelled", "done")
+OPEN_REQUEST = "status IN ('pending', 'approved')"
+VIEW_ACTIONS = ("viewed", "exported")
+
+
+class DeletionRequest(Base):
+    """A request to delete data (story P-25, FR-PRV-08, FR-PRV-09). A learner's runs after the 7-day undo window; a candidate's goes to the company that holds the
+    assessment record, and after the company approves it waits the same 7 days. `execute_after` is set when the hold starts; the scheduler job `deletion_requests`
+    carries out what is due. A person has at most one open request of a kind (and, for a candidate, per attempt): two partial unique indexes."""
+
+    __tablename__ = "deletion_requests"
+    __table_args__ = (
+        CheckConstraint("kind IN ('learner', 'candidate')", name="kind"),
+        CheckConstraint("status IN ('pending', 'approved', 'declined', 'cancelled', 'done')", name="status"),
+        CheckConstraint("kind = 'learner' OR (attempt_id IS NOT NULL AND org_id IS NOT NULL)", name="candidate_target"),
+        Index("uq_deletion_requests_open_learner", "user_id", unique=True, postgresql_where=text("kind = 'learner' AND status IN ('pending', 'approved')"),
+              sqlite_where=text("kind = 'learner' AND status IN ('pending', 'approved')")),
+        Index("uq_deletion_requests_open_candidate", "user_id", "attempt_id", unique=True,
+              postgresql_where=text("kind = 'candidate' AND status IN ('pending', 'approved')"),
+              sqlite_where=text("kind = 'candidate' AND status IN ('pending', 'approved')")),
+        Index("ix_deletion_requests_user_id", "user_id", "requested_at"),
+        Index("ix_deletion_requests_org_id", "org_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(18), primary_key=True)  # `d-` and 16 Base32 characters
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(32), nullable=False)  # no foreign key: the request outlives nothing, but the job must not fail on a user already gone
+    attempt_id: Mapped[str | None] = mapped_column(String(40))
+    org_id: Mapped[str | None] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(10), nullable=False, server_default="pending")
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decide_by: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # candidate requests: the company is asked to decide by then (14 days)
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # the deadline passed: the admins were told (placeholder numbers, FR-PRV-08)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    execute_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DataView(Base):
+    """One company-level view of a candidate's data (story P-25, FR-PRV-11): company, action, time. Insert-only for the application role. The company's name is
+    copied so the history still reads after the company is renamed; the candidate sees nothing else (no recruiter name, no address)."""
+
+    __tablename__ = "data_views"
+    __table_args__ = (
+        CheckConstraint("action IN ('viewed', 'exported')", name="action"),
+        Index("ix_data_views_candidate_user_id_at", "candidate_user_id", "at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    candidate_user_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    org_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    org_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    action: Mapped[str] = mapped_column(String(10), nullable=False)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

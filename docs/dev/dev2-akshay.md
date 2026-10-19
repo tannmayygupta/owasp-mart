@@ -255,9 +255,9 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 Goal: Deletion, the four dashboards, exports, the admin area and deployed verification.
 
-- [ ] **P-25. Deletion workflow, 7-day undo and "who viewed me"**
+- [x] **P-25. Deletion workflow, 7-day undo and "who viewed me"**  (service level plus person routes: the company's decision and direct deletion have no routes until story 5.3; no email to the parties (OI-12); the view history stays empty until the dashboard and the exports call `ViewHistory.record`; the periods are not legally reviewed (OI-33))
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: not planned yet; created when you incept `epic-privacy-audit-and-keys` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `4.4` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Account deletion request and workflow with a seven-day undo window, and the candidate view of who viewed their data.
   - Covers: FR-PRV-08, 09, 11
   - Waits on: P-17, P-24 and Tanmay's purge call (AttemptPort).

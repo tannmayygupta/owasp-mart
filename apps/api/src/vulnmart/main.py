@@ -48,6 +48,7 @@ from vulnmart.assessments.service import AssessmentService
 from vulnmart.orgs.service import CompanyService
 from vulnmart.ports.attempts import AttemptPort
 from vulnmart.privacy.api import router as consent_router
+from vulnmart.privacy.deletion_api import router as deletion_router
 from vulnmart.privacy.consent import ConsentService
 from vulnmart.privacy.targets import ConsentTargets, FakeConsentTargets
 
@@ -251,14 +252,26 @@ def create_app(
     # Retention and housekeeping jobs (story P-24): built here, started by `_scheduler_lifespan` when `VULNMART_SCHEDULER_ENABLED` is on. The lab in this process
     # erases attempts (`lab.erase`); without one a job that needs it fails visibly instead of deleting around it.
     app.state.scheduler = None
+    app.state.deletion_service = None
+    from vulnmart.privacy.views import ViewHistory
+
+    app.state.view_history = ViewHistory(ports.sessions) if ports.sessions is not None else None  # who viewed me (story P-25); the recruiter views (P-27, P-29) record into it
     if ports.sessions is not None and app.state.assessments is not None:
         from vulnmart.privacy.subjects import SubjectService
         from vulnmart.privacy.retention.build import build_scheduler
 
+        subjects = SubjectService(ports.audit_sessions) if ports.audit_sessions is not None else None
+        # The deletion workflow (story P-25): its person routes are mounted below; the company's side has no route yet (story 5.3). The same eraser as the retention jobs.
+        from vulnmart.privacy.deletion import DeletionService
+        from vulnmart.privacy.retention.records import SqlAttemptRecords
+
+        app.state.deletion_service = DeletionService(ports.sessions, app.state.assessments, SqlAttemptRecords(ports.sessions), ports.settings, ports.audit, subjects,
+                                                     lab.erase if lab is not None else None)
         app.state.scheduler = build_scheduler(sessions=ports.sessions, assessments=app.state.assessments, settings=ports.settings, audit=ports.audit,
-                                              subjects=SubjectService(ports.audit_sessions) if ports.audit_sessions is not None else None,
+                                              subjects=subjects,
                                               eraser=lab.erase if lab is not None else None, anchors=app.state.audit_anchors,
-                                              streams=store if isinstance(store, ValkeyStreamStore) else None, public_origin=settings.public_origin)
+                                              streams=store if isinstance(store, ValkeyStreamStore) else None, public_origin=settings.public_origin,
+                                              deletion=app.state.deletion_service)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)
@@ -267,6 +280,7 @@ def create_app(
         _mount_lab(app, lab, lab_tickets)
     app.include_router(mfa_router)
     app.include_router(consent_router)
+    app.include_router(deletion_router)
     app.include_router(live_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs

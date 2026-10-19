@@ -1,0 +1,7 @@
+{
+  "schema": "DeletionRequestCreate",
+  "body": {
+    "kind": "candidate",
+    "attempt_id": "a-CANDIDATEATTEMPT"
+  }
+}

@@ -1,0 +1,60 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (478.9017ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (102.4288ms)
+  ✔ the page is served and the API is also reachable directly on its own port (96.7505ms)
+  ✔ API errors follow the IF-8 format through the web origin: unknown route and wrong method (50.1949ms)
+  ✔ origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (89.122ms)
+  ✔ page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (111.683ms)
+  ✔ caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (588.7999ms)
+  ✔ mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (10468.5124ms)
+  ✔ mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost) (8424.3538ms)
+  ✔ accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (10572.8448ms)
+  ✔ sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good (5245.9937ms)
+  ✔ password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work (11045.0389ms)
+  ✔ admins (P-13): the seed command makes an admin with no learner role who signs in without admin powers, a second seed changes nothing, signup cannot make an admin (12753.7012ms)
+  ✔ mfa (P-15): an admin enrols an authenticator app, then needs the code (or a recovery code, once) to sign in; a code cannot be replayed (13047.1489ms)
+  ✔ consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record (6785.6394ms)
+  ✔ audit and keys (P-17): a login is logged under a pseudonym, the chain verifies and anchors; a key is created, used and shredded in vm_keystore (17631.1857ms)
+  ✔ companies (P-18): a recruiter signs up, verifies the address, the admin queue lists the company, the approval activates it and mails the owner (26786.1513ms)
+  ✔ company members (P-19): a colleague joins through the owner, the terms gate invites, the cap applies, a suspended recruiter is out at once (49564.6692ms)
+  ✔ invites (P-20): a template, an invite by email to a person with no account, the mail arrives, the token is only a hash, resend kills the old link (48893.4919ms)
+  ✔ accepting invites (P-21): open the link, register, address must match, consent first, attempt and role after it, re-invite, bulk, purge (50766.1012ms)
+  ✖ live updates (P-22): events reach an open stream through the proxy, heartbeat, isolation, replay after an API restart, resync, snapshot (22583.3924ms)
+# live: stream ended 29885 ms after the logout (the session is checked every 30 s)
+  ✔ stream authorisation (P-23): another user never reads your events, with or without their ids, and a logout ends the stream (52414.1376ms)
+# live: a call on the same HTTP/2 connection while six streams are open took 49 ms
+# live: one event row to six HTTP/2 streams through Caddy 1032 ms
+  ✔ live updates over HTTP/2 (P-23): one connection carries six streams and ordinary calls through the real Caddy image (7975.1862ms)
+  ✔ retention (P-24): the scheduler ran at start, the admin sees the runs, an aged learner is warned and deleted, an aged invite goes, old event rows are cleared (31936.4841ms)
+  ✔ deletion (P-25): a learner asks, sees the date, undoes, asks again; after the hold the job deletes the account and forgets the pseudonym (11096.3791ms)
+  ✔ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (393.4453ms)
+  ✔ hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (336.4613ms)
+  ✔ web has no secrets or flags in its environment (66.7905ms)
+  ✔ Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (10311.0888ms)
+  ✔ Valkey down: public health 503 degraded, /readyz names valkey; recovers (6499.2856ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (6748.1875ms)
+✖ platform and web profiles on a real Docker engine (458187.6809ms)
+ℹ tests 31
+ℹ suites 1
+ℹ pass 30
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 458454.4482
+
+✖ failing tests:
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:1028:3
+✖ live updates (P-22): events reach an open stream through the proxy, heartbeat, isolation, replay after an API restart, resync, snapshot (22583.3924ms)
+  AssertionError [ERR_ASSERTION]: the milestone arrived on the open stream
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:1108:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

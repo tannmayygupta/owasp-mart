@@ -36,6 +36,12 @@ def months(count: int) -> timedelta:
     return timedelta(days=round(count * MONTH))
 
 
+def schedule_consent_erase(sessions: sessionmaker[Session], attempt_id: str, erase_after: datetime) -> None:
+    """The short consent records of an attempt go at `erase_after` (OI-37): shared by the retention job and the deletion workflow (story P-25). A record already scheduled keeps its date."""
+    with sessions.begin() as session:
+        session.execute(update(ConsentRecord).where(ConsentRecord.attempt_id == attempt_id, ConsentRecord.erase_after.is_(None)).values(erase_after=erase_after))
+
+
 class NoEraser(RuntimeError):
     """An attempt's data is due for deletion and this process has no way to erase it (the lab runs in another process): the job fails instead of deleting around it."""
 
@@ -84,5 +90,4 @@ class CandidateRetention:
         return f"{deleted} invites deleted, {erased} attempts erased"
 
     def _schedule_consent_erase(self, attempt_id: str, erase_after: datetime) -> None:
-        with self._sessions.begin() as session:
-            session.execute(update(ConsentRecord).where(ConsentRecord.attempt_id == attempt_id, ConsentRecord.erase_after.is_(None)).values(erase_after=erase_after))
+        schedule_consent_erase(self._sessions, attempt_id, erase_after)

@@ -1390,7 +1390,7 @@ describe('platform and web profiles on a real Docker engine', () => {
       assert.equal(run.status, 0, run.stderr);
       return JSON.parse(run.stdout.trim().split('\n').pop());
     };
-    const JOBS = ['invite_expiry', 'invite_purge', 'candidate_retention', 'consent_purge', 'learner_warning', 'learner_retention', 'evidence_retention', 'account_housekeeping', 'log_purge', 'live_cleanup', 'audit_anchor'];
+    const JOBS = ['invite_expiry', 'invite_purge', 'candidate_retention', 'consent_purge', 'learner_warning', 'learner_retention', 'evidence_retention', 'account_housekeeping', 'log_purge', 'live_cleanup', 'audit_anchor', 'deletion_requests'];
 
     // every job ran when the API started, and the admin's view shows the last run of each
     for (let i = 0; i < 60 && Number(psql(`SELECT count(DISTINCT job) FROM job_runs WHERE status = 'succeeded' AND job IN (${JOBS.map((j) => `'${j}'`).join(',')})`)) < JOBS.length; i += 1) await sleep(1000);
@@ -1455,6 +1455,73 @@ describe('platform and web profiles on a real Docker engine', () => {
     py('sch.run("live_cleanup")', 'print(json.dumps(True))');
     assert.equal(psql(`SELECT count(*) FROM domain_events WHERE published_at < now() - interval '7 days'`), '0');
     assert.equal(psql(`SELECT count(*) FROM job_runs WHERE status = 'failed' AND started_at > now() - interval '1 hour'`), '0');
+  }, { timeout: 300000 });
+
+  // Story P-25: the deletion workflow on the real stack. A learner signs up, asks for deletion through the proxy (the routes need a session and the CSRF header), sees the request
+  // with its 7-day date, undoes it, asks again; the date is then moved into the past with psql as the owner role and the job `deletion_requests` is run inside the API container
+  // with the application role: the account, its roles and its audit pseudonym are gone, and the audit entries stay without naming anyone.
+  test('deletion (P-25): a learner asks, sees the date, undoes, asks again; after the hold the job deletes the account and forgets the pseudonym', async () => {
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app', 'sch = app.state.scheduler', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const email = `e2e-delete-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Delete', age_declaration: true })).status, 202);
+    const mail = await mailFor(email, 'Confirm your email');
+    assert.ok(mail, 'the verification mail arrived');
+    assert.equal((await postJson('/api/v1/accounts/verify-email', { token: /verify-email\?token=([A-Za-z0-9_-]{43})/.exec(mail.Text)[1] })).status, 200);
+
+    for (const r of [await call('GET', '/api/v1/me/deletion-requests'), await call('GET', '/api/v1/me/data-views'), await postJson('/api/v1/me/deletion-requests', { kind: 'learner' })]) assert.equal(r.status, 401);
+    const login = await postJson('/api/v1/session', { email, password });
+    assert.equal(login.status, 200);
+    const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(login.headers.getSetCookie()[0])[1]}`;
+    const csrf = (await login.json()).csrf_token;
+    const userId = psql(`SELECT id FROM users WHERE email_ci = '${email}'`);
+
+    assert.equal((await postJson('/api/v1/me/deletion-requests', { kind: 'learner' }, { cookie })).status, 403, 'no CSRF token');
+    const created = await postJson('/api/v1/me/deletion-requests', { kind: 'learner' }, { cookie, 'x-csrf-token': csrf });
+    assert.equal(created.status, 201);
+    const request = await created.json();
+    assert.deepEqual([request.kind, request.status, request.can_undo, request.attempt_id], ['learner', 'pending', true, null]);
+    const days = (Date.parse(request.execute_after) - Date.parse(request.requested_at)) / 86400000;
+    assert.ok(days > 6.99 && days < 7.01, `held 7 days, got ${days}`);
+    assert.equal((await postJson('/api/v1/me/deletion-requests', { kind: 'learner' }, { cookie, 'x-csrf-token': csrf })).status, 409, 'one open request at a time');
+    assert.equal((await postJson('/api/v1/me/deletion-requests', { kind: 'candidate' }, { cookie, 'x-csrf-token': csrf })).status, 422, 'a candidate request names an attempt');
+    assert.equal((await postJson('/api/v1/me/deletion-requests', { kind: 'candidate', attempt_id: 'a-ABCDEFGHIJKLMNOP' }, { cookie, 'x-csrf-token': csrf })).status, 404, 'not your attempt');
+    const listed = await (await call('GET', '/api/v1/me/deletion-requests', { headers: { cookie } })).json();
+    assert.deepEqual(listed.items.map((i) => i.request_id), [request.request_id]);
+    assert.deepEqual(await (await call('GET', '/api/v1/me/data-views', { headers: { cookie } })).json(), { items: [], has_more: false });
+
+    // undo: the job has nothing to do, even with the date in the past
+    const undone = await call('DELETE', `/api/v1/me/deletion-requests/${request.request_id}`, { headers: { cookie, 'x-csrf-token': csrf, origin: ORIGIN } });
+    assert.equal(undone.status, 200);
+    assert.equal((await undone.json()).status, 'cancelled');
+    assert.equal((await call('DELETE', `/api/v1/me/deletion-requests/${request.request_id}`, { headers: { cookie, 'x-csrf-token': csrf, origin: ORIGIN } })).status, 409);
+    psql(`UPDATE deletion_requests SET execute_after = now() - interval '1 minute' WHERE user_id = '${userId}'`);
+    py('sch.run("deletion_requests")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE id = '${userId}'`), '1', 'undone: nothing was deleted');
+
+    // ask again, move the date, run the job: the account, the roles and the pseudonym are gone, the audit entries stay
+    const again = await (await postJson('/api/v1/me/deletion-requests', { kind: 'learner' }, { cookie, 'x-csrf-token': csrf })).json();
+    assert.notEqual(again.request_id, request.request_id);
+    const pseudonym = psql(`SELECT subject_id FROM subject_map WHERE user_id = '${userId}'`);
+    assert.match(pseudonym, /^s-[A-Z2-7]{16}$/);
+    py('sch.run("deletion_requests")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE id = '${userId}'`), '1', 'inside the 7 days: nothing is deleted');
+    psql(`UPDATE deletion_requests SET execute_after = now() - interval '1 minute' WHERE id = '${again.request_id}'`);
+    py('sch.run("deletion_requests")', 'print(json.dumps(True))');
+    assert.equal(psql(`SELECT count(*) FROM users WHERE id = '${userId}'`), '0', 'the account is deleted');
+    assert.equal(psql(`SELECT count(*) FROM user_roles WHERE user_id = '${userId}'`), '0');
+    assert.equal(psql(`SELECT count(*) FROM sessions WHERE user_id = '${userId}'`), '0');
+    assert.equal(psql(`SELECT count(*) FROM subject_map WHERE user_id = '${userId}'`), '0', 'the audit pseudonym is forgotten');
+    assert.equal(psql(`SELECT status FROM deletion_requests WHERE id = '${again.request_id}'`), 'done');
+    assert.ok(Number(psql(`SELECT count(*) FROM audit_log WHERE subject = '${pseudonym}' AND action IN ('deletion.requested', 'deletion.cancelled', 'deletion.learner_done')`)) >= 3, 'the entries stay');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details::text LIKE '%${userId}%' OR details::text LIKE '%${email}%' OR actor LIKE '%${userId}%'`), '0', 'and name nobody');
+    assert.equal(psql(`SELECT count(*) FROM job_runs WHERE status = 'failed' AND started_at > now() - interval '1 hour'`), '0');
+    assert.equal((await call('GET', '/api/v1/me', { headers: { cookie } })).status, 401, 'the session of a deleted account is over');
   }, { timeout: 300000 });
 
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
