@@ -221,8 +221,11 @@ async function load(o) {
     const s = await c.request('POST', '/api/v1/instances', { body: { kind: 'learner' } });
     if (s.status !== 202) return { ok: false, why: `HTTP ${s.status} ${s.data?.code ?? ''}` };
     const r = await waitRunning(c, s.data.attempt_id, 300);
-    return { ok: r.ok, seconds: r.seconds, why: r.ok ? '' : `state ${r.attempt?.state}` };
+    return { ok: r.ok, seconds: r.seconds, why: r.ok ? '' : `state ${r.attempt?.state}`, c, iid: s.data.instance_id };
   }));
+  // the test frees what it used: each learner stops their own instance through the normal route (a load check once left five of the seven slots of vm-i busy for a day)
+  const stopped = await Promise.all(results.filter((r) => r.iid).map(async (r) => (await r.c.request('POST', `/api/v1/instances/${r.iid}/stop`)).status));
+  check('the instances of the load check were stopped by their owners', stopped.every((st) => st === 202 || st === 200), `${stopped.filter((st) => st === 202 || st === 200).length} of ${stopped.length}`);
   const ok = results.filter((r) => r.ok); const secs = ok.map((r) => r.seconds).sort((a, b) => a - b);
   const q = (p) => secs[Math.min(secs.length - 1, Math.floor(secs.length * p))];
   check(`${ok.length} of ${o.load} instances became ready`, ok.length === o.load, `first ${secs[0]} s, median ${q(0.5)} s, p90 ${q(0.9)} s, slowest ${secs.at(-1)} s, wall ${(Date.now() - t0) / 1000} s; failures: ${results.filter((r) => !r.ok).map((r) => r.why).join(' | ') || 'none'}`);

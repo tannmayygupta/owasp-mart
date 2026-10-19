@@ -430,3 +430,31 @@ def test_an_attempt_created_from_a_consent_runs_under_the_rules_of_its_invite():
         attempt_rules({"time_limit_min": 10})  # the 15-minute warning cannot be later than the end
     again = rt.attempts.create_from_consent(user_id="u-cand", org_id="o-acme", template_id="shop-v0~2", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-1", rules=invite_rules)
     assert again.attempt_id == a.attempt_id, "a second call is the same attempt"
+
+
+def test_a_capture_dated_before_the_start_counts_zero_seconds_instead_of_failing_the_report():
+    """Audit 2026-10-18 (L-25): `time_metrics` used to raise ValueError, which became a 500 on the report route."""
+    from datetime import timedelta
+
+    from vulnmart.lab.runtime import clamp_to_start
+    from vulnmart.ports.reports import Milestone
+
+    rt, clock, _ = make_runtime()
+    started = rt.start_attempt("u-1")
+    early = clock() - timedelta(minutes=5)
+    assert rt.milestones.credit(started.attempt_id, "C02", Milestone.M3, early), "the store accepts a capture dated before the start"
+    metrics = rt.time_metrics(started.attempt_id)
+    assert metrics.headline["C02"] == 0
+    assert clamp_to_start({"C01": early, "C02": clock() + timedelta(seconds=30)}, clock()) == {"C01": clock(), "C02": clock() + timedelta(seconds=30)}
+
+
+def test_the_instance_limits_are_an_hour_idle_and_four_hours_for_a_learner_and_cover_the_time_limit_for_a_candidate():
+    """The load check of 2026-10-19 found 24-hour limits holding slots of vm-i for a day (they were 1440 and 1440)."""
+    rt, _, _ = make_runtime()
+    learner = rt.start_attempt("u-1")
+    candidate = rt.start_attempt("u-2", org_id="o-1")
+    assert (rt._limits.idle_minutes, rt._limits.max_minutes) == (60, 240)
+    rec = rt.engine.get(candidate.attempt_id)
+    lim = rt._limits_for(rec)
+    assert lim.idle_minutes == 120 and lim.max_minutes == max(240, rec.rules.time_limit_minutes + 30)
+    assert rt._limits_for(rt.engine.get(learner.attempt_id)) == rt._limits
