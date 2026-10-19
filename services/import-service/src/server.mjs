@@ -29,9 +29,20 @@ const MAX_INFLIGHT = Number(process.env.VM_IMPORT_MAX_INFLIGHT) || 3;
 // room for liveness probes and the odd in-flight reply.
 const MAX_CONNS = Number(process.env.VM_IMPORT_MAX_CONNS) || MAX_INFLIGHT * 4;
 
+// C06 (story L-30): the audit token of this instance, a file that only THIS container mounts (read-only, placed by the injector). The parent reads it and hands it to the
+// child; the child puts it in the preview only when the merge has set the audit flag. A job that does not touch the prototype never gets it. A container without the file
+// (no C06 flag in this instance) runs the safe merge: the challenge is exploitable exactly when its flag is planted, like every other challenge.
+export const PLACEMENT_PATH = process.env.VM_C06_PLACEMENT || '/run/placement/import/C06.placement';
+export function readAuditToken(file = PLACEMENT_PATH) {
+  try {
+    const text = fs.readFileSync(file, 'utf8').trim();
+    return text && text.length <= 200 && !/\s/.test(text) ? text : null;
+  } catch { return null; }
+}
+
 // Run one job in a fresh child process, with a timeout. Always resolves (an error
 // is a result, never a rejection); the child is killed when done or on timeout.
-export function runJob(job, { timeoutMs = DEFAULT_TIMEOUT_MS, worker = WORKER } = {}) {
+export function runJob(job, { timeoutMs = DEFAULT_TIMEOUT_MS, worker = WORKER, auditToken = readAuditToken() } = {}) {
   return new Promise((resolve) => {
     let child;
     try { child = fork(worker, [], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] }); }
@@ -42,7 +53,7 @@ export function runJob(job, { timeoutMs = DEFAULT_TIMEOUT_MS, worker = WORKER } 
     child.on('message', (m) => done(m));
     child.on('error', () => done({ ok: false, error: 'worker_error' }));
     child.on('exit', (code) => { if (!settled) done({ ok: false, error: `worker_exit_${code}` }); });
-    try { child.send({ job }); } catch { done({ ok: false, error: 'send_failed' }); }
+    try { child.send({ job, ctx: { audit_token: auditToken } }); } catch { done({ ok: false, error: 'send_failed' }); }
   });
 }
 

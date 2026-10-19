@@ -5,6 +5,7 @@
 // added later in an isolated path. The worker opens no network and no database.
 process.on('message', (m) => {
   const job = (m && m.job) || {};
+  const ctx = (m && m.ctx) || {};
   // `__delay_ms` is a TEST-ONLY hook to exercise the timeout path; it is honored
   // only when VM_IMPORT_TEST_HOOKS=1, so a client cannot pin a worker in production.
   const delay = process.env.VM_IMPORT_TEST_HOOKS === '1' ? Math.min(Number(job.__delay_ms) || 0, 60000) : 0;
@@ -14,10 +15,14 @@ process.on('message', (m) => {
   const done = (msg) => process.send(msg, () => process.exit(0));
   const run = () => {
     try {
-      const result = preview(job);
+      const result = preview(job, ctx);
       // Self-check that the merge did not pollute this process's Object.prototype.
-      const protoCheck = ({}).polluted === undefined && ({}).x === undefined ? 'clean' : 'polluted';
-      done({ ok: true, preview: result, worker_pid: process.pid, proto_check: protoCheck });
+      const protoCheck = (() => { for (const _key in {}) return 'polluted'; return 'clean'; })(); // any enumerable key that a plain object inherits
+      // The audit token is shown only when the audit flag is set. Nothing in a job can set it directly: `flags` is a fresh plain object, so the flag is true only when the
+      // merge polluted Object.prototype with it (C06). Read AFTER the merge, from an object that has no property of its own.
+      const flags = {};
+      const auditToken = flags.internalAudit && ctx.audit_token ? ctx.audit_token : null;
+      done({ ok: true, preview: result, auditToken, worker_pid: process.pid, proto_check: protoCheck });
     } catch {
       done({ ok: false, error: 'preview_failed', worker_pid: process.pid });
     }
@@ -74,12 +79,13 @@ function unsafeMerge(base, patch) {
   return out;
 }
 
-function isC06Vulnerable() {
-  return process.env.VM_CHALLENGE_C06 === 'vulnerable' || process.env.VM_CHALLENGE_MODE === 'vulnerable';
+function isC06Vulnerable(ctx) {
+  // an audit token in this instance (the injector placed the C06 flag) makes the challenge exploitable; the variables are the test and laptop switches
+  return Boolean(ctx && ctx.audit_token) || process.env.VM_CHALLENGE_C06 === 'vulnerable' || process.env.VM_CHALLENGE_MODE === 'vulnerable';
 }
 
-function preview(job) {
+function preview(job, ctx) {
   const defaults = { title: '', description: '', price_cents: 0, tags: [] };
   const patch = job && typeof job.product === 'object' ? job.product : {};
-  return isC06Vulnerable() ? unsafeMerge({ ...defaults }, patch) : safeMerge(defaults, patch);
+  return isC06Vulnerable(ctx) ? unsafeMerge({ ...defaults }, patch) : safeMerge(defaults, patch);
 }
