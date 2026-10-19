@@ -130,7 +130,7 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
 Truth summary (2026-10-13): built and verified locally: L-09 preparation and release commit, L-10 to L-13 code. NOT built: L-14, L-15, L-16.
 
 - [ ] **L-09. Tag contracts v1.0.0 and start the change rules**
-  - Audit 2026-10-19: versions and release labels are now PASS in the dry-run (COMPAT.md real versions, rule amended); still open: 18 pending sign-offs and 19 of 62 checklist lines (H-352 asks Akshay and Sahil), then the tag.
+  - Audit 2026-10-19: versions and release labels are PASS in the dry-run (COMPAT.md real versions incl. IF-1 1.1.0 and DB 2.1.0 after Akshay's P-25, rule amended); still open: 18 pending sign-offs and 19 of 62 checklist lines (H-352 asks Akshay and Sahil), then the tag.
   - Unticked 2026-10-18 on the developer's instruction after a code-based status check: the tag contracts-v1.0.0 does not exist and the COMPAT.md approvals are pending, so the Done-when is not met.
   - Closed 2026-10-12 on the developer's instruction. Release commit done 2026-10-13 (0a2a43b). NOT met: tag contracts-v1.0.0 does not exist; all 19 COMPAT.md Approvals rows pending (Akshay, Sahil, and Tanmay's own); the approvals rule is NOT-APPLICABLE until the tag; handoff checklist has 27 unticked lines (node scripts/tag-contracts.mjs --dry-run).
   - Epic: `epic-lab-baseline`
