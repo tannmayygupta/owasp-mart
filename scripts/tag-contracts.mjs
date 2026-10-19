@@ -102,12 +102,12 @@ export function checkPreconditions(root, { tag = DEFAULT_TAG, create = false } =
     }
     add('versions', !problems.length, problems.length ? problems : [`${versions.size} contract versions match the changelog: ${[...versions].map(([k, v]) => `${k} ${v}`).join(', ')}`]);
 
-    // a tag contracts-v1.0.0 marks contracts that are all labelled 1.0.0 (ADR 0029: one release commit before the tag)
+    // a tag contracts-v1.0.0 marks contracts that are all at 1.0.0 or higher: none is still a 0.x draft (ADR 0029, amended 2026-10-19: a contract may already have moved on to 1.0.1, 1.1.0 or 2.0.0)
     const labelVersion = /^contracts-v1\.0\.0$/.test(tag) ? '1.0.0' : null;
     if (!labelVersion) add('release-labels', true, [`the tag ${tag} is not contracts-v1.0.0, so the 1.0.0 labels are not required`]);
     else {
-      const wrong = [...versions].filter(([, v]) => v !== labelVersion).map(([k, v]) => `${k} ${v}`);
-      add('release-labels', !wrong.length && versions.size > 0, wrong.length || !versions.size ? [`not every contract is labelled ${labelVersion} (${wrong.join(', ') || 'no versions read'}): relabel every contract 1.0.0 in a release commit first, see docs/runbooks/contracts-tag.md`] : [`every contract is labelled ${labelVersion}`]);
+      const wrong = [...versions].filter(([, v]) => cmp(ver(v), ver(labelVersion)) < 0).map(([k, v]) => `${k} ${v}`);
+      add('release-labels', !wrong.length && versions.size > 0, wrong.length || !versions.size ? [`not every contract is labelled ${labelVersion} or higher (${wrong.join(', ') || 'no versions read'}): relabel every contract 1.0.0 in a release commit first, see docs/runbooks/contracts-tag.md`] : [`every contract is labelled ${labelVersion} or higher`]);
     }
 
     const parsed = parseApprovers(compat, registry);

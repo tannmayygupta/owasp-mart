@@ -33,3 +33,4 @@ Stream L work. Where a part belongs to another stream (the invite and company fl
 ## References
 
 - parent, docs/bmad/initiative-lab/initiative-lab.md; review record docs/dev-log/2026-10-18-tannmayygupta-sprint-4-review-and-s-8.md
+- 2026-10-19: contract versions made true and the tag rule amended, docs/dev-log/2026-10-19-tannmayygupta-contract-versions-and-tag-rule.md (L-09 still open: sign-offs, handoffs, tag)
