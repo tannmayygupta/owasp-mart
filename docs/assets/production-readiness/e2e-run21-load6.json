@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-19T07:52:11.437Z",
+  "base": "https://tanmay-platform-prod.duckdns.org",
+  "rows": [
+    {
+      "name": "6 accounts made, confirmed and signed in",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "the instances of the load check were stopped by their owners",
+      "ok": true,
+      "detail": "4 of 4"
+    },
+    {
+      "name": "4 of 6 instances became ready",
+      "ok": false,
+      "detail": "first 8.3 s, median 13.8 s, p90 13.9 s, slowest 13.9 s, wall 16.985 s; failures: HTTP 429 REQ-RATE-LIMITED | HTTP 429 REQ-RATE-LIMITED"
+    }
+  ],
+  "load": {
+    "users": 6,
+    "ready": 4,
+    "seconds": [
+      8.3,
+      12.2,
+      13.8,
+      13.9
+    ]
+  }
+}
