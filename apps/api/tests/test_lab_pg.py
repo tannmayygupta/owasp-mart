@@ -312,7 +312,7 @@ def test_the_whole_loop_on_postgres_and_a_restart_loses_nothing(engine, keystore
     assert signed(rt2, c01) == 200, "a replay after the restart is still a replay"
     assert len(rt2.time_metrics(aid).headline) == 2 and rt2.time_metrics(aid).resets == 1
     assert rt2.attempts.get(aid).org_id == "o-loop"
-    assert [e["event"] for e in rt2.attempt_log.read(aid)][0] == "session_started"
+    assert [e["event"] for e in rt2.attempt_log.read(aid)][:3] == ["instance_requested", "instance_ready", "session_started"]
     assert [h.challenge_key for h in rt2.held_captures(aid)] == ["C03"]
 
     # the held capture is reviewed by the second runtime; the first one sees the decision and cannot reverse it

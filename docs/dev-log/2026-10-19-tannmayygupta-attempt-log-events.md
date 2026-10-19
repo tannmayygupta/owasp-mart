@@ -30,7 +30,7 @@ _journal appends to the attempt log; a failing log never undoes the step.
 None.
 
 ## Tests
-- tests/test_lab_runtime.py, test_lab_api.py, test_lab_loop.py, test_lab_review_reset_withdraw.py: 56 passed. The pinned log-order test now expects the two new lines first. The full suite runs in CI.
+- tests/test_lab_runtime.py, test_lab_api.py, test_lab_loop.py, test_lab_review_reset_withdraw.py: 56 passed. The pinned log-order test now expects the two new lines first. The full suite runs in CI; its first run failed on `test_lab_pg.py` (the Postgres loop test pinned the first log line as session_started), fixed to expect the three lines in order.
 
 ## Evidence
 Pull request checks.
