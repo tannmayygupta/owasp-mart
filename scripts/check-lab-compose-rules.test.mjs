@@ -234,7 +234,7 @@ test('report override: a change of anything else on the orchestrator, another se
 
 test('report override: the base orchestrator service takes the URL from the environment and never a key', () => {
   const o = yaml.load(readFileSync(path.join(ROOT, 'infra', 'compose', 'compose.yaml'), 'utf8')).services.orchestrator;
-  assert.deepEqual(o.environment, { VM_ORCH_REPORT_URL: '${VULNMART_ORCH_REPORT_URL:-}' });
+  assert.deepEqual(o.environment, { VM_ORCH_REPORT_URL: '${VULNMART_ORCH_REPORT_URL:-}', VM_ORCH_RUNTIME: '${VULNMART_ORCH_RUNTIME:-}' }, 'the report URL and the sandbox runtime (S-8) come from the environment, both empty by default');
   assert.ok(!o.command.includes('--report-url') && !o.command.includes('--report-key-file'));
   assert.match(orch('networks: [labs-core]', 'networks: [labs-core]\n    environment: { VM_ORCH_PLATFORM_KEY: x }').join('\n'), /VM_ORCH_PLATFORM_KEY would put a signing key into docker inspect/);
   assert.match(orch('networks: [labs-core]', 'networks: [labs-core]\n    environment: { VM_ORCH_REPORT_KEY: x }').join('\n'), /VM_ORCH_REPORT_KEY would put a signing key/);

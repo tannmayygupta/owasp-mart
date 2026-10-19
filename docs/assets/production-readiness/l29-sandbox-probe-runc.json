@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "runtime": "runc",
+  "image": "node:24.21.0-alpine",
+  "boundary": "shared host kernel",
+  "host_kernel_release": "7.0.0-1014-aws",
+  "facts": {
+    "kernel_release": "7.0.0-1014-aws",
+    "proc_version": "Linux version 7.0.0-1014-aws (buildd@lcy02-amd64-100) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0,",
+    "dmesg_first": "dmesg: klogctl: Operation not permitted",
+    "kcore_read": "refused",
+    "modules_listed": "61",
+    "debugfs_listed": "0",
+    "mount_tmpfs": "mount: permission denied (are you root?)",
+    "user_namespace": "refused",
+    "cap_eff": "0000000000000000",
+    "processes_visible": "4",
+    "dev_nodes": "15",
+    "shared_socket": "works"
+  },
+  "problems": []
+}

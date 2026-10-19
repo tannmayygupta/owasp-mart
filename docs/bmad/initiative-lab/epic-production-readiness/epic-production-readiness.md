@@ -45,3 +45,4 @@ Stream L work. Where a part belongs to another stream (the invite and company fl
 - 2026-10-19: L-10, L-14, L-19, L-24 closed with live proof, docs/dev-log/2026-10-19-tannmayygupta-ops-proofs-backups-alerts.md
 - 2026-10-20: L-12 closed, hello stack deployed from CI images to both VMs and the laptop, docs/dev-log/2026-10-20-tannmayygupta-l12-hello-stack-deployed.md
 - 2026-10-20: L-25 closed, docs/dev-log/2026-10-20-tannmayygupta-l25-platform-events.md
+- 2026-10-20: L-29 closed, instances run in gVisor, docs/dev-log/2026-10-20-tannmayygupta-l29-gvisor-sandbox.md
