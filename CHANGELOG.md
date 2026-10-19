@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Lab stream, ops (L-10, L-14, L-19, L-24 closed with live proof): the alert of a failed host unit (`vulnmart-alert`, ALERT file and journal line, cleared by a good run), a daily backup of the platform and key store databases on vm-p with read-back check and 7-day retention, the off-host pull `scripts/backup-pull.mjs`, the morning check `scripts/live-ops-check.mjs`, runbook `docs/runbooks/backup-and-restore.md`; live: reaper destroyed an idle and an over-limit instance, orchestrator restart during provisioning left 0 orphans, one forced certificate renewal on vm-i (serial changed), restore 39 of 39 tables and 45 of 45 users, scan of a running instance on vm-i clean.
 - Lab stream (L-25, FR-TIM-04): the attempt log now gets instance_requested, instance_ready and flag_auto_detected (ids only); the platform-owned events (invite, consent, recruiter view) and request_seen are still not written; the Postgres loop test expects the new first three lines.
 - Contracts: Tanmay's own sign-off rows in COMPAT.md are `approved` (2026-10-19); the rows of Akshay and Sahil are still pending.
 - Contracts: COMPAT.md lists IF-1 1.1.0 and DB 2.1.0 (Akshay's P-25 entries); `LabRuntime.erase` is tested to be safe to repeat (handoff H-145: the deletion workflow and the retention job both call it).

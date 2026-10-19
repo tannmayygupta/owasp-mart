@@ -1,0 +1,23 @@
+{
+    "alert":  {
+                  "success_path":  "vulnmart-certs.service and vulnmart-backup.service clear their own alert after a good run",
+                  "failure_path":  "vulnmart-alert@\u003cunit\u003e.service writes /var/lib/vulnmart/ALERT-\u003cunit\u003e and a critical journal line (shown on vm-p with a proof unit, cleared afterwards)"
+              },
+    "operations_check":  [
+                             "PASS  no alert file on vm-p  none",
+                             "PASS  no alert file on vm-i  none",
+                             "PASS  the newest backup is at most 26 hours old  0.1 hours",
+                             "PASS  the platform certificate has at least 20 days left  88 days",
+                             "PASS  the labs certificate has at least 20 days left  89 days"
+                         ],
+    "what":  "L-10: a forced certificate renewal on vm-i through the real systemd unit, the alert on a failed unit, and the operations check, 2026-10-19",
+    "renewal":  {
+                    "not_after_after":  "2027-01-17",
+                    "serial_before":  "05A41E9E16ED4D4457539BBD42A23AB2F473",
+                    "serial_after":  "053E29AA4CEC5108837867FDBC0B03420A82",
+                    "result":  "success, exit 0; lego asked Let\u0027s Encrypt for a new certificate; the reload hook restarted vulnmart-edge-caddy",
+                    "served_after":  "the wildcard name answered the new serial on port 443",
+                    "unit":  "vulnmart-certs.service started with RENEW_DAYS=89 in the manager environment (removed again)",
+                    "not_after_before":  "2027-01-15"
+                }
+}

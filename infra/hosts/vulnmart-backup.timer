@@ -1,0 +1,11 @@
+[Unit]
+Description=VulnMart daily backup (a missed run happens at the next boot)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15min
+Persistent=true
+Unit=vulnmart-backup.service
+
+[Install]
+WantedBy=timers.target
