@@ -8,6 +8,7 @@ purge follow the state machine.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
@@ -50,9 +51,10 @@ class Attempt:
 @runtime_checkable
 class AttemptPort(Protocol):
     def create_from_consent(self, *, user_id: str, org_id: str, template_id: str, invite_id: str, consent_id: str,
-                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None) -> Attempt:
+                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None,
+                            history: Mapping[str, datetime | None] | None = None) -> Attempt:
         """Create the candidate attempt of a granted consent, in state `ready`. Idempotent on `consent_id`. `attempt_id` (story P-21, proposal for stream L,
-        handoff H-141): the id the consent record already names, used for the new attempt when given."""
+        handoff H-141): the id the consent record already names, used for the new attempt when given. `history` (L-25, FR-TIM-04): the instants the platform knows and the lab does not, `invite_created`, `invite_opened` and `consent_given` (a datetime or None each); the lab writes them into the attempt's event log with those real times, once."""
         ...
 
     def get(self, attempt_id: str) -> Attempt:

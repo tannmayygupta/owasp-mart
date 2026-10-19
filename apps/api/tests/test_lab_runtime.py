@@ -484,3 +484,42 @@ def test_the_lab_writes_the_instance_and_auto_capture_events_of_the_attempt_log(
     assert "session_started" in names and "flag_auto_detected" in names, names
     detected = [e for e in rt.attempt_log.read(started.attempt_id) if e["event"] == "flag_auto_detected"]
     assert detected and detected[0]["challenge_key"] == "C02" and flag not in str(detected), "ids only, never the flag"
+
+
+def test_the_invite_history_the_platform_knows_goes_into_the_attempt_log_once_with_its_real_times():
+    """FR-TIM-04 (L-25): invite_created, invite_opened and consent_given are known to the platform, not to the lab; the port writes them when the attempt is made."""
+    from datetime import timedelta
+
+    rt, clock, _ = make_runtime()
+    made, opened, consented = clock() - timedelta(days=3), clock() - timedelta(days=2), clock() - timedelta(minutes=5)
+    args = dict(user_id="u-7", org_id="o-1", template_id="shop-v0", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-1")
+    a = rt.attempts.create_from_consent(**args, history={"invite_created": made, "invite_opened": opened, "consent_given": consented})
+    rows = {e["event"]: e["at"] for e in rt.attempt_log.read(a.attempt_id)}
+    assert rows == {"invite_created": made.isoformat(), "invite_opened": opened.isoformat(), "consent_given": consented.isoformat()}
+    again = rt.attempts.create_from_consent(**args, history={"invite_created": made, "invite_opened": opened, "consent_given": consented})
+    assert again.attempt_id == a.attempt_id
+    assert [e["event"] for e in rt.attempt_log.read(a.attempt_id)].count("invite_created") == 1, "written once, not again on a repeated call"
+    b = rt.attempts.create_from_consent(user_id="u-8", org_id="o-1", template_id="shop-v0", invite_id="i-BBBBBBBBBBBBBBBB", consent_id="c-2",
+                                        history={"invite_created": made, "invite_opened": None, "consent_given": consented})
+    assert [e["event"] for e in rt.attempt_log.read(b.attempt_id)] == ["invite_created", "consent_given"], "an instant the platform does not know is not invented"
+    c = rt.attempts.create_from_consent(user_id="u-9", org_id="o-1", template_id="shop-v0", invite_id="i-CCCCCCCCCCCCCCCC", consent_id="c-3")
+    assert rt.attempt_log.read(c.attempt_id) == (), "no history given: nothing written"
+
+
+def test_request_seen_is_a_marker_when_the_player_starts_and_after_a_quiet_gap_never_one_line_per_request():
+    """FR-TIM-04 (L-25): `request_seen` is a summary marker, never the request."""
+    from datetime import timedelta
+
+    rt, clock, _ = make_runtime()
+    s = rt.start_attempt("u-1")
+    def request(seq, at):
+        return {"schema_version": "0.1", "instance_id": s.instance_id, "epoch": 1, "seq": seq, "type": "proxy.request", "source": "sidecar", "session_kind": "player", "user_id": "u-1001",
+                "ts": at.strftime("%Y-%m-%dT%H:%M:%SZ"), "data": {"route_template": "/api/x", "method": "GET", "status": 200, "count": 3, "resp_len": 120, "client_class": "browser"}}
+    seen = lambda: [e for e in rt.attempt_log.read(s.attempt_id) if e["event"] == "request_seen"]  # noqa: E731
+    for n in range(5):
+        assert post(rt, request(n + 1, clock())).status == 202
+        clock.advance(seconds=20)  # five requests inside two minutes
+    assert len(seen()) == 1 and set(seen()[0]) == {"event", "attempt_id", "at", "instance_id"}, "one marker, ids only"
+    clock.advance(minutes=6)
+    assert post(rt, request(6, clock())).status == 202
+    assert len(seen()) == 2, "a new marker after a quiet gap"

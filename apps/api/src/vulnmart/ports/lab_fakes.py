@@ -66,7 +66,7 @@ class FakeAttemptPort:
         return a
 
     def create_from_consent(self, *, user_id: str, org_id: str, template_id: str, invite_id: str, consent_id: str,
-                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None) -> Attempt:
+                            attempt_id: str | None = None, rules: Mapping[str, Any] | None = None, history: Mapping[str, Any] | None = None) -> Attempt:
         with self.store.lock:
             for a in self.store.items.values():
                 if a.consent_id == consent_id:
