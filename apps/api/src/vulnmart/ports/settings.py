@@ -34,6 +34,13 @@ SETTINGS: dict[str, int | bool | str] = {
     "rate_reset_request_per_email_per_hour": 3,  # FR-ACC-10 (placeholder): also bounds the reset mails one address can receive
     "rate_verify_per_ip_per_hour": 30,  # FR-ACC-10: guesses at link tokens (verification and reset links)
     "rate_resend_per_email_per_hour": 3,  # FR-ACC-10
+    "learner_retention_months": 12,  # FR-PRV-05: a learner's data goes this many months after the last login
+    "learner_warning_days": 30,  # FR-PRV-05: the warning email comes this many days before
+    "session_details_days": 90,  # FR-PRV-14: network prefix and browser class of a session are dropped after this long (the session row goes with them)
+    "log_retention_months": 12,  # FR-PRV-15: security and system logs, at least 12 (the database function refuses a shorter time for the audit log)
+    "invite_token_purge_days": 7,  # FR-PRV-18: the token hash of a closed invite is emptied this long after it closed
+    "domain_event_days": 7,  # story P-24: published rows of the live-update outbox are deleted after this long (the replay buffer holds an hour)
+    "outbox_failed_address_days": 30,  # story P-24: the sealed address of a mail that never left is cleared after this long
     "email_daily_cap": 300,  # FR-NTF-02: mails sent per UTC day; 0 = no cap. Brevo free plan: 300 a day (unconfirmed for API mail)
 }
 

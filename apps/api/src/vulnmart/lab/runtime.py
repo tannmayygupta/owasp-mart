@@ -224,6 +224,11 @@ class LabRuntime:
             self.stores.purge(attempt_id)
         self.engine.mark_purged(attempt_id)
 
+    def erase(self, attempt_id: str) -> None:
+        """Erase everything the lab keeps about an attempt (key shredded, rows deleted, attempt marked purged). Safe to repeat. The platform's retention and
+        deletion jobs call it (story P-24, handoff H-144)."""
+        self._erase(attempt_id)
+
     def _erase_pending(self) -> None:
         """A `deleted` attempt whose erase did not finish (the database was away, the process stopped): finish it. Never raises."""
         if not self.stores.purge:

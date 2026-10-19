@@ -21,6 +21,7 @@ import asyncio
 import re
 import threading
 import time
+from datetime import datetime
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -63,6 +64,11 @@ class Facts:
 class StreamWriter(Protocol):
     def append(self, stream: str, oid: int, event: str) -> str | None:
         """Add `event` (JSON text) from outbox row `oid` to `stream`. Returns the new id, or None when `oid` was already appended to this stream (or an older one was)."""
+        ...
+
+    def sweep(self, now: datetime) -> int:
+        """Clear every stream whose newest entry is older than the maximum age (a trim only happens when a stream is appended to, so an idle stream would keep its
+        entries): the id of the newest entry is recorded as trimmed, so a client behind it is told to resync. Returns how many streams were cleared (story P-24)."""
         ...
 
 
@@ -127,6 +133,17 @@ class MemoryStreamStore:
                 self._trimmed[stream] = old[-1][0]
                 del rows[:len(old)]
             return format_id(new)
+
+    def sweep(self, now: datetime) -> int:
+        cutoff = int(now.timestamp() * 1000) - self._max_age_ms
+        cleared = 0
+        with self._lock:
+            for stream, rows in self._entries.items():
+                if rows and rows[-1][0][0] < cutoff:
+                    self._trimmed[stream] = rows[-1][0]
+                    rows.clear()
+                    cleared += 1
+        return cleared
 
     async def newest(self, streams: Sequence[str]) -> dict[str, str]:
         with self._lock:
@@ -196,6 +213,19 @@ end
 return id
 """
 
+_SWEEP = """
+local rows = redis.call('XREVRANGE', KEYS[1], '+', '-', 'COUNT', 1)
+if #rows == 0 then return 0 end
+local id = rows[1][1]
+local ms = tonumber(string.match(id, '^(%d+)-'))
+if ms < tonumber(ARGV[1]) then
+  redis.call('HSET', KEYS[2], KEYS[1], id)
+  redis.call('DEL', KEYS[1])
+  return 1
+end
+return 0
+"""
+
 META = "live:meta"
 TRIM = "live:trim"
 SEQ = "live:seq"
@@ -222,6 +252,15 @@ class ValkeyStreamStore:
         script = self._writer()
         got = script(keys=[stream, f"live:oid:{stream}", TRIM, META, SEQ], args=[event, oid, self._max_len, self._max_age_ms, int(self._clock() * 1000)])
         return got or None
+
+    def sweep(self, now: datetime) -> int:
+        self._writer()
+        cutoff = int(now.timestamp() * 1000) - self._max_age_ms
+        script = self._sync.register_script(_SWEEP)
+        cleared = 0
+        for key in self._sync.scan_iter(match="live:*", count=200, _type="stream"):
+            cleared += int(script(keys=[key, TRIM], args=[cutoff]))
+        return cleared
 
     def _client(self):
         if self._async is None:

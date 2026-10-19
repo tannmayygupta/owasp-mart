@@ -1,0 +1,120 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+..........................................F............................. [  8%]
+........................................................................ [ 11%]
+........................................................................ [ 13%]
+........................................................................ [ 16%]
+.....................................................................F.. [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 44%]
+........................................................................ [ 47%]
+........................................................................ [ 49%]
+..........................................................F............. [ 52%]
+F..............................s........................................ [ 55%]
+........................................................................ [ 58%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 72%]
+........................................................................ [ 74%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 91%]
+........................................................................ [ 94%]
+........................................................................ [ 96%]
+........................................................................ [ 99%]
+......                                                                   [100%]
+================================== FAILURES ===================================
+_ test_the_application_role_cannot_do_what_it_must_not_to_the_assessment_tables[DELETE FROM invites] _
+
+app_engine = Engine(postgresql+psycopg://vulnmart_app:***@127.0.0.1:55432/vm_p18_008ac1cfe6)
+statement = 'DELETE FROM invites'
+
+    @pytest.mark.parametrize("statement", ["DELETE FROM invites", "TRUNCATE invites", "TRUNCATE assessment_templates", "TRUNCATE template_challenges",
+                                           "UPDATE template_challenges SET challenge_key = 'C03'"])
+    def test_the_application_role_cannot_do_what_it_must_not_to_the_assessment_tables(app_engine, statement):
+>       with pytest.raises(DBAPIError, match="permission denied"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE DBAPIError
+
+apps\api\tests\test_assessments_postgres.py:91: Failed
+_____________ test_the_ports_package_holds_only_the_three_modules _____________
+
+    def test_the_ports_package_holds_only_the_three_modules():
+        ports = ROOT / "apps" / "api" / "src" / "vulnmart" / "ports"
+        names = sorted(p.name for p in ports.glob("*.py"))
+        # InstanceHost (stream L) and, since story P-05, the IF-9 ports with their fakes (stream P's six, stream L's three as P's proposal)
+        assert names == [
+            "__init__.py", "attempts.py", "audit.py", "engine_attempts.py", "engine_reports.py", "errors.py", "fake_instance_host.py",
+            "fakes.py", "http_instance_host.py", "instance_host.py", "instances.py", "keys.py", "lab_fakes.py", "outbox.py", "quota.py",
+            "reports.py", "scope.py", "settings.py",
+        ]
+        # The package holds the ports, the platform API modules (stream P: main.py, problem.py) and, since story P-05, the module folders
+        # named in contracts/db/table-owners.yaml (P: kernel ... live; L: attempts, instances, scoring, ingest, flags); a new module is added here on purpose.
+>       assert sorted(p.name for p in (ROOT / "apps" / "api" / "src" / "vulnmart").iterdir() if p.name != "__pycache__") == [
+            "__init__.py", "accounts", "admin", "assessments", "attempts", "flags", "ingest", "instances", "kernel", "lab", "live", "main.py",
+            "notifications", "orgs", "ports", "privacy", "problem.py", "py.typed", "scoring",
+        ]
+E       AssertionError: assert ['__init__.py... 'flags', ...] == ['__init__.py... 'flags', ...]
+E         
+E         At index 18 diff: 'retention' != 'scoring'
+E         Left contains one more item: 'scoring'
+E         Use -v to get more diff
+
+apps\api\tests\test_contract.py:384: AssertionError
+______ test_the_app_role_cannot_rewrite_or_delete_the_append_only_tables ______
+
+engine = Engine(postgresql+psycopg://vulnmart_app:***@127.0.0.1:55432/vm_lab_ce15a25eea)
+
+    def test_the_app_role_cannot_rewrite_or_delete_the_append_only_tables(engine):
+        rec = pg.PgAttemptStore(engine).add(new_record(user="u-grant"))
+        pg.PgFlagSubmissionLog(engine).record(rec.id, "C01", "incorrect", T0)
+        for sql in ("UPDATE flag_submissions SET result = 'correct'", "UPDATE review_audit SET decision = 'accept'",
+                    "UPDATE integrity_flags SET kind = 'timing'", "DELETE FROM review_audit",
+                    "DELETE FROM security_events"):
+>           with pytest.raises(ProgrammingError):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE ProgrammingError
+
+apps\api\tests\test_lab_pg.py:247: Failed
+_ test_the_app_role_cannot_do_more_than_the_code_needs[DELETE FROM security_events] _
+
+engine = Engine(postgresql+psycopg://vulnmart_app:***@127.0.0.1:55432/vm_lab_ce15a25eea)
+statement = 'DELETE FROM security_events'
+
+    @pytest.mark.parametrize("statement", [
+        "UPDATE evidence SET size = 1",  # sealed rows cannot be rewritten
+        "UPDATE instance_epochs SET epoch = 2",
+        "DELETE FROM attempts",  # the attempt row stays after a purge
+        "UPDATE events SET event = '{}'::jsonb",  # an event is only stamped with its digest and the engine's mark
+        "UPDATE flag_submissions SET result = 'correct'",
+        "UPDATE review_audit SET note = 'x'",
+        "DELETE FROM security_events",
+    ])
+    def test_the_app_role_cannot_do_more_than_the_code_needs(engine, statement):
+        """Review finding: least privilege on the lab tables. The role may only do what `vulnmart.lab.pg` does."""
+        from sqlalchemy.exc import ProgrammingError
+    
+>       with pytest.raises(ProgrammingError, match="permission denied"), engine.begin() as c:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ProgrammingError
+
+apps\api\tests\test_lab_pg.py:470: Failed
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+FAILED apps/api/tests/test_assessments_postgres.py::test_the_application_role_cannot_do_what_it_must_not_to_the_assessment_tables[DELETE FROM invites]
+FAILED apps/api/tests/test_contract.py::test_the_ports_package_holds_only_the_three_modules
+FAILED apps/api/tests/test_lab_pg.py::test_the_app_role_cannot_rewrite_or_delete_the_append_only_tables
+FAILED apps/api/tests/test_lab_pg.py::test_the_app_role_cannot_do_more_than_the_code_needs[DELETE FROM security_events]
+4 failed, 2593 passed, 1 skipped in 458.70s (0:07:38)

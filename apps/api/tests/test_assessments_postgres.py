@@ -85,12 +85,23 @@ def test_one_company_reads_only_its_own_assessment_rows(app_engine, owner, compa
     assert settings_query(app_engine, "UPDATE invites SET state = 'revoked' WHERE id = '" + invite.invite_id + "' RETURNING 1", vulnmart__org_id=bo.org_id) == []
 
 
-@pytest.mark.parametrize("statement", ["DELETE FROM invites", "TRUNCATE invites", "TRUNCATE assessment_templates", "TRUNCATE template_challenges",
+@pytest.mark.parametrize("statement", ["TRUNCATE invites", "TRUNCATE assessment_templates", "TRUNCATE template_challenges",
                                        "UPDATE template_challenges SET challenge_key = 'C03'"])
 def test_the_application_role_cannot_do_what_it_must_not_to_the_assessment_tables(app_engine, statement):
     with pytest.raises(DBAPIError, match="permission denied"):
         with app_engine.begin() as c:
             c.execute(text(statement))
+
+
+def test_the_application_role_may_delete_an_invite_only_of_the_company_in_scope(app_engine, owner, companies, assessments):
+    """Since migration 0014 (story P-24) the retention job may delete invites; row-level security still decides whose."""
+    ana = company(companies, owner)
+    bo = company(companies, owner, "bo@other.example", "Other")
+    t = assessments.create_template(ana, BASIC)
+    invite = assessments.create_invite(ana, t.template_id, "c@example.org")
+    assert settings_query(app_engine, "DELETE FROM invites RETURNING 1") == [], "no company in scope: nothing is visible, nothing is deleted"
+    assert settings_query(app_engine, "DELETE FROM invites RETURNING 1", vulnmart__org_id=bo.org_id) == [], "another company's scope: the same"
+    assert settings_query(app_engine, "DELETE FROM invites RETURNING id", vulnmart__org_id=ana.org_id) == [(invite.invite_id,)]
 
 
 def test_a_state_other_than_the_nine_is_refused_by_the_database(owner, companies, assessments):

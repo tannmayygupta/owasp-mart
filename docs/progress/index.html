@@ -58,8 +58,8 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <p class="source">source: initial.md (decisions D-01, D-03, D-06, D-26), docs/architecture/07-repo-and-workstreams.md</p>
 <h2>The three streams</h2>
 <div class="cards">
-<div class="card"><h3><a href="#lab">Lab: Tanmay</a></h3><p>Builds the part that starts a private copy of the shop for each person, keeps it isolated, detects the attacks, and scores the attempt.</p><p class="summary">10 done, 8 being implemented, 13 next, of 31 tasks.</p></div>
-<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">22 done, 1 being implemented, 9 next, of 32 tasks.</p></div>
+<div class="card"><h3><a href="#lab">Lab: Tanmay</a></h3><p>Builds the part that starts a private copy of the shop for each person, keeps it isolated, detects the attacks, and scores the attempt.</p><p class="summary">12 done, 7 being implemented, 12 next, of 31 tasks.</p></div>
+<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">23 done, 1 being implemented, 8 next, of 32 tasks.</p></div>
 <div class="card"><h3><a href="#target">Target: Sahil</a></h3><p>Builds the online shop that is deliberately vulnerable, with its 11 challenges, hints and the tests that prove each one can be solved.</p><p class="summary">31 done, 0 being implemented, 1 next, of 32 tasks.</p></div>
 </div>
 <h2>Contracts between the streams</h2>
@@ -132,7 +132,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <section id="lab">
 <h2>Lab stream: Tanmay</h2>
 <p>Builds the part that starts a private copy of the shop for each person, keeps it isolated, detects the attacks, and scores the attempt.</p>
-<p class="summary"><strong>10 done, 8 being implemented, 13 next, 31 tasks in total.</strong></p>
+<p class="summary"><strong>12 done, 7 being implemented, 12 next, 31 tasks in total.</strong></p>
 <p class="source">source: docs/dev/dev1-tanmay.md (working tree)</p>
 <h3>Sprint 1 <span class="dates">(2026-10-08 to 2026-10-14)</span></h3>
 <ul class="tasks">
@@ -153,7 +153,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <li class="task now"><div class="head"><span class="tid">L-12</span> <span class="ttitle">Image builds for amd64 and arm64 and deploy pipelines</span> <span class="status">Being implemented</span></div><p class="build">CI builds images for amd64 and natively for arm64 on the VM, and a deploy step puts them on both VMs.</p><p class="waits">Waits on: L-08, L-07.</p></li>
 <li class="task done"><div class="head"><span class="tid">L-13</span> <span class="ttitle">Orchestrator creates an instance from a template</span> <span class="status">Done</span></div><p class="build">Create a private instance on request from a template, wait for health and flag injection, track its state in a state machine.</p><p class="waits">Waits on: L-04, L-08.</p></li>
 <li class="task now"><div class="head"><span class="tid">L-14</span> <span class="ttitle">Reset, teardown, timing defaults and reconciler</span> <span class="status">Being implemented</span></div><p class="build">Reset with new flags, tear down at expiry or inactivity, and a reconciler that repairs any difference between recorded and real state.</p><p class="waits">Waits on: L-13.</p></li>
-<li class="task now"><div class="head"><span class="tid">L-15</span> <span class="ttitle">Instance isolation and hardening</span> <span class="status">Being implemented</span></div><p class="build">Internal networks with no route out, a host rule that drops instance-to-host traffic, hardened containers, the Docker socket behind a proxy, template-ID-only orchestrator requests.</p><p class="waits">Waits on: L-13.</p></li>
+<li class="task done"><div class="head"><span class="tid">L-15</span> <span class="ttitle">Instance isolation and hardening</span> <span class="status">Done</span></div><p class="build">Internal networks with no route out, a host rule that drops instance-to-host traffic, hardened containers, the Docker socket behind a proxy, template-ID-only orchestrator requests.</p><p class="waits">Waits on: L-13.</p></li>
 <li class="task done"><div class="head"><span class="tid">L-16</span> <span class="ttitle">Concurrency, quotas, start failures and warm-pool decision</span> <span class="status">Done</span></div><p class="build">Start many instances at once without manual work, enforce per-user, per-company and global quotas through QuotaPort (a fake until Akshay&#39;s P-28), handle start failures, decide whether a warm pool is needed.</p><p class="waits">Waits on: L-13, L-14.</p></li>
 </ul>
 <h3>Sprint 3 <span class="dates">(2026-10-22 to 2026-10-28)</span></h3>
@@ -171,7 +171,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <ul class="tasks">
 <li class="task next"><div class="head"><span class="tid">L-25</span> <span class="ttitle">Time metrics and event log</span> <span class="status">Next</span></div><p class="build">Headline time to capture, estimated active time, resets and retries, and the attempt event log (ids and metadata only).</p><p class="waits">Waits on: L-21, L-22.</p></li>
 <li class="task next"><div class="head"><span class="tid">L-26</span> <span class="ttitle">Reset and withdrawal during an assessment</span> <span class="status">Next</span></div><p class="build">Handle a reset and a withdrawal in the middle of an assessment attempt.</p><p class="waits">Waits on: L-14, L-22.</p></li>
-<li class="task next"><div class="head"><span class="tid">L-27</span> <span class="ttitle">Anti-cheat signals and held-capture review</span> <span class="status">Next</span></div><p class="build">Submission limits, activity-versus-capture check, timing anomalies, write-up similarity review, integrity signals as evidence for a human, review of held captures.</p><p class="waits">Waits on: L-21, L-23. Reviewer for held captures (OI-38) needs a decision.</p></li>
+<li class="task done"><div class="head"><span class="tid">L-27</span> <span class="ttitle">Anti-cheat signals and held-capture review</span> <span class="status">Done</span></div><p class="build">Submission limits, activity-versus-capture check, timing anomalies, write-up similarity review, integrity signals as evidence for a human, review of held captures.</p><p class="waits">Waits on: L-21, L-23. Reviewer for held captures (OI-38) needs a decision.</p></li>
 <li class="task next"><div class="head"><span class="tid">L-28</span> <span class="ttitle">Cohort board and ranking aid</span> <span class="status">Next</span></div><p class="build">The cohort view for recruiters and the ranking aid, with no global leaderboard.</p><p class="waits">Waits on: L-23. Open question OI-26: ask before building.</p></li>
 <li class="task next"><div class="head"><span class="tid">L-29</span> <span class="ttitle">Isolation proof and extra hardening on VM-I</span> <span class="status">Next</span></div><p class="build">Add user namespaces, rootless Docker or gVisor only where tests pass; raise Docker address pools; write up spikes S-3, S-8 and S-15.</p><p class="waits">Waits on: L-15, L-17.</p></li>
 <li class="task next"><div class="head"><span class="tid">L-30</span> <span class="ttitle">End-to-end suite and load check</span> <span class="status">Next</span></div><p class="build">An end-to-end suite for signup, instance start, a captured flag, an assessment attempt, scoring and a recruiter report on the deployed system, plus a load check.</p><p class="waits">Waits on: Akshay (P-32) and Sahil (T-32) deployed and merged.</p></li>
@@ -181,7 +181,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <section id="platform">
 <h2>Platform stream: Akshay</h2>
 <p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p>
-<p class="summary"><strong>22 done, 1 being implemented, 9 next, 32 tasks in total.</strong></p>
+<p class="summary"><strong>23 done, 1 being implemented, 8 next, 32 tasks in total.</strong></p>
 <p class="source">source: docs/dev/dev2-akshay.md (working tree)</p>
 <h3>Sprint 1 <span class="dates">(2026-10-08 to 2026-10-14)</span></h3>
 <ul class="tasks">
@@ -214,7 +214,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <li class="task done"><div class="head"><span class="tid">P-21</span> <span class="ttitle">Accepting invites, re-invite after a fault and bulk invites</span> <span class="status">Done</span></div><p class="build">A candidate accepts an invite with consent, a re-invite after a fault, and bulk invite handling.</p><p class="waits">Waits on: P-16, P-20.</p></li>
 <li class="task done"><div class="head"><span class="tid">P-22</span> <span class="ttitle">Live updates hub: SSE, heartbeat, snapshot with polling fallback, fan-out</span> <span class="status">Done</span></div><p class="build">Server-sent events with heartbeat and no buffering, a snapshot plus polling fallback, and the fan-out path from events to streams.</p><p class="waits">Waits on: P-06, P-12. Tanmay&#39;s L-11 proves SSE through Vercel (S-14).</p></li>
 <li class="task done"><div class="head"><span class="tid">P-23</span> <span class="ttitle">Stream authorisation and HTTP/2</span> <span class="status">Done</span></div><p class="build">Authorise every stream per user and company; HTTP/2 as far as the spike allows.</p><p class="waits">Waits on: P-19, P-22.</p></li>
-<li class="task next"><div class="head"><span class="tid">P-24</span> <span class="ttitle">Retention scheduler, retention rules and log rules</span> <span class="status">Next</span></div><p class="build">Retention and auto-delete jobs for candidates and learners, evidence data rules, controller and processor roles, IP and browser details, system logs, synthetic data only.</p><p class="waits">Waits on: P-17, P-21.</p></li>
+<li class="task done"><div class="head"><span class="tid">P-24</span> <span class="ttitle">Retention scheduler, retention rules and log rules</span> <span class="status">Done</span></div><p class="build">Retention and auto-delete jobs for candidates and learners, evidence data rules, controller and processor roles, IP and browser details, system logs, synthetic data only.</p><p class="waits">Waits on: P-17, P-21.</p></li>
 </ul>
 <h3>Sprint 4 <span class="dates">(2026-10-29 to 2026-11-04)</span></h3>
 <ul class="tasks">

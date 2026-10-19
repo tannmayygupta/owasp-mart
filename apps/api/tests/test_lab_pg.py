@@ -242,8 +242,7 @@ def test_the_app_role_cannot_rewrite_or_delete_the_append_only_tables(engine):
     rec = pg.PgAttemptStore(engine).add(new_record(user="u-grant"))
     pg.PgFlagSubmissionLog(engine).record(rec.id, "C01", "incorrect", T0)
     for sql in ("UPDATE flag_submissions SET result = 'correct'", "UPDATE review_audit SET decision = 'accept'",
-                "UPDATE integrity_flags SET kind = 'timing'", "DELETE FROM review_audit",
-                "DELETE FROM security_events"):
+                "UPDATE integrity_flags SET kind = 'timing'", "DELETE FROM review_audit"):
         with pytest.raises(ProgrammingError):
             with engine.begin() as c:
                 c.execute(text(sql))
@@ -461,7 +460,6 @@ def test_a_capture_body_is_never_kept_in_the_events_table(engine):
     "UPDATE events SET event = '{}'::jsonb",  # an event is only stamped with its digest and the engine's mark
     "UPDATE flag_submissions SET result = 'correct'",
     "UPDATE review_audit SET note = 'x'",
-    "DELETE FROM security_events",
 ])
 def test_the_app_role_cannot_do_more_than_the_code_needs(engine, statement):
     """Review finding: least privilege on the lab tables. The role may only do what `vulnmart.lab.pg` does."""
@@ -476,6 +474,7 @@ def test_the_app_role_keeps_what_the_code_needs(engine):
         c.execute(text("UPDATE events SET engine_seen = engine_seen WHERE false"))
         c.execute(text("UPDATE attempts SET version = version WHERE false"))
         c.execute(text("DELETE FROM evidence WHERE false"))
+        c.execute(text("DELETE FROM security_events WHERE false"))  # the log purge of story P-24 (FR-PRV-15: security logs go after 12 months), migration 0014
 
 
 def test_create_from_consent_with_an_attempt_id_the_invite_rules_and_a_reinvite_key_work_on_postgres(engine, keystore_engine):

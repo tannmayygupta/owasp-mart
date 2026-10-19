@@ -1,0 +1,44 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (574.7569ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (367.7269ms)
+  ✔ the page is served and the API is also reachable directly on its own port (184.9532ms)
+  ✔ API errors follow the IF-8 format through the web origin: unknown route and wrong method (74.9463ms)
+  ✔ origin secret: the proxy adds it, a direct call to the API without it is refused (P-07) (175.1799ms)
+  ✔ page headers: nonce-based CSP that changes per request and matches the page scripts, and the fixed headers (P-07) (200.2974ms)
+  ✔ caching (EF-02): two users on the same URL, interleaved, each receive only their own answer (P-07) (748.0544ms)
+  ✔ mail (P-09): a row in the outbox is delivered once to Mailpit through Valkey and Dramatiq (12531.0857ms)
+  ✔ mail (P-09): mail queued while the worker is down is delivered after it restarts (nothing is lost) (9050.4774ms)
+  ✔ accounts (P-11): signup sends a verification mail, its link verifies once, a repeat signup gets the "already registered" mail, and signup is rate limited (10646.9834ms)
+  ✔ sessions (P-12): login through the web origin sets the cookie, the session works, CSRF and Origin are checked, logout ends it for good (6232.5777ms)
+  ✔ password (P-14): reset by mail ends every session, weak passwords are refused with a fixed sentence, the profile and a password change work (9728.5615ms)
+  ✔ admins (P-13): the seed command makes an admin with no learner role who signs in without admin powers, a second seed changes nothing, signup cannot make an admin (4464.1274ms)
+  ✔ mfa (P-15): an admin enrols an authenticator app, then needs the code (or a recovery code, once) to sign in; a code cannot be replayed (4378.6402ms)
+  ✔ consent (P-16): the routes need a session and CSRF, answer 404 for an attempt that is not there, list nothing, and the database refuses to change a record (7207.2223ms)
+  ✔ audit and keys (P-17): a login is logged under a pseudonym, the chain verifies and anchors; a key is created, used and shredded in vm_keystore (8514.9655ms)
+  ✔ companies (P-18): a recruiter signs up, verifies the address, the admin queue lists the company, the approval activates it and mails the owner (26679.3551ms)
+  ✔ company members (P-19): a colleague joins through the owner, the terms gate invites, the cap applies, a suspended recruiter is out at once (48933.4387ms)
+  ✔ invites (P-20): a template, an invite by email to a person with no account, the mail arrives, the token is only a hash, resend kills the old link (34725.1539ms)
+  ✔ accepting invites (P-21): open the link, register, address must match, consent first, attempt and role after it, re-invite, bulk, purge (63123.5071ms)
+# live: event row to frame on the open stream 369 ms (relay every 250 ms)
+  ✔ live updates (P-22): events reach an open stream through the proxy, heartbeat, isolation, replay after an API restart, resync, snapshot (31036.9859ms)
+# live: stream ended 29972 ms after the logout (the session is checked every 30 s)
+  ✔ stream authorisation (P-23): another user never reads your events, with or without their ids, and a logout ends the stream (44512.3225ms)
+# live: a call on the same HTTP/2 connection while six streams are open took 50 ms
+# live: one event row to six HTTP/2 streams through Caddy 284 ms
+  ✔ live updates over HTTP/2 (P-23): one connection carries six streams and ordinary calls through the real Caddy image (8857.643ms)
+  ✔ retention (P-24): the scheduler ran at start, the admin sees the runs, an aged learner is warned and deleted, an aged invite goes, old event rows are cleared (35512.7411ms)
+  ✔ ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published (413.0996ms)
+  ✔ hardening: non-root, read-only root, all capabilities dropped, no-new-privileges, memory and pids limits (328.8888ms)
+  ✔ web has no secrets or flags in its environment (56.6901ms)
+  ✔ Postgres down: public health 503 degraded naming no store, /readyz names it; recovers (6069.3271ms)
+  ✔ Valkey down: public health 503 degraded, /readyz names valkey; recovers (7708.5199ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (4946.2486ms)
+✔ platform and web profiles on a real Docker engine (422173.0224ms)
+ℹ tests 30
+ℹ suites 1
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 422363.5883
