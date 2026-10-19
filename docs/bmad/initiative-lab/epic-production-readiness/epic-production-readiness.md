@@ -39,3 +39,4 @@ Stream L work. Where a part belongs to another stream (the invite and company fl
 - 2026-10-19: instance limits, flag scan in CI and the time-metrics 500, docs/dev-log/2026-10-19-tannmayygupta-instance-limits-flag-scan-and-time-metrics.md (L-14, L-19, L-25 stay open)
 - 2026-10-19: the images workflow change declared in contracts/CHANGELOG.md (contract rules), same pull request
 - 2026-10-19: COMPAT.md follows Akshay's P-25 (IF-1 1.1.0, DB 2.1.0), erase repeat test (H-145), docs/dev-log/2026-10-19-tannmayygupta-compat-after-p25-and-erase-repeat.md
+- 2026-10-19: Tanmay's own COMPAT.md sign-off rows approved, docs/dev-log/2026-10-19-tannmayygupta-own-signoff-rows.md

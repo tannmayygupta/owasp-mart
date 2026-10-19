@@ -301,6 +301,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
+### 2026-10-19 (Tanmay, story L-09: own sign-offs)
+- registry change: the Approvals rows of `@tannmayygupta` in `contracts/COMPAT.md` are set to `approved` on 2026-10-19 at the versions listed there, on the developer's instruction in chat. No contract file, registry entry or rule changed.
+
 ### 2026-10-19 (Tanmay, story L-09: COMPAT.md follows the changelog after P-25)
 - registry change: `contracts/COMPAT.md` lists IF-1 at 1.1.0 and DB at 2.1.0, the versions of the newest changelog entries of Akshay's story P-25 (the tag script checks that COMPAT.md equals the changelog); the approval rows of IF-1 and DB carry the same versions and are `pending`. No contract file, registry entry or rule changed.
 
