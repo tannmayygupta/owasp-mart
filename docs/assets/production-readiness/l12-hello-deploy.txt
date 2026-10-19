@@ -1,0 +1,20 @@
+L-12 evidence, 2026-10-20: the hello stack built by CI deployed by the developer with scripts/deploy.mjs.
+Manifest: release.json of the images run 39226401054 on main (commit 73f0917174d4); image hello@sha256:a2d378dffde3... (public on GHCR).
+Command: node scripts/deploy.mjs --manifest release.json --target p,i,local --provider aws --identity <key for the hosts>
+Run twice, the same result both times (the second run recreates the container):
+PASS vm-p copy compose file
+PASS vm-p pull
+PASS vm-p compose up
+PASS vm-p verify image
+PASS vm-p health check
+PASS vm-i copy compose file
+PASS vm-i pull
+PASS vm-i compose up
+PASS vm-i verify image
+PASS vm-i health check
+PASS local pull
+PASS local compose up
+PASS local verify image
+PASS local health check
+RESULT PASS
+"verify image" checks that the running container uses exactly the image pulled by digest.

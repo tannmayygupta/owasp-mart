@@ -330,6 +330,7 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 | LE-27 | Certificate renewal with an alert on failure (touches LE-2, L-10) | Done: forced renewal on vm-i through the real unit, alert path shown, ops check | docs/assets/production-readiness/l10-renewal-live.json |
 | LE-28 | Daily backup, off-host copy and a restore (touches LE-5, LE-8, L-24) | Done: backup unit, timer, pull script, restore 39 of 39 tables and 45 of 45 users; copy to cloud storage not built | docs/assets/production-readiness/l24-backup-live.json; docs/runbooks/backup-and-restore.md |
 | LE-29 | No flag pattern in a running instance's logs, inspect output or image (touches FR-FLG-08, L-19) | Done: scan of vm-i clean; CI scan green | docs/assets/production-readiness/l19-vmi-scan.txt |
+| LE-30 | CI-built images are deployed to both VMs and the laptop by a person (touches LE-4, L-12) | Done: hello stack, all checks PASS twice, digest verified | docs/dev-log/2026-10-20-tannmayygupta-l12-hello-stack-deployed.md; docs/assets/production-readiness/l12-hello-deploy.txt |
 
 
 ## Live updates (P stream)
