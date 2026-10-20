@@ -46,6 +46,7 @@ from vulnmart.live.snapshot import EmptySnapshot, LabSnapshotSource, SnapshotSou
 from vulnmart.live.store import StreamReader, ValkeyStreamStore
 from vulnmart.lab.tickets import TicketMinter, minter_from_environ
 from vulnmart.assessments.service import AssessmentService
+from vulnmart.orgs.company_api import router as company_router
 from vulnmart.orgs.service import CompanyService
 from vulnmart.ports.attempts import AttemptPort
 from vulnmart.privacy.api import router as consent_router
@@ -304,6 +305,7 @@ def create_app(
     app.include_router(consent_router)
     app.include_router(deletion_router)
     app.include_router(invite_router)
+    app.include_router(company_router)
     app.include_router(live_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs

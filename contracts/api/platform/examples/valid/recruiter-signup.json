@@ -1,0 +1,9 @@
+{
+  "schema": "RecruiterSignupRequest",
+  "body": {
+    "email": "rita@initech.example",
+    "password": "correct horse battery staple",
+    "display_name": "Rita",
+    "company_name": "Initech"
+  }
+}

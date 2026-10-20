@@ -52,7 +52,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] The recruiter routes, the contract change and their tests.
+- [x] The recruiter routes, the contract change and their tests (2026-10-20: 10 route tests, contract rules 18 PASS).
 - [ ] The recruiter pages and their tests; the stack test.
 
 **Acceptance Criteria:**

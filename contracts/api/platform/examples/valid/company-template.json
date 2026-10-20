@@ -1,0 +1,9 @@
+{
+  "schema": "TemplateRequest",
+  "body": {
+    "title": "Web security, junior",
+    "challenge_keys": ["C01", "C02", "C05"],
+    "hints_mode": "on",
+    "hint_cost_pct": 10
+  }
+}
