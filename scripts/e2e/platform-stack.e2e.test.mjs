@@ -1689,6 +1689,106 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(psql(`SELECT state || ',' || (user_id = (SELECT id FROM users WHERE email_ci = '${candidate}')) FROM invites WHERE attempt_id = '${mine.attempt_id}'`), 'opened,true');
   }, { timeout: 300000 });
 
+  // Story P-27: the recruiter's routes through the web origin on the real stack: sign-up over HTTP, approval by an admin, the terms, a template, an invite, the
+  // candidate accepting it, and the recruiter's list showing it; a second company and a learner see none of it. The candidate's results are the lab's reviewer routes,
+  // and this stack has no lab in the API process; they are tested by stream L.
+  test('recruiter (P-27): sign up, approval, terms, template, invite, the candidate accepts, the list shows it; another company and a learner see nothing', async () => {
+    for (const path of ['/company', '/company/candidates', '/company/candidates/a-AAAAAAAAAAAAAAAA']) {
+      const page = await fetch(`${ORIGIN}${path}`, { signal: AbortSignal.timeout(60000) });
+      assert.equal(page.status, 200, path);
+      assert.match(page.headers.get('content-security-policy') ?? '', /'nonce-[A-Za-z0-9+/=]+'/, `${path} has the nonce CSP`);
+    }
+    const domain = `rec-${RUN}.example`;
+    const owner = `owner@${domain}`;
+    const otherOwner = `owner@rec2-${RUN}.example`;
+    const candidate = `rec-taker-${RUN}@example.org`;
+    const learner = `rec-learner-${RUN}@example.org`;
+    const adminEmail = `e2e-rec-admin-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app', 'from vulnmart.ports.scope import Scope, Role',
+        'c = app.state.companies', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const signIn = async (email) => {
+      const r = await postJson('/api/v1/session', { email, password });
+      assert.equal(r.status, 200, email);
+      const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(r.headers.getSetCookie()[0])[1]}`;
+      return { cookie, csrf: (await r.json()).csrf_token };
+    };
+    const as = (who) => ({
+      get: (path) => call('GET', path, { headers: { cookie: who.cookie } }),
+      send: (method, path, body) => call(method, path, { body, headers: { cookie: who.cookie, 'x-csrf-token': who.csrf } }),
+    });
+
+    // two recruiters sign up over HTTP; the same answer twice
+    for (const [email, company] of [[owner, `Rec Ltd ${RUN}`], [otherOwner, `Rec Two ${RUN}`]]) {
+      const r = await postJson('/api/v1/recruiters', { email, password, display_name: 'E2E Recruiter', company_name: company });
+      assert.equal(r.status, 202);
+      assert.deepEqual(await r.json(), { status: 'accepted' });
+      psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${email}'`);
+    }
+    let rec = as(await signIn(owner));
+    assert.equal((await (await rec.get('/api/v1/company')).json()).state, 'pending_approval');
+    assert.equal((await rec.send('POST', '/api/v1/company/templates', { title: 'Too early', challenge_keys: ['C01'] })).status, 409);
+
+    // an admin approves both companies
+    const seeded = docker('exec', '-e', 'VULNMART_SEED_ADMIN_PASSWORD=a long admin password 123', NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Rec Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    for (const email of [owner, otherOwner]) {
+      const orgId = psql(`SELECT o.id FROM organizations o JOIN users u ON u.id = o.owner_user_id WHERE u.email_ci = '${email}'`);
+      py(`c.approve(Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN})), "${orgId}")`, 'print(json.dumps(True))');
+    }
+
+    // the owner reads and accepts the terms, makes a template and invites the candidate
+    rec = as(await signIn(owner));
+    const standing = await (await rec.get('/api/v1/company')).json();
+    assert.deepEqual([standing.state, standing.role, standing.terms_accepted], ['active', 'owner', false]);
+    const terms = await (await rec.get('/api/v1/company/terms')).json();
+    assert.match(terms.sha256, /^[0-9a-f]{64}$/);
+    assert.equal((await rec.send('POST', '/api/v1/company/terms', { version: terms.version, sha256: terms.sha256 })).status, 204);
+    const template = await rec.send('POST', '/api/v1/company/templates', { title: 'E2E recruiter', challenge_keys: ['C01', 'C03'], hints_mode: 'on', hint_cost_pct: 10 });
+    assert.equal(template.status, 201);
+    const tid = (await template.json()).template_id;
+    const invited = await rec.send('POST', '/api/v1/company/invites', { template_id: tid, emails: [candidate] });
+    assert.equal(invited.status, 201);
+    const inviteId = (await invited.json()).created[0].invite_id;
+
+    // the candidate gets the mail, signs up, accepts
+    let token = null;
+    for (let i = 0; i < 60 && !token; i += 1) {
+      const m = await mailFor(candidate, 'invited you to a security assessment', 1);
+      token = (m && /invite\?token=([a-z2-7]{26}\.[A-Za-z0-9_-]{43})/.exec(m.Text)?.[1]) || null;
+      if (!token) await new Promise((r) => setTimeout(r, 1000));
+    }
+    assert.ok(token, 'the invite mail arrived');
+    for (const email of [candidate, learner]) {
+      assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Person', age_declaration: true })).status, 202);
+      psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${email}'`);
+    }
+    const cand = await signIn(candidate);
+    const accepted = await postJson('/api/v1/invites/accept', { token }, { cookie: cand.cookie, 'x-csrf-token': cand.csrf });
+    assert.equal(accepted.status, 200);
+    const attemptId = (await accepted.json()).attempt_id;
+
+    // the recruiter's list shows the candidate's state and attempt
+    const listed = (await (await rec.get('/api/v1/company/invites')).json()).items;
+    assert.deepEqual(listed.map((i) => [i.invite_id, i.email, i.state, i.attempt_id, i.hints_mode, i.hint_cost_pct]), [[inviteId, candidate, 'opened', attemptId, 'on', 10]]);
+
+    // another company and a learner see none of it
+    const other = as(await signIn(otherOwner));
+    assert.deepEqual(await (await other.get('/api/v1/company/invites')).json(), { items: [] });
+    assert.deepEqual(await (await other.get('/api/v1/company/templates')).json(), { items: [] });
+    assert.equal((await other.get(`/api/v1/company/templates/${tid}`)).status, 404);
+    const lea = as(await signIn(learner));
+    const refused = await lea.get('/api/v1/company/invites');
+    assert.equal(refused.status, 404);
+    assert.equal((await refused.json()).code, 'REQ-ROUTE-UNKNOWN');
+  }, { timeout: 300000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

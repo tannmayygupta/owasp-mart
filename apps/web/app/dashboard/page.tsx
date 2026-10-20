@@ -48,6 +48,8 @@ export default function DashboardPage() {
         <h1>Dashboard</h1>
         {user.account_type === 'admin' && !user.mfa_enabled ? (
           <p>Set up your authenticator app on the <Link href="/account">account page</Link>: the admin area needs it.</p>
+        ) : user.account_type === 'recruiter' ? (
+          <p className="row"><Link href="/company/candidates">Your candidates</Link> <Link href="/company">Your company, templates and invitations</Link></p>
         ) : (
           <p className="muted">The {user.account_type} dashboard is not here yet.</p>
         )}

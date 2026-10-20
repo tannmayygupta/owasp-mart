@@ -2,7 +2,7 @@
 //   node --test apps/web/test/dashboard-lib.test.mjs
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
-import { ApiError, api, say, setCsrf } from '../lib/api.ts';
+import { ApiError, api, duration, say, setCsrf } from '../lib/api.ts';
 import { safeNext } from '../lib/paths.ts';
 
 const realFetch = globalThis.fetch;
@@ -63,4 +63,12 @@ test('after sign-in only a same-origin path is followed (no open redirect)', () 
   for (const bad of [null, '', 'https://evil.example/', '//evil.example/', '/\\evil.example', 'javascript:alert(1)', '/ok\nSet-Cookie: x']) {
     assert.equal(safeNext(bad), '/dashboard', String(bad));
   }
+});
+
+test('durations read as hours, minutes and seconds; a missing one is a dash (story P-27)', () => {
+  assert.equal(duration(3723), '1h 02m 03s');
+  assert.equal(duration(59.6), '0h 01m 00s');
+  assert.equal(duration(0), '0h 00m 00s');
+  assert.equal(duration(-5), '0h 00m 00s');
+  for (const missing of [null, undefined, Number.NaN]) assert.equal(duration(missing), '-');
 });

@@ -1,0 +1,6 @@
+{
+  "schema": "InviteActionRequest",
+  "body": {
+    "action": "resend"
+  }
+}

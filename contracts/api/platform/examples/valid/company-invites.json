@@ -1,0 +1,7 @@
+{
+  "schema": "InvitesRequest",
+  "body": {
+    "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+    "emails": ["candidate@example.org", "second@example.org"]
+  }
+}

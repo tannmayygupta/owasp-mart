@@ -1,0 +1,10 @@
+{
+  "schema": "TemplateRequest",
+  "body": {
+    "title": "Too short",
+    "challenge_keys": ["C01"],
+    "time_limit_min": 5
+  },
+  "path": "/time_limit_min",
+  "rule": "the time limit is 30 to 480 minutes"
+}

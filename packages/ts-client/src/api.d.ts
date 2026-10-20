@@ -488,6 +488,204 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recruiters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign up as a recruiter
+         * @description A recruiter and a pending company (or, when a company already claims the address's domain, a request to join it), and the verification mail (story P-27 over P-18,
+         *     FR-ORG-01). No session is needed; the answer is 202 whether the address is new or known, as for `createAccount`, and the known address gets the "already registered"
+         *     mail. A disposable address, a bad name or company name, or a weak password is 422. Rate limited per visitor and per address.
+         */
+        post: operations["signupRecruiter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My company's standing
+         * @description Where the calling recruiter stands (FR-ORG-02): `unverified_email`, `pending_approval`, `active`, `rejected` (with the admin's reason), `suspended`, `deleted` or `none`,
+         *     the company's name, whether the current data-processing terms are accepted, and whether the caller is the owner or a member. Only a recruiter's session; anyone else
+         *     is answered 404 REQ-ROUTE-UNKNOWN.
+         */
+        get: operations["getMyCompany"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/reapply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply again after a rejection
+         * @description The owner of a rejected company applies again (OI-11: at any time); the company is pending again and the earlier reason is cleared. Another state is 409
+         *     ATT-INVALID-STATE; a caller who is not the owner is 404 REQ-ROUTE-UNKNOWN. The body is empty.
+         */
+        post: operations["reapplyCompany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The data-processing terms to accept
+         * @description The terms the owner of an active company accepts before the company can invite (FR-ORG-07): the version, the text and its SHA-256. Only the owner (others 404
+         *     REQ-ROUTE-UNKNOWN); a company that is not active is 409 ATT-INVALID-STATE.
+         */
+        get: operations["getCompanyTerms"];
+        put?: never;
+        /**
+         * Accept the data-processing terms
+         * @description The owner accepts the version and text they were shown (both from `getCompanyTerms`); a different text is 409 ATT-CONSENT-STALE (read them again). Accepting again is
+         *     204. The acceptance is recorded with the company, the user, the version and the time.
+         */
+        post: operations["acceptCompanyTerms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The company's assessment templates
+         * @description The templates of the caller's company only (FR-ASM-01, FR-ORG-06). A company that is not active is 409 ATT-INVALID-STATE.
+         */
+        get: operations["listTemplates"];
+        put?: never;
+        /**
+         * Make an assessment template
+         * @description A template of the caller's company (FR-ASM-01): a title, any of the 11 challenges, and the rules (time limit 30 to 480 minutes, hints off or on with a cost of 0 to 100
+         *     percent, resets, invite expiry, retention 30 to 365 days, write-up required or optional, when the candidate sees results, flag submissions per minute). A field left out
+         *     takes its default; a value outside its range, or a field that cannot be switched off, is 422.
+         */
+        post: operations["createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One template
+         * @description A template of the caller's company; another company's is 404 ATT-NOT-FOUND.
+         */
+        get: operations["getTemplate"];
+        /**
+         * Replace a template
+         * @description Replaces every field (a field left out goes back to its default) and raises the version. Invites already sent keep the rules they were made with.
+         */
+        put: operations["updateTemplate"];
+        post?: never;
+        /**
+         * Delete a template
+         * @description A template that invites were made from is 409 ATT-INVALID-STATE.
+         */
+        delete: operations["deleteTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The company's invites and their candidates
+         * @description The invites of the caller's company, newest first, with each one's state, dates and attempt id (the live monitor of FR-DSH-03 reads the attempt from the lab's reviewer
+         *     routes). Filters: `state`, `template_id`. Never a practice attempt or anything outside the company.
+         */
+        get: operations["listCompanyInvites"];
+        put?: never;
+        /**
+         * Invite one or more candidates
+         * @description One address: the invite, or 409 ATT-INVALID-STATE (a live invite for it exists, or the company has not accepted the terms) or 429 REQ-RATE-LIMITED (the daily cap,
+         *     FR-ORG-08). Several (up to 500, FR-ASM-06): 201 with what was created, what was skipped and why (`invalid`, `duplicate`, `exists`, `started`), and what was not tried
+         *     because the cap ran out (`remaining`), so nothing is lost. Each invite mails its link.
+         */
+        post: operations["createInvites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/invites/{invite_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend, cancel, revoke or re-invite
+         * @description `resend` mails a new link (the old one stops working); `cancel` closes an invite not yet accepted; `revoke` closes one already accepted; `reinvite` makes a new invite
+         *     (a new attempt) after a fault (FR-ASM-05). A change that does not start from the invite's state is 409 ATT-INVALID-STATE; another company's invite is 404
+         *     ATT-NOT-FOUND. Answers the invite after the change (for `reinvite`, the new one).
+         */
+        post: operations["actOnInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/pending": {
         parameters: {
             query?: never;
@@ -1558,6 +1756,114 @@ export interface components {
         MyInviteList: {
             items: components["schemas"]["MyInvite"][];
         };
+        RecruiterSignupRequest: {
+            email: components["schemas"]["Email"];
+            password: components["schemas"]["Password"];
+            display_name: string;
+            company_name: string;
+            captcha_token?: string;
+        };
+        CompanyStanding: {
+            /** @enum {unknown} */
+            state: "none" | "unverified_email" | "pending_approval" | "active" | "rejected" | "suspended" | "deleted";
+            company_name: string | null;
+            reason: string | null;
+            terms_accepted: boolean;
+            /** @enum {unknown} */
+            role: "owner" | "member" | null;
+        };
+        CompanyTerms: {
+            version: string;
+            text: string;
+            sha256: string;
+        };
+        TermsAcceptRequest: {
+            version: string;
+            sha256: string;
+        };
+        TemplateRequest: {
+            title: string;
+            challenge_keys: components["schemas"]["ChallengeKey"][];
+            time_limit_min?: number;
+            /** @enum {unknown} */
+            hints_mode?: "off" | "on";
+            hint_cost_pct?: number;
+            reset_limit?: number;
+            invite_expiry_days?: number;
+            retention_days?: number;
+            writeup_required?: boolean;
+            /** @enum {unknown} */
+            results_visibility?: "after_submit" | "after_release";
+            flag_submissions_per_minute?: number;
+        };
+        Template: {
+            /** Format: uuid */
+            template_id: string;
+            title: string;
+            challenge_keys: components["schemas"]["ChallengeKey"][];
+            time_limit_min: number;
+            /** @enum {unknown} */
+            hints_mode: "off" | "on";
+            hint_cost_pct: number;
+            reset_limit: number;
+            invite_expiry_days: number;
+            retention_days: number;
+            writeup_required: boolean;
+            /** @enum {unknown} */
+            results_visibility: "after_submit" | "after_release";
+            flag_submissions_per_minute: number;
+            version: number;
+            updated_at: components["schemas"]["Timestamp"];
+        };
+        TemplateList: {
+            items: components["schemas"]["Template"][];
+        };
+        InvitesRequest: {
+            /** Format: uuid */
+            template_id: string;
+            emails: string[];
+        };
+        InviteActionRequest: {
+            /** @enum {unknown} */
+            action: "resend" | "cancel" | "revoke" | "reinvite";
+        };
+        CompanyInvite: {
+            invite_id: string;
+            /** Format: uuid */
+            template_id: string;
+            email: string;
+            /** @enum {unknown} */
+            state: "created" | "sent" | "opened" | "consented" | "started" | "declined" | "expired" | "cancelled" | "revoked";
+            attempt_id: components["schemas"]["AttemptId"] | null;
+            generation: number;
+            superseded_by: string | null;
+            expires_at: components["schemas"]["Timestamp"];
+            created_at: components["schemas"]["Timestamp"];
+            sent_at: components["schemas"]["Timestamp"] | null;
+            opened_at: components["schemas"]["Timestamp"] | null;
+            consented_at: components["schemas"]["Timestamp"] | null;
+            started_at: components["schemas"]["Timestamp"] | null;
+            closed_at: components["schemas"]["Timestamp"] | null;
+            time_limit_min: number | null;
+            /** @enum {unknown} */
+            hints_mode: "off" | "on";
+            hint_cost_pct: number;
+            /** @enum {unknown} */
+            results_visibility: "after_submit" | "after_release";
+        };
+        CompanyInviteList: {
+            items: components["schemas"]["CompanyInvite"][];
+        };
+        InvitesResult: {
+            created: components["schemas"]["CompanyInvite"][];
+            skipped: {
+                email: string;
+                /** @enum {unknown} */
+                reason: "invalid" | "duplicate" | "exists" | "started";
+            }[];
+            remaining: string[];
+            cap: number | null;
+        };
         PendingCompany: {
             org_id: string;
             name: string;
@@ -2122,6 +2428,26 @@ export interface components {
         };
         /** @description The invite is closed or taken, or this account cannot accept it (not an active, verified participant, or not the address the invite was sent to) (ATT-INVALID-STATE). */
         InviteConflict: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Not found: a template or invite of another company or none at all (ATT-NOT-FOUND), or the caller is not a recruiter, or not the owner where the owner is needed (REQ-ROUTE-UNKNOWN, the answer of a route that does not exist). */
+        CompanyNotFound: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The company is not active, the terms are not accepted, the invite or template is in a state this change does not start from (ATT-INVALID-STATE), or the terms text changed (ATT-CONSENT-STALE). */
+        CompanyConflict: {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
                 [name: string]: unknown;
@@ -3043,6 +3369,385 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             422: components["responses"]["Invalid"];
+        };
+    };
+    signupRecruiter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecruiterSignupRequest"];
+            };
+        };
+        responses: {
+            202: components["responses"]["Accepted"];
+            403: components["responses"]["OriginForbidden"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getMyCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The standing. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStanding"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    reapplyCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getCompanyTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The terms. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyTerms"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    acceptCompanyTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TermsAcceptRequest"];
+            };
+        };
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listTemplates: {
+        parameters: {
+            query?: {
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The templates. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description The template. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The template. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description The template. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Template"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    deleteTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listCompanyInvites: {
+        parameters: {
+            query?: {
+                state?: "created" | "sent" | "opened" | "consented" | "started" | "declined" | "expired" | "cancelled" | "revoked";
+                template_id?: string;
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invites. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyInviteList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    createInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitesRequest"];
+            };
+        };
+        responses: {
+            /** @description What was done. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitesResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    actOnInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteActionRequest"];
+            };
+        };
+        responses: {
+            /** @description The invite. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyInvite"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     listPendingCompanies: {
