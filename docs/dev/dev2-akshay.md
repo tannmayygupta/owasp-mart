@@ -94,7 +94,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Waits on: P-01, P-04.
   - Done when: A page reaches the API health through `/api/*` and two different users never receive each other's response in a caching test.
 
-- [ ] **P-08. Sign off contracts v1.0.0 as provider and consumer**
+- [x] **P-08. Sign off contracts v1.0.0 as provider and consumer**  (2026-10-20: re-reviewed and approved at the current versions in COMPAT.md; the GitHub review of L-09's tag pull request follows when Tanmay opens it)
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.8` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Review and sign the contracts you provide and consume and record the versions you build against.

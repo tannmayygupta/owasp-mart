@@ -1,0 +1,29 @@
+FAIL  clean-tree: the working tree is not clean (8 path(s)): M contracts/COMPAT.md; M docs/dev/HANDOFFS.md; ?? .claude/worktrees/agent-a435a6f5887cb8851/; ?? .claude/worktrees/agent-acf85d1c6528fb792/; ?? .claude/worktrees/agent-af2d793fdc52b167a/; ...
+FAIL  on-main: the current branch is sprint-4-akshay-p08, not main (a tag on a feature branch would tag work that is not merged)
+PASS  up-to-date: HEAD is origin/main
+PASS  tag-absent: the tag contracts-v1.0.0 does not exist yet
+PASS  versions: 10 contract versions match the changelog: IF-1 1.6.0, IF-3 1.0.0, IF-8 1.0.0, IF-2 1.2.0, IF-4 1.0.0, IF-5 1.1.0, IF-6 1.0.1, IF-7 1.2.0, DB 2.1.0, GATE 1.0.0
+PASS  release-labels: every contract is labelled 1.0.0 or higher
+FAIL  approvals: line 46: IF-6 @sahillroy signs version 1.0.0, but the Versions table says 1.0.1 (version mismatch)
+FAIL  handoffs: 19 of 62 checklist line(s) are not ticked:
+        line 216: H-25 flag, seed and document limits (Sahil)
+        line 217: H-26 injector entrypoint, marker, flags file, exit codes, stdin limit (Sahil)
+        line 219: H-28 placement volumes read by the consumers (Sahil)
+        line 222: H-31 limits and sizes (Sahil, after S-4 and S-5)
+        line 223: H-32 env allowlist and flag-in-env exception (Sahil)
+        line 224: H-34 template and component names (Sahil)
+        line 227: H-37 flag-like rule and redaction marker (Sahil)
+        line 229: H-39 data field shapes (Sahil)
+        line 230: H-40 `challenge_key` placement (Sahil)
+        line 232: H-43 milestone definitions versus event names (Sahil, Tanmay)
+        line 233: H-44 bot controller and `bot.visit` (Sahil)
+        line 234: H-45 to H-55 event names and data fields of C01 to C11 (Sahil; H-50 also needs the import-service posting path decided)
+        line 239: H-62 injector network and architecture 02 drawing (Tanmay)
+        line 245: H-72 numbers after spikes S-4 and S-5 (Tanmay)
+        line 248: H-79 `InstancePort` Protocol author (Tanmay, Akshay)
+        line 249: H-81 placeholder names replaced after P-02 (Tanmay; waits for H-01 to H-03, answered by Akshay)
+        line 250: H-82 Tanmay's own open points confirmed (Tanmay)
+        line 252: H-42 `decoy_placement` content (Sahil, may be closed in T-30 if the field stays an optional string)
+        line 254: H-80 this checklist reviewed and the tag decision (Tanmay)
+
+NOT READY: 4 of 8 preconditions failed (clean-tree, on-main, approvals, handoffs). No tag was created.

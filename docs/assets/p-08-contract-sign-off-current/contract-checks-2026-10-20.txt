@@ -1,0 +1,11 @@
+checked 4 schemas, 7 valid and 192 invalid examples
+contracts: PASS
+checked 1 schema, 29 event types, 29 valid events, 3 signed envelopes, 6 valid posted bodies and 69 invalid examples
+events: PASS
+orchestrator contract: checked 9 operations, 20 valid and 74 invalid examples
+orchestrator contract: PASS
+lab contract: checked 20 operations, 41 valid and 101 invalid examples
+lab contract: PASS
+OK: platform fragment 66 operations; bundle valid.
+OK: all 11 catalogue stubs validate against contracts\catalog\challenge.schema.json.
+SUMMARY: 16 PASS, 0 FAIL, 1 NOT-APPLICABLE

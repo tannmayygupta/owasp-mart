@@ -34,8 +34,16 @@ context:
 - Oneshot: documents only (no code). Files: `docs/reviews/2026-10-12-p08-contract-sign-off.md` (the review), `contracts/COMPAT.md` (stream P's nine rows; the rules engine's `compat` check passes), `docs/dev/HANDOFFS.md` (H-01 to H-04, H-07, H-08, H-10 to H-18, H-83 answered; H-114 added for Tanmay; checklist ticks), `docs/dev/dev1-tanmay.md` (Handoffs line of L-09), ADR 0023 (note on the events migration).
 - Remaining human step: Akshay approves the contracts pull request of L-09 on GitHub when Tanmay opens it; then the ticket is marked done.
 
+## Plan Change Log
+
+- 2026-10-20 (the developer: "complete sprint 1 remaining task"): the review was redone against the current versions (`docs/reviews/2026-10-20-p08-contract-sign-off-current.md`); stream P's eight rows of COMPAT.md are `approved` (IF-1 1.6.0, IF-3 1.0.0, IF-8 1.0.0, DB 2.1.0 as owner; IF-2 1.2.0, IF-4 1.0.0, IF-5 1.1.0, IF-7 1.2.0 as consumer); H-79 (stream P's part), H-83 and H-352 answered. The GitHub review of L-09's tag pull request is the one step left, when Tanmay opens it.
+
 ## Verification
 
 **Commands:**
 - `node scripts/check-contract-rules.mjs` -- result: 15 PASS, 0 FAIL (compat: 9 rows, every listed version exists)
 - `node --test "scripts/*.test.mjs"` -- expected: all pass
+
+**Results (2026-10-20):** every contract check PASS; contract rules 16 PASS, 0 FAIL; `tag-contracts.mjs --dry-run`: versions and labels PASS, approvals fail only on Sahil's IF-6 row, handoffs fail on Sahil's and Tanmay's lines (`docs/assets/p-08-contract-sign-off-current/`).
+
+**CI fix (2026-10-20):** the trusted-base contract rule needs a `registry change:` line for any edit of `contracts/COMPAT.md`; added to the IF-1 1.6.0 entry of `contracts/CHANGELOG.md`.
