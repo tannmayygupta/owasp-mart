@@ -1,0 +1,8 @@
+{
+  "schema": "CompanyExportRequest",
+  "body": {
+    "template_id": "not-a-uuid"
+  },
+  "path": "/template_id",
+  "rule": "a template id is a UUID"
+}

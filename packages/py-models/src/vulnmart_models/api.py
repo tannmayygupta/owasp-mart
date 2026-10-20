@@ -689,6 +689,13 @@ class InvitesResult(BaseModel):
     cap: Annotated[int | None, Field(ge=0)]
 
 
+class CompanyExportRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    template_id: UUID
+
+
 class PendingCompany(BaseModel):
     model_config = ConfigDict(
         extra='forbid',

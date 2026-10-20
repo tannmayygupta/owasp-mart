@@ -686,6 +686,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export my data
+         * @description The caller's own data as a zip of JSON and CSV (story P-29, FR-EXP-01, FR-EXP-02): the profile, the consent history, every attempt of theirs with its results,
+         *     timings, hints and evidence requests, the companies that viewed or exported their data, and their deletion requests. No other person's data and no flag value
+         *     (anything shaped like a flag in a captured request is replaced by `VM{redacted}`). Every export writes an audit entry (FR-EXP-04). The body is empty. Rate
+         *     limited per account.
+         */
+        post: operations["exportMyData"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export one assessment's results
+         * @description The results of one template of the caller's company as a zip of CSV and JSON (story P-29, FR-EXP-03; OI-27 answered by the developer on 2026-10-20: scores as
+         *     CSV and JSON, no evidence): per candidate the invite and attempt state, the score of 1000, the times, the hints used, the open integrity flags and the points per
+         *     challenge. Every export writes an audit entry (FR-EXP-04) and an `exported` entry in each candidate's view history (FR-PRV-11). Only a recruiter (others 404
+         *     REQ-ROUTE-UNKNOWN); another company's template is 404 ATT-NOT-FOUND; a company that is not active is 409 ATT-INVALID-STATE.
+         */
+        post: operations["exportCompanyResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/pending": {
         parameters: {
             query?: never;
@@ -1863,6 +1909,10 @@ export interface components {
             }[];
             remaining: string[];
             cap: number | null;
+        };
+        CompanyExportRequest: {
+            /** Format: uuid */
+            template_id: string;
         };
         PendingCompany: {
             org_id: string;
@@ -3738,6 +3788,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyInvite"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    exportMyData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip (JSON and CSV files). */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    /** @description attachment; filename="..." */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    exportCompanyResults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyExportRequest"];
+            };
+        };
+        responses: {
+            /** @description The zip (JSON and CSV files). */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    /** @description attachment; filename="..." */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
                 };
             };
             401: components["responses"]["Unauthenticated"];

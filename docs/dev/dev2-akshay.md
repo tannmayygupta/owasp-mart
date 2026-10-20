@@ -291,7 +291,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [ ] **P-29. Data exports**
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.3` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `in-progress`
   - Build: Candidate, learner and recruiter exports, each audited.
   - Covers: FR-EXP-01 to 04
   - Waits on: P-17. Open: OI-27.

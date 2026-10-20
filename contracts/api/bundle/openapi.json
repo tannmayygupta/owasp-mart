@@ -46,6 +46,9 @@
       "name": "company"
     },
     {
+      "name": "exports"
+    },
+    {
       "name": "admin"
     },
     {
@@ -2585,6 +2588,141 @@
                       "hint_cost_pct": 10,
                       "results_visibility": "after_submit"
                     }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/exports": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "exportMyData",
+        "summary": "Export my data",
+        "description": "The caller's own data as a zip of JSON and CSV (story P-29, FR-EXP-01, FR-EXP-02): the profile, the consent history, every attempt of theirs with its results,\ntimings, hints and evidence requests, the companies that viewed or exported their data, and their deletion requests. No other person's data and no flag value\n(anything shaped like a flag in a captured request is replaced by `VM{redacted}`). Every export writes an audit entry (FR-EXP-04). The body is empty. Rate\nlimited per account.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The zip (JSON and CSV files).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Disposition": {
+                "description": "attachment; filename=\"...\"",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "examples": {
+                  "default": {
+                    "value": "(the bytes of a zip file)"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/exports": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "exportCompanyResults",
+        "summary": "Export one assessment's results",
+        "description": "The results of one template of the caller's company as a zip of CSV and JSON (story P-29, FR-EXP-03; OI-27 answered by the developer on 2026-10-20: scores as\nCSV and JSON, no evidence): per candidate the invite and attempt state, the score of 1000, the times, the hints used, the open integrity flags and the points per\nchallenge. Every export writes an audit entry (FR-EXP-04) and an `exported` entry in each candidate's view history (FR-PRV-11). Only a recruiter (others 404\nREQ-ROUTE-UNKNOWN); another company's template is 404 ATT-NOT-FOUND; a company that is not active is 409 ATT-INVALID-STATE.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The zip (JSON and CSV files).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Disposition": {
+                "description": "attachment; filename=\"...\"",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "examples": {
+                  "default": {
+                    "value": "(the bytes of a zip file)"
                   }
                 }
               }
@@ -6285,6 +6423,19 @@
               "null"
             ],
             "minimum": 0
+          }
+        }
+      },
+      "CompanyExportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template_id"
+        ],
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
