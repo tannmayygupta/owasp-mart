@@ -43,7 +43,7 @@ IF-5 | L | @tannmayygupta | owner | 1.1.0 | 2026-10-19 | approved
 IF-5 | P | @akshaay29 | consumer | 1.1.0 | 2026-10-20 | approved
 IF-6 | L | @tannmayygupta | owner | 1.0.1 | 2026-10-20 | approved
 IF-6 | L | @tannmayygupta | consumer | 1.0.1 | 2026-10-20 | approved
-IF-6 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
+IF-6 | T | @sahillroy | consumer | 1.0.1 | 2026-10-20 | approved
 IF-7 | T | @sahillroy | owner | 1.2.0 | 2026-10-20 | approved
 IF-7 | P | @akshaay29 | consumer | 1.2.0 | 2026-10-20 | approved
 IF-7 | L | @tannmayygupta | consumer | 1.2.0 | 2026-10-20 | approved
