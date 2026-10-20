@@ -5,7 +5,7 @@
 // are props: whether hints cost points (a candidate confirms the cost first, FR-HNT-02) and whether results may be shown (OI-15, `results_visibility`).
 // Everything the server sends is rendered as text. A flag is sent and the box is cleared; it is never kept in the page.
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError, api, say, type Attempt, type CatalogueItem, type Hint, type Instance, type Progress, type Score } from '../lib/api';
+import { ApiError, api, say, timeWarning, type Attempt, type CatalogueItem, type Hint, type Instance, type Progress, type Score } from '../lib/api';
 import { useLive } from '../lib/live';
 
 const LIVE_INSTANCE = ['ready', 'active', 'idle'];
@@ -80,6 +80,7 @@ export function AttemptBoard({ attemptId, catalog, resultsAllowed, onChanged }: 
   const info = Object.fromEntries(catalog.map((c) => [c.challenge_key, c]));
   const points = Object.fromEntries((score?.per_challenge ?? []).map((c) => [c.challenge_key, c.points]));
   const left = attempt.deadline_at && running ? Math.max(0, Math.round((Date.parse(attempt.deadline_at) - now) / 1000)) : null;
+  const warning = timeWarning(left); // story 2.3: 15 and 5 minutes left
 
   async function openInstance() {
     const w = window.open('about:blank', '_blank'); // opened first so the browser allows it, filled when the ticket arrives
@@ -125,6 +126,11 @@ export function AttemptBoard({ attemptId, catalog, resultsAllowed, onChanged }: 
   return (
     <div className="stack" data-testid="attempt-board">
       {message && <p className={`banner ${message.kind}`} role={message.kind === 'bad' ? 'alert' : 'status'}>{message.text}</p>}
+      {warning !== null && (
+        <p key={warning} className="banner bad" role="alert" data-testid="time-warning">
+          {warning} minutes left. {learner ? 'The practice attempt ends at the deadline.' : 'Your assessment is submitted automatically at the deadline.'}
+        </p>
+      )}
       <dl className="facts">
         <dt>Attempt</dt><dd><span className="pill" data-testid="attempt-state">{attempt.state}</span></dd>
         <dt>Instance</dt><dd><span className={`pill ${instanceLive ? 'ok' : starting ? 'warn' : ''}`} data-testid="instance-state">{instance ? instance.state : 'none'}</span></dd>

@@ -1,0 +1,23 @@
+..                                                                       [100%]
+2 passed in 0.91s
+(node:23372) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/apps/web/lib/api.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\gupta\OneDrive\Desktop\mp\owasp-mart\apps\web\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a GET goes to the same origin with the cookie and no CSRF header (59.5113ms)
+✔ a state-changing call sends the CSRF token and a JSON body (0.5867ms)
+✔ 204 answers nothing, a problem body becomes an ApiError with its code and Retry-After (1.5081ms)
+✔ a network failure is the NETWORK error, not an exception from fetch (0.583ms)
+✔ messages: known codes read as sentences, the password rule sentence is shown as it is, unknown codes are named (0.4041ms)
+✔ after sign-in only a same-origin path is followed (no open redirect) (1.3154ms)
+✔ durations read as hours, minutes and seconds; a missing one is a dash (story P-27) (0.3205ms)
+✔ a refused export is the ApiError of its problem body, sent with the CSRF token (story P-29) (0.8808ms)
+✔ story 2.3: the time warning is 15 from fifteen minutes left, 5 from five, none before, at the end or without a deadline (0.406ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 295.5995
