@@ -470,3 +470,24 @@ def test_deleting_a_user_removes_the_second_factor_data(sessions):
         s.execute(text("DELETE FROM users"))
     with sessions() as s:
         assert s.scalars(select(MfaCredential)).all() == [] and s.scalars(select(RecoveryCode)).all() == []
+
+
+def test_the_seed_command_writes_admin_created_to_the_durable_audit_log(sessions, monkeypatch):
+    """Story 1.9 (deferred O7): the command's audit entry is a pseudonymised row of audit_log, written by the application role, not an in-memory record."""
+    import io
+
+    from vulnmart.accounts import seed_admin
+    from vulnmart.kernel.models import AuditLog
+    from vulnmart.kernel.settings import Settings
+
+    monkeypatch.setattr(seed_admin, "make_engine", lambda dsn: object())
+    monkeypatch.setattr(seed_admin, "make_sessions", lambda engine, scope: sessions)
+    monkeypatch.setenv("VULNMART_SEED_ADMIN_PASSWORD", "a long admin password 456")
+    out, err = io.StringIO(), io.StringIO()
+    code = seed_admin.main(["--email", "seeded@example.com", "--name", "Seeded"], settings=Settings(postgres_dsn="postgresql://app@db.invalid/x"), out=out, err=err)
+    assert code == 0, err.getvalue()
+    with sessions() as s:
+        uid = s.scalar(select(User.id).where(User.email_ci == "seeded@example.com"))
+        rows = s.scalars(select(AuditLog).where(AuditLog.action == "admin.created", AuditLog.actor == "system:seed")).all()
+    assert uid is not None and rows, "the entry is in the durable audit log"
+    assert all(r.subject != uid for r in rows), "the subject is a pseudonym, never the user id"

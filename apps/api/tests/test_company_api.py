@@ -156,6 +156,22 @@ def test_bulk_invites_answer_address_by_address_and_invite_actions_work(web, com
     assert web.get("/api/v1/company/invites", params={"state": "cancelled"}).json()["items"][0]["invite_id"] == invite_id
 
 
+def test_resends_are_limited_per_recruiter_and_other_actions_are_not(web, companies, sessions):
+    """Story 1.9 (deferred R5): a resend mails the candidate again outside the daily invite cap, so one recruiter may resend only so many an hour."""
+    active_company(companies, sessions)
+    web.app.state.ports.settings.set("rate_invite_resend_per_user_per_hour", 2)
+    csrf = login(web, ANA)
+    tid = web.post("/api/v1/company/templates", json=basic(), headers=csrf).json()["template_id"]
+    invite_id = web.post("/api/v1/company/invites", json={"template_id": tid, "emails": [CAND]}, headers=csrf).json()["created"][0]["invite_id"]
+    url = f"/api/v1/company/invites/{invite_id}/actions"
+    first, second = (web.post(url, json={"action": "resend"}, headers=csrf) for _ in range(2))
+    third = web.post(url, json={"action": "resend"}, headers=csrf)
+    cancel = web.post(url, json={"action": "cancel"}, headers=csrf)
+    assert first.status_code != 429 and second.status_code != 429
+    assert (third.status_code, third.json()["code"]) == (429, "REQ-RATE-LIMITED") and "retry-after" in third.headers
+    assert cancel.status_code == 200, "cancel is not a mail and is not limited"
+
+
 def test_another_company_sees_none_of_it(web, companies, sessions):
     active_company(companies, sessions)
     csrf = login(web, ANA)

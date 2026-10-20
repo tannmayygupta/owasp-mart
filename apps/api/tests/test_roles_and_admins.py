@@ -278,6 +278,10 @@ def cli(sessions, monkeypatch):
     monkeypatch.setattr(seed_admin, "make_engine", lambda dsn: object())
     monkeypatch.setattr(seed_admin, "make_sessions", lambda engine, scope: sessions)
     monkeypatch.delenv("VULNMART_SEED_ADMIN_PASSWORD", raising=False)
+    # The durable audit port commits on a connection of its own while the seed's transaction is open; SQLite here has one shared connection, so the
+    # command's audit is a recording stand-in in these tests. The real audit_log row is tested on Postgres (test_accounts_postgres.py).
+    run_audit = FakeAuditPort()
+    monkeypatch.setattr(seed_admin, "PseudonymisingAudit", lambda port, subjects: run_audit)
 
     def run(*argv, stdin="", env_password=None, dsn="postgresql://app@db.invalid/vulnmart"):
         if env_password:
@@ -286,6 +290,7 @@ def cli(sessions, monkeypatch):
         code = seed_admin.main(list(argv), settings=Settings(postgres_dsn=dsn), stdin=io.StringIO(stdin), out=out, err=err)
         return code, out.getvalue(), err.getvalue()
 
+    run.audit = run_audit
     return run
 
 
@@ -296,7 +301,7 @@ def test_the_command_takes_the_password_from_the_environment(sessions, cli, capl
     with sessions() as s:
         user = s.scalar(select(User))
     assert user.account_type == "admin" and security.verify_password(user.password_hash, ADMIN_PASSWORD)
-    assert "admin.created" in caplog.text and "system:seed" in caplog.text, "the audit entry is also in the log until story P-17"
+    assert [r.action for r in cli.audit.records] == ["admin.created"]
 
 
 def test_the_command_takes_the_password_from_standard_input(sessions, cli):

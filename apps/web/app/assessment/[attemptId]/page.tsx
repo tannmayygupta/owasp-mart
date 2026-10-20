@@ -17,6 +17,7 @@ export default function AssessmentPage() {
   const [catalog, setCatalog] = useState<CatalogueItem[]>([]);
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
   const [banner, setBanner] = useState<{ text: string; kind: 'ok' | 'bad' } | null>(null);
+  const [agreed, setAgreed] = useState(false); // FR-PRV-01: the agree box is never pre-ticked
 
   const load = useCallback(async () => {
     try {
@@ -87,9 +88,13 @@ export default function AssessmentPage() {
           <h2>Before you start: your data</h2>
           <p className="notice">{notice.notice_text}</p>
           <p className="muted">{notice.company_name} keeps your assessment record for {notice.retention_days_shown} days.</p>
+          <label className="check">
+            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.currentTarget.checked)} data-testid="consent-agree" />
+            <span>I have read this and agree to these terms for this assessment.</span>
+          </label>
           <div className="row">
-            <button type="button" onClick={() => decide('granted')}>I agree</button>
-            <button type="button" className="ghost" onClick={() => decide('declined')}>I do not agree</button>
+            <button type="button" disabled={!agreed} onClick={() => decide('granted')}>Start</button>
+            <button type="button" className="ghost" onClick={() => decide('declined')}>Decline</button>
           </div>
         </section>
       ) : ['consented', 'started'].includes(invite.state) ? (

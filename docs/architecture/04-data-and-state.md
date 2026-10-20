@@ -234,7 +234,7 @@ stateDiagram-v2
     [*] --> invited
     invited --> consent: invite opened and verified
     consent --> ready: consent granted
-    consent --> withdrawn: declined
+    consent --> cancelled: declined (the invite becomes declined; no attempt record is made)
     ready --> running: start (clock rule is OI-22)
     running --> submitted: manual submit
     running --> expired: time limit reached
