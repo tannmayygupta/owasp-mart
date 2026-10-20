@@ -572,23 +572,6 @@ async def list_hints(attempt_id: str, challenge_key: str, request: Request, auth
     return json_ok({"challenge_key": challenge_key, "items": items, "has_more": False})
 
 
-@router.get("/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/writeup", operation_id="getWriteup")
-async def get_writeup(attempt_id: str, challenge_key: str, request: Request, auth: Authenticated = Depends(authenticated)) -> JSONResponse:
-    """The write-up of a challenge (the vulnerable idea and the fix, IF-7 `write_up`), for the attempt's owner once the challenge is solved in that attempt (story P-26,
-    FR-DSH-01: "after a solve, the write-up is available on the same page"). Not solved yet: 409 ATT-INVALID-STATE, so it can never be read ahead of the flag."""
-    rt = lab(request)
-    query(request, ())
-    rec = owned(rt, auth, attempt_id)
-    if not _CHALLENGE.fullmatch(challenge_key) or challenge_key not in rt.challenge_keys:
-        raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)
-    if not await run(lambda: rt.milestones.best(rec.id, challenge_key).value == "M3"):
-        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
-    entry = rt.catalog.get(challenge_key)
-    if entry is None or entry.write_up is None:
-        raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)
-    return json_ok({"challenge_key": challenge_key, "vulnerable": entry.write_up[0], "fix": entry.write_up[1]})
-
-
 @router.post("/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints/{level}/unlock", operation_id="unlockHint")
 async def unlock_hint(attempt_id: str, challenge_key: str, level: str, request: Request,
                       auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:

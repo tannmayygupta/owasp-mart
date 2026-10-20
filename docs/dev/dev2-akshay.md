@@ -263,7 +263,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Waits on: P-17, P-24 and Tanmay's purge call (AttemptPort).
   - Done when: A deletion request completes after seven days, can be undone before, and a candidate sees who viewed.
 
-- [x] **P-26. Learner and candidate dashboards with hints**  (export is P-29; `after_release` results hidden in the page only until stream L adds the server rule (H-355); the write-up route waits for Tanmay's confirmation (H-354); not browser-tested (OI-30))
+- [x] **P-26. Learner and candidate dashboards with hints**  (export is P-29; `after_release` results hidden in the page only until stream L adds the server rule (H-355); the write-up is Tanmay's IF-2 1.2.0 field, practice attempts only; not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
   - BMAD story: planned, ref `8.1` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: The learner and candidate dashboards, learner hints, candidate hints off by default.

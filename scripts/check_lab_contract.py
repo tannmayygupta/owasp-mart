@@ -37,7 +37,6 @@ OPERATIONS = {
     ("get", "/api/v1/attempts/{attempt_id}/score"), ("get", "/api/v1/attempts/{attempt_id}/challenges"),
     ("get", "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints"),
     ("post", "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints/{level}/unlock"),
-    ("get", "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/writeup"),  # story P-26 (Akshay), handoff H-354
     ("get", "/api/v1/attempts/{attempt_id}/evidence"), ("get", "/api/v1/attempts/{attempt_id}/integrity-flags"),
     ("post", "/api/v1/attempts/{attempt_id}/integrity-flags/{integrity_flag_id}/decision"),
     ("get", "/api/v1/attempts/{attempt_id}/report"), ("get", "/api/v1/attempts/{attempt_id}/timeline"),

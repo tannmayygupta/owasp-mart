@@ -27,7 +27,6 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `listChallenges` | `GET /api/v1/attempts/{attempt_id}/challenges` | 200 | Progress per challenge |
 | `listHints` | `GET .../challenges/{challenge_key}/hints` | 200 | Three hint levels |
 | `unlockHint` | `POST .../challenges/{challenge_key}/hints/{level}/unlock` | 200 | Unlock one level |
-| `getWriteup` | `GET .../challenges/{challenge_key}/writeup` | 200 | The write-up of a solved challenge (owner only, after the solve; 409 before). Added in story P-26 by Akshay, handoff H-354 |
 | `listEvidence` | `GET /api/v1/attempts/{attempt_id}/evidence` | 200 | Captured requests (redacted) |
 | `listIntegrityFlags` | `GET /api/v1/attempts/{attempt_id}/integrity-flags` | 200 | Integrity signals |
 | `decideIntegrityFlag` | `POST .../integrity-flags/{integrity_flag_id}/decision` | 200 | Review decision |
