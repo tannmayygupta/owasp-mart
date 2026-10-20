@@ -5,7 +5,7 @@
 | Date | 2026-10-20 |
 | Developer | akshaay29 |
 | Branch / commit | `sprint-4-akshay-1-9-refactor-sweep` |
-| Status | Done (story `built`; marked done once merged) |
+| Status | Done (story `done`, merged in pull request 72) |
 | Report tag | platform, quality |
 
 ## Requirements covered

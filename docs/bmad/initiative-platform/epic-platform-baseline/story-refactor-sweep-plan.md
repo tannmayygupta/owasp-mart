@@ -1,7 +1,7 @@
 ---
 title: "Refactor sweep"
 ticket: 9
-status: built
+status: done
 ---
 
 # Refactor sweep
