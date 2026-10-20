@@ -39,6 +39,7 @@ By the developer (2026-10-20): complete P-08. The approvals are the developer's 
 
 ## Problems met and how they were fixed
 - The first sign-off (2026-10-12) was against older versions; redone at the current ones.
+- CI's contract rules (trusted base) failed: an edit of `contracts/COMPAT.md` needs a `registry change:` line in `contracts/CHANGELOG.md`; added to the IF-1 1.6.0 entry.
 - `platform.openapi.yaml` still carries `info.version` 1.0.0 while COMPAT.md says 1.6.0: left unchanged here (changing it needs a new IF-1 changelog entry); the tag procedure (L-09) decides whether labels must match. The tag dry run's label check passes.
 
 ## Security notes (vulnerable parts only)

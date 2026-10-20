@@ -45,3 +45,5 @@ context:
 - `node --test "scripts/*.test.mjs"` -- expected: all pass
 
 **Results (2026-10-20):** every contract check PASS; contract rules 16 PASS, 0 FAIL; `tag-contracts.mjs --dry-run`: versions and labels PASS, approvals fail only on Sahil's IF-6 row, handoffs fail on Sahil's and Tanmay's lines (`docs/assets/p-08-contract-sign-off-current/`).
+
+**CI fix (2026-10-20):** the trusted-base contract rule needs a `registry change:` line for any edit of `contracts/COMPAT.md`; added to the IF-1 1.6.0 entry of `contracts/CHANGELOG.md`.
