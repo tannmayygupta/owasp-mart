@@ -317,6 +317,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
+### 2026-10-20 (Sahil, IF-7 1.2.0 owner + DB 2.1.0 consumer sign-off)
+- registry change: in `contracts/COMPAT.md` the stream-T Approvals rows for IF-7 (owner) and DB (consumer) are set to `approved` at 1.2.0 and 2.1.0 (date 2026-10-20). Sahil's review: IF-7 1.2.0 is data-only (the player-facing `start_state` text of C01–C11 now names the seeded demo account and where to look; no schema change, no flag/placement/test-path in any text, the accounts match `apps/shop/seed/contributions/010-challenge-accounts.mjs`); DB 2.1.0 is additive table-owner rows (`data_views`, lab tables, `security_events`) that do not touch the shop (own SQLite) or the catalogue tables. No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
+
 ### 2026-10-20 (Tanmay, story L-30: COMPAT.md follows IF-2 1.2.0 and IF-7 1.2.0)
 - registry change: `contracts/COMPAT.md` lists IF-2 and IF-7 at 1.2.0; the rows of @tannmayygupta for them are `approved` on 2026-10-20 (the developer's standing instruction for their own rows), the others are `pending`. No contract file, registry entry or rule changed.
 
