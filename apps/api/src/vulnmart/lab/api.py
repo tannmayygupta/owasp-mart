@@ -542,24 +542,75 @@ async def list_challenges(attempt_id: str, request: Request, auth: Authenticated
     query(request, ())
     rec = not_gone(readable(rt, auth, attempt_id))
 
-    def build() -> list[dict[str, Any]]:
+    sequenced = rt.is_sequenced(rec.id)
+
+    def build() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         out = []
         practice = rec.org_id is None and is_owner(auth, rec)  # a write-up is for a learner of their own practice, never in an assessment
+        now = rt.clock()
+        clocks = {c.challenge_key: c for c in rt.challenge_clocks(rec.id)}
         for key in rt.challenge_keys:
+            clock = clocks[key]
+            if sequenced and not clock.visible:
+                continue  # a sandbox run shows one challenge at a time: the ones after the current one do not exist for the learner yet
             best = rt.milestones.best(rec.id, key)
             entry = rt.catalog.get(key)
             solved = best.value == "M3"
             item = {"challenge_key": key, "best_milestone": best.value, "solved": solved,
                     "held": rt.milestones.is_held(rec.id, key), "hints_used": len(rt.hints.levels(rec.id, key)),
-                    "hints_available": hints_enabled(rec)}
-            if entry is not None and (entry.brief or entry.start):
-                item["brief"], item["start"] = entry.brief, entry.start
-            if entry is not None and entry.write_up and solved and practice:
+                    "hints_available": hints_enabled(rec) and (not sequenced or clock.state == "active")}
+            if sequenced:
+                item.update({"state": clock.state, "title": (entry.title[:120] if entry else key), "tier": (entry.tier if entry else None) or "Medium",
+                             "time_limit_seconds": clock.limit_seconds, "opened_at": stamp(clock.opened_at), "expires_at": stamp(clock.expires_at),
+                             "seconds_left": clock.seconds_left(now)})
+            # a challenge that has not begun shows what it is about; how to begin (the demo account, where to look) comes with the countdown
+            if entry is not None and entry.brief and (not sequenced or clock.state != "future"):
+                item["brief"] = entry.brief
+            if entry is not None and entry.start and (not sequenced or clock.state != "ready"):
+                item["start"] = entry.start
+            if entry is not None and entry.write_up and (solved or (sequenced and clock.state == "expired")) and practice:
                 item["write_up"] = {"vulnerable": entry.write_up[0], "fix": entry.write_up[1]}
             out.append(item)
-        return out
+        meta: dict[str, Any] = {}
+        if sequenced:
+            current = next((c for c in clocks.values() if c.state in ("ready", "active")), None)
+            meta = {"total": len(rt.challenge_keys), "current_key": current.challenge_key if current else None, "server_time": stamp(now)}
+        return out, meta
 
-    return json_ok({"items": await run(build), "has_more": False})
+    items, meta = await run(build)
+    return json_ok({"items": items, "has_more": False, **meta})
+
+
+@router.post("/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin", operation_id="beginChallenge")
+async def begin_challenge(attempt_id: str, challenge_key: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """Start the countdown of the current challenge of a sequenced run (Easy 20, Medium 40, Hard 60 minutes). Repeating the call changes nothing.
+    404 for a challenge that is not the current one, 409 when the attempt is not running or the challenge already ended."""
+    rt = lab(request)
+    rec = not_gone(owned(rt, auth, attempt_id))
+    await no_body(request)
+    if not _CHALLENGE.fullmatch(challenge_key):
+        raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)
+    clock = await run(rt.begin_challenge, rec.id, challenge_key)
+
+    def view() -> dict[str, Any]:
+        entry = rt.catalog.get(challenge_key)
+        best = rt.milestones.best(rec.id, challenge_key)
+        return {"challenge_key": challenge_key, "best_milestone": best.value, "solved": best.value == "M3", "held": rt.milestones.is_held(rec.id, challenge_key),
+                "hints_used": len(rt.hints.levels(rec.id, challenge_key)), "hints_available": hints_enabled(rec) and clock.state == "active",
+                "state": clock.state, "title": (entry.title[:120] if entry else challenge_key), "tier": (entry.tier if entry else None) or "Medium",
+                "time_limit_seconds": clock.limit_seconds, "opened_at": stamp(clock.opened_at), "expires_at": stamp(clock.expires_at),
+                "seconds_left": clock.seconds_left(rt.clock()),
+                **({"brief": entry.brief} if entry and entry.brief else {}), **({"start": entry.start} if entry and entry.start else {})}
+
+    return json_ok(await run(view))
+
+
+@router.get("/api/v1/me/progress", operation_id="getMyProgress")
+async def get_my_progress(request: Request, auth: Authenticated = Depends(authenticated)) -> JSONResponse:
+    """The points on the learner's account: the best result per challenge over every run, so a repeated challenge never counts twice."""
+    rt = lab(request)
+    query(request, ())
+    return json_ok(await run(rt.account_progress, auth.session.user.id))
 
 
 def hint_context(rt: LabRuntime, auth: Authenticated, attempt_id: str, challenge_key: str) -> AttemptRecord:
@@ -576,6 +627,9 @@ async def list_hints(attempt_id: str, challenge_key: str, request: Request, auth
     rt = lab(request)
     query(request, ())
     rec = hint_context(rt, auth, attempt_id, challenge_key)
+    clock = rt.sequence.clock_of(rec.id, challenge_key) if rt.is_sequenced(rec.id) else None
+    if clock is not None and clock.state == "future":
+        raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)  # a challenge the sandbox run has not reached does not exist for the learner
     items = await run(lambda: [hint_view(rt, rec, challenge_key, level) for level in (1, 2, 3)])
     return json_ok({"challenge_key": challenge_key, "items": items, "has_more": False})
 

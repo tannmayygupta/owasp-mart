@@ -24,7 +24,9 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `submitAttempt` | `POST /api/v1/attempts/{attempt_id}/submit` | 200 | Manual submit after confirmation |
 | `submitFlag` | `POST /api/v1/attempts/{attempt_id}/flags` | 200 | Paste a flag |
 | `getScore` | `GET /api/v1/attempts/{attempt_id}/score` | 200 | Score snapshot |
-| `listChallenges` | `GET /api/v1/attempts/{attempt_id}/challenges` | 200 | Progress per challenge |
+| `listChallenges` | `GET /api/v1/attempts/{attempt_id}/challenges` | 200 | Progress per challenge (a sequenced run lists only the challenges reached, v1.3.0) |
+| `beginChallenge` | `POST .../challenges/{challenge_key}/begin` | 200 | Start the countdown of the current challenge: Easy 20, Medium 40, Hard 60 minutes (v1.3.0) |
+| `getMyProgress` | `GET /api/v1/me/progress` | 200 | The points on the learner's account: best result per challenge over all runs (v1.3.0) |
 | `listHints` | `GET .../challenges/{challenge_key}/hints` | 200 | Three hint levels |
 | `unlockHint` | `POST .../challenges/{challenge_key}/hints/{level}/unlock` | 200 | Unlock one level |
 | `listEvidence` | `GET /api/v1/attempts/{attempt_id}/evidence` | 200 | Captured requests (redacted) |
@@ -33,13 +35,16 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `getReport` | `GET /api/v1/attempts/{attempt_id}/report` | 200 | Per-candidate report |
 | `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first |
 
+**A sequenced practice run (v1.3.0).** A learner works through the challenges one at a time, in catalogue order. The current challenge is `ready` until the learner calls `beginChallenge`; then its countdown runs (the tier sets the time) and flags, hints and milestones count for it. It ends when its flag is captured (`solved`; a capture held for review counts as solved) or the time is over (`expired`); the next challenge then becomes current. A challenge that ended gives no more credit and no more hints; what it earned stays. The challenges after the current one are not listed and answer 404 `ATT-CHALLENGE-NOT-FOUND` on every route; a challenge not begun, or one that ended, answers 409 `ATT-INVALID-STATE` on flags and hints. A run lasts the sum of the challenge times plus 30 minutes. When every challenge is solved or timed out the run is submitted by the lab's tick; after that the learner can start a new run (`requestInstance` again): the old run stays as history and the account points keep the best result per challenge. A company assessment is not sequenced. The deployed lab turns this on with `VULNMART_LAB_SEQUENCE=1`.
+
 Who may call what (the mock enforces every row marked "mock"; a failure for a reader who may not know the resource is always the same 404). The roles are the account types of the architecture (`participant`, `recruiter`, `admin`; 04 section 2.1); a participant acts as a learner on a practice attempt and as a candidate on an assessment attempt.
 
 | Route group | Owner of the attempt (learner or candidate) | Recruiter of the owning company (candidate attempt only) | Anyone else, including a recruiter of another company | Admin |
 |---|---|---|---|---|
 | Instances (all five calls): request, get, open, reset, stop | yes (request: a learner; a candidate instance is created by the platform) | no: 404 (mock) | 404 (mock) | not here (proposal, to confirm) |
 | `getAttempt`, `getScore`, `listChallenges`, `getTimeline` | yes | yes | 404 | not here (proposal, to confirm; admin reads are break-glass sessions of FR-ADM-03, a platform route) |
-| `startAttempt`, `submitAttempt`, `submitFlag`, `listHints`, `unlockHint` | yes | no: 404 (mock) | 404 | no (proposal, to confirm) |
+| `startAttempt`, `submitAttempt`, `submitFlag`, `listHints`, `unlockHint`, `beginChallenge` | yes | no: 404 (mock) | 404 | no (proposal, to confirm) |
+| `getMyProgress` | yes (the learner's own account only) | not applicable | not applicable | no |
 | `listEvidence`, `listIntegrityFlags`, `getReport` | learner attempt: yes; candidate attempt: **OI-15** (the mock says no) | yes | 404 | not here (proposal, to confirm) |
 | `decideIntegrityFlag` | no: answered 404 like anyone else (the contract declares no 403 for it; the owner may read but not decide) | yes (**OI-38**) | 404 | not here (**OI-38** outcome B adds it) |
 

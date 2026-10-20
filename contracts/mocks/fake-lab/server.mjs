@@ -120,6 +120,12 @@ export function createFakeLab(options = {}) {
     e.deleteAfter = stamp(Date.now() + 7 * 24 * 3600 * 1000);
     makeAttempt('a-FFFFFFFFFFFFFFFF', 'cam', 'candidate', 'org-1', 'cancelled', false);
     makeAttempt('a-GGGGGGGGGGGGGGGG', 'cam', 'candidate', 'org-1', 'deleted', false);
+    // a sequenced learner run (contract 1.3.0): one challenge at a time, each with its own countdown by tier; a-AAAA... above stays open on every challenge
+    const h = makeAttempt('a-HHHHHHHHHHHHHHHH', 'ada', 'learner', null, 'running', true);
+    h.sequenced = true;
+    h.opened = new Map();
+    h.startedAt = stamp(Date.now() - 5 * 60 * 1000);
+    h.deadlineAt = stamp(Date.now() + 445 * 60 * 1000);
   }
   seed();
 
@@ -159,6 +165,45 @@ export function createFakeLab(options = {}) {
   const total = (a) => Math.round((1000 * KEYS.reduce((n, k) => n + points(a, k), 0)) / (KEYS.length * WEIGHT));
   const scoreRows = (a) => KEYS.map((k) => { const p = a.progress.get(k);
     return { challenge_key: k, best_milestone: MILESTONES[p.best], held: p.held, hints_used: p.hints.size, points: points(a, k) }; });
+  // ---- one challenge at a time, each with a countdown (contract 1.3.0; the real rules are vulnmart.lab.sequence) ----
+  const TIER = { C01: 'Easy', C02: 'Medium', C03: 'Medium', C04: 'Medium', C05: 'Easy', C06: 'Hard', C07: 'Easy', C08: 'Medium', C09: 'Medium', C10: 'Hard', C11: 'Medium' };
+  const TITLE = { C01: 'Broken Access Control', C02: 'Cryptographic Failures', C03: 'Injection', C04: 'Insecure Design', C05: 'Security Misconfiguration', C06: 'Software Supply Chain Failures',
+    C07: 'Authentication Failures', C08: 'Software or Data Integrity Failures', C09: 'Security Logging and Alerting Failures', C10: 'Server-Side Request Forgery', C11: 'Mishandling of Exceptional Conditions' };
+  const MINUTES = { Easy: 20, Medium: 40, Hard: 60 };
+  function clocks(a) {
+    const now = Date.now();
+    let foundCurrent = false;
+    return KEYS.map((k) => {
+      const p = a.progress.get(k);
+      const limit = MINUTES[TIER[k]] * 60;
+      const opened = a.opened.get(k) ?? null;
+      const expires = opened === null ? null : opened + limit * 1000;
+      if (p.best === 3 || p.held) return { key: k, state: 'solved', limit, opened, expires };
+      if (expires !== null && now >= expires) return { key: k, state: 'expired', limit, opened, expires };
+      if (foundCurrent) return { key: k, state: 'future', limit, opened: null, expires: null };
+      foundCurrent = true;
+      return { key: k, state: opened === null ? 'ready' : 'active', limit, opened, expires };
+    });
+  }
+  const clockOf = (a, key) => clocks(a).find((c) => c.key === key);
+  function sequencedItem(a, user, c) {
+    const p = a.progress.get(c.key);
+    const item = { challenge_key: c.key, best_milestone: MILESTONES[p.best], solved: p.best === 3, held: p.held, hints_used: p.hints.size, hints_available: a.hintsEnabled && c.state === 'active',
+      state: c.state, title: TITLE[c.key], tier: TIER[c.key], time_limit_seconds: c.limit, opened_at: c.opened === null ? null : stamp(c.opened), expires_at: c.expires === null ? null : stamp(c.expires),
+      seconds_left: c.state === 'active' ? Math.max(0, Math.floor((c.expires - Date.now()) / 1000)) : null };
+    item.brief = `Mock brief of ${c.key}: what the weakness is, in plain words.`;
+    if (c.state !== 'ready') item.start = `Mock start of ${c.key}: sign in with the demo account of the mock lab.`;
+    if ((p.best === 3 || c.state === 'expired') && a.mode === 'learner' && a.ownerId === user.id) item.write_up = { vulnerable: `Mock write-up of ${c.key}: the idea that made it vulnerable.`, fix: `Mock write-up of ${c.key}: how to fix it.` };
+    return item;
+  }
+  // 404 for a challenge not reached, 409 for one not begun or ended; null when the call may go on
+  function sequenceGate(res, a, key, { allowSolved = false } = {}) {
+    if (!a.sequenced) return null;
+    const c = clockOf(a, key);
+    if (!c || c.state === 'future') return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge for this run yet') ?? true;
+    if (c.state === 'active' || (allowSolved && c.state === 'solved')) return null;
+    return problem(res, 409, 'ATT-INVALID-STATE', `the challenge is ${c.state}`) ?? true;
+  }
   const timelineView = (e) => ({ at: e.at, type: e.type, challenge_key: e.challenge_key, milestone: e.milestone, result: e.result });
   const GONE_STATES = ['withdrawn', 'cancelled'];
   const flagView = (f) => ({ integrity_flag_id: f.id, type: f.type, challenge_key: f.challenge, explanation: f.explanation, status: f.status,
@@ -394,6 +439,7 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     if (typeof body.challenge_key !== 'string' || !RE.challenge.test(body.challenge_key)) return invalid(res, '/challenge_key', 'bad challenge key');
     if (typeof body.flag !== 'string' || body.flag.length < 1 || body.flag.length > 200) return invalid(res, '/flag', 'flag is text of 1 to 200 characters');
     if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a flag cannot be submitted in state ${a.state}`);
+    if (sequenceGate(res, a, body.challenge_key, { allowSolved: true })) return;
     const key = body.challenge_key;
     const now = Date.now();
     // Only the result is kept, never the text. The submitter is told `correct` or `incorrect` (no oracle); the reason stays on the server.
@@ -443,6 +489,11 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
   H.listChallenges = ({ res, user, params, url }) => {
     const a = readable(res, user, params.attempt_id);
     if (!a || !queryOf(res, url, [])) return;
+    if (a.sequenced) {
+      const all = clocks(a);
+      const cur = all.find((c) => c.state === 'ready' || c.state === 'active');
+      return send(res, 200, { items: all.filter((c) => c.state !== 'future').map((c) => sequencedItem(a, user, c)), has_more: false, total: KEYS.length, current_key: cur ? cur.key : null, server_time: stamp() });
+    }
     send(res, 200, { items: KEYS.map((k) => { const p = a.progress.get(k);
       const item = { challenge_key: k, best_milestone: MILESTONES[p.best], solved: p.best === 3, held: p.held, hints_used: p.hints.size, hints_available: a.hintsEnabled,
         brief: `Mock brief of ${k}: what the weakness is, in plain words.`, start: `Mock start of ${k}: sign in with the demo account of the mock lab.` };
@@ -464,11 +515,35 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     const a = hintContext(res, user, params);
     if (a && queryOf(res, url, [])) send(res, 200, { challenge_key: params.challenge_key, items: [1, 2, 3].map((l) => hintView(a, params.challenge_key, l)), has_more: false });
   };
+  H.beginChallenge = ({ res, user, params, take }) => {
+    const a = owned(res, user, params.attempt_id);
+    if (!a || take() === false) return;
+    if (!RE.challenge.test(params.challenge_key) || !a.sequenced) return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge, or the run is not sequenced');
+    if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a challenge cannot be begun in state ${a.state}`);
+    const c = clockOf(a, params.challenge_key);
+    if (!c || c.state === 'future') return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge for this run yet');
+    if (c.state === 'solved' || c.state === 'expired') return problem(res, 409, 'ATT-INVALID-STATE', `the challenge is ${c.state}`);
+    if (c.state === 'ready') a.opened.set(c.key, Date.now());
+    send(res, 200, sequencedItem(a, user, clockOf(a, c.key)));
+  };
+  H.getMyProgress = ({ res, user, url }) => {
+    if (!queryOf(res, url, [])) return;
+    const best = Object.fromEntries(KEYS.map((k) => [k, 0]));
+    let runs = 0;
+    for (const a of attempts.values()) {
+      if (a.ownerId !== user.id || a.mode !== 'learner') continue;
+      runs += 1;
+      for (const k of KEYS) best[k] = Math.max(best[k], points(a, k));
+    }
+    const sum = KEYS.reduce((n, k) => n + best[k], 0);
+    send(res, 200, { total_points: Math.min(1000, Math.round((1000 * sum) / (KEYS.length * WEIGHT))), runs, per_challenge: KEYS.map((k) => ({ challenge_key: k, best_points: best[k] })) });
+  };
   H.unlockHint = ({ res, user, params, take }) => {
     const a = hintContext(res, user, params);
     if (!a || take() === false) return;
     if (!/^[1-3]$/.test(params.level)) return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such hint level');
     if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a hint cannot be unlocked in state ${a.state}`);
+    if (sequenceGate(res, a, params.challenge_key)) return;
     const level = Number(params.level);
     const set = a.progress.get(params.challenge_key).hints;
     if (!set.has(level)) {
@@ -586,6 +661,8 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/flags$`), ['attempt_id'], 'submitFlag', 'json'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/score$`), ['attempt_id'], 'getScore'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges$`), ['attempt_id'], 'listChallenges'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/begin$`), ['attempt_id', 'challenge_key'], 'beginChallenge', 'none'],
+    ['GET', /^\/api\/v1\/me\/progress$/, [], 'getMyProgress'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/hints$`), ['attempt_id', 'challenge_key'], 'listHints'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/hints/${ID}/unlock$`), ['attempt_id', 'challenge_key', 'level'], 'unlockHint', 'none'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/evidence$`), ['attempt_id'], 'listEvidence'],

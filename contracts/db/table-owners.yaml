@@ -42,6 +42,7 @@ tables:
   - { table: integrity_flags, owner: scoring, note: "To confirm by Tanmay." }
   - { table: score_snapshots, owner: scoring, note: "To confirm by Tanmay." }
   - { table: hint_unlocks, owner: attempts, note: "To confirm by Tanmay (attempts or scoring)." }
+  - { table: challenge_opens, owner: attempts, note: "Added by migration 0017 (stream L): when a learner began each challenge of a sequenced run (the per-challenge countdown)." }
   - { table: flag_submissions, owner: flags, note: "No submitted value is stored (FR-FLG-05). To confirm by Tanmay." }
   - { table: held_captures, owner: scoring, note: "Added by migration 0011 (stream L): a capture held for a human and the decision on it." }
   - { table: review_audit, owner: scoring, note: "Added by migration 0011 (stream L): every held-capture decision." }

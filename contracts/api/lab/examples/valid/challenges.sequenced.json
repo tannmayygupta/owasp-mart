@@ -1,0 +1,46 @@
+{
+  "items": [
+    {
+      "challenge_key": "C01",
+      "best_milestone": "M3",
+      "solved": true,
+      "held": false,
+      "hints_used": 1,
+      "hints_available": false,
+      "state": "solved",
+      "title": "Broken Access Control",
+      "tier": "Easy",
+      "time_limit_seconds": 1200,
+      "opened_at": "2026-10-20T09:00:00Z",
+      "expires_at": "2026-10-20T09:20:00Z",
+      "seconds_left": null,
+      "brief": "A seller order-detail endpoint checks that you are a seller, but not that the order is yours. Read a competitor order.",
+      "start": "Sign in to the shop as the seller staff of Harbor Crafts (the demo account of the lab).",
+      "write_up": {
+        "vulnerable": "Order lookup by order number only; no store-ownership check.",
+        "fix": "Scope the lookup to the caller's store and test that a second tenant gets 403 or 404."
+      }
+    },
+    {
+      "challenge_key": "C02",
+      "best_milestone": "M1",
+      "solved": false,
+      "held": false,
+      "hints_used": 0,
+      "hints_available": true,
+      "state": "active",
+      "title": "Cryptographic Failures",
+      "tier": "Medium",
+      "time_limit_seconds": 2400,
+      "opened_at": "2026-10-20T09:21:00Z",
+      "expires_at": "2026-10-20T10:01:00Z",
+      "seconds_left": 1830,
+      "brief": "Gift-card codes are derived from a predictable serial, so any card's code can be forged.",
+      "start": "Sign in as the customer player (the demo account of the lab)."
+    }
+  ],
+  "has_more": false,
+  "total": 11,
+  "current_key": "C02",
+  "server_time": "2026-10-20T09:30:30Z"
+}

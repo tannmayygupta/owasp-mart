@@ -60,11 +60,11 @@ CLASSES: dict[str, tuple[str, str]] = {
         "openInvite", "signupRecruiter", "listCatalogue", "getCatalogueChallenge")},
     **{op: ("self", W + "test_self_routes_show_only_the_caller_s_data") for op in (
         "getSession", "deleteSession", "getMe", "updateMe", "changePassword", "startMfaEnrolment", "disableMfa", "confirmMfaEnrolment", "listMyConsents",
-        "listMyDeletionRequests", "listMyDataViews", "listMyInvites", "exportMyData", "listMyAttempts", "requestInstance")},
+        "listMyDeletionRequests", "listMyDataViews", "listMyInvites", "exportMyData", "listMyAttempts", "requestInstance", "getMyProgress")},
     **{op: ("self", "test_live_authorisation.py::test_two_people_never_share_a_user_stream_and_two_companies_never_share_a_company_stream") for op in ("openLiveStream", "getLiveSnapshot", "createLiveTicket")},
     **{op: ("own_id", W + "test_another_learner_cannot_use_an_attempt_or_instance_of_mine") for op in (
         "getInstance", "openInstance", "resetInstance", "stopInstance", "getAttempt", "startAttempt", "submitAttempt", "submitFlag", "getScore", "listChallenges",
-        "listHints", "unlockHint", "listEvidence", "listIntegrityFlags", "getReport", "getTimeline")},
+        "listHints", "unlockHint", "listEvidence", "listIntegrityFlags", "getReport", "getTimeline", "beginChallenge")},
     **{op: ("own_id", W + "test_another_person_cannot_use_a_consent_deletion_invite_or_withdrawal_of_mine") for op in (
         "getConsentNotice", "recordConsent", "createDeletionRequest", "cancelDeletionRequest", "acceptInvite", "withdrawAttempt", "undoWithdrawal")},
     **{op: ("company", W + "test_another_company_sees_none_of_a_company_s_data") for op in (
@@ -234,7 +234,7 @@ def test_public_routes_carry_nobody_s_data(w):
 def test_self_routes_show_only_the_caller_s_data(w):
     eve = w.browser(EVE_EMAIL)
     for url in ("/api/v1/session", "/api/v1/me", "/api/v1/me/consents", "/api/v1/me/deletion-requests", "/api/v1/me/data-views", "/api/v1/me/invites",
-                "/api/v1/me/attempts"):
+                "/api/v1/me/attempts", "/api/v1/me/progress"):
         r = eve.get(url)
         assert r.status_code == 200, (url, r.text)
         assert not leaks(r.text, w), (url, leaks(r.text, w))
@@ -256,7 +256,8 @@ def test_another_learner_cannot_use_an_attempt_or_instance_of_mine(w):
              eve.post(f"/api/v1/attempts/{a}/submit", {"confirm": True}), eve.post(f"/api/v1/attempts/{a}/flags", {"challenge_key": "C02", "flag": "VM{x}"}),
              eve.get(f"/api/v1/attempts/{a}/score"), eve.get(f"/api/v1/attempts/{a}/challenges"), eve.get(f"/api/v1/attempts/{a}/challenges/C01/hints"),
              eve.post(f"/api/v1/attempts/{a}/challenges/C01/hints/1/unlock"), eve.get(f"/api/v1/attempts/{a}/evidence"),
-             eve.get(f"/api/v1/attempts/{a}/integrity-flags"), eve.get(f"/api/v1/attempts/{a}/report"), eve.get(f"/api/v1/attempts/{a}/timeline")]
+             eve.get(f"/api/v1/attempts/{a}/integrity-flags"), eve.get(f"/api/v1/attempts/{a}/report"), eve.get(f"/api/v1/attempts/{a}/timeline"),
+             eve.post(f"/api/v1/attempts/{a}/challenges/C01/begin")]
     for r in tries:
         assert r.status_code == 404, r.text
         assert not leaks(r.text, w, allowed=(a, i))

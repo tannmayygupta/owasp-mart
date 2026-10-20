@@ -1457,6 +1457,24 @@ class WriteUp(BaseModel):
     fix: Annotated[str, Field(max_length=1200)]
 
 
+class State8(Enum):
+    ready = 'ready'
+    active = 'active'
+    solved = 'solved'
+    expired = 'expired'
+
+
+class SecondsLeft(RootModel[int]):
+    root: Annotated[
+        int,
+        Field(
+            description='Optional (sequenced run). Seconds left when the answer was made; null unless the challenge is `active`. The browser counts down from it.',
+            ge=0,
+            le=86400,
+        ),
+    ]
+
+
 class ChallengeProgress(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -1486,7 +1504,52 @@ class ChallengeProgress(BaseModel):
     write_up: Annotated[
         WriteUp | None,
         Field(
-            description='Optional. Present only for the owner of a practice attempt once the challenge is captured (M3); never in an assessment. The weakness and the fix.'
+            description='Optional. Present only for the owner of a practice attempt once the challenge is captured (M3) or timed out; never in an assessment. The weakness and the fix.'
+        ),
+    ] = None
+    state: Annotated[
+        State8 | None,
+        Field(
+            description='Optional (a sequenced practice run only, v1.3.0). `ready`: the current challenge, not begun. `active`: begun, the countdown runs.\n`solved`: captured (or held for review). `expired`: the time ran out; nothing counts for it any more.\n'
+        ),
+    ] = None
+    title: Annotated[
+        str | None,
+        Field(
+            description='Optional (sequenced run). The catalogue title of the challenge.',
+            max_length=120,
+        ),
+    ] = None
+    tier: Annotated[
+        Tier | None,
+        Field(
+            description='Optional (sequenced run). The tier of the catalogue; it sets the time (Easy 20, Medium 40, Hard 60 minutes).'
+        ),
+    ] = None
+    time_limit_seconds: Annotated[
+        int | None,
+        Field(
+            description='Optional (sequenced run). The time the challenge has once begun.',
+            ge=1,
+            le=86400,
+        ),
+    ] = None
+    opened_at: Annotated[
+        Timestamp | None,
+        Field(
+            description='Optional (sequenced run). When the challenge was begun; null before.'
+        ),
+    ] = None
+    expires_at: Annotated[
+        Timestamp | None,
+        Field(
+            description='Optional (sequenced run). When the countdown ends; null before the challenge is begun.'
+        ),
+    ] = None
+    seconds_left: Annotated[
+        SecondsLeft | None,
+        Field(
+            description='Optional (sequenced run). Seconds left when the answer was made; null unless the challenge is `active`. The browser counts down from it.'
         ),
     ] = None
 
@@ -1502,6 +1565,58 @@ class ChallengeProgressList(BaseModel):
             description='Always false here; the list is complete and has a fixed size (not truncated).'
         ),
     ]
+    total: Annotated[
+        int | None,
+        Field(
+            description='Optional (sequenced run). How many challenges the run has in all, so the browser can show "3 of 11" without listing the ones ahead.',
+            ge=1,
+            le=11,
+        ),
+    ] = None
+    current_key: Annotated[
+        ChallengeKey | None,
+        Field(
+            description='Optional (sequenced run). The challenge to work on now; null when every challenge is solved or timed out.'
+        ),
+    ] = None
+    server_time: Annotated[
+        Timestamp | None,
+        Field(
+            description='Optional (sequenced run). The server clock when the answer was made.'
+        ),
+    ] = None
+
+
+class AccountChallengePoints(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    challenge_key: ChallengeKey
+    best_points: Annotated[
+        int,
+        Field(
+            description='The best net points of this challenge over all runs (the points of one challenge',
+            ge=0,
+        ),
+    ]
+
+
+class AccountProgress(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    total_points: Annotated[
+        int,
+        Field(
+            description='The best points of every challenge added up and shown out of 1000',
+            ge=0,
+            le=1000,
+        ),
+    ]
+    runs: Annotated[
+        int, Field(description='How many practice runs the learner has started.', ge=0)
+    ]
+    per_challenge: Annotated[list[AccountChallengePoints], Field(max_length=11)]
 
 
 class Kind3(Enum):

@@ -1503,9 +1503,62 @@ export interface paths {
         };
         /**
          * Progress per challenge (milestone, solved, hints used)
-         * @description Progress only. Titles, tags and difficulty are catalogue data (IF-7) served by the platform.
+         * @description Progress per challenge. Titles, tags and difficulty are catalogue data (IF-7) served by the platform.
+         *
+         *     A learner's practice run is sequenced (v1.3.0): the learner works on one challenge at a time, so the list holds only the challenges
+         *     that have been reached (the ones solved or timed out and the current one) and each entry carries `state`, `title`, `tier` and the
+         *     countdown fields. Challenges after the current one are not listed. `total` says how many challenges the run has and `current_key`
+         *     names the one to work on. A company assessment is not sequenced: every challenge is listed and the optional fields are absent.
          */
         get: operations["listChallenges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+                challenge_key: components["parameters"]["ChallengeKeyPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Begin the current challenge and start its countdown
+         * @description Only for a sequenced practice run (v1.3.0). Starts the countdown of the current challenge: Easy 20, Medium 40, Hard 60 minutes
+         *     (the tier of the catalogue). Repeating the call changes nothing and answers the same entry. Until the challenge is begun no flag, hint
+         *     or milestone counts for it. A challenge that is not the current one, and a run that is not sequenced, answer 404
+         *     ATT-CHALLENGE-NOT-FOUND; an attempt that is not running, or a challenge that already ended (solved or out of time), answers 409
+         *     ATT-INVALID-STATE. The body is empty.
+         */
+        post: operations["beginChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The points on the learner's account
+         * @description The best result per challenge over every practice run of the signed-in learner, so a challenge repeated in a new run never counts
+         *     twice. `total_points` is shown out of 1000 on the same scale as the score of one run. A learner with no run gets zero everywhere.
+         */
+        get: operations["getMyProgress"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2406,11 +2459,32 @@ export interface components {
             brief?: string;
             /** @description Optional. How to begin, for example the demo account to sign in with and where to look. The accounts are documented demo accounts of the lab shop, not real credentials. */
             start?: string;
-            /** @description Optional. Present only for the owner of a practice attempt once the challenge is captured (M3); never in an assessment. The weakness and the fix. */
+            /** @description Optional. Present only for the owner of a practice attempt once the challenge is captured (M3) or timed out; never in an assessment. The weakness and the fix. */
             write_up?: {
                 vulnerable: string;
                 fix: string;
             };
+            /**
+             * @description Optional (a sequenced practice run only, v1.3.0). `ready`: the current challenge, not begun. `active`: begun, the countdown runs.
+             *     `solved`: captured (or held for review). `expired`: the time ran out; nothing counts for it any more.
+             * @enum {unknown}
+             */
+            state?: "ready" | "active" | "solved" | "expired";
+            /** @description Optional (sequenced run). The catalogue title of the challenge. */
+            title?: string;
+            /**
+             * @description Optional (sequenced run). The tier of the catalogue; it sets the time (Easy 20, Medium 40, Hard 60 minutes).
+             * @enum {unknown}
+             */
+            tier?: "Easy" | "Medium" | "Hard";
+            /** @description Optional (sequenced run). The time the challenge has once begun. */
+            time_limit_seconds?: number;
+            /** @description Optional (sequenced run). When the challenge was begun; null before. */
+            opened_at?: components["schemas"]["Timestamp"] | null;
+            /** @description Optional (sequenced run). When the countdown ends; null before the challenge is begun. */
+            expires_at?: components["schemas"]["Timestamp"] | null;
+            /** @description Optional (sequenced run). Seconds left when the answer was made; null unless the challenge is `active`. The browser counts down from it. */
+            seconds_left?: number | null;
         };
         ChallengeProgressList: {
             items: components["schemas"]["ChallengeProgress"][];
@@ -2419,6 +2493,24 @@ export interface components {
              * @constant
              */
             has_more: false;
+            /** @description Optional (sequenced run). How many challenges the run has in all, so the browser can show "3 of 11" without listing the ones ahead. */
+            total?: number;
+            /** @description Optional (sequenced run). The challenge to work on now; null when every challenge is solved or timed out. */
+            current_key?: components["schemas"]["ChallengeKey"] | null;
+            /** @description Optional (sequenced run). The server clock when the answer was made. */
+            server_time?: components["schemas"]["Timestamp"];
+        };
+        AccountChallengePoints: {
+            challenge_key: components["schemas"]["ChallengeKey"];
+            /** @description The best net points of this challenge over all runs (the points of one challenge */
+            best_points: number;
+        };
+        AccountProgress: {
+            /** @description The best points of every challenge added up and shown out of 1000 */
+            total_points: number;
+            /** @description How many practice runs the learner has started. */
+            runs: number;
+            per_challenge: components["schemas"]["AccountChallengePoints"][];
         };
         Hint: {
             level: number;
@@ -5004,7 +5096,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description One entry per challenge of the attempt. */
+            /** @description One entry per challenge the learner has reached (all of them for an attempt that is not sequenced). */
             200: {
                 headers: {
                     "Cache-Control": components["headers"]["CacheControl"];
@@ -5017,6 +5109,59 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    beginChallenge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+                challenge_key: components["parameters"]["ChallengeKeyPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The challenge with its countdown running. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeProgress"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    getMyProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account points. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountProgress"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
             422: components["responses"]["Invalid"];
         };
     };

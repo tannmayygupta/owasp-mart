@@ -81,6 +81,7 @@ Loaded from `challenges/catalog/*.yaml` by a sync job at deploy time (NFR-EXT-02
 | `review_audit` | `attempt_id`, `challenge_key`, `reviewer`, `decision`, `at`, `note_id`, `note` | Every held-capture decision (FR-SCR-10); added by migration 0005 |
 | `attempt_events` | `attempt_id`, `event jsonb` | The ids-only attempt event log (FR-TIM-04); added by migration 0005 |
 | `bot_visits` | `instance_id`, `epoch`, `visit_id`, `ticket_id`, `phase`, `at` | `bot.visit` records, never a credit (FR-DET-09); added by migration 0005 |
+| `challenge_opens` | `attempt_id`, `challenge_key`, `opened_at` | When a learner began a challenge of a sequenced run: the start of its countdown (Easy 20, Medium 40, Hard 60 minutes). Written once per attempt and challenge; the state of a challenge (ready, active, solved, expired) is worked out from it, the milestones and the clock. Added by migration 0017, ADR 0063 |
 | `security_events` | `kind`, `instance_id`, `epoch`, `seq`, `created_at` | Refused events worth a human's eye, ids and numbers only; added by migration 0005 |
 
 ### 2.7 Privacy, admin and operations (stream P)
