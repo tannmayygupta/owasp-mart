@@ -117,7 +117,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance contract (IF-6), `contracts/instance/`
 
-### 1.0.1 (2026-10-20, Tanmay, story L-30 support bot, ADR 0058)
+### 1.0.1 (2026-10-20, Tanmay, story L-30 support bot, ADR 0061)
 
 - The example templates give the two components of the live C03 part B loop the addresses they need, using names that were already allowed in section 2: `mock-services` gets `VM_INSTANCE_ID` (the collector checks its id against it) and `VM_SIDECAR_EVENTS_URL` (it reports `collector.hit`); `bot-controller` gets `VM_SIDECAR_EVENTS_URL` (it reports `bot.visit`) and `VM_MOCK_URL` (the collector is the one address besides the shop its browser may reach). No schema change, no new name, no change to the injection document or the sidecar start.
 - registry change: none to `contracts/registry.json`.
@@ -352,7 +352,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
 ### 2026-10-20 (Sahil, IF-6 1.0.1 consumer re-sign-off)
-- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0058) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
+- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0061) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
 
 
 ### 2026-10-20 (Sahil, IF-7 1.2.0 owner + DB 2.1.0 consumer sign-off)

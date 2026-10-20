@@ -4,7 +4,7 @@
 - **Date:** 2026-10-20
 - **Deciders:** Claude Code (design); the developer (OI-12, OI-34, D-97)
 - **Requirements:** FR-ADM-03, FR-ADM-07, FR-ADM-08, FR-PRV-19, FR-PRV-20, D-19, D-94, D-95, D-97, ADR 0057, ADR 0060
-- **Numbering:** 0061 is left for the renumbering of the second record 0058 (handoff H-357).
+- **Numbering:** 0061 is the support-bot record, renumbered from a second 0058 (handoff H-357, done 2026-10-20).
 
 ## Context
 An admin must never have standing access to a candidate's answers, write-ups or evidence (FR-ADM-08); break-glass is the one way, with a written reason, a time box, a real-time alert, a record of what was read and a later review (FR-ADM-03). Admins read the full audit log, and each read is logged (FR-ADM-07). The architecture planned a table `break_glass_sessions` (architecture 04, owner admin).

@@ -6,7 +6,7 @@
 | Developer | tannmayygupta |
 | Branch / commit | l-c03b-bot-xss |
 | Status | Done on the live lab; not looked at in a real browser |
-| Report tag | Lab stream, C03 part B, support bot, ADR 0058 |
+| Report tag | Lab stream, C03 part B, support bot, ADR 0061 |
 
 ## Requirements covered
 C03 (part B), FR-SHP-11, FR-CHL-04, challenge-specs 3.2 to 3.7, IF-4 events `bot.visit` and `collector.hit`, IF-6 1.0.1, spike S-5.
@@ -22,7 +22,7 @@ The task brief asked for every challenge to be solvable end to end. C03B was the
 - Shop: the bot queue (3 s delay, one visit per ticket, 10 visits in 10 minutes, 2 KB body limit), a signed bot session, a scope rule (one ticket page and the agent profile only), `GET /staff/api/agent-profile` (flag as `console_key` for the bot session in the vulnerable build only), a customer Support page (`/tickets`), "Agent has viewed this ticket at hh:mm", and the Listener page `/lab/listener`.
 - Mock-services collector: `/c/<id>` with id check, visit tag check, 1x1 GIF and open CORS, `collector.hit` to the sidecar (ids and counts only), `/inbox` with the last 20 hits.
 - Contracts: IF-6 1.0.1 (example templates give mock-services and the bot the event and mock addresses); catalogue text for C03 (start and hints).
-- ADR 0058 (why jsdom and not Chromium, and what is built around its limits).
+- ADR 0061 (why jsdom and not Chromium, and what is built around its limits).
 
 ## How it works
 Player ticket, shop queue (3 s), bot controller `/visit` with a fresh signed session, jsdom child process loads `/staff/tickets/<id>` as `bot.support`, the script runs, its requests go through the network layer, the collector records the hit and tells the sidecar, the Listener page shows the content to the player.
@@ -33,10 +33,10 @@ Player ticket, shop queue (3 s), bot controller `/visit` with a fresh signed ses
 - `apps/shop/src/challenges/c03b-bot.mjs`, `apps/shop/src/{app.mjs,web/routes.mjs,web/routes-staff.mjs,domain/shop-service.mjs}`, views `ticket.njk`, `tickets.njk`, `lab/listener.njk`, `layout.njk`, test `apps/shop/test/web/c03b-bot.test.mjs`
 - `challenges/tests/c03-injection/{live-loop.test.mjs,exploit.live.mjs}`, `challenges/catalog/c03.yaml`
 - `contracts/instance/examples/valid/instance-template/*.json`, `contracts/instance/instance-contract.md`, `contracts/CHANGELOG.md`, `contracts/COMPAT.md`
-- `docs/adr/0058-support-bot-runs-page-scripts-in-jsdom.md`
+- `docs/adr/0061-support-bot-runs-page-scripts-in-jsdom.md`
 
 ## Decisions made
-ADR 0058 (status Proposed until the developer confirms it for `initial.md` Section 15). Alternatives: headless Chromium (too heavy for seven instances per host), regex check (no loop). The placeholders of challenge-specs 3.2 were set to 3 s delay and 5 s open time instead of 10 s and 15 s to keep the player's loop short.
+ADR 0061 (status Proposed until the developer confirms it for `initial.md` Section 15). Alternatives: headless Chromium (too heavy for seven instances per host), regex check (no loop). The placeholders of challenge-specs 3.2 were set to 3 s delay and 5 s open time instead of 10 s and 15 s to keep the player's loop short.
 
 ## Tests
 Real commands and results:
@@ -56,13 +56,13 @@ Real commands and results:
 
 ## Problems met and how they were fixed
 - jsdom 28 has no `ResourceLoader`; resources go through `requestInterceptor` (found by running the worker, fixed).
-- The test probe showed that `setTimeout.constructor('return process')()` returned the worker's `process`: jsdom's own functions belong to the worker's realm. Closed in the worker (see ADR 0058) and covered by the probe test.
+- The test probe showed that `setTimeout.constructor('return process')()` returned the worker's `process`: jsdom's own functions belong to the worker's realm. Closed in the worker (see ADR 0061) and covered by the probe test.
 - A first test run hung: one test leaked a server (never closed); fixed.
 - PowerShell mangled the escaping in two edits (a lost path separator, a stray tab); found by the failing run and fixed by hand.
-- My ADR number 0057 collided with Akshay's admin-operations ADR; renumbered to 0058.
+- My ADR number 0057 collided with Akshay's admin-operations ADR; renumbered to 0058. It collided again with Akshay's candidate-invite record 0058 on main and moved to 0061 (handoff H-357, 2026-10-20).
 
 ## Security notes (vulnerable parts only)
-Weakness: stored XSS (CWE-79) in the support console. The flag lives in the agent profile of the bot account (`console_key` returned by `/staff/api/agent-profile` to the bot session only). Outline: send a ticket whose message runs a script that fetches the profile and sends it to the collector address on the Listener page. jsdom is not a security sandbox; the boundary is the container (ADR 0058).
+Weakness: stored XSS (CWE-79) in the support console. The flag lives in the agent profile of the bot account (`console_key` returned by `/staff/api/agent-profile` to the bot session only). Outline: send a ticket whose message runs a script that fetches the profile and sends it to the collector address on the Listener page. jsdom is not a security sandbox; the boundary is the container (ADR 0061).
 
 ## Limitations and follow-ups
 Navigation-based payloads (`location = ...`) are not emulated. The demo memory stays 128 MB for the bot. The Windows run of `live-loop.test.mjs` works (no unix sockets involved).

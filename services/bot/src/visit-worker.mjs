@@ -1,7 +1,7 @@
 // One browser visit, run in its own child process (C03 part B, FR-SHP-11). The parent (browser.mjs) sends one job and kills this process when the time is up, so a player
 // script that never returns (`while(1){}`) cannot hang the controller, and the heap of one visit is capped.
 //
-// What runs here is jsdom: a page with scripts, a cookie jar, events and a DOM, not a full browser (decision: ADR 0058). The "network layer" of challenge-specs 3.7 is the
+// What runs here is jsdom: a page with scripts, a cookie jar, events and a DOM, not a full browser (decision: ADR 0061). The "network layer" of challenge-specs 3.7 is the
 // function netFetch below: every request of the page (fetch, XMLHttpRequest, images, scripts, beacons) goes through it, it refuses any origin that is not in the job's list,
 // adds the visit tag (the collector reads it as `bot_tagged`) and the bot's cookie for the shop's own origin, and caps sizes and counts.
 //
@@ -13,7 +13,7 @@ const { CookieJar, JSDOM, VirtualConsole, requestInterceptor } = jsdom;
 
 // jsdom's own functions (setTimeout, createElement, addEventListener ...) belong to this process, so a page can climb from one of them to this process's Function with
 // setTimeout.constructor('return process')(). The climb is closed here, before any page runs: no function prototype answers .constructor, and the stack-trace hook that
-// would hand a page its caller's this cannot be set. This is defence in depth, not a security boundary (ADR 0058): the boundary is the container, which holds no secret.
+// would hand a page its caller's this cannot be set. This is defence in depth, not a security boundary (ADR 0061): the boundary is the container, which holds no secret.
 export function lockIntrinsics() {
   const closed = { get() { return undefined; }, set() {}, configurable: false };
   for (const proto of [Function.prototype, Object.getPrototypeOf(async function () {}), Object.getPrototypeOf(function* () {}), Object.getPrototypeOf(async function* () {})]) Object.defineProperty(proto, 'constructor', closed);
