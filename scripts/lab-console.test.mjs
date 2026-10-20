@@ -54,6 +54,7 @@ function boot(routes) {
     const hit = Object.entries(routes).find(([k]) => k === key || (k.endsWith('*') && key.startsWith(k.slice(0, -1))));
     if (!hit) return { ok: false, status: 404, json: async () => ({ code: 'ATT-NOT-FOUND' }) };
     const body = typeof hit[1] === 'function' ? hit[1](opts) : hit[1];
+    if (body?.__error) return { ok: false, status: body.__error, json: async () => ({ code: body.code }) };
     return { ok: true, status: 200, json: async () => body };
   };
   return { byId, calls, copied, load: async () => { vm.runInThisContext(`(function(){${APP}\n})()`, { filename: 'app.js' }); } }; // a fresh run of app.js per test (the page runs it once per load)
@@ -117,6 +118,40 @@ test('opening a challenge loads its hints: the revealed one stays on the page, t
   assert.match(body.textContent, /CWE-639/);
   const buttons = body.all('button').map((b) => [b.textContent, b.disabled]);
   assert.deepEqual(buttons, [['Reveal', false], ['Locked', true], ['Check', false]], 'hint 2 can be revealed, hint 3 is locked, then the flag check');
+});
+
+test('a hint that cannot be revealed says why on its own row, and the hint stays locked', async () => {
+  const app = boot(ROUTES({ 'POST /api/v1/attempts/a-AAAAAAAAAAAAAAAA/challenges/C01/hints/2/unlock': { __error: 409, code: 'ATT-INVALID-STATE' } }));
+  await app.load(); await settle();
+  const c01 = app.byId.get('rows').querySelector('details[data-key="C01"]');
+  c01.open = true; await c01.fire('toggle'); await settle();
+  const reveal = c01.querySelector('.ch-body').all('button')[0];
+  assert.equal(reveal.textContent, 'Reveal');
+  await reveal.fire('click'); await settle();
+  const row2 = c01.querySelector('.ch-body').all('.hintrow')[1];
+  assert.match(row2.textContent, /Hint 2: A direction.*cannot be done in the attempt's state now/, 'the error is on the hint row');
+  assert.doesNotMatch(row2.textContent, /Look at how/, 'no hint text appears');
+});
+
+test('a revealed hint is on the page even when the follow-up progress call fails', async () => {
+  let progressCalls = 0;
+  const app = boot(ROUTES({
+    'GET /api/v1/attempts/a-AAAAAAAAAAAAAAAA/challenges': () => (++progressCalls <= 2 ? PROGRESS() : { __error: 500, code: 'REQ-INTERNAL' }),
+    'POST /api/v1/attempts/a-AAAAAAAAAAAAAAAA/challenges/C01/hints/2/unlock': { level: 2, kind: 'direction', unlocked: true, cost_pct: 0, text: 'Order numbers run in sequence.' },
+  }));
+  await app.load(); await settle();
+  const c01 = app.byId.get('rows').querySelector('details[data-key="C01"]');
+  c01.open = true; await c01.fire('toggle'); await settle();
+  const before = progressCalls;
+  await c01.querySelector('.ch-body').all('button')[0].fire('click'); await settle();
+  assert.ok(progressCalls > before, 'the refresh did run and failed');
+  const body = c01.querySelector('.ch-body');
+  assert.match(body.textContent, /Hint 2: A direction.*Order numbers run in sequence\./);
+  assert.deepEqual(body.all('button').map((b) => [b.textContent, b.disabled]), [['Reveal', false], ['Check', false]], 'hint 3 is next');
+});
+
+test('the Open area tells the learner to open DevTools in the shop tab and to keep the log', () => {
+  assert.match(HTML, /id="devtools-note"[^>]*>[^<]*F12 in that tab[^<]*Network[^<]*Preserve log/);
 });
 
 test('Copy link for Burp asks for a fresh ticket, shows it, copies it and never opens a window', async () => {

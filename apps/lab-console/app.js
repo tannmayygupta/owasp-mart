@@ -2,7 +2,7 @@
 // It is a stand-in for the learner dashboards of stream P (P-26): it only calls the documented browser routes of IF-1 and IF-2 on its own origin.
 // Everything the server sends is put on the page with textContent, never as HTML.
 const $ = (id) => document.getElementById(id);
-const state = { csrf: null, user: null, attempt: null, instance: null, catalog: [], poll: null, timer: null, opened: new Set(), details: {}, hints: {}, progress: [] };
+const state = { csrf: null, user: null, attempt: null, instance: null, catalog: [], poll: null, timer: null, opened: new Set(), details: {}, hints: {}, hintErrors: {}, progress: [], points: {} };
 
 // ---------- the API ----------
 async function api(method, path, body) {
@@ -86,7 +86,7 @@ async function onLogin(ev) {
 async function onLogout() {
   try { await api('DELETE', '/api/v1/session'); } catch { /* the session may be gone already */ }
   clearInterval(state.poll); clearInterval(state.timer);
-  Object.assign(state, { csrf: null, user: null, attempt: null, instance: null, opened: new Set(), details: {}, hints: {}, progress: [] });
+  Object.assign(state, { csrf: null, user: null, attempt: null, instance: null, opened: new Set(), details: {}, hints: {}, hintErrors: {}, progress: [] });
   $('link-box').hidden = true;
   show('auth'); tab('login'); banner('Signed out.', 'ok');
 }
@@ -173,10 +173,15 @@ async function loadProgress() {
   $('bar-fill').style.width = `${Math.min(100, Math.round(score.score / 10))}%`;
   $('captured').textContent = `${got} of ${progress.items.length} challenges captured`;
   $('score-note').textContent = score.per_challenge.some((c) => c.held) ? 'A capture is waiting for a human review and is not counted yet.' : '';
-  const pts = Object.fromEntries(score.per_challenge.map((c) => [c.challenge_key, c.points]));
+  state.points = Object.fromEntries(score.per_challenge.map((c) => [c.challenge_key, c.points]));
+  paintRows();
+}
+
+// The challenge rows from what the page already holds (progress, points, hints), so a change the server accepted shows at once and never waits for a second call.
+function paintRows() {
   const info = Object.fromEntries(state.catalog.map((c) => [c.challenge_key, c]));
   const rows = $('rows');
-  for (const p of progress.items) renderChallenge(rows, p, info[p.challenge_key], pts[p.challenge_key] ?? 0);
+  for (const p of state.progress) renderChallenge(rows, p, info[p.challenge_key], state.points[p.challenge_key] ?? 0);
   steps();
 }
 
@@ -222,6 +227,7 @@ function renderChallenge(rows, p, info, points) {
       btn.type = 'button'; btn.disabled = level !== p.hints_used + 1 || state.attempt.state !== 'running' || !p.hints_available;
       btn.addEventListener('click', () => unlockHint(key, level));
       row.appendChild(btn);
+      if (state.hintErrors[key]?.level === level) row.appendChild(el('span', 'txt bad', state.hintErrors[key].text));
     }
     body.appendChild(row);
   }
@@ -242,7 +248,7 @@ function renderChallenge(rows, p, info, points) {
 async function loadDetail(key) {
   if (state.details[key]) return;
   try { state.details[key] = await api('GET', `/api/v1/challenges/${key}`); } catch { state.details[key] = {}; }
-  await loadProgress();
+  await loadProgress().catch(() => { /* the next refresh shows the error */ });
 }
 async function loadHints(key) {
   if (!state.attempt || !['running', 'submitted'].includes(state.attempt.state)) return;
@@ -305,8 +311,14 @@ async function submitFlag(key, input) {
 async function unlockHint(key, level) {
   try {
     const h = await api('POST', `/api/v1/attempts/${state.attempt.attempt_id}/challenges/${key}/hints/${level}/unlock`);
-    state.hints[key] = (state.hints[key] || []).filter((x) => x.level !== h.level).concat(h); $('flag-answer').textContent = `${key} hint ${h.level} revealed.`; await refresh();
-  } catch (e) { $('flag-answer').textContent = say(e.code); }
+    state.hints[key] = (state.hints[key] || []).filter((x) => x.level !== h.level).concat(h); delete state.hintErrors[key]; $('flag-answer').textContent = `${key} hint ${h.level} revealed.`;
+    const p = state.progress.find((x) => x.challenge_key === key); if (p) p.hints_used = Math.max(p.hints_used, h.level);
+    paintRows(); // the hint is on the page now, whatever the refresh below does
+    await refresh();
+  } catch (e) {
+    // shown on the hint row itself (the status line is far from the button), and kept across the next render
+    state.hintErrors[key] = { level, text: say(e.code) }; $('flag-answer').textContent = say(e.code); paintRows();
+  }
 }
 async function onReport() {
   try {

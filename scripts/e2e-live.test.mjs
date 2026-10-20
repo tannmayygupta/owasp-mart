@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mailpitToken, parseArgs } from './e2e-live.mjs';
+import { hintTextProblem, mailpitToken, parseArgs } from './e2e-live.mjs';
+
+test('the hint sweep refuses the placeholder, a short text and a flag, and accepts a real hint', () => {
+  assert.match(hintTextProblem('This hint has not been written yet.'), /placeholder/);
+  assert.match(hintTextProblem('  This hint has not been written yet.  '), /placeholder/);
+  assert.match(hintTextProblem('too short'), /short/);
+  assert.match(hintTextProblem(`Look here ${'VM{' + 'A'.repeat(24) + '}'} ok`), /flag/);
+  assert.equal(hintTextProblem('Look at your two gift-card codes. Do they look random?'), null);
+  assert.match(hintTextProblem(undefined), /short/);
+});
 
 test('arguments: an https origin is required; load is bounded; the mail host looks like ubuntu@host', () => {
   assert.equal(parseArgs(['--base', 'https://x.example']).base, 'https://x.example');

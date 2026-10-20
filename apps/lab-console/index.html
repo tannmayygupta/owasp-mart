@@ -64,6 +64,7 @@
           <button id="stop" type="button" class="ghost">Stop</button>
           <button id="submit" type="button" class="ghost">Finish and submit</button>
         </div>
+        <p id="devtools-note" class="hint">To watch your own requests: the shop opens in its own tab, so press F12 in that tab (not here), choose Network and tick Preserve log, then sign in. The login is an ordinary form POST you can read there.</p>
         <div id="link-box" hidden>
           <p class="hint">One-time link, valid for about a minute. Paste it into the browser you attack from (Burp's browser, for example); the shop then sets its cookie and every later request is an ordinary HTTPS request to your instance.</p>
           <input id="link" readonly aria-label="One-time link to your instance">

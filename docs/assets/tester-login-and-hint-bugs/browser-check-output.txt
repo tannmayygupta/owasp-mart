@@ -1,0 +1,31 @@
+Real-browser checks of 2026-10-20 (headless Chrome driven over the DevTools protocol; local only, test accounts of the repo's own fixtures).
+Nothing here is a flag, key or session value.
+
+== 1. Shop login, real shop in the vulnerable C01 build, port 3100 ==
+REQ GET  /login
+RES 200  /login
+REQ POST /login  POSTDATA = csrf=<hex>&email=<staff account>&password=<its demo password>
+REQ GET  /shop   (after 302)
+RES 200  /shop
+=> the credentials are in the request as form data; the answer is a 302 to /shop (a navigation).
+
+== 2. Lab console + real lab API (fake instance host), learner flow, challenge C02, console BEFORE this story ==
+run A: attempt running, instance ready (open)
+  opened C02: Hint 1 [Reveal, enabled], Hint 2 [Locked], Hint 3 [Locked]
+  after Reveal 1/2/3: the catalogue text of each hint appeared in order; hints/1,2,3/unlock all HTTP 200
+  one uncaught page exception: Error REQ-INTERNAL at loadProgress (called from loadDetail)
+run B (after the unlock of hint 2 answered 200 and the status line said "C02 hint 2 revealed."):
+  Hint 2 still showed [Reveal, enabled] with no text; Reveal 3 did nothing.
+  Cause: the row is redrawn only when the follow-up progress call succeeds, and that call had failed.
+
+== 3. Same flow, console AFTER this story ==
+  after Reveal 2: Hint 1 text, Hint 2 text, Hint 3 [Reveal, enabled]
+  after Reveal 3: all three hint texts on the page; hints/1,2,3/unlock all HTTP 200
+
+== Harness note ==
+The local lab API for these runs keeps its accounts in one shared in-memory SQLite connection (as the API tests do). Concurrent browser calls
+sometimes gave 500 REQ-INTERNAL (IndexError) and then 401 for the rest of the session. This was seen only on that harness; it has not been
+checked against Postgres, so it is NOT recorded as a product defect.
+
+== Not done ==
+The live lab was not reproduced: it needs the developer's sign-in, and the Chrome extension was not connected in this session.

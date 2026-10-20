@@ -37,7 +37,7 @@ details.ch .pts { color:var(--muted); font-size:.85rem; margin-left:auto; }
 .box { border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#0d1117; } .box b { display:block; font-size:.8rem; color:var(--muted); font-weight:500; margin-bottom:2px; }
 .box.start { border-color:#2f5d4a; } .box.win { border-color:var(--accent); }
 .tags { display:flex; gap:6px; flex-wrap:wrap; } .tag { font-size:.78rem; color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:0 6px; }
-.hintrow { display:flex; gap:10px; align-items:flex-start; } .hintrow .lvl { min-width:5.5rem; color:var(--muted); font-size:.85rem; padding-top:6px; } .hintrow .txt { flex:1; padding-top:4px; }
+.hintrow { display:flex; gap:10px; align-items:flex-start; } .hintrow .lvl { min-width:5.5rem; color:var(--muted); font-size:.85rem; padding-top:6px; } .hintrow .txt { flex:1; padding-top:4px; } .hintrow .txt.bad { color:var(--bad); }
 .flagrow { display:flex; gap:8px; } .flagrow input { max-width:22rem; }
 #link-box { margin-top:10px; } #link-box input { font-size:.8rem; }
 .pill.tier-Easy { color:#6fd3a0; } .pill.tier-Medium { color:var(--warn); } .pill.tier-Hard { color:var(--bad); }
