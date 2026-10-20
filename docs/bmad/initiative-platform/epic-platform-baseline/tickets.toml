@@ -98,3 +98,15 @@ covers = []
 after = [1, 2, 3, 4, 5, 6, 7, 8]
 hitl = false
 risk = "low"
+
+# Added 2026-10-20 for task P-32 (its task line names "All platform epics", which has no folder of its own; the baseline epic holds the cross-epic checks).
+[[entry]]
+id = 10
+type = "story"
+title = "Deployed verification and ASVS checklist"
+description = "Verify every platform epic on the deployed site with a read-only script, and compile the ASVS 5.0 checklist in docs/traceability.md (level 2, level 3 for admin and the key service)."
+verify = "Each epic is verified on the deployed site and the ASVS rows are filled."
+covers = ["NFR-SEC-01", "NFR-SEC-02", "NFR-SEC-03"]
+after = [9]
+hitl = false
+risk = "medium"
