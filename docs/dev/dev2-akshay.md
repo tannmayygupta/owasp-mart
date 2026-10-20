@@ -265,7 +265,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [x] **P-26. Learner and candidate dashboards with hints**  (export is P-29; `after_release` results hidden in the page only until stream L adds the server rule (H-355); the write-up is Tanmay's IF-2 1.2.0 field, practice attempts only; not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: planned, ref `8.1` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `8.1` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20, merged in pull request 58)
   - Build: The learner and candidate dashboards, learner hints, candidate hints off by default.
   - Covers: FR-DSH-01, 04, FR-HNT-01, 02
   - Waits on: P-22, Tanmay's scoring (L-23) and the catalogue (T-30). Open in part: OI-15.

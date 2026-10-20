@@ -3,7 +3,7 @@ title: 'Learner and candidate dashboards with hints'
 type: 'feature'
 ticket: '1'
 created: '2026-10-20'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
