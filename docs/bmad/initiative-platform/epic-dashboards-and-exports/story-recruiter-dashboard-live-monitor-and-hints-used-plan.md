@@ -53,7 +53,7 @@ context:
 
 **Execution:**
 - [x] The recruiter routes, the contract change and their tests (2026-10-20: 10 route tests, contract rules 18 PASS).
-- [ ] The recruiter pages and their tests; the stack test.
+- [ ] The recruiter pages and their tests; the stack test. (2026-10-20: pages built, typecheck and build of 14 routes pass, web tests 16 of 16; the stack test next.)
 
 **Acceptance Criteria:**
 - Given a recruiter of an active company that accepted the terms, then they make a template, invite a candidate, see the candidate's state change live, and read the report with hints used and their cost.

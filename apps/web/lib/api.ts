@@ -140,6 +140,89 @@ export type ConsentNotice = { attempt_id: string; notice_version: string; notice
 export type DeletionRequest = { request_id: string; kind: string; status: string; execute_after: string | null; can_undo: boolean; company_name: string | null; attempt_id: string | null };
 export type DataView = { company_name: string; action: string; at: string };
 
+// ---- the recruiter's shapes (IF-1 1.4.0, story P-27; the candidate's results are the lab's reviewer routes, IF-2) ----
+
+export type CompanyStanding = {
+  state: 'none' | 'unverified_email' | 'pending_approval' | 'active' | 'rejected' | 'suspended' | 'deleted';
+  company_name: string | null;
+  reason: string | null;
+  terms_accepted: boolean;
+  role: 'owner' | 'member' | null;
+};
+export type CompanyTerms = { version: string; text: string; sha256: string };
+export type Template = {
+  template_id: string;
+  title: string;
+  challenge_keys: string[];
+  time_limit_min: number;
+  hints_mode: 'on' | 'off';
+  hint_cost_pct: number;
+  reset_limit: number;
+  invite_expiry_days: number;
+  retention_days: number;
+  writeup_required: boolean;
+  results_visibility: 'after_submit' | 'after_release';
+  flag_submissions_per_minute: number;
+  version: number;
+  updated_at: string;
+};
+export type CompanyInvite = {
+  invite_id: string;
+  template_id: string;
+  email: string;
+  state: string;
+  attempt_id: string | null;
+  generation: number;
+  expires_at: string;
+  created_at: string;
+  sent_at: string | null;
+  consented_at: string | null;
+  started_at: string | null;
+  closed_at: string | null;
+  time_limit_min: number | null;
+  hints_mode: 'on' | 'off';
+  hint_cost_pct: number;
+};
+export type InvitesResult = { created: CompanyInvite[]; skipped: { email: string; reason: string }[]; remaining: string[]; cap: number | null };
+export type ReportChallenge = {
+  challenge_key: string;
+  best_milestone: string;
+  points: number;
+  held: boolean;
+  hints_used: number;
+  time_to_capture_seconds: number | null;
+  technique_label: string | null;
+};
+export type Report = {
+  attempt_id: string;
+  state: string;
+  score: number;
+  elapsed_seconds: number | null;
+  active_seconds: number | null;
+  hints_used_total: number;
+  integrity_open: number;
+  per_challenge: ReportChallenge[];
+};
+export type Evidence = { evidence_id: string; challenge_key: string; captured_at: string; method: string; path: string; body: string | null; body_truncated: boolean };
+export type IntegrityFlag = {
+  integrity_flag_id: string;
+  type: string;
+  challenge_key: string | null;
+  explanation: string;
+  status: 'open' | 'accepted' | 'rejected';
+  held: boolean;
+  created_at: string;
+  decision_note: string | null;
+};
+export type TimelineEntry = { at: string; type: string; challenge_key: string | null; milestone: string | null; result: string | null };
+
+/** Seconds as "1h 02m 03s" (or "-"). */
+export function duration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '-';
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m ${String(s % 60).padStart(2, '0')}s`;
+}
+
 /** "2026-10-20T10:00:00Z" as the reader's local date and time. */
 export function when(stamp: string | null | undefined): string {
   if (!stamp) return '-';
