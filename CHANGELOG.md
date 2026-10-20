@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Team change (D-102, ADR 0064): the project is now the leader and Claude only; `CLAUDE.md` rewritten (no per-developer streams, trackers, handoffs, sprint branches or hand-kept Excel; one tracker `docs/bmad/initiative-lab`; safety floor kept).
 - Fix: the template's rules (time limit, reset limit, results visibility) now reach the attempt that a consent creates; before, `accept.py` dropped them, so a recruiter's settings had no effect on a real candidate (found by the role-scenario audit).
 - Test repairs after the full API run: migration head 0017 and the table list in the settings tests, the withdrawn-run refusal test uses a company attempt, the invite-rules test uses a valid visibility, the run-order test no longer depends on a random id.
 - Learner console redesign (backlog story 11): one challenge at a time with a countdown ring by tier, a progress rail, account points in the top bar, new run after a finished one, light and dark, self-hosted open-licence fonts; works against a server that is not sequenced.
