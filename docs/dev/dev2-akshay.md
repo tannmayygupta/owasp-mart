@@ -263,9 +263,9 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Waits on: P-17, P-24 and Tanmay's purge call (AttemptPort).
   - Done when: A deletion request completes after seven days, can be undone before, and a candidate sees who viewed.
 
-- [ ] **P-26. Learner and candidate dashboards with hints**
+- [x] **P-26. Learner and candidate dashboards with hints**  (export is P-29; `after_release` results hidden in the page only until stream L adds the server rule (H-355); the write-up is Tanmay's IF-2 1.2.0 field, practice attempts only; not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.1` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: The learner and candidate dashboards, learner hints, candidate hints off by default.
   - Covers: FR-DSH-01, 04, FR-HNT-01, 02
   - Waits on: P-22, Tanmay's scoring (L-23) and the catalogue (T-30). Open in part: OI-15.
@@ -282,7 +282,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [x] **P-28. Admin operations: queue, users, force-stop, settings, quotas, capacity**  (force-stop needs a lab in the API process, so it is tested with a stand-in, not on the Compose stack; quota and cap numbers are placeholders (OI-21); no admin dashboard pages (P-30))
   - Epic: `epic-admin-and-operations`
-  - BMAD story: planned, ref `1` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `1` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Approval queue screen, user management, force-stop, settings and quotas (provides SettingsPort and QuotaPort to Tanmay), capacity view.
   - Covers: FR-ADM-01, 02, 04, 05, 06
   - Waits on: P-18 and Tanmay's L-16 (InstancePort, capacity).

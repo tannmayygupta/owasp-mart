@@ -37,6 +37,7 @@ from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_che
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
 from vulnmart.assessments.accept import InviteAcceptance, InviteConsentTargets
+from vulnmart.assessments.invite_api import router as invite_router
 from vulnmart.lab.runtime import LabRuntime
 from vulnmart.live.api import router as live_router
 from vulnmart.live.authorise import StreamAuthoriser
@@ -302,6 +303,7 @@ def create_app(
     app.include_router(mfa_router)
     app.include_router(consent_router)
     app.include_router(deletion_router)
+    app.include_router(invite_router)
     app.include_router(live_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs

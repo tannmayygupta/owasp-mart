@@ -1,0 +1,48 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-20: one story per task of docs/dev/dev2-akshay.md that names this epic (P-26, P-27, P-29, P-30), as START-HERE.md section 5 asks; the developer asked to
+# "continue with the sprint 4 tasks one by one and merge it to main" (2026-10-20). Open items stay open and are recorded in the stories that meet them: OI-15 (result timing),
+# OI-27 (recruiter export), OI-30 (browsers and accessibility).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Learner and candidate dashboards with hints"
+description = "The learner dashboard (catalogue, stars, hints, flags, write-up after solving, instance controls) and the candidate dashboard (the assessment, its state and time, hints off by default), each showing only the caller's own data and live updates; learner hints on, candidate hints off unless the template turns them on."
+verify = "Both dashboards show live data and a learner or candidate sees only their own; candidate hints are off by default."
+covers = ["FR-DSH-01", "FR-DSH-04", "FR-HNT-01", "FR-HNT-02"]
+after = ["7.2"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Recruiter dashboard, live monitor and hints used"
+description = "The recruiter dashboard per candidate (score, time, technique, tags, evidence, hints used, integrity flags), the live monitor of the company's running attempts and the hints-used view; every view recorded in the view history and audited; never practice history."
+verify = "A recruiter sees only their company's candidates, live, and every view is recorded."
+covers = ["FR-DSH-02", "FR-DSH-03", "FR-HNT-03"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Data exports"
+description = "Candidate, learner and recruiter exports as a zip of JSON and CSV with no flag values and no other user's data, each audited and recorded in the view history."
+verify = "Each export produces the right data, no flag value and writes an audit entry."
+covers = ["FR-EXP-01", "FR-EXP-02", "FR-EXP-03", "FR-EXP-04"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Admin dashboard and privacy wall in every view"
+description = "The admin dashboard over the admin routes of P-28 (counts and states, no candidate content) and a test per view that every role fails to read another user's or another company's data."
+verify = "No view shows data the privacy wall forbids, checked by a test per view."
+covers = ["FR-DSH-05", "FR-DSH-06"]
+after = [3]
+hitl = false
+risk = "high"

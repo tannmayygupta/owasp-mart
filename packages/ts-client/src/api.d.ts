@@ -421,6 +421,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/invites/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open an invite link
+         * @description The candidate opened the link of an invite (story P-26 over story P-21, FR-ASM-04): no session is needed, because the candidate may have no account yet. The invite becomes `opened`
+         *     (a link that was opened was delivered) and the answer says what the assessment is: the company, the title, the time limit, how many challenges, the hints, write-up and results
+         *     rules (OI-14, OI-15) and the expiry. A closed invite (expired, cancelled, revoked, declined) answers its state. The answer never contains the invite's address. A link that opens
+         *     nothing (malformed, unknown, or emptied by the invite purge) is 400 AUTH-TOKEN-INVALID, as for the email links; opening is rate limited per visitor.
+         */
+        post: operations["openInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invites/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept an invite
+         * @description Binds the invite to the signed-in candidate (FR-ASM-04) and answers the `attempt_id` the consent screen is for (`getConsentNotice`, then `recordConsent`); the attempt is created
+         *     when consent is granted. Repeating it for the same account answers the same attempt. A closed invite, an invite another account accepted, an account that cannot take an
+         *     assessment (not an active, verified participant) and an account whose verified address is not the one the invite was sent to are one 409 ATT-INVALID-STATE: the answer must
+         *     not say what the invite's address is, and the registry has no invite codes (ADR 0058).
+         */
+        post: operations["acceptInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My invitations
+         * @description The invites bound to the caller, newest first (FR-DSH-04): the company, the title, the state, the expiry, the rules the candidate needs to see, and the attempt id. Only the
+         *     caller's own invites (the database policy `own_invite`); an account that accepted none gets an empty list.
+         */
+        get: operations["listMyInvites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/pending": {
         parameters: {
             query?: never;
@@ -1452,6 +1519,45 @@ export interface components {
             items: components["schemas"]["DataView"][];
             has_more: boolean;
         };
+        InviteTokenRequest: {
+            /** @description The token of the invite link (the company prefix and the secret); never logged. */
+            token: string;
+        };
+        InviteSummary: {
+            /** @enum {unknown} */
+            state: "created" | "sent" | "opened" | "consented" | "started" | "declined" | "expired" | "cancelled" | "revoked";
+            company_name: string;
+            title: string;
+            expires_at: components["schemas"]["Timestamp"];
+            time_limit_min: number | null;
+            challenge_count: number;
+            /** @enum {unknown} */
+            hints_mode: "off" | "on";
+            hint_cost_pct: number;
+            writeup_required: boolean;
+            /** @enum {unknown} */
+            results_visibility: "after_submit" | "after_release";
+        };
+        MyInvite: {
+            invite_id: string;
+            attempt_id: components["schemas"]["AttemptId"] | null;
+            /** @enum {unknown} */
+            state: "created" | "sent" | "opened" | "consented" | "started" | "declined" | "expired" | "cancelled" | "revoked";
+            company_name: string;
+            title: string;
+            expires_at: components["schemas"]["Timestamp"];
+            time_limit_min: number | null;
+            challenge_count: number;
+            /** @enum {unknown} */
+            hints_mode: "off" | "on";
+            hint_cost_pct: number;
+            writeup_required: boolean;
+            /** @enum {unknown} */
+            results_visibility: "after_submit" | "after_release";
+        };
+        MyInviteList: {
+            items: components["schemas"]["MyInvite"][];
+        };
         PendingCompany: {
             org_id: string;
             name: string;
@@ -2006,6 +2112,16 @@ export interface components {
         };
         /** @description The notice the person saw is not the current one (ATT-CONSENT-STALE), or the attempt is not in state consent (ATT-INVALID-STATE). */
         ConsentConflict: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The invite is closed or taken, or this account cannot accept it (not an active, verified participant, or not the address the invite was sent to) (ATT-INVALID-STATE). */
+        InviteConflict: {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
                 [name: string]: unknown;
@@ -2833,6 +2949,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataViewList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    openInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description What the assessment is. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteSummary"];
+                };
+            };
+            400: components["responses"]["TokenInvalid"];
+            403: components["responses"]["OriginForbidden"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    acceptInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description The invite, bound to the caller. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyInvite"];
+                };
+            };
+            400: components["responses"]["TokenInvalid"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            409: components["responses"]["InviteConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listMyInvites: {
+        parameters: {
+            query?: {
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invitations. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyInviteList"];
                 };
             };
             401: components["responses"]["Unauthenticated"];

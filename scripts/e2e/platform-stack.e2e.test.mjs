@@ -1605,6 +1605,90 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(psql(`SELECT count(*) FROM audit_log WHERE actor = '${adminId}' OR subject = '${learnerId}'`), '0', 'no raw user id in the log');
   }, { timeout: 300000 });
 
+  // Story P-26: the dashboards' pages are served through the proxy with the per-request CSP, and the candidate's invite routes work through the web origin:
+  // open with no session (no address in the answer), accept as the invited account, see it in "my invites", and another account sees none of it. Consent and
+  // the attempt itself need a lab in the API process, which this stack does not have; they are tested in test_invite_api.py and test_invite_acceptance.py.
+  test('dashboards (P-26): the pages are served with the CSP; open, accept and list an invite through the web origin; another account sees nothing', async () => {
+    for (const path of ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/account', '/dashboard', '/invite', '/assessment/a-AAAAAAAAAAAAAAAA']) {
+      const page = await fetch(`${ORIGIN}${path}`, { signal: AbortSignal.timeout(60000) });
+      assert.equal(page.status, 200, path);
+      assert.match(page.headers.get('content-security-policy') ?? '', /'nonce-[A-Za-z0-9+/=]+'/, `${path} has the nonce CSP`);
+      assert.match(page.headers.get('cache-control') ?? '', /no-store/, path); // the page answer of the dev server, as in the P-07 page test
+      assert.doesNotMatch(await page.text(), /VM\{/, `${path} carries no flag`);
+    }
+
+    const domain = `dash-${RUN}.example`;
+    const ownerEmail = `owner@${domain}`;
+    const candidate = `dash-taker-${RUN}@example.org`;
+    const other = `dash-other-${RUN}@example.org`;
+    const adminEmail = `e2e-dash-admin-${RUN}@example.com`;
+    const password = 'correct horse battery staple';
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app', 'from vulnmart.ports.scope import Scope, Role',
+        'c, a = app.state.companies, app.state.assessments', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const seeded = docker('exec', '-e', 'VULNMART_SEED_ADMIN_PASSWORD=a long admin password 123', NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Dash Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    py(`c.signup_recruiter(email="${ownerEmail}", password="${password}", display_name="E2E Dash Owner", company_name="Dash Ltd ${RUN}")`, 'print(json.dumps(True))');
+    psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${ownerEmail}'`);
+    const ownerId = psql(`SELECT id FROM users WHERE email_ci = '${ownerEmail}'`);
+    const orgId = psql(`SELECT id FROM organizations WHERE domain_claim = '${domain}'`);
+    py(`c.approve(Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN})), "${orgId}")`, `t = c.terms_for("${ownerId}")`, `c.accept_terms("${ownerId}", t.version, t.sha256)`, 'print(json.dumps(True))');
+    const owner = `Scope(user_id="${ownerId}", org_id="${orgId}", roles=frozenset({Role.RECRUITER, Role.ORG_OWNER}))`;
+    py(`t = a.create_template(${owner}, {"title": "E2E dashboard", "challenge_keys": ["C01", "C03"], "retention_days": 60, "hints_mode": "on", "hint_cost_pct": 10})`,
+      `i = a.create_invite(${owner}, t.template_id, "${candidate}")`, 'print(json.dumps(True))');
+    let token = null;
+    for (let i = 0; i < 60 && !token; i += 1) {
+      const m = await mailFor(candidate, 'invited you to a security assessment', 1);
+      token = (m && /invite\?token=([a-z2-7]{26}\.[A-Za-z0-9_-]{43})/.exec(m.Text)?.[1]) || null;
+      if (!token) await new Promise((r) => setTimeout(r, 1000));
+    }
+    assert.ok(token, 'the invite mail arrived and links to /invite');
+
+    // opening needs no session and never says the invited address
+    const opened = await postJson('/api/v1/invites/open', { token });
+    assert.equal(opened.status, 200);
+    const summary = await opened.json();
+    assert.equal(summary.state, 'opened');
+    assert.equal(summary.title, 'E2E dashboard');
+    assert.equal(summary.hints_mode, 'on');
+    assert.equal(summary.hint_cost_pct, 10);
+    assert.equal(summary.challenge_count, 2);
+    assert.doesNotMatch(JSON.stringify(summary), new RegExp(candidate.replace(/[.]/g, '\\.')));
+    assert.equal((await postJson('/api/v1/invites/open', { token: 'not-a-token' })).status, 400);
+
+    // both people register and confirm; the invited one accepts, the other cannot
+    const signIn = async (email) => {
+      const r = await postJson('/api/v1/session', { email, password });
+      assert.equal(r.status, 200, email);
+      const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(r.headers.getSetCookie()[0])[1]}`;
+      return { cookie, csrf: (await r.json()).csrf_token };
+    };
+    for (const email of [candidate, other]) {
+      assert.equal((await postJson('/api/v1/accounts', { email, password, display_name: 'E2E Dash', age_declaration: true })).status, 202);
+      psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${email}'`);
+    }
+    const them = await signIn(other);
+    const refused = await postJson('/api/v1/invites/accept', { token }, { cookie: them.cookie, 'x-csrf-token': them.csrf });
+    assert.equal(refused.status, 409);
+    assert.doesNotMatch(await refused.text(), new RegExp(candidate.replace(/[.]/g, '\\.')));
+    const me = await signIn(candidate);
+    assert.equal((await postJson('/api/v1/invites/accept', { token })).status, 401, 'accepting needs a session');
+    const accepted = await postJson('/api/v1/invites/accept', { token }, { cookie: me.cookie, 'x-csrf-token': me.csrf });
+    assert.equal(accepted.status, 200);
+    const mine = await accepted.json();
+    assert.match(mine.attempt_id, /^a-[A-Z2-7]{16}$/);
+
+    const listed = await (await call('GET', '/api/v1/me/invites', { headers: { cookie: me.cookie } })).json();
+    assert.deepEqual(listed.items.map((i) => [i.attempt_id, i.company_name, i.title]), [[mine.attempt_id, `Dash Ltd ${RUN}`, 'E2E dashboard']]);
+    assert.deepEqual(await (await call('GET', '/api/v1/me/invites', { headers: { cookie: them.cookie } })).json(), { items: [] });
+    assert.equal(psql(`SELECT state || ',' || (user_id = (SELECT id FROM users WHERE email_ci = '${candidate}')) FROM invites WHERE attempt_id = '${mine.attempt_id}'`), 'opened,true');
+  }, { timeout: 300000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

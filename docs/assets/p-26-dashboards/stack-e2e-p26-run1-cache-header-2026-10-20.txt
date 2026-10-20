@@ -1,0 +1,36 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (954.6584ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (502.349ms)
+  ✖ dashboards (P-26): the pages are served with the CSP; open, accept and list an invite through the web origin; another account sees nothing (1470.5581ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (8402.3617ms)
+✖ platform and web profiles on a real Docker engine (47591.3643ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47857.4072
+
+✖ failing tests:
+
+test at scripts\e2e\platform-stack.e2e.test.mjs:1611:3
+✖ dashboards (P-26): the pages are served with the CSP; open, accept and list an invite through the web origin; another account sees nothing (1470.5581ms)
+  AssertionError [ERR_ASSERTION]: /login
+  + actual - expected
+  
+  + 'no-store'
+  - 'private, no-store'
+  
+      at test.timeout (file:///C:/Users/gupta/OneDrive/Desktop/mp/owasp-mart/scripts/e2e/platform-stack.e2e.test.mjs:1616:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'no-store',
+    expected: 'private, no-store',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

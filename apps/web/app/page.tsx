@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useSession } from '../lib/session';
 
 // GET /api/v1/health (IF-1 getHealth): `ok` or `degraded`, never which store is down.
 type Health = { status: 'ok' | 'degraded' };
@@ -23,16 +25,25 @@ async function loadHealth(): Promise<State> {
 
 export default function Page() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const { user, loading } = useSession();
 
   useEffect(() => {
     loadHealth().then(setState);
   }, []);
 
   return (
-    <main>
-      <h1>VulnMart platform</h1>
-      {state.kind === 'loading' && <p>Checking the API...</p>}
-      <ul>
+    <>
+      <h1>VulnMart</h1>
+      <div className="card">
+        <p>Practise finding and fixing the OWASP Top 10 in a shop that is vulnerable on purpose, or take an assessment you were invited to.</p>
+        {!loading && (user ? (
+          <p><Link href="/dashboard">Go to your dashboard</Link></p>
+        ) : (
+          <p className="row"><Link href="/login">Sign in</Link> <Link href="/signup">Create an account</Link></p>
+        ))}
+      </div>
+      {state.kind === 'loading' && <p className="muted">Checking the API...</p>}
+      <ul className="muted">
         {state.kind === 'unreachable' && (
           <li>
             API: <strong data-testid="health-api">unreachable</strong>
@@ -44,6 +55,6 @@ export default function Page() {
           </li>
         )}
       </ul>
-    </main>
+    </>
   );
 }

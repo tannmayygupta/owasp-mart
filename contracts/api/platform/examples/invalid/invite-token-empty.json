@@ -1,0 +1,8 @@
+{
+  "schema": "InviteTokenRequest",
+  "body": {
+    "token": ""
+  },
+  "path": "/token",
+  "rule": "a token is 1 to 200 characters"
+}

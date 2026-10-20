@@ -172,6 +172,14 @@ class InviteView:
 
 
 @dataclass(frozen=True, slots=True)
+class CandidateInvite:
+    """An invite as its candidate sees it (story P-26): the invite, the company's name and the assessment's title. The candidate's page never gets the invite's address."""
+    invite: InviteView
+    company_name: str
+    title: str
+
+
+@dataclass(frozen=True, slots=True)
 class RetentionInvite:
     """What the retention job needs to know about an invite: whose record it is, which attempt, how long the template said to keep it, and since when."""
     invite_id: str
@@ -714,6 +722,36 @@ class AssessmentService:
             with self._sessions() as session:
                 company = session.get(Organization, org)
                 return None if company is None else (view, str(org), company.name)
+
+    def describe(self, org_id: str, invite: InviteView) -> CandidateInvite:
+        """The company's name and the template's title for an invite, read in the company's own scope (the candidate has none). A template deleted since the invite
+        was sent leaves the title empty; the invite keeps its own copy of the rules."""
+        oid = self._uuid(org_id, InviteNotFound)
+        with self._scope.acting_as(self._system(oid)):
+            with self._sessions() as session:
+                company = session.get(Organization, oid)
+                template = session.get(AssessmentTemplate, self._uuid(invite.template_id, InviteNotFound))
+                return CandidateInvite(invite, company.name if company is not None else "", template.title if template is not None else "")
+
+    def my_invites(self, user_id: str, limit: int = 50) -> list[CandidateInvite]:
+        """The invites bound to this candidate, newest first (story P-26, FR-DSH-04). Read in the scope of the running request (policy `own_invite`: only the invites
+        that name the signed-in account), and filtered by the account here too. Expired invites are closed on the way, like every other read."""
+        limit = max(1, min(limit, 100))
+        now = self._now()
+        with self._sessions.begin() as session:
+            rows = list(session.scalars(select(Invite).where(Invite.user_id == user_id).order_by(Invite.created_at.desc(), Invite.id).limit(limit)))
+            found = [(str(r.org_id), r.id) for r in rows]
+        out = []
+        for org, invite_id in found:
+            with self._scope.acting_as(self._system(uuid.UUID(org))):
+                with self._sessions.begin() as session:
+                    invite = session.get(Invite, invite_id)
+                    if invite is None or invite.user_id != user_id:
+                        continue
+                    self._refresh(session, [invite], now)
+                    view = self._invite_view(invite)
+            out.append(self.describe(org, view))
+        return out
 
     def purge_closed_tokens(self, before: datetime) -> int:
         """Empty the token hash of every closed invite (expired, cancelled, declined, revoked) that closed at or before `before` (the invite purge of story P-24 calls
