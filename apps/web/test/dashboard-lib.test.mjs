@@ -81,3 +81,9 @@ test('a refused export is the ApiError of its problem body, sent with the CSRF t
   assert.equal(calls[0].init.headers['x-csrf-token'], 'csrf-3');
   assert.equal(calls[0].init.body, '{"template_id":"x"}');
 });
+
+test('story 2.3: the time warning is 15 from fifteen minutes left, 5 from five, none before, at the end or without a deadline', async () => {
+  const { timeWarning } = await import('../lib/api.ts');
+  assert.deepEqual([16 * 60, 15 * 60 + 1, 15 * 60, 14 * 60, 5 * 60 + 1, 5 * 60, 60, 1, 0, -5, null, undefined, NaN].map(timeWarning),
+    [null, null, 15, 15, 15, 5, 5, 5, null, null, null, null, null]);
+});

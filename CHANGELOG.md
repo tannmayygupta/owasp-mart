@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Time warnings (story 2.3, FR-SES-03, FR-NTF-04): the attempt page shows 15 and 5 minutes left and the recruiter's live monitor marks each running candidate, both from `deadline_at`; the engine already records each warning once (`time_warning_sent`), now pinned by a test through the lab runtime; handoff H-359 (the report timeline does not list the warnings).
 - My sessions (story 3.6, FR-ACC-04; IF-1 1.7.0, re-approved in COMPAT.md): list my sessions, sign out one, sign out everywhere (routes and an account page section); the session ref must be hex, so a `%` ref can no longer end all of a user's sessions; both endings audited.
 - Recruiter and company routes (story 5.3, FR-ORG-01, FR-ORG-02): the routes were built by P-27 and P-28; one test now runs signup, the admin's queue and approval and the owner's standing through the routes with the real company service.
 - Contract sign-off at the current versions (task P-08, PB-9; handoffs H-79, H-83, H-352): a fresh review; stream P's eight approval rows in `contracts/COMPAT.md` approved at IF-1 1.6.0, IF-3 1.0.0, IF-8 1.0.0, DB 2.1.0 (owner) and IF-2 1.2.0, IF-4 1.0.0, IF-5 1.1.0, IF-7 1.2.0 (consumer); every contract check passes; the tag still waits for Sahil's IF-6 row and Sahil's and Tanmay's checklist lines. The COMPAT.md edit is declared with a `registry change:` line in `contracts/CHANGELOG.md`.

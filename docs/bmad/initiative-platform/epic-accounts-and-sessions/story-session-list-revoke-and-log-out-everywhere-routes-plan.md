@@ -1,7 +1,7 @@
 ---
 title: "Session list, revoke and log out everywhere routes"
 ticket: 6
-status: built
+status: done
 ---
 
 # Session list, revoke and log out everywhere routes

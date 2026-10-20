@@ -292,6 +292,16 @@ export function duration(seconds: number | null | undefined): string {
   return `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m ${String(s % 60).padStart(2, '0')}s`;
 }
 
+/** The time warnings (story 2.3, FR-SES-03, FR-NTF-04), worked out from the deadline on the reader's clock: the minutes of the warning now in force, or null. The
+ * thresholds are the engine's default rules (15 and 5 minutes, placeholders); the engine records each warning once in the attempt log (`time_warning_sent`). */
+export const WARNING_MINUTES = [15, 5] as const;
+export function timeWarning(secondsLeft: number | null | undefined): number | null {
+  if (secondsLeft === null || secondsLeft === undefined || !Number.isFinite(secondsLeft) || secondsLeft <= 0) return null;
+  let due: number | null = null;
+  for (const m of WARNING_MINUTES) if (secondsLeft <= m * 60) due = m;
+  return due;
+}
+
 /** "2026-10-20T10:00:00Z" as the reader's local date and time. */
 export function when(stamp: string | null | undefined): string {
   if (!stamp) return '-';
