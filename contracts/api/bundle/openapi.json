@@ -40,6 +40,15 @@
       "name": "privacy"
     },
     {
+      "name": "invites"
+    },
+    {
+      "name": "company"
+    },
+    {
+      "name": "exports"
+    },
+    {
       "name": "admin"
     },
     {
@@ -1453,6 +1462,1295 @@
           },
           "422": {
             "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/invites/open": {
+      "post": {
+        "tags": [
+          "invites"
+        ],
+        "operationId": "openInvite",
+        "summary": "Open an invite link",
+        "description": "The candidate opened the link of an invite (story P-26 over story P-21, FR-ASM-04): no session is needed, because the candidate may have no account yet. The invite becomes `opened`\n(a link that was opened was delivered) and the answer says what the assessment is: the company, the title, the time limit, how many challenges, the hints, write-up and results\nrules (OI-14, OI-15) and the expiry. A closed invite (expired, cancelled, revoked, declined) answers its state. The answer never contains the invite's address. A link that opens\nnothing (malformed, unknown, or emptied by the invite purge) is 400 AUTH-TOKEN-INVALID, as for the email links; opening is rate limited per visitor.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What the assessment is.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteSummary"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "state": "opened",
+                      "company_name": "Acme Security Ltd",
+                      "title": "Web security screening",
+                      "expires_at": "2026-10-27T10:00:00Z",
+                      "time_limit_min": 120,
+                      "challenge_count": 3,
+                      "hints_mode": "off",
+                      "hint_cost_pct": 0,
+                      "writeup_required": false,
+                      "results_visibility": "after_submit"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/TokenInvalid"
+          },
+          "403": {
+            "$ref": "#/components/responses/OriginForbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/invites/accept": {
+      "post": {
+        "tags": [
+          "invites"
+        ],
+        "operationId": "acceptInvite",
+        "summary": "Accept an invite",
+        "description": "Binds the invite to the signed-in candidate (FR-ASM-04) and answers the `attempt_id` the consent screen is for (`getConsentNotice`, then `recordConsent`); the attempt is created\nwhen consent is granted. Repeating it for the same account answers the same attempt. A closed invite, an invite another account accepted, an account that cannot take an\nassessment (not an active, verified participant) and an account whose verified address is not the one the invite was sent to are one 409 ATT-INVALID-STATE: the answer must\nnot say what the invite's address is, and the registry has no invite codes (ADR 0058).\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invite, bound to the caller.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyInvite"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "invite_id": "i-AAAAAAAAAAAAAAAA",
+                      "attempt_id": "a-AAAAAAAAAAAAAAAA",
+                      "state": "opened",
+                      "company_name": "Acme Security Ltd",
+                      "title": "Web security screening",
+                      "expires_at": "2026-10-27T10:00:00Z",
+                      "time_limit_min": 120,
+                      "challenge_count": 3,
+                      "hints_mode": "off",
+                      "hint_cost_pct": 0,
+                      "writeup_required": false,
+                      "results_visibility": "after_submit"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/TokenInvalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "409": {
+            "$ref": "#/components/responses/InviteConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/invites": {
+      "get": {
+        "tags": [
+          "invites"
+        ],
+        "operationId": "listMyInvites",
+        "summary": "My invitations",
+        "description": "The invites bound to the caller, newest first (FR-DSH-04): the company, the title, the state, the expiry, the rules the candidate needs to see, and the attempt id. Only the\ncaller's own invites (the database policy `own_invite`); an account that accepted none gets an empty list.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitations.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyInviteList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "invite_id": "i-AAAAAAAAAAAAAAAA",
+                          "attempt_id": "a-AAAAAAAAAAAAAAAA",
+                          "state": "consented",
+                          "company_name": "Acme Security Ltd",
+                          "title": "Web security screening",
+                          "expires_at": "2026-10-27T10:00:00Z",
+                          "time_limit_min": 120,
+                          "challenge_count": 3,
+                          "hints_mode": "on",
+                          "hint_cost_pct": 10,
+                          "writeup_required": false,
+                          "results_visibility": "after_submit"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/recruiters": {
+      "post": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "signupRecruiter",
+        "summary": "Sign up as a recruiter",
+        "description": "A recruiter and a pending company (or, when a company already claims the address's domain, a request to join it), and the verification mail (story P-27 over P-18,\nFR-ORG-01). No session is needed; the answer is 202 whether the address is new or known, as for `createAccount`, and the known address gets the \"already registered\"\nmail. A disposable address, a bad name or company name, or a weak password is 422. Rate limited per visitor and per address.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecruiterSignupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/Accepted"
+          },
+          "403": {
+            "$ref": "#/components/responses/OriginForbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company": {
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "getMyCompany",
+        "summary": "My company's standing",
+        "description": "Where the calling recruiter stands (FR-ORG-02): `unverified_email`, `pending_approval`, `active`, `rejected` (with the admin's reason), `suspended`, `deleted` or `none`,\nthe company's name, whether the current data-processing terms are accepted, and whether the caller is the owner or a member. Only a recruiter's session; anyone else\nis answered 404 REQ-ROUTE-UNKNOWN.\n",
+        "responses": {
+          "200": {
+            "description": "The standing.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyStanding"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "state": "active",
+                      "company_name": "Acme Security Ltd",
+                      "reason": null,
+                      "terms_accepted": true,
+                      "role": "owner"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/reapply": {
+      "post": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "reapplyCompany",
+        "summary": "Apply again after a rejection",
+        "description": "The owner of a rejected company applies again (OI-11: at any time); the company is pending again and the earlier reason is cleared. Another state is 409\nATT-INVALID-STATE; a caller who is not the owner is 404 REQ-ROUTE-UNKNOWN. The body is empty.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/terms": {
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "getCompanyTerms",
+        "summary": "The data-processing terms to accept",
+        "description": "The terms the owner of an active company accepts before the company can invite (FR-ORG-07): the version, the text and its SHA-256. Only the owner (others 404\nREQ-ROUTE-UNKNOWN); a company that is not active is 409 ATT-INVALID-STATE.\n",
+        "responses": {
+          "200": {
+            "description": "The terms.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTerms"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "version": "dpa-2026-10",
+                      "text": "Data-processing terms between Acme Security Ltd and VulnMart ...",
+                      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "post": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "acceptCompanyTerms",
+        "summary": "Accept the data-processing terms",
+        "description": "The owner accepts the version and text they were shown (both from `getCompanyTerms`); a different text is 409 ATT-CONSENT-STALE (read them again). Accepting again is\n204. The acceptance is recorded with the company, the user, the version and the time.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TermsAcceptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/templates": {
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "listTemplates",
+        "summary": "The company's assessment templates",
+        "description": "The templates of the caller's company only (FR-ASM-01, FR-ORG-06). A company that is not active is 409 ATT-INVALID-STATE.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The templates.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                          "title": "Web security, junior",
+                          "challenge_keys": [
+                            "C01",
+                            "C02",
+                            "C05"
+                          ],
+                          "time_limit_min": 120,
+                          "hints_mode": "on",
+                          "hint_cost_pct": 10,
+                          "reset_limit": 3,
+                          "invite_expiry_days": 7,
+                          "retention_days": 180,
+                          "writeup_required": false,
+                          "results_visibility": "after_submit",
+                          "flag_submissions_per_minute": 10,
+                          "version": 1,
+                          "updated_at": "2026-10-20T09:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "post": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "createTemplate",
+        "summary": "Make an assessment template",
+        "description": "A template of the caller's company (FR-ASM-01): a title, any of the 11 challenges, and the rules (time limit 30 to 480 minutes, hints off or on with a cost of 0 to 100\npercent, resets, invite expiry, retention 30 to 365 days, write-up required or optional, when the candidate sees results, flag submissions per minute). A field left out\ntakes its default; a value outside its range, or a field that cannot be switched off, is 422.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The template.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                      "title": "Web security, junior",
+                      "challenge_keys": [
+                        "C01",
+                        "C02",
+                        "C05"
+                      ],
+                      "time_limit_min": 120,
+                      "hints_mode": "on",
+                      "hint_cost_pct": 10,
+                      "reset_limit": 3,
+                      "invite_expiry_days": 7,
+                      "retention_days": 180,
+                      "writeup_required": false,
+                      "results_visibility": "after_submit",
+                      "flag_submissions_per_minute": 10,
+                      "version": 1,
+                      "updated_at": "2026-10-20T09:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/templates/{template_id}": {
+      "parameters": [
+        {
+          "name": "template_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "getTemplate",
+        "summary": "One template",
+        "description": "A template of the caller's company; another company's is 404 ATT-NOT-FOUND.",
+        "responses": {
+          "200": {
+            "description": "The template.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                      "title": "Web security, junior",
+                      "challenge_keys": [
+                        "C01",
+                        "C02",
+                        "C05"
+                      ],
+                      "time_limit_min": 120,
+                      "hints_mode": "on",
+                      "hint_cost_pct": 10,
+                      "reset_limit": 3,
+                      "invite_expiry_days": 7,
+                      "retention_days": 180,
+                      "writeup_required": false,
+                      "results_visibility": "after_submit",
+                      "flag_submissions_per_minute": 10,
+                      "version": 1,
+                      "updated_at": "2026-10-20T09:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "put": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "updateTemplate",
+        "summary": "Replace a template",
+        "description": "Replaces every field (a field left out goes back to its default) and raises the version. Invites already sent keep the rules they were made with.",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The template.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                      "title": "Web security, junior",
+                      "challenge_keys": [
+                        "C01",
+                        "C02",
+                        "C05"
+                      ],
+                      "time_limit_min": 120,
+                      "hints_mode": "on",
+                      "hint_cost_pct": 10,
+                      "reset_limit": 3,
+                      "invite_expiry_days": 7,
+                      "retention_days": 180,
+                      "writeup_required": false,
+                      "results_visibility": "after_submit",
+                      "flag_submissions_per_minute": 10,
+                      "version": 2,
+                      "updated_at": "2026-10-20T09:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "delete": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "deleteTemplate",
+        "summary": "Delete a template",
+        "description": "A template that invites were made from is 409 ATT-INVALID-STATE.",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/invites": {
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "listCompanyInvites",
+        "summary": "The company's invites and their candidates",
+        "description": "The invites of the caller's company, newest first, with each one's state, dates and attempt id (the live monitor of FR-DSH-03 reads the attempt from the lab's reviewer\nroutes). Filters: `state`, `template_id`. Never a practice attempt or anything outside the company.\n",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "created",
+                "sent",
+                "opened",
+                "consented",
+                "started",
+                "declined",
+                "expired",
+                "cancelled",
+                "revoked"
+              ]
+            }
+          },
+          {
+            "name": "template_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invites.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyInviteList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "invite_id": "i-AAAAAAAAAAAAAAAA",
+                          "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                          "email": "candidate@example.org",
+                          "state": "sent",
+                          "attempt_id": null,
+                          "generation": 1,
+                          "superseded_by": null,
+                          "expires_at": "2026-10-27T09:00:00Z",
+                          "created_at": "2026-10-20T09:00:00Z",
+                          "sent_at": "2026-10-20T09:00:05Z",
+                          "opened_at": null,
+                          "consented_at": null,
+                          "started_at": null,
+                          "closed_at": null,
+                          "time_limit_min": 120,
+                          "hints_mode": "on",
+                          "hint_cost_pct": 10,
+                          "results_visibility": "after_submit"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "post": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "createInvites",
+        "summary": "Invite one or more candidates",
+        "description": "One address: the invite, or 409 ATT-INVALID-STATE (a live invite for it exists, or the company has not accepted the terms) or 429 REQ-RATE-LIMITED (the daily cap,\nFR-ORG-08). Several (up to 500, FR-ASM-06): 201 with what was created, what was skipped and why (`invalid`, `duplicate`, `exists`, `started`), and what was not tried\nbecause the cap ran out (`remaining`), so nothing is lost. Each invite mails its link.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "What was done.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitesResult"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "created": [
+                        {
+                          "invite_id": "i-AAAAAAAAAAAAAAAA",
+                          "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                          "email": "candidate@example.org",
+                          "state": "sent",
+                          "attempt_id": null,
+                          "generation": 1,
+                          "superseded_by": null,
+                          "expires_at": "2026-10-27T09:00:00Z",
+                          "created_at": "2026-10-20T09:00:00Z",
+                          "sent_at": "2026-10-20T09:00:05Z",
+                          "opened_at": null,
+                          "consented_at": null,
+                          "started_at": null,
+                          "closed_at": null,
+                          "time_limit_min": 120,
+                          "hints_mode": "on",
+                          "hint_cost_pct": 10,
+                          "results_visibility": "after_submit"
+                        }
+                      ],
+                      "skipped": [
+                        {
+                          "email": "not-an-address",
+                          "reason": "invalid"
+                        }
+                      ],
+                      "remaining": [],
+                      "cap": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/invites/{invite_id}/actions": {
+      "parameters": [
+        {
+          "name": "invite_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^i-[A-Z2-7]{16}$"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "company"
+        ],
+        "operationId": "actOnInvite",
+        "summary": "Resend, cancel, revoke or re-invite",
+        "description": "`resend` mails a new link (the old one stops working); `cancel` closes an invite not yet accepted; `revoke` closes one already accepted; `reinvite` makes a new invite\n(a new attempt) after a fault (FR-ASM-05). A change that does not start from the invite's state is 409 ATT-INVALID-STATE; another company's invite is 404\nATT-NOT-FOUND. Answers the invite after the change (for `reinvite`, the new one).\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invite.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyInvite"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "invite_id": "i-AAAAAAAAAAAAAAAA",
+                      "template_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                      "email": "candidate@example.org",
+                      "state": "cancelled",
+                      "attempt_id": null,
+                      "generation": 1,
+                      "superseded_by": null,
+                      "expires_at": "2026-10-27T09:00:00Z",
+                      "created_at": "2026-10-20T09:00:00Z",
+                      "sent_at": "2026-10-20T09:00:05Z",
+                      "opened_at": null,
+                      "consented_at": null,
+                      "started_at": null,
+                      "closed_at": "2026-10-20T10:00:00Z",
+                      "time_limit_min": 120,
+                      "hints_mode": "on",
+                      "hint_cost_pct": 10,
+                      "results_visibility": "after_submit"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/exports": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "exportMyData",
+        "summary": "Export my data",
+        "description": "The caller's own data as a zip of JSON and CSV (story P-29, FR-EXP-01, FR-EXP-02): the profile, the consent history, every attempt of theirs with its results,\ntimings, hints and evidence requests, the companies that viewed or exported their data, and their deletion requests. No other person's data and no flag value\n(anything shaped like a flag in a captured request is replaced by `VM{redacted}`). Every export writes an audit entry (FR-EXP-04). The body is empty. Rate\nlimited per account.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The zip (JSON and CSV files).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Disposition": {
+                "description": "attachment; filename=\"...\"",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "examples": {
+                  "default": {
+                    "value": "(the bytes of a zip file)"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/company/exports": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "exportCompanyResults",
+        "summary": "Export one assessment's results",
+        "description": "The results of one template of the caller's company as a zip of CSV and JSON (story P-29, FR-EXP-03; OI-27 answered by the developer on 2026-10-20: scores as\nCSV and JSON, no evidence): per candidate the invite and attempt state, the score of 1000, the times, the hints used, the open integrity flags and the points per\nchallenge. Every export writes an audit entry (FR-EXP-04) and an `exported` entry in each candidate's view history (FR-PRV-11). Only a recruiter (others 404\nREQ-ROUTE-UNKNOWN); another company's template is 404 ATT-NOT-FOUND; a company that is not active is 409 ATT-INVALID-STATE.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The zip (JSON and CSV files).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Disposition": {
+                "description": "attachment; filename=\"...\"",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "examples": {
+                  "default": {
+                    "value": "(the bytes of a zip file)"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/CompanyNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/CompanyConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         },
         "x-fragment": "platform"
@@ -4368,6 +5666,779 @@
           }
         }
       },
+      "InviteTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The token of the invite link (the company prefix and the secret); never logged."
+          }
+        }
+      },
+      "InviteSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "company_name",
+          "title",
+          "expires_at",
+          "time_limit_min",
+          "challenge_count",
+          "hints_mode",
+          "hint_cost_pct",
+          "writeup_required",
+          "results_visibility"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "created",
+              "sent",
+              "opened",
+              "consented",
+              "started",
+              "declined",
+              "expired",
+              "cancelled",
+              "revoked"
+            ]
+          },
+          "company_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "time_limit_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "challenge_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11
+          },
+          "hints_mode": {
+            "enum": [
+              "off",
+              "on"
+            ]
+          },
+          "hint_cost_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "writeup_required": {
+            "type": "boolean"
+          },
+          "results_visibility": {
+            "enum": [
+              "after_submit",
+              "after_release"
+            ]
+          }
+        }
+      },
+      "MyInvite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "invite_id",
+          "attempt_id",
+          "state",
+          "company_name",
+          "title",
+          "expires_at",
+          "time_limit_min",
+          "challenge_count",
+          "hints_mode",
+          "hint_cost_pct",
+          "writeup_required",
+          "results_visibility"
+        ],
+        "properties": {
+          "invite_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "attempt_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AttemptId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "created",
+              "sent",
+              "opened",
+              "consented",
+              "started",
+              "declined",
+              "expired",
+              "cancelled",
+              "revoked"
+            ]
+          },
+          "company_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "time_limit_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "challenge_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11
+          },
+          "hints_mode": {
+            "enum": [
+              "off",
+              "on"
+            ]
+          },
+          "hint_cost_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "writeup_required": {
+            "type": "boolean"
+          },
+          "results_visibility": {
+            "enum": [
+              "after_submit",
+              "after_release"
+            ]
+          }
+        }
+      },
+      "MyInviteList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/MyInvite"
+            }
+          }
+        }
+      },
+      "RecruiterSignupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "password",
+          "display_name",
+          "company_name"
+        ],
+        "properties": {
+          "email": {
+            "$ref": "#/components/schemas/Email"
+          },
+          "password": {
+            "$ref": "#/components/schemas/Password"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "captcha_token": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      },
+      "CompanyStanding": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "company_name",
+          "reason",
+          "terms_accepted",
+          "role"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "none",
+              "unverified_email",
+              "pending_approval",
+              "active",
+              "rejected",
+              "suspended",
+              "deleted"
+            ]
+          },
+          "company_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "terms_accepted": {
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "member",
+              null
+            ]
+          }
+        }
+      },
+      "CompanyTerms": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "text",
+          "sha256"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "TermsAcceptRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "sha256"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "TemplateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "challenge_keys"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "challenge_keys": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 11,
+            "items": {
+              "$ref": "#/components/schemas/ChallengeKey"
+            }
+          },
+          "time_limit_min": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 480
+          },
+          "hints_mode": {
+            "enum": [
+              "off",
+              "on"
+            ]
+          },
+          "hint_cost_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "reset_limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "invite_expiry_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "retention_days": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 365
+          },
+          "writeup_required": {
+            "type": "boolean"
+          },
+          "results_visibility": {
+            "enum": [
+              "after_submit",
+              "after_release"
+            ]
+          },
+          "flag_submissions_per_minute": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          }
+        }
+      },
+      "Template": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template_id",
+          "title",
+          "challenge_keys",
+          "time_limit_min",
+          "hints_mode",
+          "hint_cost_pct",
+          "reset_limit",
+          "invite_expiry_days",
+          "retention_days",
+          "writeup_required",
+          "results_visibility",
+          "flag_submissions_per_minute",
+          "version",
+          "updated_at"
+        ],
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "challenge_keys": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 11,
+            "items": {
+              "$ref": "#/components/schemas/ChallengeKey"
+            }
+          },
+          "time_limit_min": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 480
+          },
+          "hints_mode": {
+            "enum": [
+              "off",
+              "on"
+            ]
+          },
+          "hint_cost_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "reset_limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "invite_expiry_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "retention_days": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 365
+          },
+          "writeup_required": {
+            "type": "boolean"
+          },
+          "results_visibility": {
+            "enum": [
+              "after_submit",
+              "after_release"
+            ]
+          },
+          "flag_submissions_per_minute": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "TemplateList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/Template"
+            }
+          }
+        }
+      },
+      "InvitesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template_id",
+          "emails"
+        ],
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "emails": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "maxLength": 254
+            }
+          }
+        }
+      },
+      "InviteActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "resend",
+              "cancel",
+              "revoke",
+              "reinvite"
+            ]
+          }
+        }
+      },
+      "CompanyInvite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "invite_id",
+          "template_id",
+          "email",
+          "state",
+          "attempt_id",
+          "generation",
+          "superseded_by",
+          "expires_at",
+          "created_at",
+          "sent_at",
+          "opened_at",
+          "consented_at",
+          "started_at",
+          "closed_at",
+          "time_limit_min",
+          "hints_mode",
+          "hint_cost_pct",
+          "results_visibility"
+        ],
+        "properties": {
+          "invite_id": {
+            "type": "string",
+            "pattern": "^i-[A-Z2-7]{16}$"
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "state": {
+            "enum": [
+              "created",
+              "sent",
+              "opened",
+              "consented",
+              "started",
+              "declined",
+              "expired",
+              "cancelled",
+              "revoked"
+            ]
+          },
+          "attempt_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AttemptId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "superseded_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "sent_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "opened_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consented_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "closed_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time_limit_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "hints_mode": {
+            "enum": [
+              "off",
+              "on"
+            ]
+          },
+          "hint_cost_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "results_visibility": {
+            "enum": [
+              "after_submit",
+              "after_release"
+            ]
+          }
+        }
+      },
+      "CompanyInviteList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/CompanyInvite"
+            }
+          }
+        }
+      },
+      "InvitesResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "created",
+          "skipped",
+          "remaining",
+          "cap"
+        ],
+        "properties": {
+          "created": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/CompanyInvite"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "email",
+                "reason"
+              ],
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "maxLength": 254
+                },
+                "reason": {
+                  "enum": [
+                    "invalid",
+                    "duplicate",
+                    "exists",
+                    "started"
+                  ]
+                }
+              }
+            }
+          },
+          "remaining": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "maxLength": 254
+            }
+          },
+          "cap": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "CompanyExportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "template_id"
+        ],
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "PendingCompany": {
         "type": "object",
         "additionalProperties": false,
@@ -6612,6 +8683,84 @@
                 }
               },
               "invalid_state": {
+                "value": {
+                  "type": "urn:vulnmart:error:ATT-INVALID-STATE",
+                  "title": "This action is not allowed in the attempt's current state.",
+                  "status": 409,
+                  "code": "ATT-INVALID-STATE",
+                  "request_id": "req-0a1b2c3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InviteConflict": {
+        "description": "The invite is closed or taken, or this account cannot accept it (not an active, verified participant, or not the address the invite was sent to) (ATT-INVALID-STATE).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "examples": {
+              "default": {
+                "value": {
+                  "type": "urn:vulnmart:error:ATT-INVALID-STATE",
+                  "title": "This action is not allowed in the attempt's current state.",
+                  "status": 409,
+                  "code": "ATT-INVALID-STATE",
+                  "request_id": "req-0a1b2c3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CompanyNotFound": {
+        "description": "Not found: a template or invite of another company or none at all (ATT-NOT-FOUND), or the caller is not a recruiter, or not the owner where the owner is needed (REQ-ROUTE-UNKNOWN, the answer of a route that does not exist).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "examples": {
+              "default": {
+                "value": {
+                  "type": "urn:vulnmart:error:ATT-NOT-FOUND",
+                  "title": "Attempt not found.",
+                  "status": 404,
+                  "code": "ATT-NOT-FOUND",
+                  "request_id": "req-0a1b2c3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CompanyConflict": {
+        "description": "The company is not active, the terms are not accepted, the invite or template is in a state this change does not start from (ATT-INVALID-STATE), or the terms text changed (ATT-CONSENT-STALE).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "examples": {
+              "default": {
                 "value": {
                   "type": "urn:vulnmart:error:ATT-INVALID-STATE",
                   "title": "This action is not allowed in the attempt's current state.",

@@ -37,6 +37,7 @@ from vulnmart.kernel.service import NO_STORE, Check, create_service_app, run_che
 from vulnmart.kernel.services import build_ports
 from vulnmart.kernel.settings import Settings, get_settings
 from vulnmart.assessments.accept import InviteAcceptance, InviteConsentTargets
+from vulnmart.assessments.invite_api import router as invite_router
 from vulnmart.lab.runtime import LabRuntime
 from vulnmart.live.api import router as live_router
 from vulnmart.live.authorise import StreamAuthoriser
@@ -45,10 +46,12 @@ from vulnmart.live.snapshot import EmptySnapshot, LabSnapshotSource, SnapshotSou
 from vulnmart.live.store import StreamReader, ValkeyStreamStore
 from vulnmart.lab.tickets import TicketMinter, minter_from_environ
 from vulnmart.assessments.service import AssessmentService
+from vulnmart.orgs.company_api import router as company_router
 from vulnmart.orgs.service import CompanyService
 from vulnmart.ports.attempts import AttemptPort
 from vulnmart.privacy.api import router as consent_router
 from vulnmart.privacy.deletion_api import router as deletion_router
+from vulnmart.privacy.export_api import router as export_router
 from vulnmart.admin.api import router as admin_router
 from vulnmart.kernel.quota import DbQuotaPort
 from vulnmart.privacy.consent import ConsentService
@@ -274,6 +277,14 @@ def create_app(
                                               eraser=lab.erase if lab is not None else None, anchors=app.state.audit_anchors,
                                               streams=store if isinstance(store, ValkeyStreamStore) else None, public_origin=settings.public_origin,
                                               deletion=app.state.deletion_service)
+    # The exports (story P-29): a person's own data and a company's results of one template, as zips; the lab's results are read from this process's lab runtime.
+    app.state.export_service = None
+    if ports.sessions is not None and app.state.assessments is not None:
+        from vulnmart.privacy.exports import ExportService
+
+        app.state.export_service = ExportService(sessions=ports.sessions, audit=ports.audit, consent=app.state.consent_service, views=app.state.view_history,
+                                                 deletion=getattr(app.state, "deletion_service", None), assessments=app.state.assessments,
+                                                 companies=app.state.companies, lab=lambda: getattr(app.state, "lab", None))
     # The admin's operations (story P-28): the queue, users, force-stop, settings, quotas, capacity and the scheduler's runs, behind admin-only routes. They need the database,
     # the company and role services and the quota table; a lab in this process gives force-stop and the capacity view (without one force-stop answers 500 and capacity shows no hosts).
     app.state.admin_ops = None
@@ -302,6 +313,9 @@ def create_app(
     app.include_router(mfa_router)
     app.include_router(consent_router)
     app.include_router(deletion_router)
+    app.include_router(invite_router)
+    app.include_router(company_router)
+    app.include_router(export_router)
     app.include_router(live_router)
 
     # The route is public and unauthenticated: its answer is reused for a short time, so a burst of anonymous calls costs

@@ -1,5 +1,93 @@
 /* Site-wide styles. A stylesheet, not inline styles: the Content-Security-Policy allows no inline style in production. */
+:root {
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --ink: #1d1d22;
+  --muted: #62626b;
+  --line: #dcdce2;
+  --accent: #2d5bd7;
+  --ok: #17803d;
+  --warn: #9a6400;
+  --bad: #b3261e;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15161a;
+    --card: #1e2026;
+    --ink: #ececf1;
+    --muted: #a3a3ad;
+    --line: #34363f;
+    --accent: #7ea2ff;
+    --ok: #5cc98a;
+    --warn: #e0b04f;
+    --bad: #ff8a80;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
 body {
   font-family: system-ui, sans-serif;
-  margin: 2rem;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.45;
 }
+main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+a { color: var(--accent); }
+h1 { font-size: 1.6rem; margin: 0 0 1rem; }
+h2 { font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+h3 { font-size: 1rem; margin: 1rem 0 0.5rem; }
+
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); background: var(--card); flex-wrap: wrap; }
+.nav nav { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.brand { font-weight: 700; text-decoration: none; color: var(--ink); }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.25rem; margin: 0 0 1rem; }
+.narrow { max-width: 28rem; }
+.muted { color: var(--muted); }
+.row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.stack > * + * { margin-top: 0.75rem; }
+
+form label { display: block; font-weight: 600; margin: 0.5rem 0 0.25rem; }
+input[type="text"], input[type="email"], input[type="password"], input:not([type]) {
+  width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit;
+}
+.check { display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 400; }
+.check input { margin-top: 0.3rem; }
+
+button { font: inherit; padding: 0.45rem 0.9rem; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+button.ghost { background: transparent; color: var(--accent); }
+button.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.banner { padding: 0.6rem 0.8rem; border-radius: 6px; margin: 0 0 1rem; border: 1px solid var(--line); }
+.banner.ok { border-color: var(--ok); color: var(--ok); }
+.banner.bad { border-color: var(--bad); color: var(--bad); }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.45rem 0.4rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+
+.pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.8rem; border: 1px solid var(--line); white-space: nowrap; }
+.pill.ok { border-color: var(--ok); color: var(--ok); }
+.pill.warn { border-color: var(--warn); color: var(--warn); }
+.pill.bad { border-color: var(--bad); color: var(--bad); }
+.stars { color: var(--warn); letter-spacing: 0.1rem; white-space: nowrap; }
+.tag { font-size: 0.8rem; color: var(--muted); display: block; }
+
+.hint, .writeup { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 0.7rem; margin-top: 0.4rem; white-space: pre-wrap; }
+.notice { white-space: pre-wrap; max-height: 22rem; overflow-y: auto; }
+.code-list { font-family: ui-monospace, monospace; columns: 2; }
+.flag-input { max-width: 16rem; }
+dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0; }
+dl.facts dt { color: var(--muted); }
+dl.facts dd { margin: 0; }
+select, textarea { width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+.row select, .row input { width: auto; flex: 1 1 10rem; }
+fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0.75rem 0; padding: 0.5rem 0.75rem; }
+legend { font-weight: 600; padding: 0 0.25rem; }
+pre.writeup { overflow-x: auto; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+code { font-family: ui-monospace, monospace; font-size: 0.9em; }

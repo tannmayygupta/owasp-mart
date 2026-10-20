@@ -3,7 +3,7 @@ title: 'Company members, admin controls, data scoping, terms and invite caps'
 type: 'feature'
 ticket: '2'
 created: '2026-10-18'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

@@ -2,6 +2,7 @@
 
 from enum import Enum
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 
@@ -414,6 +415,287 @@ class DataViewList(BaseModel):
     has_more: bool
 
 
+class InviteTokenRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    token: Annotated[
+        str,
+        Field(
+            description='The token of the invite link (the company prefix and the secret); never logged.',
+            max_length=200,
+            min_length=1,
+        ),
+    ]
+
+
+class State(Enum):
+    created = 'created'
+    sent = 'sent'
+    opened = 'opened'
+    consented = 'consented'
+    started = 'started'
+    declined = 'declined'
+    expired = 'expired'
+    cancelled = 'cancelled'
+    revoked = 'revoked'
+
+
+class HintsMode(Enum):
+    off = 'off'
+    on = 'on'
+
+
+class ResultsVisibility(Enum):
+    after_submit = 'after_submit'
+    after_release = 'after_release'
+
+
+class InviteSummary(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    state: State
+    company_name: Annotated[str, Field(max_length=200)]
+    title: Annotated[str, Field(max_length=200)]
+    expires_at: Timestamp
+    time_limit_min: Annotated[int | None, Field(ge=1)]
+    challenge_count: Annotated[int, Field(ge=0, le=11)]
+    hints_mode: HintsMode
+    hint_cost_pct: Annotated[int, Field(ge=0, le=100)]
+    writeup_required: bool
+    results_visibility: ResultsVisibility
+
+
+class MyInvite(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invite_id: Annotated[str, Field(max_length=64)]
+    attempt_id: AttemptId | None
+    state: State
+    company_name: Annotated[str, Field(max_length=200)]
+    title: Annotated[str, Field(max_length=200)]
+    expires_at: Timestamp
+    time_limit_min: Annotated[int | None, Field(ge=1)]
+    challenge_count: Annotated[int, Field(ge=0, le=11)]
+    hints_mode: HintsMode
+    hint_cost_pct: Annotated[int, Field(ge=0, le=100)]
+    writeup_required: bool
+    results_visibility: ResultsVisibility
+
+
+class MyInviteList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[MyInvite], Field(max_length=100)]
+
+
+class RecruiterSignupRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    email: Email
+    password: Password
+    display_name: Annotated[str, Field(max_length=60, min_length=1)]
+    company_name: Annotated[str, Field(max_length=120, min_length=1)]
+    captcha_token: Annotated[str | None, Field(max_length=2048)] = None
+
+
+class State2(Enum):
+    none = 'none'
+    unverified_email = 'unverified_email'
+    pending_approval = 'pending_approval'
+    active = 'active'
+    rejected = 'rejected'
+    suspended = 'suspended'
+    deleted = 'deleted'
+
+
+class Role(Enum):
+    owner = 'owner'
+    member = 'member'
+    NoneType_None = None
+
+
+class CompanyStanding(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    state: State2
+    company_name: Annotated[str | None, Field(max_length=120)]
+    reason: Annotated[str | None, Field(max_length=500)]
+    terms_accepted: bool
+    role: Role
+
+
+class CompanyTerms(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    version: Annotated[str, Field(max_length=40)]
+    text: Annotated[str, Field(max_length=20000)]
+    sha256: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+
+
+class TermsAcceptRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    version: Annotated[str, Field(max_length=40, min_length=1)]
+    sha256: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+
+
+class TemplateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    challenge_keys: Annotated[list[ChallengeKey], Field(max_length=11, min_length=1)]
+    time_limit_min: Annotated[int | None, Field(ge=30, le=480)] = None
+    hints_mode: HintsMode | None = None
+    hint_cost_pct: Annotated[int | None, Field(ge=0, le=100)] = None
+    reset_limit: Annotated[int | None, Field(ge=0, le=10)] = None
+    invite_expiry_days: Annotated[int | None, Field(ge=1, le=30)] = None
+    retention_days: Annotated[int | None, Field(ge=30, le=365)] = None
+    writeup_required: bool | None = None
+    results_visibility: ResultsVisibility | None = None
+    flag_submissions_per_minute: Annotated[int | None, Field(ge=1, le=60)] = None
+
+
+class Template(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    template_id: UUID
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    challenge_keys: Annotated[list[ChallengeKey], Field(max_length=11, min_length=1)]
+    time_limit_min: Annotated[int, Field(ge=30, le=480)]
+    hints_mode: HintsMode
+    hint_cost_pct: Annotated[int, Field(ge=0, le=100)]
+    reset_limit: Annotated[int, Field(ge=0, le=10)]
+    invite_expiry_days: Annotated[int, Field(ge=1, le=30)]
+    retention_days: Annotated[int, Field(ge=30, le=365)]
+    writeup_required: bool
+    results_visibility: ResultsVisibility
+    flag_submissions_per_minute: Annotated[int, Field(ge=1, le=60)]
+    version: Annotated[int, Field(ge=1)]
+    updated_at: Timestamp
+
+
+class TemplateList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[Template], Field(max_length=100)]
+
+
+class Email1(RootModel[str]):
+    root: Annotated[str, Field(max_length=254)]
+
+
+class InvitesRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    template_id: UUID
+    emails: Annotated[list[Email1], Field(max_length=500, min_length=1)]
+
+
+class Action1(Enum):
+    resend = 'resend'
+    cancel = 'cancel'
+    revoke = 'revoke'
+    reinvite = 'reinvite'
+
+
+class InviteActionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    action: Action1
+
+
+class State3(Enum):
+    created = 'created'
+    sent = 'sent'
+    opened = 'opened'
+    consented = 'consented'
+    started = 'started'
+    declined = 'declined'
+    expired = 'expired'
+    cancelled = 'cancelled'
+    revoked = 'revoked'
+
+
+class CompanyInvite(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invite_id: Annotated[str, Field(pattern='^i-[A-Z2-7]{16}$')]
+    template_id: UUID
+    email: Annotated[str, Field(max_length=254)]
+    state: State3
+    attempt_id: AttemptId | None
+    generation: Annotated[int, Field(ge=1)]
+    superseded_by: Annotated[str | None, Field(max_length=64)]
+    expires_at: Timestamp
+    created_at: Timestamp
+    sent_at: Timestamp | None
+    opened_at: Timestamp | None
+    consented_at: Timestamp | None
+    started_at: Timestamp | None
+    closed_at: Timestamp | None
+    time_limit_min: Annotated[int | None, Field(ge=1)]
+    hints_mode: HintsMode
+    hint_cost_pct: Annotated[int, Field(ge=0, le=100)]
+    results_visibility: ResultsVisibility
+
+
+class CompanyInviteList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[CompanyInvite], Field(max_length=100)]
+
+
+class Reason(Enum):
+    invalid = 'invalid'
+    duplicate = 'duplicate'
+    exists = 'exists'
+    started = 'started'
+
+
+class SkippedItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    email: Annotated[str, Field(max_length=254)]
+    reason: Reason
+
+
+class RemainingItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=254)]
+
+
+class InvitesResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    created: Annotated[list[CompanyInvite], Field(max_length=500)]
+    skipped: Annotated[list[SkippedItem], Field(max_length=500)]
+    remaining: Annotated[list[RemainingItem], Field(max_length=500)]
+    cap: Annotated[int | None, Field(ge=0)]
+
+
+class CompanyExportRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    template_id: UUID
+
+
 class PendingCompany(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -457,7 +739,7 @@ class Status2(Enum):
     disabled = 'disabled'
 
 
-class Role(Enum):
+class Role1(Enum):
     learner = 'learner'
     candidate = 'candidate'
 
@@ -471,7 +753,7 @@ class AdminUser(BaseModel):
     email: Annotated[str, Field(max_length=254)]
     account_type: AccountType
     status: Status2
-    roles: list[Role]
+    roles: list[Role1]
     email_verified: bool
     created_at: Timestamp
     last_login_at: Timestamp | None
@@ -484,7 +766,7 @@ class AdminUserList(BaseModel):
     items: Annotated[list[AdminUser], Field(max_length=100)]
 
 
-class Action1(Enum):
+class Action2(Enum):
     lock = 'lock'
     unlock = 'unlock'
     reset_password = 'reset_password'
@@ -495,7 +777,7 @@ class UserActionRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    action: Action1
+    action: Action2
     reason: Annotated[str | None, Field(max_length=500, min_length=1)] = None
 
 
@@ -716,7 +998,7 @@ class Mode(Enum):
     candidate = 'candidate'
 
 
-class State(Enum):
+class State4(Enum):
     invited = 'invited'
     consent = 'consent'
     ready = 'ready'
@@ -736,7 +1018,7 @@ class AttemptSummary(BaseModel):
     attempt_id: AttemptId
     mode: Mode
     state: Annotated[
-        State,
+        State4,
         Field(
             description='The ten attempt states of the architecture (04 section 10.1); the same as IF-2 and IF-3.'
         ),
@@ -754,7 +1036,7 @@ class AttemptSummaryList(BaseModel):
     has_more: bool
 
 
-class State1(Enum):
+class State5(Enum):
     requested = 'requested'
     provisioning = 'provisioning'
     starting = 'starting'
@@ -797,7 +1079,7 @@ class InstanceSummary(BaseModel):
     instance_id: InstanceId
     attempt_id: AttemptId
     state: Annotated[
-        State1,
+        State5,
         Field(
             description='The ten instance states of IF-5 (identical in IF-2 and IF-3).'
         ),
@@ -971,7 +1253,7 @@ class Instance(BaseModel):
     )
     instance_id: InstanceId
     attempt_id: AttemptId
-    state: State1
+    state: State5
     access: Access
     health: Health
     epoch: Annotated[int, Field(ge=1)]

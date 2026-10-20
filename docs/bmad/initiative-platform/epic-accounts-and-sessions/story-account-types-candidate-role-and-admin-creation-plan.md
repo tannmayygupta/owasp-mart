@@ -3,7 +3,7 @@ title: 'Account types, candidate role and admin creation'
 type: 'feature'
 ticket: '3'
 created: '2026-10-17'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'medium'

@@ -109,7 +109,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-09. Outbox, queue worker and email provider**
   - Epic: `epic-notifications-and-email`
-  - BMAD story: planned, ref `2.1` in `epic-notifications-and-email` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `2.1` in `epic-notifications-and-email` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Transactional outbox, Dramatiq worker with retries, and the email provider adapter.
   - Covers: FR-NTF-02, 03
   - Waits on: P-06. Open: which provider, Resend or Brevo (OI-32).
@@ -117,7 +117,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-10. Email templates and in-app warnings**  (email templates built; the in-app warnings part, FR-NTF-04, was moved to story 2.3 because it needs the live hub and the dashboards: NOT built here)
   - Epic: `epic-notifications-and-email`
-  - BMAD story: planned, refs `2.2` (email templates, state `built`, awaiting the developer's confirmation) and `2.3` (in-app warnings, planned, blocked until P-22 to P-26) in `epic-notifications-and-email`
+  - BMAD story: planned, refs `2.2` (email templates, state `done`, confirmed by the developer 2026-10-20) and `2.3` (in-app warnings, planned, blocked until P-22 to P-26) in `epic-notifications-and-email`
   - Build: Templates for every email type and in-app warnings.
   - Covers: FR-NTF-01, 04
   - Waits on: P-09.
@@ -126,7 +126,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-11. Learner signup, email verification and signup abuse protection**
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: planned, ref `3.1` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `3.1` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Learner signup with Argon2id passwords, email verification and rate limits against abuse.
   - Covers: FR-ACC-01, 02, 10
   - Waits on: P-10. Open: CAPTCHA choice.
@@ -135,7 +135,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-12. Login, sessions, timeouts and CSRF**  (the user's own session list and "log out everywhere" exist as tested service functions; their routes need a contract change and moved to story 3.6)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: planned, ref `3.2` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done; the routes of FR-ACC-04's session list are story `3.6`
+  - BMAD story: planned, ref `3.2` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20); the routes of FR-ACC-04's session list are story `3.6`
   - Build: Session cookies, idle and absolute timeouts, logout, CSRF protection and the cookie rules of NFR-SEC-03.
   - Covers: FR-ACC-03, 04
   - Waits on: P-11.
@@ -144,7 +144,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-13. Account types, candidate role and admin creation**  (service level: no HTTP route for role changes or admin creation yet, they come with the admin area P-28 and the invite routes P-21)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: planned, ref `3.3` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `3.3` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Separate account types, the candidate role on the same login, and admin account creation.
   - Covers: FR-ACC-05, 06, 11
   - Waits on: P-12.
@@ -153,7 +153,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-14. Password reset, password quality and account self-service**  (API level: the forgot-password, reset and account pages are dashboards work)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: planned, ref `3.4` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `3.4` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Password reset by email, password quality rules, and self-service account management.
   - Covers: FR-ACC-08, 09
   - Waits on: P-10, P-12.
@@ -162,7 +162,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-15. Multi-factor login**  (API level: no enrolment or sign-in page, those are dashboards work; OI-13 stays open)
   - Epic: `epic-accounts-and-sessions`
-  - BMAD story: planned, ref `3.5` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `3.5` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Multi-factor login as the requirement specifies.
   - Covers: FR-ACC-07
   - Waits on: P-12.
@@ -171,7 +171,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
 
 - [x] **P-16. Consent screen, consent record, minimum data and 18-and-over**  (API level: the notice text and the three routes; no consent page, and no attempt in state consent exists until P-21; OI-37 answered, wording is a draft until legal review OI-33)
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: planned, ref `4.1` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `4.1` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Consent screen, stored consent record, collect only the minimum data, 18-and-over check.
   - Covers: FR-PRV-01, 02, 03, 13
   - Waits on: P-12. Open in part: OI-37.
@@ -184,7 +184,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-17. Audit log and key service**  (the mechanism and the entries that exist today: logins, failed logins, logouts, roles, admins, second factor, consent; every other sensitive action writes its entry in the story that creates it; OI-28 answered, anchor schedule and purge are P-24, snapshot and anchor shipping are operator steps)
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: planned, ref `4.2` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `4.2` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Append-only audit log, encryption at rest and the key service with a KeyPort.
   - Covers: FR-PRV-10, 12
   - Waits on: P-12. Open in part: OI-28. Tanmay's flag and evidence tasks use your KeyPort.
@@ -193,7 +193,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-18. Recruiter signup and company approval**  (service level: IF-1 has no recruiter or admin route, they are story 5.3 and a contract change; OI-10 and OI-11 answered: free webmail allowed, re-apply any time)
   - Epic: `epic-companies-and-approval`
-  - BMAD story: planned, ref `5.1` in `epic-companies-and-approval` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `5.1` in `epic-companies-and-approval` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Recruiter signup, the company state machine from signup to active, rejected and suspended, and the approve and reject API.
   - Covers: FR-ORG-01, 02, 04
   - Waits on: P-13, P-17. Open: free-email recruiters (OI-10).
@@ -202,7 +202,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-19. Company members, admin controls, data scoping, terms and invite caps**  (service level, no routes (story 5.3); the cap is a decision function that P-20 applies when it counts the invites; assessments, invites and candidates do not exist yet, so the cross-company test over them comes with P-20 and P-21)
   - Epic: `epic-companies-and-approval`
-  - BMAD story: planned, ref `5.2` in `epic-companies-and-approval` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `5.2` in `epic-companies-and-approval` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Colleagues join through the owner, admin controls over companies, company scoping of data, data-processing terms, invite caps.
   - Covers: FR-ORG-03, 05, 06, 07, 08
   - Waits on: P-18.
@@ -211,7 +211,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-20. Assessment template, creating and sending invites, invite lifecycle**  (service level, no routes (story 5.3); the invite mail arrives on the local stack at an address with no account; OI-14 and OI-15 answered: template settings)
   - Epic: `epic-assessments-and-invites`
-  - BMAD story: planned, ref `6.1` in `epic-assessments-and-invites` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `6.1` in `epic-assessments-and-invites` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Assessment template, create and send invites by email, invite lifecycle states.
   - Covers: FR-ASM-01, 02, 03
   - Waits on: P-10, P-19.
@@ -220,7 +220,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-21. Accepting invites, re-invite after a fault and bulk invites**  (service level, no routes (story 5.3); `create_app` takes the lab runtime's attempt port when the lab runs in the same process (tests give an engine port); the first way of FR-ASM-04: a different verified address cannot use the link)
   - Epic: `epic-assessments-and-invites`
-  - BMAD story: planned, ref `6.2` in `epic-assessments-and-invites` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `6.2` in `epic-assessments-and-invites` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: A candidate accepts an invite with consent, a re-invite after a fault, and bulk invite handling.
   - Covers: FR-ASM-04, 05, 06
   - Waits on: P-16, P-20.
@@ -229,7 +229,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-22. Live updates hub: SSE, heartbeat, snapshot with polling fallback, fan-out**  (server side: nothing in the lab publishes events yet (H-142), the browser client and polling are the dashboards', HTTP/2 and the per-role tests are P-23; proven on the local stack through the web origin, not through Vercel (S-14))
   - Epic: `epic-live-updates`
-  - BMAD story: planned, ref `7.1` in `epic-live-updates` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `7.1` in `epic-live-updates` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Server-sent events with heartbeat and no buffering, a snapshot plus polling fallback, and the fan-out path from events to streams.
   - Covers: FR-LIV-01, 02, 04, 06
   - Waits on: P-06, P-12. Tanmay's L-11 proves SSE through Vercel (S-14).
@@ -237,7 +237,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-23. Stream authorisation and HTTP/2**  (the stream is authorised from the session and the company's standing and re-checked while open; HTTP/2 proven locally through the real Caddy image, not through Vercel (S-14); the stream and snapshot no longer extend an idle session)
   - Epic: `epic-live-updates`
-  - BMAD story: planned, ref `7.2` in `epic-live-updates` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `7.2` in `epic-live-updates` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Authorise every stream per user and company; HTTP/2 as far as the spike allows.
   - Covers: FR-LIV-03, 05
   - Waits on: P-19, P-22.
@@ -245,7 +245,7 @@ Goal: Audit and keys, companies, assessments and invites, live updates, retentio
 
 - [x] **P-24. Retention scheduler, retention rules and log rules**  (service level: no admin route, the status data exists (`Scheduler.status`); the lab erases attempts through `LabRuntime.erase`; raw container logs are the lab's; the periods are the requirements' numbers, not legally reviewed (OI-33))
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: planned, ref `4.3` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `4.3` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Retention and auto-delete jobs for candidates and learners, evidence data rules, controller and processor roles, IP and browser details, system logs, synthetic data only.
   - Covers: FR-PRV-04, 05, 06, 07, 14, 15, 16, 17, 18
   - Waits on: P-17, P-21.
@@ -257,24 +257,24 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [x] **P-25. Deletion workflow, 7-day undo and "who viewed me"**  (service level plus person routes: the company's decision and direct deletion have no routes until story 5.3; no email to the parties (OI-12); the view history stays empty until the dashboard and the exports call `ViewHistory.record`; the periods are not legally reviewed (OI-33))
   - Epic: `epic-privacy-audit-and-keys`
-  - BMAD story: planned, ref `4.4` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `4.4` in `epic-privacy-audit-and-keys` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Account deletion request and workflow with a seven-day undo window, and the candidate view of who viewed their data.
   - Covers: FR-PRV-08, 09, 11
   - Waits on: P-17, P-24 and Tanmay's purge call (AttemptPort).
   - Done when: A deletion request completes after seven days, can be undone before, and a candidate sees who viewed.
 
-- [ ] **P-26. Learner and candidate dashboards with hints**
+- [x] **P-26. Learner and candidate dashboards with hints**  (export is P-29; `after_release` results hidden in the page only until stream L adds the server rule (H-355); the write-up is Tanmay's IF-2 1.2.0 field, practice attempts only; not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.1` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20, merged in pull request 58)
   - Build: The learner and candidate dashboards, learner hints, candidate hints off by default.
   - Covers: FR-DSH-01, 04, FR-HNT-01, 02
   - Waits on: P-22, Tanmay's scoring (L-23) and the catalogue (T-30). Open in part: OI-15.
   - Done when: Both dashboards show live data on the deployed site and candidate hints are off by default.
   - Handoffs: H-134, H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-27. Recruiter dashboard, live monitor and hints used**
+- [x] **P-27. Recruiter dashboard, live monitor and hints used**  (the recruiter routes added by P-27; report views recorded by the lab in the attempt log and view history, not the platform audit log (ADR 0059); no release action (H-355); no member routes (story 5.3); not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.2` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: The recruiter dashboard, the live monitor of running attempts and the hints-used view.
   - Covers: FR-DSH-02, 03, FR-HNT-03
   - Waits on: P-19, P-22.
@@ -282,16 +282,16 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [x] **P-28. Admin operations: queue, users, force-stop, settings, quotas, capacity**  (force-stop needs a lab in the API process, so it is tested with a stand-in, not on the Compose stack; quota and cap numbers are placeholders (OI-21); no admin dashboard pages (P-30))
   - Epic: `epic-admin-and-operations`
-  - BMAD story: planned, ref `1` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
+  - BMAD story: planned, ref `1` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Approval queue screen, user management, force-stop, settings and quotas (provides SettingsPort and QuotaPort to Tanmay), capacity view.
   - Covers: FR-ADM-01, 02, 04, 05, 06
   - Waits on: P-18 and Tanmay's L-16 (InstancePort, capacity).
   - Done when: An admin approves a company, force-stops an instance and changes a quota that the lab then enforces.
   - Handoffs: H-15, H-122, H-128, H-133 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-29. Data exports**
+- [x] **P-29. Data exports**  (OI-27 answered: scores as CSV and JSON, no evidence; the export reads the lab runtime in the API process (ADR 0060); the rate limit is a placeholder; not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.3` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20)
   - Build: Candidate, learner and recruiter exports, each audited.
   - Covers: FR-EXP-01 to 04
   - Waits on: P-17. Open: OI-27.

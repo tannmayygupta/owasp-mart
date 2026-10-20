@@ -3,7 +3,7 @@ title: 'Password reset, password quality and account self-service'
 type: 'feature'
 ticket: '4'
 created: '2026-10-17'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'medium'

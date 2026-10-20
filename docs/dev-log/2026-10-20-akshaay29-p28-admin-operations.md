@@ -5,7 +5,7 @@
 | Date | 2026-10-20 |
 | Developer | akshaay29 |
 | Branch / commit | `sprint-4-akshay-p28` |
-| Status | Done (story `built`, awaiting the developer's confirmation to mark it done) |
+| Status | Done (story `done`, confirmed by the developer 2026-10-20) |
 | Report tag | platform, admin area, sprint 4 |
 
 ## Requirements covered

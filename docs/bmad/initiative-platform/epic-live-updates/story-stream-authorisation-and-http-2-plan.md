@@ -3,7 +3,7 @@ title: 'Stream authorisation and HTTP/2'
 type: 'feature'
 ticket: '2'
 created: '2026-10-19'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

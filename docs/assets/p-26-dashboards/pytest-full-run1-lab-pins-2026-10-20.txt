@@ -1,0 +1,117 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+........................................................................ [  7%]
+........................................................................ [ 10%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+........................................................................ [ 28%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 35%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 43%]
+........................................................................ [ 46%]
+...F...FF........................F...................................... [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+.s...................................................................... [ 59%]
+........................................................................ [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 71%]
+........................................................................ [ 74%]
+........................................................................ [ 77%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 84%]
+........................................................................ [ 87%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 97%]
+....................................................................     [100%]
+================================== FAILURES ===================================
+______________ test_the_contract_check_passes_on_the_repository _______________
+
+    def test_the_contract_check_passes_on_the_repository():
+        errors, counts = contract.run(LAB_DIR)
+        assert errors == []
+        valid = json.loads((LAB_DIR / "examples" / "valid" / "manifest.json").read_text(encoding="utf-8"))
+        invalid = json.loads((LAB_DIR / "examples" / "invalid" / "manifest.json").read_text(encoding="utf-8"))
+>       assert counts["operations"] == 20
+E       assert 21 == 20
+
+apps\api\tests\test_lab_contract.py:187: AssertionError
+_______ test_every_route_is_under_api_v1_and_every_operation_has_an_id ________
+
+    def test_every_route_is_under_api_v1_and_every_operation_has_an_id():
+        ids = [op["operationId"] for item in SPEC["paths"].values() for m, op in item.items() if m in contract.METHODS]
+>       assert len(ids) == len(set(ids)) == 20
+E       AssertionError: assert 21 == 20
+E        +  where 21 = len({'decideIntegrityFlag', 'getAttempt', 'getInstance', 'getReport', 'getScore', 'getTimeline', ...})
+E        +    where {'decideIntegrityFlag', 'getAttempt', 'getInstance', 'getReport', 'getScore', 'getTimeline', ...} = set(['requestInstance', 'getInstance', 'openInstance', 'resetInstance', 'stopInstance', 'getAttempt', ...])
+
+apps\api\tests\test_lab_contract.py:217: AssertionError
+___________ test_the_text_lists_every_operation_and_has_open_points ___________
+
+    def test_the_text_lists_every_operation_and_has_open_points():
+        text = (LAB_DIR / contract.TEXT).read_text(encoding="utf-8")
+        for item in SPEC["paths"].values():
+            for m, op in item.items():
+                if m in contract.METHODS:
+>                   assert f"`{op['operationId']}`" in text, op["operationId"]
+E                   AssertionError: getWriteup
+E                   assert '`getWriteup`' in '# Lab API v0 (IF-2): the browser-facing routes the lab owns\n\n- **Version:** 1.0.0 (first stable release, tag `contr... 0.3.0 of IF-2, IF-8 change request of 2026-10-11) | IF-8 chose the stricter option: no free text reaches a client |\n'
+
+apps\api\tests\test_lab_contract.py:226: AssertionError
+___________ test_every_operation_answers_and_every_answer_conforms ____________
+
+fresh = <function fresh.<locals>.factory at 0x0000012AE7EA8040>
+
+    def test_every_operation_answers_and_every_answer_conforms(fresh):
+        m = fresh()
+        ok = lambda r, *codes: (r[0] in codes) or pytest.fail(f"{r[0]} {r[1]}")  # noqa: E731
+        r = m.call("POST", "/api/v1/instances", "ada", {"kind": "learner"}); ok(r, 202)
+        iid = r[1]["instance_id"]
+        wait_state(m, iid, "ready")
+        ok(m.call("GET", f"/api/v1/instances/{iid}"), 200)
+        r = m.call("POST", f"/api/v1/instances/{iid}/open"); ok(r, 200)
+        assert r[1]["url"].startswith("https://") and "/_vm/enter?t=" in r[1]["url"]
+        ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}"), 200)
+        ok(m.call("POST", f"/api/v1/attempts/{A_READY}/start", "cam"), 200)
+        ok(m.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", {"challenge_key": "C01", "flag": flag("A")}), 200)
+        ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score"), 200)
+        ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges"), 200)
+        ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges/C02/hints"), 200)
+        ok(m.call("POST", f"/api/v1/attempts/{A_LEARNER}/challenges/C02/hints/1/unlock"), 200)
+        ok(m.call("GET", f"/api/v1/attempts/{A_CAND}/evidence", "rex"), 200)
+        r = m.call("GET", f"/api/v1/attempts/{A_CAND}/integrity-flags", "rex"); ok(r, 200)
+        fid = r[1]["items"][0]["integrity_flag_id"]
+        ok(m.call("POST", f"/api/v1/attempts/{A_CAND}/integrity-flags/{fid}/decision", "rex", {"decision": "accept", "note": "checked"}), 200)
+        ok(m.call("GET", f"/api/v1/attempts/{A_CAND}/report", "rex"), 200)
+        ok(m.call("GET", f"/api/v1/attempts/{A_CAND}/timeline", "rex"), 200)
+        ok(m.call("POST", f"/api/v1/instances/{iid}/reset", "ada", {"confirm": True}), 202)
+        wait_state(m, iid, "ready")
+        ok(m.call("POST", f"/api/v1/instances/{iid}/stop"), 202)
+        ok(m.call("POST", f"/api/v1/instances/{iid}/stop"), 200)
+        ok(m.call("POST", f"/api/v1/attempts/{A_LEARNER}/submit", "ada", {"confirm": True}), 200)
+        ok(m.call("POST", f"/api/v1/attempts/{A_READY}/withdraw", "cam", {"confirm": True}), 200)  # the candidate withdraws (started above) and undoes it (L-26)
+        ok(m.call("POST", f"/api/v1/attempts/{A_READY}/withdraw/undo", "cam"), 200)
+>       assert m.operations == {op["operationId"] for item in SPEC["paths"].values() for k, op in item.items() if k in contract.METHODS}
+E       AssertionError: assert {'decideInteg...imeline', ...} == {'decideInteg...imeline', ...}
+E         
+E         Extra items in the right set:
+E         'getWriteup'
+E         Use -v to get more diff
+
+apps\api\tests\test_lab_contract.py:401: AssertionError
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+4 failed, 2799 passed, 1 skipped in 666.99s (0:11:06)

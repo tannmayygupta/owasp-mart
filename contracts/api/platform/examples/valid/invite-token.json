@@ -1,0 +1,6 @@
+{
+  "schema": "InviteTokenRequest",
+  "body": {
+    "token": "aaaaaaaaaaaaaaaaaaaaaaaaaa.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  }
+}
