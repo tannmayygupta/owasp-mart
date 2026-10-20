@@ -3,106 +3,120 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VulnMart lab console</title>
+<meta name="color-scheme" content="light dark">
+<title>VulnMart Lab</title>
+<link rel="preload" href="/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/martian-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header>
-  <h1>VulnMart lab console</h1>
-  <div id="who" hidden><span id="who-name"></span> <button id="logout" type="button">Sign out</button></div>
+<a class="skip" href="#main">Skip to the lab</a>
+<header class="top">
+  <div class="brand">
+    <svg class="logo" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" class="logo-bg"/><path d="M9 10l7 13 7-13" class="logo-v"/><circle cx="16" cy="23" r="2.2" class="logo-dot"/></svg>
+    <span class="brand-name">VulnMart <b>Lab</b></span>
+    <span class="sandbox-tag" title="Everything you attack here is a private copy built to be broken">Sandbox</span>
+  </div>
+  <div id="who" class="who" hidden>
+    <span class="acct" title="Points on your account: your best result for each challenge"><span id="acct-num" class="num">0</span><span class="unit"> pts</span></span>
+    <span id="who-name" class="who-name"></span>
+    <button id="logout" type="button" class="btn quiet sm">Sign out</button>
+  </div>
 </header>
-<main>
+
+<main id="main">
   <p id="banner" role="status" hidden></p>
 
-  <section id="auth" hidden>
-    <div class="card intro">
-      <h2>Practice attacking a real web shop, safely</h2>
-      <p>Each learner gets a private copy of an online shop with eleven planted weaknesses from the OWASP Top 10. Attack it with your own tools (Burp Suite, a browser, curl), find the flag of each weakness (it looks like <code>VM{...}</code>), paste it here and the lab scores it. Your copy and your flags are yours alone.</p>
+  <section id="auth" class="auth" hidden>
+    <div class="auth-intro">
+      <p class="eyebrow">OWASP Top 10, hands on</p>
+      <h1>Break a real web shop, safely.</h1>
+      <p class="lead">You get a private copy of an online shop with planted weaknesses. Work through the challenges one at a time, find the flag of each, and earn points on your account.</p>
+      <ol class="how">
+        <li><span class="n">1</span><span><b>Start your lab.</b> A private shop is built for you in seconds.</span></li>
+        <li><span class="n">2</span><span><b>Begin a challenge.</b> A countdown starts: 20, 40 or 60 minutes by difficulty.</span></li>
+        <li><span class="n">3</span><span><b>Find the flag</b> and paste it. It looks like <code>VM{...}</code>. Then the next challenge opens.</span></li>
+      </ol>
     </div>
-    <div class="tabs"><button id="tab-login" type="button" class="on">Sign in</button><button id="tab-signup" type="button">Create account</button></div>
-    <form id="login-form" autocomplete="on">
-      <label>Email <input name="email" type="email" required autocomplete="username"></label>
-      <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
-      <button type="submit">Sign in</button>
-    </form>
-    <form id="signup-form" hidden autocomplete="on">
-      <label>Display name <input name="display_name" required maxlength="60"></label>
-      <label>Email <input name="email" type="email" required autocomplete="username"></label>
-      <label>Password (12 characters or more) <input name="password" type="password" required minlength="12" autocomplete="new-password"></label>
-      <label class="check"><input name="age" type="checkbox" required> I am 18 or older and I will only attack the lab, never anything else.</label>
-      <button type="submit">Create account</button>
-    </form>
+    <div class="auth-card">
+      <div class="tabs" role="tablist"><button id="tab-login" type="button" role="tab" class="on">Sign in</button><button id="tab-signup" type="button" role="tab">Create account</button></div>
+      <form id="login-form" autocomplete="on">
+        <label>Email <input name="email" type="email" required autocomplete="username"></label>
+        <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+        <button type="submit" class="btn primary block">Sign in</button>
+      </form>
+      <form id="signup-form" hidden autocomplete="on">
+        <label>Display name <input name="display_name" required maxlength="60"></label>
+        <label>Email <input name="email" type="email" required autocomplete="username"></label>
+        <label>Password <span class="sub">12 characters or more</span><input name="password" type="password" required minlength="12" autocomplete="new-password"></label>
+        <label class="check"><input name="age" type="checkbox" required><span>I am 18 or older and I will only attack the lab, never anything else.</span></label>
+        <button type="submit" class="btn primary block">Create account</button>
+      </form>
+    </div>
   </section>
 
-  <section id="verify" hidden>
-    <h2>Confirm your email</h2>
+  <section id="verify" class="narrow" hidden>
+    <h1>Confirm your email</h1>
     <p id="verify-text">Checking the link...</p>
     <p><a href="/">Back to sign in</a></p>
   </section>
 
-  <section id="lab" hidden>
-    <ol id="steps" class="steps" aria-label="Your progress">
-      <li id="step-1">Start your lab</li><li id="step-2">Open the shop</li><li id="step-3">Find a flag</li><li id="step-4">Check it here</li>
-    </ol>
-    <div class="grid">
-      <div class="card">
-        <h2>Your instance</h2>
-        <div id="no-instance" hidden>
-          <p>Start a private copy of the shop to attack. It is yours alone and ends when you stop it or the time runs out.</p>
-          <button id="start" type="button">Start a practice instance</button>
-        </div>
-        <dl id="instance" hidden>
-          <dt>State</dt><dd id="i-state"></dd>
-          <dt>Flag round</dt><dd id="i-epoch"></dd>
-          <dt>Attempt</dt><dd id="a-state"></dd>
-          <dt>Time left</dt><dd id="a-left"></dd>
-        </dl>
-        <div id="instance-actions" class="row" hidden>
-          <button id="open" type="button">Open the shop</button>
-          <button id="copy" type="button" class="ghost" title="A fresh one-time link for Burp's browser or another browser">Copy link for Burp</button>
-          <button id="reset" type="button" class="ghost">Reset</button>
-          <button id="stop" type="button" class="ghost">Stop</button>
-          <button id="submit" type="button" class="ghost">Finish and submit</button>
-        </div>
-        <p id="devtools-note" class="hint">To watch your own requests: the shop opens in its own tab, so press F12 in that tab (not here), choose Network and tick Preserve log, then sign in. The login is an ordinary form POST you can read there.</p>
-        <div id="link-box" hidden>
-          <p class="hint">One-time link, valid for about a minute. Paste it into the browser you attack from (Burp's browser, for example); the shop then sets its cookie and every later request is an ordinary HTTPS request to your instance.</p>
-          <input id="link" readonly aria-label="One-time link to your instance">
-        </div>
+  <section id="lab" class="lab" hidden>
+    <div class="workspace">
+      <div class="stage">
+        <ol id="rail" class="rail" aria-label="Your progress through the challenges"></ol>
+        <article id="mission" class="mission" aria-live="polite"></article>
+        <p id="flag-answer" class="sr-only" role="status"></p>
       </div>
-      <div class="card">
-        <h2>Score</h2>
-        <p class="big"><span id="score">0</span><small> / 1000</small></p>
-        <div class="bar" aria-hidden="true"><div id="bar-fill"></div></div>
-        <p id="captured" class="hint"></p>
-        <p id="score-note"></p>
-        <button id="report" type="button" class="ghost" hidden>Show my report</button>
-        <pre id="report-box" hidden></pre>
-      </div>
-    </div>
 
-    <details class="card help">
-      <summary>Attacking with Burp Suite (or another proxy)</summary>
-      <ol>
-        <li>Start Burp Suite, open <b>Proxy</b>, then <b>Open browser</b> (Burp's own browser already trusts Burp). Or point your browser at Burp's listener (127.0.0.1:8080) and install Burp's certificate.</li>
-        <li>Press <b>Copy link for Burp</b> above and paste the link into that browser's address bar within a minute. It works once; it signs your browser into your instance.</li>
-        <li>Browse the shop. Every request and answer shows up in <b>HTTP history</b>: send them to Repeater, change an order number, a field or a header, and watch what the server lets you do.</li>
-        <li>Each challenge below says how to begin (for example which demo account to sign in with) and has three hints that you can reveal one by one.</li>
-        <li>When you find a flag (<code>VM{...}</code>) paste it into its challenge. Reset gives you a fresh shop and new flags; the old ones stop counting.</li>
-      </ol>
-      <p class="hint">Only attack your own instance. It is built to be broken; nothing else is.</p>
-    </details>
+      <aside class="side" aria-label="Your lab">
+        <section class="panel" id="panel-lab">
+          <h2>Your lab</h2>
+          <dl class="facts">
+            <dt>Shop</dt><dd id="i-state" class="pill">not started</dd>
+            <dt>Run ends</dt><dd id="a-left">-</dd>
+            <dt>Run score</dt><dd><span id="score" class="num">0</span><span class="of"> / 1000</span></dd>
+          </dl>
+          <div class="bar" aria-hidden="true"><div id="bar-fill"></div></div>
+          <p id="captured" class="sub"></p>
+          <div id="instance-actions" class="tools" hidden>
+            <button id="open" type="button" class="btn soft block">Open the shop in a new tab</button>
+            <div class="tools-row">
+              <button id="copy" type="button" class="btn quiet sm" title="A fresh one-time link for Burp's browser or another browser">Copy link for Burp</button>
+              <button id="reset" type="button" class="btn quiet sm">Reset shop</button>
+              <button id="stop" type="button" class="btn quiet sm">Stop</button>
+            </div>
+            <button id="submit" type="button" class="btn quiet sm block">Finish this run</button>
+          </div>
+          <div id="link-box" hidden>
+            <p class="sub">One-time link, valid for about a minute. Paste it into the browser you attack from (Burp's browser, for example); the shop then sets its cookie and every later request is an ordinary HTTPS request to your instance.</p>
+            <input id="link" readonly aria-label="One-time link to your instance">
+          </div>
+          <button id="report" type="button" class="btn quiet sm block" hidden>Show my run report</button>
+          <pre id="report-box" hidden></pre>
+        </section>
 
-    <div class="card">
-      <h2>Challenges</h2>
-      <p class="hint">Open a challenge to read what it is about, how to begin and the hints. Hints cost nothing in practice mode.</p>
-      <div id="rows" class="challenges"></div>
-      <p id="flag-answer" role="status"></p>
-    </div>
+        <details class="panel fold">
+          <summary>Watch your own requests</summary>
+          <p id="devtools-note" class="sub">The shop opens in its own tab, so press F12 in that tab (not here), choose Network and tick <b>Preserve log</b>, then sign in. The login is an ordinary form POST you can read there.</p>
+        </details>
 
-    <div class="card">
-      <h2>What happened</h2>
-      <ol id="timeline" class="timeline"></ol>
+        <details class="panel fold">
+          <summary>Attack with Burp Suite or another proxy</summary>
+          <ol class="steps-list">
+            <li>Start Burp Suite, open <b>Proxy</b>, then <b>Open browser</b>. Or point your browser at Burp's listener (127.0.0.1:8080) and install Burp's certificate.</li>
+            <li>Press <b>Copy link for Burp</b> and paste the link into that browser within a minute. It works once and signs your browser into your instance.</li>
+            <li>Browse the shop. Send requests to Repeater, change an order number, a field or a header, and watch what the server lets you do.</li>
+            <li>When you find a flag (<code>VM{...}</code>) paste it into the challenge. Reset gives a fresh shop and new flags; the old ones stop counting.</li>
+          </ol>
+          <p class="sub">Only attack your own instance. It is built to be broken; nothing else is.</p>
+        </details>
+
+        <details class="panel fold">
+          <summary>What happened</summary>
+          <ol id="timeline" class="timeline"></ol>
+        </details>
+      </aside>
     </div>
   </section>
 </main>
