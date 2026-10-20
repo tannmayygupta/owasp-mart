@@ -5,7 +5,7 @@
 | Date | 2026-10-20 |
 | Developer | tannmayygupta |
 | Branch / commit | l-c03b-bot-xss |
-| Status | Partly done: built and tested locally and in the hardened container; live run recorded in the section Tests once done |
+| Status | Done on the live lab; not looked at in a real browser |
 | Report tag | Lab stream, C03 part B, support bot, ADR 0058 |
 
 ## Requirements covered
@@ -48,8 +48,11 @@ Real commands and results:
 - Hardened container run (`--read-only --cap-drop=ALL --security-opt=no-new-privileges --memory=128m --cpus=0.5 --pids-limit=64`, distroless image): the script ran and the collector got a tagged hit; sampled peak 81 to 92 MiB; a visit took 12.7 s at 0.5 CPU with the older 8 s dwell (about 6 s start-up).
 - `node scripts/validate-contracts.mjs`: PASS; `node scripts/check-contract-rules.mjs`: 18 PASS 0 FAIL; `node scripts/validate-catalog.mjs`: 11 validate; `uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests`: 473 passed.
 
+- Live (lab redeployed with `live-deploy build`, `ship-i`, `lab`; the platform was not redeployed for this task): `node scripts/e2e-live-exploits.mjs --only C03` 7 PASS, 0 FAIL: the exploit works against a deployed instance (part A, then part B: ticket with an image onerror payload, the flag read on the Listener page, "Agent has viewed this ticket"), the sidecar credited the capture by itself (M3), pasting gives "correct", the flag of another learner's instance is refused. A first run failed on the "viewed" line only (the shop notes a visit when the agent closes the ticket, after the script ran); the exploit now waits for it.
+- Live: `node scripts/e2e-live.mjs` after adding a sweep of all 11 challenges x 3 hints (ordered unlock, text only after the unlock, a repeat is free, no hint holds a flag, unknown key or level refused): 38 PASS, 0 FAIL. The first attempt got HTTP 429 (the exploit runs had filled the lab); with the developer's yes, `live-free-test-instances.mjs --apply` freed 7 attempts and the rerun passed.
+
 ## Evidence
-`docs/assets/c03b-bot/` (probe output and the live run, added with the deploy).
+`docs/assets/c03b-bot/exploits-live-c03b.json`, `docs/assets/production-readiness/e2e-run-hints-all.json`.
 
 ## Problems met and how they were fixed
 - jsdom 28 has no `ResourceLoader`; resources go through `requestInterceptor` (found by running the worker, fixed).
