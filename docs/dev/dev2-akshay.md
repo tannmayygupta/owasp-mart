@@ -133,7 +133,7 @@ Goal: Email, accounts, sessions, MFA and the consent screen work.
   - Done when: A learner can sign up and verify by email on the local stack, and the abuse limits trigger in a test.
   - Handoffs: H-127 (answered in P-11), H-129 (to Tanmay, L-11) (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [x] **P-12. Login, sessions, timeouts and CSRF**  (the user's own session list and "log out everywhere" exist as tested service functions; their routes need a contract change and moved to story 3.6)
+- [x] **P-12. Login, sessions, timeouts and CSRF**  (the user's own session list and "log out everywhere" exist as tested service functions; their routes need a contract change and moved to story 3.6, built 2026-10-20 with IF-1 1.7.0)
   - Epic: `epic-accounts-and-sessions`
   - BMAD story: planned, ref `3.2` in `epic-accounts-and-sessions` (find it with `bmad-ticket`); state `done` (confirmed by the developer 2026-10-20); the routes of FR-ACC-04's session list are story `3.6`
   - Build: Session cookies, idle and absolute timeouts, logout, CSRF protection and the cookie rules of NFR-SEC-03.

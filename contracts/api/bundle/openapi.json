@@ -691,6 +691,144 @@
         "x-fragment": "platform"
       }
     },
+    "/api/v1/me/sessions": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "operationId": "listMySessions",
+        "summary": "My sessions",
+        "description": "The caller's own live sessions, the newest 100, newest first (story 3.6, FR-ACC-04): a `ref` to end one by (the first 16 hex characters of the stored hash of the session value,\nuseless as a credential), when it began and was last used, a coarse network prefix (IPv4 /24, IPv6 /48, never the address), the kind of client\n(`browser`, `mobile` or `tool`) and whether it is the session making this call. Ended, idle and expired sessions are not listed.\n",
+        "responses": {
+          "200": {
+            "description": "The sessions.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySessionList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "ref": "3f9a0c1d2e4b5a69",
+                          "created_at": "2026-10-20T09:00:00Z",
+                          "last_seen_at": "2026-10-20T09:40:00Z",
+                          "ip_trunc": "203.0.113.0/24",
+                          "ua_class": "browser",
+                          "current": true
+                        },
+                        {
+                          "ref": "7c2b8e0f1a3d4c56",
+                          "created_at": "2026-10-19T18:00:00Z",
+                          "last_seen_at": "2026-10-19T18:10:00Z",
+                          "ip_trunc": "198.51.100.0/24",
+                          "ua_class": "mobile",
+                          "current": false
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "delete": {
+        "tags": [
+          "me"
+        ],
+        "operationId": "logOutEverywhere",
+        "summary": "Log out everywhere",
+        "description": "Ends every session of the caller at once, this one included (FR-ACC-04); the answer clears the cookie. Written to the audit log. The body is empty.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Every session ended.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SessionCookie"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/sessions/{ref}": {
+      "delete": {
+        "tags": [
+          "me"
+        ],
+        "operationId": "revokeMySession",
+        "summary": "End one of my sessions",
+        "description": "Ends the caller's session with this `ref` (from listMySessions). The answer is 204 whether or not a live session of the caller had this ref (it may have ended\nalready, or belong to someone else): the list shows what is left. Ending the session making the call also clears the cookie. Written to the audit log when a\nsession ended. A ref that is not 16 lower-case hex characters is 422.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ref",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SessionRef"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The session is ended (or was not live).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SessionCookie"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
     "/api/v1/me/mfa": {
       "post": {
         "tags": [
@@ -6109,6 +6247,74 @@
             "maxItems": 100,
             "items": {
               "$ref": "#/components/schemas/DeletionRequest"
+            }
+          }
+        }
+      },
+      "SessionRef": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{16}$",
+        "description": "A handle for one of the caller's sessions: the first 16 hex characters of the stored hash of the session value."
+      },
+      "MySession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ref",
+          "created_at",
+          "last_seen_at",
+          "ip_trunc",
+          "ua_class",
+          "current"
+        ],
+        "properties": {
+          "ref": {
+            "$ref": "#/components/schemas/SessionRef"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "last_seen_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "ip_trunc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "A network prefix (IPv4 /24, IPv6 /48), never the address."
+          },
+          "ua_class": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "browser",
+              "mobile",
+              "tool",
+              null
+            ]
+          },
+          "current": {
+            "type": "boolean",
+            "description": "This is the session making the call."
+          }
+        }
+      },
+      "MySessionList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/MySession"
             }
           }
         }

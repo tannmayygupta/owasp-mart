@@ -167,6 +167,7 @@ export type InviteSummary = Omit<MyInvite, 'invite_id' | 'attempt_id'>;
 export type ConsentNotice = { attempt_id: string; notice_version: string; notice_text: string; notice_text_sha256: string; retention_days_shown: number; company_name: string };
 export type DeletionRequest = { request_id: string; kind: string; status: string; execute_after: string | null; can_undo: boolean; company_name: string | null; attempt_id: string | null };
 export type DataView = { company_name: string; action: string; at: string };
+export type MySession = { ref: string; created_at: string; last_seen_at: string; ip_trunc: string | null; ua_class: string | null; current: boolean };
 
 // ---- the recruiter's shapes (IF-1 1.4.0, story P-27; the candidate's results are the lab's reviewer routes, IF-2) ----
 

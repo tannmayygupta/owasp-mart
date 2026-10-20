@@ -61,6 +61,9 @@ CLASSES: dict[str, tuple[str, str]] = {
     **{op: ("self", W + "test_self_routes_show_only_the_caller_s_data") for op in (
         "getSession", "deleteSession", "getMe", "updateMe", "changePassword", "startMfaEnrolment", "disableMfa", "confirmMfaEnrolment", "listMyConsents",
         "listMyDeletionRequests", "listMyDataViews", "listMyInvites", "exportMyData", "listMyAttempts", "requestInstance")},
+    "listMySessions": ("self", "test_my_sessions_api.py::test_the_list_shows_only_my_live_sessions_and_marks_the_current_one"),
+    "logOutEverywhere": ("self", "test_my_sessions_api.py::test_log_out_everywhere_ends_every_session_clears_the_cookie_and_is_audited"),
+    "revokeMySession": ("own_id", "test_my_sessions_api.py::test_another_users_ref_ends_nothing"),
     **{op: ("self", "test_live_authorisation.py::test_two_people_never_share_a_user_stream_and_two_companies_never_share_a_company_stream") for op in ("openLiveStream", "getLiveSnapshot", "createLiveTicket")},
     **{op: ("own_id", W + "test_another_learner_cannot_use_an_attempt_or_instance_of_mine") for op in (
         "getInstance", "openInstance", "resetInstance", "stopInstance", "getAttempt", "startAttempt", "submitAttempt", "submitFlag", "getScore", "listChallenges",

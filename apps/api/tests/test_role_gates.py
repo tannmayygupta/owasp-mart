@@ -140,7 +140,7 @@ def test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an
     admin_area = {path for path, methods in schema.items() if path.startswith("/api/v1/admin/") and set(methods) - {"get", "head", "options"}}
     assert "/api/v1/session" in schema and "get" in schema["/api/v1/session"], "the schema really lists the included routers"
     assert state_changing == {"/api/v1/accounts", "/api/v1/accounts/verify-email", "/api/v1/accounts/verify-email/resend", "/api/v1/session",
-                              "/api/v1/password-reset/request", "/api/v1/password-reset/confirm", "/api/v1/me", "/api/v1/me/password",
+                              "/api/v1/password-reset/request", "/api/v1/password-reset/confirm", "/api/v1/me", "/api/v1/me/password", "/api/v1/me/sessions", "/api/v1/me/sessions/{ref}",
                               "/api/v1/session/mfa", "/api/v1/me/mfa", "/api/v1/me/mfa/confirm", "/api/v1/consent", "/api/v1/me/deletion-requests",
                               "/api/v1/me/deletion-requests/{request_id}", "/api/v1/invites/open", "/api/v1/invites/accept", "/api/v1/recruiters",
                               "/api/v1/company/reapply", "/api/v1/company/terms", "/api/v1/company/templates", "/api/v1/company/templates/{template_id}",

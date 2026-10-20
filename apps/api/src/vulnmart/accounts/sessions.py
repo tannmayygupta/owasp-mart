@@ -19,6 +19,7 @@ import base64
 import hashlib
 import hmac
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -37,6 +38,7 @@ logger = logging.getLogger("vulnmart.accounts")
 
 Clock = Callable[[], datetime]
 TOUCH_EVERY = timedelta(seconds=60)
+_REF = re.compile(r"[0-9a-f]{16}")  # a session ref: the first 16 hex characters of the stored hash
 
 
 def utc_now() -> datetime:
@@ -202,7 +204,7 @@ class SessionService:
     def _create(self, session: Session, user_id: str, now: datetime, absolute_expires_at: datetime, ip_trunc: str | None,
                 ua_class: str | None, *, mfa_at: datetime | None = None) -> str:
         token = new_token()
-        session.add(UserSession(id_hash=token_hash(token), user_id=user_id, last_seen_at=now, absolute_expires_at=absolute_expires_at,
+        session.add(UserSession(id_hash=token_hash(token), user_id=user_id, created_at=now, last_seen_at=now, absolute_expires_at=absolute_expires_at,
                                 ip_trunc=ip_trunc, ua_class=ua_class, mfa_at=mfa_at))
         return token
 
@@ -292,13 +294,22 @@ class SessionService:
                     for r in rows if now < _aware(r.absolute_expires_at) and now - _aware(r.last_seen_at) < idle]
 
     def revoke(self, user_id: str, ref: str) -> bool:
-        """End one of the user's own sessions by its `ref`. A ref of another user's session is simply not found."""
-        if len(ref) != 16:
+        """End one of the user's own sessions by its `ref`. A ref of another user's session is simply not found. The ref must be 16 lower-case hex characters, so
+        it can never carry a LIKE wildcard (`%` or `_` would match several sessions)."""
+        if not _REF.fullmatch(ref):
             return False
         with self._sessions.begin() as session:
             done = session.execute(update(UserSession).where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None),
                                                              UserSession.id_hash.like(ref + "%")).values(revoked_at=self._now())).rowcount
+        if done:
+            self._record("auth.session_revoked", actor=user_id, subject=user_id)
         return done == 1
+
+    def log_out_everywhere(self, user_id: str) -> int:
+        """End every session of the user, the current one included (FR-ACC-04), and audit it; the number ended."""
+        ended = self.revoke_all(user_id)
+        self._record("auth.logout_all", actor=user_id, subject=user_id, sessions=ended)
+        return ended
 
     def revoke_all(self, user_id: str, *, keep: str | None = None) -> int:
         """Log out everywhere (FR-ACC-04), optionally keeping the session behind the `keep` cookie value (a password change)."""

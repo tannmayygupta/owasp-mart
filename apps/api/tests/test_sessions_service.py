@@ -249,6 +249,15 @@ def test_a_user_lists_and_revokes_only_their_own_sessions(service, sessions):
     assert service.revoke("u-AAAAAAAAAAAAAAAA", "short") is False
 
 
+def test_a_wildcard_ref_ends_nothing(service, sessions):
+    """Story 3.6: the ref goes into a LIKE prefix match, so `%` or `_` (or anything not hex) must not reach it."""
+    add_user(sessions)
+    one, two = login(service), login(service)
+    for ref in ("%" * 16, "_" * 16, "%" + "0" * 15, one.token[:16].upper() if one.token[:16] != one.token[:16].upper() else "G" * 16):
+        assert service.revoke("u-AAAAAAAAAAAAAAAA", ref) is False
+    assert service.resolve(one.token) is not None and service.resolve(two.token) is not None
+
+
 def test_log_out_everywhere_with_and_without_keeping_the_current_one(service, sessions):
     add_user(sessions)
     one, two, three = login(service), login(service), login(service)

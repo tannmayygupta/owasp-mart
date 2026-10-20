@@ -1,5 +1,6 @@
 """The session routes of IF-1: createSession (login), getSession, deleteSession (logout). The second step of a login with a second factor (completeMfaLogin)
-is in mfa_api.py; the user's own session list and "log out everywhere" exist in `SessionService` and get their routes with a contract change.
+is in mfa_api.py. The user's own sessions (story 3.6, FR-ACC-04, IF-1 1.7.0): listMySessions, revokeMySession (one, by its ref) and logOutEverywhere (all of
+them, this one included).
 
 Login is throttled twice (FR-ACC-10, FR-ACC-08): every attempt from one visitor address counts against an hourly limit, and wrong
 passwords for one email address (known or not) count against a failure limit; past it the address waits for the rest of the window,
@@ -9,8 +10,9 @@ password, which means an attacker can keep one address waiting; the price of not
 from __future__ import annotations
 
 import asyncio
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import Field
 from vulnmart_models.error_codes import ErrorCode
@@ -23,7 +25,7 @@ from .http import (
     Authenticated, Strict, authenticated, authenticated_with_csrf, check_origin, clear_session_cookie, hash_slots, ip_of, ip_trunc,
     limit, limiter_call, mfa_service, read_json, services, session_body, session_service, set_session_cookie, timestamp, ua_class,
 )
-from .security import normalize_email
+from .security import normalize_email, token_hash
 from .sessions import EmailNotVerified, InvalidCredentials, MfaChallenge
 
 router = APIRouter(tags=["session"])
@@ -78,6 +80,34 @@ async def get_session(request: Request, auth: Authenticated = Depends(authentica
 @router.delete("/api/v1/session", operation_id="deleteSession", status_code=204)
 async def delete_session(request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> Response:
     await asyncio.to_thread(session_service(request).logout, auth.token)
+    response = Response(status_code=204, headers=NO_STORE)
+    clear_session_cookie(response)
+    return response
+
+
+# -- the user's own sessions (story 3.6, FR-ACC-04) ------------------------------------------------------------------------
+
+@router.get("/api/v1/me/sessions", operation_id="listMySessions")
+async def list_my_sessions(request: Request, auth: Authenticated = Depends(authenticated)) -> JSONResponse:
+    rows = await asyncio.to_thread(session_service(request).list_sessions, auth.session.user.id, current=auth.token)
+    return JSONResponse({"items": [{"ref": r.ref, "created_at": timestamp(r.created_at), "last_seen_at": timestamp(r.last_seen_at), "ip_trunc": r.ip_trunc,
+                                    "ua_class": r.ua_class, "current": r.current} for r in rows[:100]]}, headers=NO_STORE)
+
+
+@router.delete("/api/v1/me/sessions/{ref}", operation_id="revokeMySession", status_code=204)
+async def revoke_my_session(request: Request, ref: Annotated[str, Path(pattern="^[0-9a-f]{16}$")],
+                            auth: Authenticated = Depends(authenticated_with_csrf)) -> Response:
+    """204 whether or not a live session of the caller had this ref (it may have ended already): the list is the place to look."""
+    await asyncio.to_thread(session_service(request).revoke, auth.session.user.id, ref)
+    response = Response(status_code=204, headers=NO_STORE)
+    if token_hash(auth.token).startswith(ref):  # the caller ended the session they are using
+        clear_session_cookie(response)
+    return response
+
+
+@router.delete("/api/v1/me/sessions", operation_id="logOutEverywhere", status_code=204)
+async def log_out_everywhere(request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> Response:
+    await asyncio.to_thread(session_service(request).log_out_everywhere, auth.session.user.id)
     response = Response(status_code=204, headers=NO_STORE)
     clear_session_cookie(response)
     return response
