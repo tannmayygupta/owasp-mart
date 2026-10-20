@@ -272,9 +272,9 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Done when: Both dashboards show live data on the deployed site and candidate hints are off by default.
   - Handoffs: H-134, H-135 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-27. Recruiter dashboard, live monitor and hints used**
+- [x] **P-27. Recruiter dashboard, live monitor and hints used**  (the recruiter routes added by P-27; report views recorded by the lab in the attempt log and view history, not the platform audit log (ADR 0059); no release action (H-355); no member routes (story 5.3); not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: planned, ref `8.2` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `in-progress`
+  - BMAD story: planned, ref `8.2` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: The recruiter dashboard, the live monitor of running attempts and the hints-used view.
   - Covers: FR-DSH-02, 03, FR-HNT-03
   - Waits on: P-19, P-22.

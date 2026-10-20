@@ -173,6 +173,7 @@ export type CompanyInvite = {
   state: string;
   attempt_id: string | null;
   generation: number;
+  superseded_by: string | null;
   expires_at: string;
   created_at: string;
   sent_at: string | null;

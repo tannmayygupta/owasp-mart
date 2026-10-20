@@ -3,7 +3,7 @@ title: 'Recruiter dashboard, live monitor and hints used'
 type: 'feature'
 ticket: '2'
 created: '2026-10-20'
-status: in-progress
+status: built
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -53,7 +53,7 @@ context:
 
 **Execution:**
 - [x] The recruiter routes, the contract change and their tests (2026-10-20: 10 route tests, contract rules 18 PASS).
-- [ ] The recruiter pages and their tests; the stack test. (2026-10-20: pages built, typecheck and build of 14 routes pass, web tests 16 of 16; the stack test next.)
+- [x] The recruiter pages and their tests; the stack test (2026-10-20: 3 recruiter pages, web tests 16 of 16, build of 14 routes, the stack test 5 of 5 on real Docker).
 
 **Acceptance Criteria:**
 - Given a recruiter of an active company that accepted the terms, then they make a template, invite a candidate, see the candidate's state change live, and read the report with hints used and their cost.
@@ -64,6 +64,17 @@ context:
 
 ## Review Triage Log
 
+### 2026-10-20, quick review against the plan and the handoffs (lens: quick), loop 1
+Run in the main session, not by an independent subagent (the subagent does not survive this machine's session restarts).
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | The report page multiplied hints used by the template cost; the lab charges per level | medium | patch | shows hints used, the stated cost and the points after it |
+| 2 | H-141: a replaced attempt's results must stay visible | medium | patch | the monitor loads superseded invites' attempts and marks re-invites |
+| 3 | H-143: the monitor polled every 2 s while candidates ran, keeping an idle recruiter signed in | medium | patch | live events only; polling while the stream is down |
+| 4 | FR-DSH-02 asks for the platform audit log on each report view; the lab records the attempt log and view history | medium | defer | ADR 0059, dev-log limitation, for the developer |
+| 5 | No release action for `after_release` | low | defer | H-355 |
+
 ## Verification
 
 **Commands:**
@@ -71,3 +82,5 @@ context:
 - `node --test apps/web/test/*.test.mjs`, `tsc --noEmit`, `next build` -- expected: pass
 - `node --test scripts/e2e/platform-stack.e2e.test.mjs` (the P-27 test) -- expected: pass
 - `node scripts/check-contract-rules.mjs` -- expected: 0 FAIL
+
+**Results (2026-10-20):** see the dev-log `docs/dev-log/2026-10-20-akshaay29-p27-recruiter-dashboard.md`: route tests 10, full pytest 2813 passed, contract rules 18 PASS, web 16 of 16, build of 14 routes, stack 5 of 5.

@@ -11,7 +11,6 @@ import { useRequireUser } from '../../../lib/session';
 // events). The invites are the company's own (IF-1); the attempt and its progress come from the lab's reviewer routes, which check the company.
 type Row = { invite: CompanyInvite; attempt: Attempt | null; progress: Progress[] };
 const MILESTONE: Record<string, string> = { none: '-', M1: 'found', M2: 'exploited', M3: 'captured' };
-const RUNNING = ['consent', 'ready', 'running'];
 
 export default function CandidatesPage() {
   const user = useRequireUser();
@@ -23,7 +22,9 @@ export default function CandidatesPage() {
     try {
       const invites = (await api<{ items: CompanyInvite[] }>('GET', '/api/v1/company/invites')).items;
       const out = await Promise.all(invites.map(async (invite): Promise<Row> => {
-        if (!invite.attempt_id || !['consented', 'started'].includes(invite.state)) return { invite, attempt: null, progress: [] };
+        // a live invite's attempt, and the attempt of an invite a re-invite replaced: its results stay visible to the recruiter (FR-ASM-05, H-141)
+        const hasAttempt = !!invite.attempt_id && (['consented', 'started'].includes(invite.state) || !!invite.superseded_by);
+        if (!hasAttempt) return { invite, attempt: null, progress: [] };
         const attempt = await api<Attempt>('GET', `/api/v1/attempts/${invite.attempt_id}`).catch(() => null);
         const progress = attempt && attempt.state !== 'ready'
           ? (await api<{ items: Progress[] }>('GET', `/api/v1/attempts/${invite.attempt_id}/challenges`).catch(() => ({ items: [] as Progress[] }))).items
@@ -44,7 +45,9 @@ export default function CandidatesPage() {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-  useLive(() => void load(), { busy: rows.some((r) => r.attempt && RUNNING.includes(r.attempt.state)) });
+  // Live events reload the list; no fast polling here: the stream is not activity (H-143), and polling every few seconds would keep an idle recruiter signed in.
+  // Polling runs only while the stream is down (lib/live.ts).
+  useLive(() => void load());
 
   if (!user) return <p className="muted">Loading...</p>;
   if (user.account_type !== 'recruiter') return <p className="card">This page is for recruiters. <Link href="/dashboard">Back to your dashboard</Link></p>;
@@ -64,7 +67,11 @@ export default function CandidatesPage() {
                 const captured = progress.filter((p) => p.solved).length;
                 return (
                   <tr key={invite.invite_id} data-invite={invite.invite_id}>
-                    <td>{invite.email}<span className="tag">sent {when(invite.sent_at ?? invite.created_at)}</span></td>
+                    <td>
+                      {invite.email}<span className="tag">sent {when(invite.sent_at ?? invite.created_at)}</span>
+                      {invite.generation > 1 && <span className="tag">re-invite, attempt {invite.generation}</span>}
+                      {invite.superseded_by && <span className="tag">replaced by a re-invite</span>}
+                    </td>
                     <td><span className="pill">{invite.state}</span></td>
                     <td>{attempt ? <span className={`pill ${attempt.state === 'running' ? 'ok' : ''}`}>{attempt.state}</span> : '-'}</td>
                     <td>{left !== null ? `${Math.floor(left / 3600)}h ${String(Math.floor(left / 60) % 60).padStart(2, '0')}m ${String(left % 60).padStart(2, '0')}s` : '-'}</td>
