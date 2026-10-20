@@ -8,6 +8,7 @@
 // No secrets or flag values are ever read or returned here (instance contract
 // section 6: /version carries no secrets).
 
+import { botScope, createBotQueue } from './challenges/c03b-bot.mjs';
 import express from 'express';
 import { configureViews } from './web/views.mjs';
 import { loadUser, checkCsrf } from './web/middleware.mjs';
@@ -38,7 +39,7 @@ const ALWAYS_READY = () => true;
 // without it the shop is always-ready (tests / local runs). Pass { emit } to post
 // app events to the sidecar on built flows (T-09, IF-4); without it emission is a
 // no-op (local runs and tests that do not assert on events).
-export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {}, flagOf = () => undefined } = {}) {
+export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {}, flagOf = () => undefined, bot = null, mockUrl = process.env.VM_MOCK_URL ?? 'http://mock-services' } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -77,6 +78,10 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
       next();
     });
     app.use(loadUser(db));
+    // C03 part B: a session minted for the support bot reaches one ticket page and the agent profile, nothing else (scope rule of challenge-specs 3.3).
+    app.use(botScope);
+    // The bot's visit queue exists in an instance (the bot controller is there); local runs and tests pass their own or none.
+    const botQueue = bot ?? createBotQueue({ db, enabled: Boolean(process.env.VM_INSTANCE_ID) });
     // C05 (Security Misconfiguration): the ops console + verbose-error endpoint
     // are mounted before checkCsrf — they are anonymous and the verbose-error
     // probe posts raw JSON (no form token). All behaviour is build-gated in the
@@ -95,8 +100,8 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
     // so even a successful injection cannot reach anything but merchandising data.
     // Built lazily on first search (after readiness) so instance mode, where the
     // snapshot db opens only after the marker, does not touch it at construction.
-    registerRoutes(app, db, emit, { challenges, getCatalogDb: () => buildCatalogStore(db, { flag: flagOf('C03') }) });
-    registerStaffRoutes(app, db, { emit, challenges });
+    registerRoutes(app, db, emit, { challenges, bot: botQueue, mockUrl, instanceId: process.env.VM_INSTANCE_ID, getCatalogDb: () => buildCatalogStore(db, { flag: flagOf('C03') }) });
+    registerStaffRoutes(app, db, { emit, challenges, flagOf });
     registerSellerRoutes(app, db, { emit, challenges });
   }
 

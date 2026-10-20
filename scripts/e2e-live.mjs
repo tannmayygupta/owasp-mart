@@ -191,6 +191,24 @@ export async function journey(o) {
   check('the right flag is correct and credited', right.status === 200 && right.data?.result === 'correct' && right.data?.credit === 'credited', `${right.data?.result}/${right.data?.credit}`);
   const hint = await c.request('POST', `/api/v1/attempts/${aid}/challenges/C03/hints/1/unlock`);
   check('a hint unlocks', hint.status === 200 && hint.data?.unlocked === true, `HTTP ${hint.status}`);
+  // the hint ladder of EVERY challenge, through the real API: ordered levels, text only after the unlock, a repeat costs nothing, a bad key or level is refused
+  const KEYS = ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11'];
+  const hintProblems = [];
+  for (const key of KEYS) {
+    const list0 = (await c.request('GET', `/api/v1/attempts/${aid}/challenges/${key}/hints`)).data?.items ?? [];
+    if (list0.length !== 3) hintProblems.push(`${key}: ${list0.length} levels`);
+    for (const level of [1, 2, 3]) {
+      const u = await c.request('POST', `/api/v1/attempts/${aid}/challenges/${key}/hints/${level}/unlock`);
+      const again = await c.request('POST', `/api/v1/attempts/${aid}/challenges/${key}/hints/${level}/unlock`);
+      const item = ((await c.request('GET', `/api/v1/attempts/${aid}/challenges/${key}/hints`)).data?.items ?? []).find((x) => x.level === level);
+      const text = String(item?.text ?? '');
+      if (u.status !== 200 || again.status !== 200 || !item?.unlocked || text.length < 20 || /VM\{[A-Z2-7]{24}\}/.test(text)) hintProblems.push(`${key} level ${level}: ${u.status}/${again.status} unlocked=${item?.unlocked} text ${text.length} chars`);
+    }
+  }
+  check('every challenge gives its three hints in order, with text, a repeat is free, and no hint holds a flag', hintProblems.length === 0, hintProblems.length ? hintProblems.slice(0, 3).join('; ') : '11 x 3 hints');
+  const badKey = await c.request('POST', `/api/v1/attempts/${aid}/challenges/C99/hints/1/unlock`);
+  const badLevel = await c.request('POST', `/api/v1/attempts/${aid}/challenges/C01/hints/4/unlock`);
+  check('an unknown challenge or hint level is refused', badKey.status >= 400 && badKey.status < 500 && badLevel.status >= 400 && badLevel.status < 500, `${badKey.status}/${badLevel.status}`);
   const score = (await c.request('GET', `/api/v1/attempts/${aid}/score`)).data;
   check('the score counts the capture', score?.score > 0, `score ${score?.score}`);
 
@@ -211,7 +229,7 @@ export async function journey(o) {
   const frozen = await c.request('GET', `/api/v1/instances/${iid}`);
   check('the instance is frozen after the submit', frozen.data?.access === 'frozen', `${frozen.data?.access}`);
   const rep = (await c.request('GET', `/api/v1/attempts/${aid}/report`)).data;
-  check('the report has the score, the time and the hints', rep?.score > 0 && rep?.elapsed_seconds != null && rep.hints_used_total === 1, `score ${rep?.score}, ${rep?.elapsed_seconds} s`);
+  check('the report has the score, the time and the hints', rep?.score > 0 && rep?.elapsed_seconds != null && rep.hints_used_total === 33, `score ${rep?.score}, ${rep?.elapsed_seconds} s`);
   check('no answer shows the flag', ![JSON.stringify(rep), JSON.stringify(tl), JSON.stringify(score)].some((t) => t.includes(flag)));
   return finish(o, t00, { aid, iid, startToRunning: run.seconds, total: Math.round((Date.now() - t0) / 100) / 10 });
 }

@@ -285,6 +285,10 @@ export function createTicket(db, user, subject, body) {
   return ticketId;
 }
 
+export function listTickets(db, user) {
+  return db.prepare('SELECT id, subject, status FROM tickets WHERE requester_id = ? ORDER BY id DESC LIMIT 50').all(user.id);
+}
+
 export function getTicket(db, user, ticketId) {
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(parseId(ticketId));
   if (!ticket) throw new NotFoundError('ticket not found');

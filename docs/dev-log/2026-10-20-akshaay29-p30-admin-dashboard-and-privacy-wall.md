@@ -39,6 +39,7 @@ By the developer (2026-10-20): "start with the next task", "update the tracker a
 - Full `pytest apps/api/tests`: **2830 passed, 0 failed, 1 skipped** in 489 s (`pytest-full-2026-10-20.txt`).
 - `node --test "scripts/*.test.mjs" "apps/*/test/**/*.test.mjs"`: 1210 tests, 1202 pass, **3 fail on this PC** (the three generator tests: `datamodel-codegen` is not installed here; CI has it). Contract rules **16 PASS, 0 FAIL**, 1 not applicable (no contract changed).
 - Stack end to end on real Docker (images rebuilt, build exit 0): start-up, the P-26, P-27, P-28, P-29 and new P-30 tests and tear-down **8 of 8** on the first run (`stack-e2e-2026-10-20.txt`): `/admin` served with the nonce CSP; an admin's user search and queue read each add one `audit_log` row and the search text is in no row; a learner gets 404 REQ-ROUTE-UNKNOWN.
+- After merging main (pull request 57, stream L's support bot) into the branch: contract rules 18 PASS, 0 FAIL; `check_platform_contract.py` OK (60 operations); the privacy wall and admin tests 51 passed; CI of pull request 64 runs the full suites on the merged code. While merging, two decision records numbered 0058 were found on main (handoff H-357 to Tanmay).
 - NOT run: a browser; the privacy wall on Postgres row-level security (the wall test is SQLite; the row-level policies are tested per story on Postgres); CI on GitHub (see the pull request).
 
 ## Evidence

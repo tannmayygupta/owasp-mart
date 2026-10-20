@@ -121,3 +121,44 @@ test('the default HTTP visitor bounds a hung target by the timeout', async () =>
     });
   } finally { hung.close(); }
 });
+
+test('a visit with a session and a ticket id passes the session on and reports start and end (bot.visit)', async () => {
+  const seen = [];
+  const events = [];
+  const visit = async (href, opts) => { seen.push(opts); return { ok: true, status: 200 }; };
+  await withBot({ target: TARGET, allowPrefixes: ['/staff/tickets'], visit, emit: (type, data) => events.push({ type, ...data }) }, async (base) => {
+    const r = await fetch(`${base}/visit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: '/staff/tickets/7', session: 'abcdefghij.klmnop', ticket_id: 't-7' }) });
+    assert.equal(r.status, 200);
+    assert.equal(seen[0].session, 'abcdefghij.klmnop');
+    assert.match(seen[0].visitId, /^v-/);
+    assert.deepEqual(events.map((e) => [e.type, e.phase, e.ticket_id]), [['bot.visit', 'start', 't-7'], ['bot.visit', 'end', 't-7']]);
+    assert.equal(typeof events[1].duration_ms, 'number');
+  });
+});
+
+test('one visit at a time: a second request while one runs gets 429', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const visit = async () => { await gate; return { ok: true, status: 200 }; };
+  await withBot({ target: TARGET, allowPrefixes: ['/staff/tickets'], visit }, async (base) => {
+    const first = fetch(`${base}/visit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: '/staff/tickets/1' }) });
+    await new Promise((r) => setTimeout(r, 50));
+    const second = await fetch(`${base}/visit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: '/staff/tickets/2' }) });
+    assert.equal(second.status, 429);
+    release();
+    assert.equal((await first).status, 200);
+    const third = await fetch(`${base}/visit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: '/staff/tickets/3' }) });
+    assert.equal(third.status, 200, 'the bot is free again after the visit');
+  });
+});
+
+test('a session that is not a signed-cookie value, or a bad ticket id, is refused before any visit', async () => {
+  const { visit, calls } = fakeVisitor();
+  await withBot({ target: TARGET, allowPrefixes: ['/staff/tickets'], visit }, async (base) => {
+    for (const body of [{ path: '/staff/tickets/1', session: 'a b; evil=1' }, { path: '/staff/tickets/1', session: 5 }, { path: '/staff/tickets/1', ticket_id: 'x y' }]) {
+      const r = await fetch(`${base}/visit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      assert.equal(r.status, 400);
+    }
+    assert.equal(calls.length, 0);
+  });
+});

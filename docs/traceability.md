@@ -25,7 +25,7 @@ Status values: Not started / In progress / Done / Blocked. Fill "Result" only wi
 |---|---|---|---|---|---|---|---|
 | C01 | Broken Access Control | A01 / A01 | Not started | | | | |
 | C02 | Cryptographic Failures | A02 / A04 | Not started | | | | |
-| C03 | Injection | A03 / A05 | Not started | | | | |
+| C03 | Injection | A03 / A05 | Built end to end locally (part A SQL injection; part B stored XSS run by the support bot in jsdom, ADR 0058); live run pending | `challenges/tests/c03-injection/` (exploit.live.mjs, live-loop.test.mjs), `services/bot/test/browser.test.mjs`, `apps/shop/test/web/c03b-bot.test.mjs` | local: loop test 2 pass, bot 20 pass, shop file 8 pass | dev-log `2026-10-20-tannmayygupta-c03b-support-bot.md` | |
 | C04 | Insecure Design | A04 / A06 | Not started | | | | |
 | C05 | Security Misconfiguration | A05 / A02 | Not started | | | | |
 | C06 | Outdated Components / Supply Chain | A06 / A03 | Not started | | | | |

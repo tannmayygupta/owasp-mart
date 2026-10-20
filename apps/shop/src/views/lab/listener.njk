@@ -1,0 +1,13 @@
+{% extends "layout.njk" %}
+{% block title %}Listener{% endblock %}
+{% block body %}
+<h1>Listener</h1>
+<p>This page shows what the collector inside your lab instance has received. The support agent's browser can reach the collector at:</p>
+<pre class="card">{{ collector_url }}</pre>
+<p class="muted">Anything sent to that address (a query string such as <code>?d=...</code> or a request body) appears below, newest last. The agent opens your ticket a few seconds after you send it. The agent's console loads its profile from <code>/staff/api/agent-profile</code>.</p>
+{% if not reachable %}<p class="flash">The collector is not answering yet. Try again in a moment.</p>{% endif %}
+<table><tr><th>Time</th><th>Method</th><th>From the agent</th><th>Content</th></tr>
+{% for h in hits %}<tr><td>{{ h.at }}</td><td>{{ h.method }}</td><td>{{ "yes" if h.bot_tagged else "no" }}</td><td><code>{{ h.data }}</code></td></tr>
+{% else %}<tr><td colspan="4" class="muted">Nothing received yet.</td></tr>{% endfor %}</table>
+<p><a href="/tickets">Back to support</a></p>
+{% endblock %}

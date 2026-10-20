@@ -311,6 +311,8 @@
         }
       ],
       "env": {
+        "VM_INSTANCE_ID": "{instance_id}",
+        "VM_SIDECAR_EVENTS_URL": "http://sidecar:9000",
         "TZ": "UTC",
         "VM_LOG_LEVEL": "info"
       },
@@ -363,6 +365,8 @@
         }
       ],
       "env": {
+        "VM_SIDECAR_EVENTS_URL": "http://sidecar:9000",
+        "VM_MOCK_URL": "http://mock-services",
         "VM_PUBLIC_HOST": "{host}",
         "PORT": "9200",
         "TZ": "UTC",
