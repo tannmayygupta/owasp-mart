@@ -39,6 +39,11 @@ No ADR. No catalogue, shop or contract file was changed; the hint wording and th
 - `node --test scripts/e2e-live.test.mjs scripts/lab-console.test.mjs scripts/scan-flags.test.mjs` — 21 pass, 0 fail.
 - `node --test "scripts/*.test.mjs"` — 919 tests, 917 pass, 0 fail, 2 skipped (run before the last console edit; the console tests were rerun after it, see above).
 - `uv run --locked --package vulnmart-api pytest apps/api/tests/test_lab_api.py apps/api/tests/test_lab_runtime.py -k hint -q` — 5 passed, 46 deselected (baseline, no API change).
+- `node --test "challenges/tests/**/*.test.mjs"` — 42 tests, 42 pass: for each of C01 to C11 the exploit passes on the vulnerable build and fails on the fixed build.
+- `uv run --locked --package vulnmart-api pytest apps/api -q` — 2586 passed, 237 skipped, 0 failed (13 min). The skips need `VULNMART_TEST_POSTGRES_DSN` and `VULNMART_TEST_APP_DSN` (a Postgres test database), so the Postgres-backed tests did not run.
+- `node --test` in `apps/shop` — 180 tests, 177 pass, 0 fail, 3 skipped. `node --test "apps/edge/test/*.test.mjs"` — 105 of 105 pass. `pnpm run contracts:check` — all PASS (events, orchestrator, lab, platform contracts).
+- `node --test --test-concurrency=1 scripts/e2e/loop.e2e.test.mjs` (real Docker, orchestrator, Caddy, gate, stub shop, lab runtime) — first run 4 pass, 6 fail, because the compose file mounts `/run/secrets/ingest_ca` and the test did not provide it. After adding an empty placeholder file: 9 pass, 1 fail (step 8). Step 8 expected a credited M3 but the correct flag was held for review: since audit blocker B6 (D-94) a flag pasted without enough recorded activity is held, and the stub reports none. I changed step 8 to assert the held outcome (twice the same, score unchanged); the credited M3 and its hand number stay proved by the in-process loop. Final: 10 pass, 0 fail. No containers left.
+- `node --test --test-concurrency=1 scripts/e2e/edge.e2e.test.mjs` — 11 of 11 pass after the same `ingest_ca` placeholder.
 - Real Chrome (headless, DevTools protocol), see the evidence file: shop login request shows `POST /login` with the form fields then a 302; C02 hints 1 to 3 reveal in order with the fixed console.
 - Not run: the live lab, the live e2e (`scripts/e2e-live.mjs` itself), the pnpm contract checks.
 
