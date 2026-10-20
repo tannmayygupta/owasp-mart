@@ -53,7 +53,7 @@ context:
 
 **Execution:**
 - [x] The three invite routes, the contract change and their tests (2026-10-20: 9 route tests, contract rules 18 PASS).
-- [ ] The web pages and their tests; the stack test.
+- [ ] The web pages and their tests; the stack test. (2026-10-20: 11 pages built, typecheck and production build pass, web unit tests 15 of 15; the stack test next.)
 
 **Acceptance Criteria:**
 - Given a learner, then the dashboard shows the catalogue and their own attempt, the instance state updates live, hints unlock with no cost and the write-up shows after a solve.

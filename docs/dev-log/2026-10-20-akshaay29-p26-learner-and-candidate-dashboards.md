@@ -21,6 +21,8 @@ The dashboards app was a one-page tracer bullet and a candidate could not accept
 - API: `assessments/invite_api.py` with `openInvite`, `acceptInvite`, `listMyInvites`; `AssessmentService.describe` and `my_invites`; IF-1 1.3.0.
 - Lab API (Tanmay's module, the developer agreed): `getWriteup` (IF-2 1.2.0), `CatalogEntry.write_up`; the fake lab mock; `check_lab_contract.py`; handoffs H-354 (check it) and H-355 (enforce `after_release` results on the server).
 
+- Web (`apps/web`): `lib/api.ts` (same-origin fetch, CSRF, messages), `lib/session.tsx` (who is signed in), `lib/live.ts` (live stream with polling fallback), `lib/paths.ts` (no open redirect after sign-in); pages `/login` (with the second factor), `/signup`, `/verify-email`, `/forgot-password`, `/reset-password`, `/account` (name, password, authenticator app, deletion request and undo, who viewed my data), `/dashboard` (invitations and the practice lab), `/invite` (open and accept), `/assessment/[attemptId]` (consent, then the attempt); the shared `attempt-board.tsx`.
+
 ## How it works
 (Filled at the end of the story.)
 
@@ -35,6 +37,8 @@ By the developer (2026-10-20): continue with the sprint 4 tasks one by one and m
 - `check_platform_contract.py` OK (45 operations); `check_api_models.py` OK (110 checks); `platform-mock.test.mjs` 20 of 20; contract rules 18 PASS, 0 FAIL.
 
 - `test_lab_api.py -k "write_up or catalogue"`: 2 passed (the new write-up test: 409 before the solve, 200 after, 404 for another account and an unknown challenge, 401 without a session); fake lab mock tests 8 of 8; `check_lab_contract.py` PASS; contract rules 20 PASS, 0 FAIL.
+
+- Web: `tsc --noEmit` clean; `next build` compiles the 11 routes; `node --test apps/web/test/dashboard-lib.test.mjs apps/web/test/security.test.mjs`: 15 of 15.
 
 ## Evidence
 `docs/assets/p-26-dashboards/`.

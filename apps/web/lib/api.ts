@@ -1,0 +1,139 @@
+// The dashboards' only way to the API (story P-26, ADR 0058): same-origin calls to /api/v1/..., which proxy.ts forwards with the origin secret.
+// The session cookie travels by itself; a state-changing call sends the CSRF token the session answer gave. Errors come back as IF-8 problem bodies.
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly detail: string | undefined;
+  readonly retryAfter: number | undefined;
+
+  constructor(status: number, code: string, detail?: string, retryAfter?: number) {
+    super(code);
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
+    this.retryAfter = retryAfter;
+  }
+}
+
+let csrfToken: string | null = null;
+
+/** The CSRF token of the current session (from createSession, completeMfaLogin or getSession). */
+export function setCsrf(token: string | null): void {
+  csrfToken = token;
+}
+
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export async function api<T = unknown>(method: Method, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  if (method !== 'GET' && csrfToken) headers['x-csrf-token'] = csrfToken;
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK');
+  }
+  if (res.status === 204) return undefined as T;
+  let data: unknown = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    const problem = (data ?? {}) as { code?: string; errors?: { detail?: string }[] };
+    const retry = Number(res.headers.get('retry-after'));
+    throw new ApiError(res.status, problem.code ?? `HTTP-${res.status}`, problem.errors?.[0]?.detail, Number.isFinite(retry) && retry > 0 ? retry : undefined);
+  }
+  return data as T;
+}
+
+// What a person reads for each registry code. Unknown codes get a general sentence that still names the code for support.
+const MESSAGES: Record<string, string> = {
+  NETWORK: 'The site cannot be reached. Check your connection and try again.',
+  'AUTH-INVALID-CREDENTIALS': 'That email and password do not match.',
+  'AUTH-EMAIL-NOT-VERIFIED': 'Confirm your email first, with the link we sent you.',
+  'AUTH-SESSION-REQUIRED': 'Please sign in.',
+  'AUTH-CSRF-FAILED': 'Your session changed. Reload the page and try again.',
+  'AUTH-ORIGIN-FORBIDDEN': 'This request came from another site and was refused.',
+  'AUTH-TOKEN-INVALID': 'This link is not valid any more. It may have been used already or have expired.',
+  'AUTH-MFA-INVALID': 'That code is not right. Try the current code from your authenticator app.',
+  'AUTH-MFA-STATE': 'The second factor is not in a state that allows this.',
+  'REQ-RATE-LIMITED': 'Too many tries. Wait a little and try again.',
+  'REQ-VALIDATION': 'Something in the form is not valid.',
+  'REQ-INTERNAL': 'Something went wrong on our side. Try again in a moment.',
+  'INST-QUOTA-REACHED': 'You already have a running instance. Stop it before starting another.',
+  'INST-NOT-READY': 'The instance is not ready yet.',
+  'INST-INVALID-STATE': 'That cannot be done in the instance’s state now.',
+  'INST-START-FAILED': 'The lab could not start an instance. Try again in a moment.',
+  'ATT-INVALID-STATE': 'That cannot be done in the attempt’s state now.',
+  'ATT-NOT-FOUND': 'That was not found.',
+  'ATT-GONE': 'That attempt is closed.',
+  'ATT-HINTS-DISABLED': 'Hints are off for this assessment.',
+  'ATT-FLAG-RATE-LIMITED': 'Too many wrong flags for this challenge. Wait a few minutes.',
+  'ATT-CHALLENGE-NOT-FOUND': 'That challenge was not found.',
+  'ATT-CONSENT-STALE': 'The notice changed. Read it again and decide.',
+};
+
+export function say(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === 'REQ-VALIDATION' && error.detail) return error.detail; // the password rules answer a fixed sentence (H-134)
+    return MESSAGES[error.code] ?? `Something went wrong (${error.code}).`;
+  }
+  return 'Something went wrong.';
+}
+
+// ---- the shapes this app reads (IF-1, IF-2; only the fields used) ----
+
+export type User = {
+  user_id: string;
+  email: string;
+  display_name: string;
+  account_type: 'participant' | 'recruiter' | 'admin';
+  email_verified: boolean;
+  mfa_enabled: boolean;
+};
+export type Session = { status: 'authenticated'; user: User; csrf_token: string };
+export type MfaRequired = { status: 'mfa_required'; mfa_ticket: string };
+export type CatalogueItem = { challenge_key: string; title: string; owasp_2021: string | null; owasp_2025: string; difficulty: number; tier: string };
+export type AttemptSummary = { attempt_id: string; mode: 'learner' | 'candidate'; state: string; instance_id: string | null; created_at: string; deadline_at: string | null };
+export type Attempt = AttemptSummary & { hints_enabled: boolean; started_at: string | null; submitted_at: string | null; delete_after?: string | null };
+export type Instance = { instance_id: string; state: string; access: string; epoch: number };
+export type Progress = { challenge_key: string; best_milestone: string; solved: boolean; held: boolean; hints_used: number; hints_available: boolean };
+export type Hint = { level: number; kind: string; unlocked: boolean; cost_pct: number; text: string | null };
+export type Score = { score: number; per_challenge: { challenge_key: string; points: number; held: boolean }[] };
+export type Writeup = { challenge_key: string; vulnerable: string; fix: string };
+export type MyInvite = {
+  invite_id: string;
+  attempt_id: string | null;
+  state: string;
+  company_name: string;
+  title: string;
+  expires_at: string;
+  time_limit_min: number | null;
+  challenge_count: number;
+  hints_mode: 'on' | 'off';
+  hint_cost_pct: number;
+  writeup_required: boolean;
+  results_visibility: 'after_submit' | 'after_release';
+};
+export type InviteSummary = Omit<MyInvite, 'invite_id' | 'attempt_id'>;
+export type ConsentNotice = { attempt_id: string; notice_version: string; notice_text: string; notice_text_sha256: string; retention_days_shown: number; company_name: string };
+export type DeletionRequest = { request_id: string; kind: string; status: string; execute_after: string | null; can_undo: boolean; company_name: string | null; attempt_id: string | null };
+export type DataView = { company_name: string; action: string; at: string };
+
+/** "2026-10-20T10:00:00Z" as the reader's local date and time. */
+export function when(stamp: string | null | undefined): string {
+  if (!stamp) return '-';
+  const d = new Date(stamp);
+  return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString();
+}
