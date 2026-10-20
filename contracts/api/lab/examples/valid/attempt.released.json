@@ -1,0 +1,13 @@
+{
+  "attempt_id": "a-AAAAAAAAAAAAAAAA",
+  "mode": "candidate",
+  "state": "submitted",
+  "hints_enabled": false,
+  "instance_id": null,
+  "started_at": "2026-10-09T12:00:00Z",
+  "deadline_at": "2026-10-09T14:00:00Z",
+  "submitted_at": "2026-10-09T13:00:00Z",
+  "frozen_until": null,
+  "results_released": true,
+  "server_time": "2026-10-09T13:10:00Z"
+}

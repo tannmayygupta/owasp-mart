@@ -184,7 +184,7 @@ def test_the_contract_check_passes_on_the_repository():
     assert errors == []
     valid = json.loads((LAB_DIR / "examples" / "valid" / "manifest.json").read_text(encoding="utf-8"))
     invalid = json.loads((LAB_DIR / "examples" / "invalid" / "manifest.json").read_text(encoding="utf-8"))
-    assert counts["operations"] == 22
+    assert counts["operations"] == 23
     assert counts["valid"] == len(valid) and counts["invalid"] == len(invalid)
     # every file in the folders is in its manifest, and every manifest entry is a file (the counts cannot drift apart)
     for folder, manifest in (("valid", valid), ("invalid", invalid)):
@@ -214,7 +214,7 @@ def test_states_access_and_health_are_identical_to_if5():
 
 def test_every_route_is_under_api_v1_and_every_operation_has_an_id():
     ids = [op["operationId"] for item in SPEC["paths"].values() for m, op in item.items() if m in contract.METHODS]
-    assert len(ids) == len(set(ids)) == 22
+    assert len(ids) == len(set(ids)) == 23
     assert all(p.startswith("/api/v1/") for p in SPEC["paths"])
 
 
@@ -400,6 +400,12 @@ def test_every_operation_answers_and_every_answer_conforms(fresh):
     ok(m.call("POST", f"/api/v1/attempts/{A_READY}/withdraw/undo", "cam"), 200)
     ok(m.call("POST", "/api/v1/attempts/a-HHHHHHHHHHHHHHHH/challenges/C01/begin", "ada"), 200)  # the sequenced run of Ada (seeded), IF-2 1.3.0
     ok(m.call("GET", "/api/v1/me/progress", "ada"), 200)
+    assert m.call("GET", f"/api/v1/attempts/{A_DONE}/score", "cam")[0] == 404  # the invite of this candidate says after_release: nothing to see yet (IF-2 2.1.0, H-355)
+    assert m.call("POST", f"/api/v1/attempts/{A_DONE}/release", "cam")[0] == 404  # the candidate cannot release their own results
+    r = m.call("POST", f"/api/v1/attempts/{A_DONE}/release", "rex"); ok(r, 200)
+    assert r[1]["results_released"] is True
+    ok(m.call("POST", f"/api/v1/attempts/{A_DONE}/release", "rex"), 200)  # repeating changes nothing
+    ok(m.call("GET", f"/api/v1/attempts/{A_DONE}/score", "cam"), 200)
     assert m.operations == {op["operationId"] for item in SPEC["paths"].values() for k, op in item.items() if k in contract.METHODS}
     for text in m.answers:  # no secret in any answer
         for word in FORBIDDEN_IN_ANSWERS:

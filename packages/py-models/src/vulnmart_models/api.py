@@ -1422,6 +1422,12 @@ class Attempt(BaseModel):
             description='Optional. Present only while the attempt is `withdrawn` (the end of the undo window when the deletion is scheduled, null once the withdrawal was undone). Absent in every other state.'
         ),
     ] = None
+    results_released: Annotated[
+        bool | None,
+        Field(
+            description='Optional (v2.1.0). Only on a company assessment whose invite says `after_release`; true once the recruiter released the results. Absent otherwise.'
+        ),
+    ] = None
     server_time: Annotated[
         Timestamp,
         Field(

@@ -72,7 +72,7 @@ CLASSES: dict[str, tuple[str, str]] = {
         "getConsentNotice", "recordConsent", "createDeletionRequest", "cancelDeletionRequest", "acceptInvite", "withdrawAttempt", "undoWithdrawal")},
     **{op: ("company", W + "test_another_company_sees_none_of_a_company_s_data") for op in (
         "getMyCompany", "reapplyCompany", "getCompanyTerms", "acceptCompanyTerms", "listTemplates", "createTemplate", "getTemplate", "updateTemplate", "deleteTemplate",
-        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag")},
+        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag", "releaseResults")},
     **{op: ("admin", W + "test_admin_routes_answer_everyone_else_like_unknown_routes") for op in (
         "listPendingCompanies", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
         "setQuota", "removeQuota", "getCapacity", "listJobs")},
@@ -314,6 +314,7 @@ def test_another_company_sees_none_of_a_company_s_data(w):
                 f"/api/v1/attempts/{c}/timeline", f"/api/v1/attempts/{c}/challenges", f"/api/v1/attempts/{c}/score"):
         assert rob.get(url).status_code == 404, url
     assert rob.post(f"/api/v1/attempts/{c}/integrity-flags/f-AAAAAAAAAAAAAAAA/decision", {"decision": "accept", "note": "x"}).status_code == 404
+    assert rob.post(f"/api/v1/attempts/{c}/release").status_code == 404  # another company cannot release the results either (H-355)
     assert w.browser(RITA).get(f"/api/v1/attempts/{c}/report").status_code == 200
     # Rob's look left no trace in Cam's view history; Rita's did
     views = w.browser(CAM_EMAIL).get("/api/v1/me/data-views").json()["items"]

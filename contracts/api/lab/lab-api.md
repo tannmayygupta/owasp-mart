@@ -32,6 +32,7 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `listEvidence` | `GET /api/v1/attempts/{attempt_id}/evidence` | 200 | Captured requests (redacted) |
 | `listIntegrityFlags` | `GET /api/v1/attempts/{attempt_id}/integrity-flags` | 200 | Integrity signals |
 | `decideIntegrityFlag` | `POST .../integrity-flags/{integrity_flag_id}/decision` | 200 | Review decision |
+| `releaseResults` | `POST /api/v1/attempts/{attempt_id}/release` | 200 | The recruiter releases a finished candidate's results when the invite says `after_release` (v2.1.0) |
 | `getReport` | `GET /api/v1/attempts/{attempt_id}/report` | 200 | Per-candidate report |
 | `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first (with the time warnings, v2.0.0) |
 

@@ -117,6 +117,7 @@ export function createFakeLab(options = {}) {
     d.deadlineAt = stamp(Date.now() - 1 * 3600 * 1000);
     d.submittedAt = stamp(Date.now() - 70 * 60 * 1000);
     d.frozenUntil = stamp(Date.now() - 55 * 60 * 1000);
+    d.afterRelease = true; d.released = false; // the invite of this candidate says after_release (IF-2 2.1.0, H-355)
     const e = makeAttempt('a-EEEEEEEEEEEEEEEE', 'cam', 'candidate', 'org-1', 'withdrawn', false);
     e.deleteAfter = stamp(Date.now() + 7 * 24 * 3600 * 1000);
     makeAttempt('a-FFFFFFFFFFFFFFFF', 'cam', 'candidate', 'org-1', 'cancelled', false);
@@ -153,7 +154,7 @@ export function createFakeLab(options = {}) {
     error_code: r.errorCode, requested_at: r.requestedAt, ready_at: r.readyAt, expires_at: r.expiresAt, updated_at: r.updatedAt });
   const attemptView = (a) => ({ attempt_id: a.id, mode: a.mode, state: a.state, hints_enabled: a.hintsEnabled, instance_id: a.instanceId,
     started_at: a.startedAt, deadline_at: a.deadlineAt, submitted_at: a.submittedAt, frozen_until: a.frozenUntil,
-    ...(a.state === 'withdrawn' ? { delete_after: a.deleteAfter ?? null } : {}), server_time: stamp() });
+    ...(a.state === 'withdrawn' ? { delete_after: a.deleteAfter ?? null } : {}), ...(a.afterRelease ? { results_released: a.released === true } : {}), server_time: stamp() });
   const costPct = (a, level) => (a.mode === 'candidate' ? level * 10 : 0);
   const hintText = (key, level) => `Fake hint level ${level} for ${key} (mock text, not a real hint).`;
   function points(a, key) {
@@ -409,6 +410,14 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     send(res, 200, attemptView(a));
   };
   const WITHDRAWABLE = ['ready', 'running', 'submitted'];
+  H.releaseResults = ({ res, user, params, take }) => {
+    const a = reviewable(res, user, params.attempt_id);
+    if (!a || take() === false) return;
+    if (user.role !== 'recruiter' || a.orgId === null) return attemptNotFound(res);
+    if (!['submitted', 'reported', 'expired'].includes(a.state)) return problem(res, 409, 'ATT-INVALID-STATE', `release is not allowed in state ${a.state}`);
+    if (a.afterRelease) a.released = true;
+    send(res, 200, attemptView(a));
+  };
   H.withdrawAttempt = ({ res, user, params, take }) => {
     const a = owned(res, user, params.attempt_id);
     if (!a) return;
@@ -483,8 +492,10 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     addTimeline(a, { at: stamp(), type: 'flag.submitted', challenge_key: key, milestone: null, result });
     send(res, 200, { challenge_key: key, result, credit });
   };
+  const hidden = (user, a) => a.afterRelease === true && a.released !== true && a.ownerId === user.id && !isReviewer(user, a); // H-355: the candidate sees no results yet
   H.getScore = ({ res, user, params, url }) => {
     const a = readable(res, user, params.attempt_id);
+    if (a && hidden(user, a)) return attemptNotFound(res);
     if (a && queryOf(res, url, [])) send(res, 200, { attempt_id: a.id, score: total(a), computed_at: stamp(), per_challenge: scoreRows(a) });
   };
   H.listChallenges = ({ res, user, params, url }) => {
@@ -657,6 +668,7 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     ['POST', new RegExp(`^/api/v1/instances/${ID}/stop$`), ['instance_id'], 'stopInstance', 'none'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}$`), ['attempt_id'], 'getAttempt'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/start$`), ['attempt_id'], 'startAttempt', 'none'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/release$`), ['attempt_id'], 'releaseResults', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/submit$`), ['attempt_id'], 'submitAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw$`), ['attempt_id'], 'withdrawAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw/undo$`), ['attempt_id'], 'undoWithdrawal', 'none'],

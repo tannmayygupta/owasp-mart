@@ -1443,6 +1443,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempts/{attempt_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release a candidate's results (the recruiter of the company)
+         * @description Since v2.1.0 (handoff H-355, OI-15). When the invite says `results_visibility: after_release`, the candidate sees no score and no earned progress
+         *     (`getScore` answers 404, `listChallenges` shows nothing earned) until the recruiter of the owning company calls this once the attempt has ended
+         *     (`submitted`, `reported` or `expired`; otherwise 409 ATT-INVALID-STATE). Repeating it changes nothing. The candidate and anyone else get the 404 of every
+         *     attempt route. The answer is the attempt with `results_released: true`. The body is empty.
+         */
+        post: operations["releaseResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attempts/{attempt_id}/withdraw": {
         parameters: {
             query?: never;
@@ -2480,6 +2505,8 @@ export interface components {
             frozen_until: components["schemas"]["Timestamp"] | null;
             /** @description Optional. Present only while the attempt is `withdrawn` (the end of the undo window when the deletion is scheduled, null once the withdrawal was undone). Absent in every other state. */
             delete_after?: components["schemas"]["Timestamp"] | null;
+            /** @description Optional (v2.1.0). Only on a company assessment whose invite says `after_release`; true once the recruiter released the results. Absent otherwise. */
+            results_released?: boolean;
             /** @description The server clock; the browser timer is cosmetic (FR-SES-02). */
             server_time: components["schemas"]["Timestamp"];
         };
@@ -5111,6 +5138,25 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    releaseResults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
         };
     };

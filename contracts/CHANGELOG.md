@@ -167,6 +167,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 2.1.0 (2026-10-20, Tanmay, backlog story 10, handoff H-355: the recruiter releases a candidate's results)
+- Additive: one operation, `releaseResults` (`POST /api/v1/attempts/{attempt_id}/release`), for the recruiter of the owning company; the optional member `results_released` (boolean) of `Attempt`, present only on a company assessment whose invite says `after_release`. No existing value, member or route changed.
+- Behaviour: when the invite says `after_release` the candidate's own `getScore` answers 404 and `listChallenges` shows nothing earned until the recruiter releases the finished attempt (OI-15, the developer's answer of 2026-10-18). `after_submit` (the default) and a learner's practice are as before.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs`; examples `examples/valid/attempt.released.json` and `examples/invalid/attempt-released-string.json`. Generated code and bundle regenerated.
+
 ### 2.0.0 (2026-10-20, Tanmay, backlog story 8, handoff H-359: time warnings in the timeline)
 - Additive: the timeline type `attempt.time_warning` and the optional member `minutes_left` (1 to 1440) of `TimelineEntry`, present only on that type. `getTimeline` now lists the warnings the engine wrote (`time_warning_sent`, 15 and 5 minutes before the end by default), so the recruiter's report shows when the candidate was told time was running out. Nothing a client sends changed; a client that does not know the type shows it as text.
 - BREAKING: the response enum `TimelineEntry.type` gains `attempt.time_warning` (the diff tool counts a new value of a response enum as breaking, because a client that switches exhaustively on the enum would not know it). Why it is safe here: the only consumer, the recruiter page of stream P (`apps/web`), printed the type as text and now maps it to words with a fallback for an unknown type; no value is removed or renamed, so there is no contract step to follow. The rule of this repository raises the major number for any new value of a response enum, which is why an additive change is labelled 2.0.0.

@@ -39,7 +39,7 @@ export default function AssessmentPage() {
   }, [user, load]);
 
   const resultsAllowed = useCallback(
-    (a: Attempt) => !!invite && invite.results_visibility === 'after_submit' && ['submitted', 'reported'].includes(a.state),
+    (a: Attempt) => !!invite && ['submitted', 'reported'].includes(a.state) && (invite.results_visibility === 'after_submit' || a.results_released === true), // IF-2 2.1.0: or once the company released them
     [invite],
   );
 

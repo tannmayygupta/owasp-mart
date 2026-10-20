@@ -244,6 +244,18 @@ def reviewable(rt: LabRuntime, auth: Authenticated, attempt_id: str) -> AttemptR
     return not_gone(rec)
 
 
+def results_released(rt: LabRuntime, rec: AttemptRecord) -> bool:
+    """H-355: the recruiter released this candidate's results (the attempt log holds the line `results_released`)."""
+    return any(e.get("event") == "results_released" for e in rt.attempt_log.read(rec.id))
+
+
+def results_hidden(rt: LabRuntime, auth: Authenticated, rec: AttemptRecord) -> bool:
+    """H-355, OI-15: the candidate of an assessment whose invite says `after_release` sees no score and no per-challenge result until the recruiter releases them.
+    The recruiter of the company and a learner on their own practice always see them."""
+    return (rec.org_id is not None and is_owner(auth, rec) and not is_reviewer(auth, rec)
+            and rec.rules.results_visibility == "after_release" and not results_released(rt, rec))
+
+
 def note_company_view(request: Request, rt: LabRuntime, auth: Authenticated, rec: AttemptRecord, *, report: bool) -> None:
     """A recruiter of the owning company looks at a candidate's data (the report, the evidence): the attempt log gets a line with the viewer's id only (FR-TIM-04,
     `recruiter_viewed_report`) and the candidate's view history an entry with the company's name (FR-PRV-11, handoff H-145). The candidate looking at their own data is
@@ -275,6 +287,8 @@ def attempt_view(rt: LabRuntime, rec: AttemptRecord) -> dict[str, Any]:
             "instance_id": rec.instance_id or (info.instance_id if info else None), "started_at": stamp(rec.started_at),
             "deadline_at": stamp(rec.deadline_at), "submitted_at": stamp(rec.submitted_at), "frozen_until": stamp(rec.frozen_until),
             "server_time": stamp(rt.clock())}
+    if rec.org_id is not None and rec.rules.results_visibility == "after_release":  # optional in IF-2 2.1.0: only where the recruiter releases the results
+        view["results_released"] = results_released(rt, rec)
     if rec.state.value == "withdrawn":  # optional in IF-2 1.1.0: only a withdrawn attempt carries it (null once the withdrawal is undone)
         view["delete_after"] = stamp(rec.delete_after)
     return view
@@ -505,6 +519,22 @@ async def submit_attempt(attempt_id: str, request: Request, auth: Authenticated 
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
 
 
+@router.post("/api/v1/attempts/{attempt_id}/release", operation_id="releaseResults")
+async def release_results(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """H-355, OI-15: the recruiter of the owning company releases a finished candidate's results (the invite said `after_release`). Repeating it changes nothing.
+    The candidate and anyone else get the 404 of every route; an attempt that has not ended is 409."""
+    rt = lab(request)
+    rec = reviewable(rt, auth, attempt_id)
+    if Role.RECRUITER not in auth.session.roles or rec.org_id is None:
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND)
+    await no_body(request)
+    if rec.state.value not in ("submitted", "reported", "expired"):
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    if not await run(results_released, rt, rec):
+        await run(rt.attempt_log.append, {"event": "results_released", "attempt_id": rec.id, "at": rt.clock().isoformat(), "viewer_id": auth.session.user.id})
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
 @router.post("/api/v1/attempts/{attempt_id}/withdraw", operation_id="withdrawAttempt")
 async def withdraw_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
     """FR-SES-10: the candidate leaves the assessment. The instance is destroyed, deletion is scheduled after the undo window, nothing scores any more."""
@@ -545,6 +575,8 @@ async def get_score(attempt_id: str, request: Request, auth: Authenticated = Dep
     rt = lab(request)
     query(request, ())
     rec = not_gone(readable(rt, auth, attempt_id))
+    if await run(results_hidden, rt, auth, rec):
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND)  # not released yet: the same 404 as for a stranger
     total, rows = await run(score_rows, rt, rec)
     return json_ok({"attempt_id": rec.id, "score": total, "computed_at": stamp(rt.clock()), "per_challenge": rows})
 
@@ -556,6 +588,7 @@ async def list_challenges(attempt_id: str, request: Request, auth: Authenticated
     rec = not_gone(readable(rt, auth, attempt_id))
 
     sequenced = rt.is_sequenced(rec.id)
+    hidden = await run(results_hidden, rt, auth, rec)
 
     def build() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         out = []
@@ -572,6 +605,8 @@ async def list_challenges(attempt_id: str, request: Request, auth: Authenticated
             item = {"challenge_key": key, "best_milestone": best.value, "solved": solved,
                     "held": rt.milestones.is_held(rec.id, key), "hints_used": len(rt.hints.levels(rec.id, key)),
                     "hints_available": hints_enabled(rec) and (not sequenced or clock.state == "active")}
+            if hidden:  # H-355: the progress of a candidate whose results are not released shows nothing earned
+                item.update({"best_milestone": "none", "solved": False, "held": False})
             if sequenced:
                 item.update({"state": clock.state, "title": (entry.title[:120] if entry else key), "tier": (entry.tier if entry else None) or "Medium",
                              "time_limit_seconds": clock.limit_seconds, "opened_at": stamp(clock.opened_at), "expires_at": stamp(clock.expires_at),

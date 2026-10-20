@@ -149,6 +149,11 @@
     "path": "/attempt_id",
     "rule": "attempt id shape"
   },
+  "attempt-released-string.json": {
+    "schema": "Attempt",
+    "path": "/results_released",
+    "rule": "results_released is true or false"
+  },
   "attempt-hints-string.json": {
     "schema": "Attempt",
     "path": "/hints_enabled",

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
-  title: Lab API (IF-2), browser-facing fragment, contract v2.0.0
-  version: 2.0.0
+  title: Lab API (IF-2), browser-facing fragment, contract v2.1.0
+  version: 2.1.0
   description: |
     The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
     flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
@@ -218,6 +218,28 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/TooLarge' }
         '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/release:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [attempts]
+      operationId: releaseResults
+      summary: Release a candidate's results (the recruiter of the company)
+      description: |
+        Since v2.1.0 (handoff H-355, OI-15). When the invite says `results_visibility: after_release`, the candidate sees no score and no earned progress
+        (`getScore` answers 404, `listChallenges` shows nothing earned) until the recruiter of the owning company calls this once the attempt has ended
+        (`submitted`, `reported` or `expired`; otherwise 409 ATT-INVALID-STATE). Repeating it changes nothing. The candidate and anyone else get the 404 of every
+        attempt route. The answer is the attempt with `results_released: true`. The body is empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Invalid' }
   /api/v1/attempts/{attempt_id}/withdraw:
     parameters:
@@ -936,6 +958,9 @@ components:
           anyOf:
             - { $ref: '#/components/schemas/Timestamp' }
             - { type: 'null' }
+        results_released:
+          description: Optional (v2.1.0). Only on a company assessment whose invite says `after_release`; true once the recruiter released the results. Absent otherwise.
+          type: boolean
         server_time:
           description: The server clock; the browser timer is cosmetic (FR-SES-02).
           $ref: '#/components/schemas/Timestamp'
