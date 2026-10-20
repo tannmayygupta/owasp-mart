@@ -44,6 +44,21 @@ async function classify(raw) {
   return (ip && privateClass(ip)) || 'public';
 }
 
+// The link-local metadata address of a cloud instance, and where it really is in the lab: the instance network has no route to 169.254.169.254, so the importer
+// carries a player's request for the fixed address to the metadata mock of the same instance (port 9103), the way a cloud's own network would. Without this the
+// "ask the importer for its startup data" path of the hints leads nowhere (found by running the challenge against a deployed instance, story L-30).
+export const METADATA_ADDRESS = '169.254.169.254';
+export const METADATA_PORT = 9103;
+
+/** The URL that is really fetched: a request for the metadata address (any written form, the URL parser normalises 2852039166 or 0xa9fea9fe) goes to the mock. */
+export function routeMetadata(raw, env = process.env) {
+  let u;
+  try { u = new URL(raw); } catch { return raw; }
+  const mock = String(env.VM_MOCK_URL ?? '').replace(/\/$/, '');
+  if (u.hostname !== METADATA_ADDRESS || !(u.port === '' || u.port === '80') || !/^https?:\/\/[A-Za-z0-9.-]+$/.test(mock)) return raw;
+  return `${mock}:${METADATA_PORT}${u.pathname}${u.search}`;
+}
+
 // Import an image by URL. Returns { ok, preview | error }. Throws ValidationError
 // (-> 400) when the URL is refused.
 export async function importImageFromUrl(url, { challenges = {}, emit = () => {}, fetchImpl = fetch } = {}) {
@@ -72,7 +87,7 @@ export async function importImageFromUrl(url, { challenges = {}, emit = () => {}
   // Fetch with a timeout; a 1 MB cap in a real deployment. If the response is not
   // an image, the first 200 characters are shown (this is what leaks the flag).
   let res;
-  try { res = await fetchImpl(raw, { signal: AbortSignal.timeout(3000) }); }
+  try { res = await fetchImpl(routeMetadata(raw), { signal: AbortSignal.timeout(3000) }); }
   catch (e) { throw new ValidationError(`could not fetch the image (${e?.cause?.code || 'error'})`); }
   const ct = res.headers.get('content-type') || '';
   const body = (await res.text()).slice(0, 200);

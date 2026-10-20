@@ -1,0 +1,14 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (610.3143ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (227.7415ms)
+  ✔ admin (P-28): approve a company, lock a learner, change a setting and a quota the lab reads, capacity and jobs; nothing without the second factor (16581.6894ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (8497.1496ms)
+✔ platform and web profiles on a real Docker engine (77289.3994ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 91094.931

@@ -40,6 +40,9 @@
       "name": "privacy"
     },
     {
+      "name": "admin"
+    },
+    {
       "name": "catalogue"
     },
     {
@@ -1450,6 +1453,867 @@
           },
           "422": {
             "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/companies/pending": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "listPendingCompanies",
+        "summary": "Companies waiting for approval",
+        "description": "The approval queue (FR-ADM-01): the companies waiting for a decision, oldest first, with the owner's name and the domain of their address.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The queue.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingCompanyList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "org_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                          "name": "Acme Security Ltd",
+                          "owner_name": "Ana Owner",
+                          "owner_email_domain": "acme.example",
+                          "applied_at": "2026-10-19T09:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/companies/{org_id}/decision": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "decideCompany",
+        "summary": "Approve, reject, suspend or reinstate a company",
+        "description": "One decision on a company (FR-ADM-01). `reject`, `suspend` and `reinstate` need a `reason`; its text is not copied into the audit log. The company's owner is mailed the outcome. A company that is not in a state\nthe decision starts from (already decided) is 409; an unknown company is 404.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "The decision is made.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/AdminConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "listUsers",
+        "summary": "Search accounts",
+        "description": "Accounts for user management (FR-ADM-02): name, address, type, status and roles, newest first, never a password or a hash. `q` matches part of the name or address, or a whole user id.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "disabled"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The accounts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "user_id": "u-AAAAAAAAAAAAAAAA",
+                          "display_name": "Lena Learner",
+                          "email": "lena@college.example",
+                          "account_type": "participant",
+                          "status": "active",
+                          "roles": [
+                            "learner"
+                          ],
+                          "email_verified": true,
+                          "created_at": "2026-10-01T08:00:00Z",
+                          "last_login_at": "2026-10-18T17:30:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/users/{user_id}/actions": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "actOnUser",
+        "summary": "Lock, unlock, reset or delete an account",
+        "description": "An action on one account (FR-ADM-02), audited. `lock` disables the account and ends its sessions; `unlock` enables it again; `reset_password` mails a reset link to the account's own address (an admin never sees\nor sets a password); `delete` erases a participant's practice data and account (an account that holds assessment data is locked instead, outcome `locked_instead`) or marks a recruiter's account deleted.\n`lock`, `unlock` and `delete` need a `reason`, whose text is not copied into the audit log. An admin account, and the admin's own, cannot be changed here: 409. The outcome says what happened.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^u-[A-Z2-7]{16}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What happened.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserActionResult"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "outcome": "locked"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/AdminConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/attempts/{attempt_id}/force-stop": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "forceStopInstance",
+        "summary": "Force-stop an instance",
+        "description": "Destroys the instance of an attempt whatever its state (FR-ADM-04); the attempt keeps its state and clock; the owner is mailed. The answer says whether an instance was alive. Audited.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AttemptId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The instance is gone.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForceStopResult"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "attempt_id": "a-CANDIDATEATTEMPT",
+                      "instance_stopped": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "listSettings",
+        "summary": "All settings",
+        "description": "Every setting with its current value, its default, whether an admin changed it, and the range a number may be set to (FR-ADM-05).\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "responses": {
+          "200": {
+            "description": "The settings.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSettingList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "name": "candidate_retention_days",
+                          "value": 180,
+                          "default": 180,
+                          "overridden": false,
+                          "minimum": 30,
+                          "maximum": 365
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/settings/{name}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "updateSetting",
+        "summary": "Change a setting",
+        "description": "Sets one setting (FR-ADM-05). The value has the type of the default; a number must be in its range (a candidate retention default outside 30 to 365 days is 422). Old and new value are audited.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The setting now.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSetting"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "name": "candidate_retention_days",
+                      "value": 90,
+                      "default": 180,
+                      "overridden": true,
+                      "minimum": 30,
+                      "maximum": 365
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "resetSetting",
+        "summary": "Return a setting to its default",
+        "description": "Removes the admin's change of one setting (FR-ADM-05); audited.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The setting now.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSetting"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "name": "candidate_retention_days",
+                      "value": 180,
+                      "default": 180,
+                      "overridden": false,
+                      "minimum": 30,
+                      "maximum": 365
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/quotas": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "listQuotas",
+        "summary": "Instance quotas",
+        "description": "The quota rows an admin set (FR-ADM-05, OI-21): a user's, a company's and the global one. A user's beats a company's, which beats the global one; with none the limit is one instance.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "responses": {
+          "200": {
+            "description": "The quotas.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "scope": "global",
+                          "scope_id": null,
+                          "max_instances": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "setQuota",
+        "summary": "Set an instance quota",
+        "description": "Inserts or changes one quota (FR-ADM-05); the lab enforces it from the next request. A global quota has no `scope_id`, a user quota a user id, a company quota the company's id. 0 stops a user or company. Audited.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The quota now.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quota"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "scope": "user",
+                      "scope_id": "u-AAAAAAAAAAAAAAAA",
+                      "max_instances": 3
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "removeQuota",
+        "summary": "Remove an instance quota",
+        "description": "Removes one quota row; the next level applies (FR-ADM-05). `scope_id` is left out for the global quota. A quota that does not exist is 404. Audited.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "user",
+                "org",
+                "global"
+              ]
+            }
+          },
+          {
+            "name": "scope_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The quota is removed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/capacity": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getCapacity",
+        "summary": "Capacity",
+        "description": "Running instances, memory in use, queue depth (mails waiting, events not yet relayed) and failures (mails, jobs, instances) (FR-ADM-06). Counts and states only.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "responses": {
+          "200": {
+            "description": "The capacity.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capacity"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "instances": {
+                        "running": 3,
+                        "reported": 3,
+                        "failed": 0
+                      },
+                      "memory": {
+                        "capacity_mb": 8192,
+                        "used_mb": 2048,
+                        "health": "ok"
+                      },
+                      "queue": {
+                        "emails_waiting": 0,
+                        "events_unpublished": 0
+                      },
+                      "failures": {
+                        "emails_failed": 0,
+                        "jobs_failed": 0,
+                        "instances_failed": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/jobs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "listJobs",
+        "summary": "Scheduled jobs and their last runs",
+        "description": "Every scheduled job with its interval, its last run (status and a fixed summary, or the class of the error) and when it is next due (FR-PRV-18).\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "responses": {
+          "200": {
+            "description": "The jobs.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "name": "log_purge",
+                          "interval_seconds": 86400,
+                          "last_started_at": "2026-10-19T03:00:00Z",
+                          "last_finished_at": "2026-10-19T03:00:01Z",
+                          "last_status": "succeeded",
+                          "last_detail": "0 audit entries purged",
+                          "last_success_at": "2026-10-19T03:00:01Z",
+                          "next_due_at": "2026-10-20T03:00:01Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
           }
         },
         "x-fragment": "platform"
@@ -3504,6 +4368,576 @@
           }
         }
       },
+      "PendingCompany": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "org_id",
+          "name",
+          "owner_name",
+          "owner_email_domain",
+          "applied_at"
+        ],
+        "properties": {
+          "org_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "owner_name": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "owner_email_domain": {
+            "type": "string",
+            "maxLength": 253
+          },
+          "applied_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "PendingCompanyList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/PendingCompany"
+            }
+          }
+        }
+      },
+      "CompanyDecisionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "enum": [
+              "approve",
+              "reject",
+              "suspend",
+              "reinstate"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "AdminUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "user_id",
+          "display_name",
+          "email",
+          "account_type",
+          "status",
+          "roles",
+          "email_verified",
+          "created_at",
+          "last_login_at"
+        ],
+        "properties": {
+          "user_id": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "account_type": {
+            "enum": [
+              "participant",
+              "recruiter",
+              "admin"
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "learner",
+                "candidate"
+              ]
+            }
+          },
+          "email_verified": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "last_login_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "AdminUserList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            }
+          }
+        }
+      },
+      "UserActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "lock",
+              "unlock",
+              "reset_password",
+              "delete"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "UserActionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "enum": [
+              "locked",
+              "unlocked",
+              "reset_sent",
+              "deleted",
+              "locked_instead"
+            ]
+          }
+        }
+      },
+      "ForceStopResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attempt_id",
+          "instance_stopped"
+        ],
+        "properties": {
+          "attempt_id": {
+            "$ref": "#/components/schemas/AttemptId"
+          },
+          "instance_stopped": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AdminSetting": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "value",
+          "default",
+          "overridden",
+          "minimum",
+          "maximum"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "default": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "overridden": {
+            "type": "boolean"
+          },
+          "minimum": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "maximum": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "AdminSettingList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSetting"
+            }
+          }
+        }
+      },
+      "SettingUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          }
+        }
+      },
+      "Quota": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "scope_id",
+          "max_instances"
+        ],
+        "properties": {
+          "scope": {
+            "enum": [
+              "user",
+              "org",
+              "global"
+            ]
+          },
+          "scope_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "max_instances": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      },
+      "QuotaList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Quota"
+            }
+          }
+        }
+      },
+      "QuotaRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "max_instances"
+        ],
+        "properties": {
+          "scope": {
+            "enum": [
+              "user",
+              "org",
+              "global"
+            ]
+          },
+          "scope_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "max_instances": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      },
+      "Capacity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "instances",
+          "memory",
+          "queue",
+          "failures"
+        ],
+        "properties": {
+          "instances": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "running",
+              "reported",
+              "failed"
+            ],
+            "properties": {
+              "running": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reported": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "memory": {
+            "description": "Null when this process has no lab to ask.",
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "capacity_mb",
+                  "used_mb",
+                  "health"
+                ],
+                "properties": {
+                  "capacity_mb": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "used_mb": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "health": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "queue": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "emails_waiting",
+              "events_unpublished"
+            ],
+            "properties": {
+              "emails_waiting": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "events_unpublished": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "failures": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "emails_failed",
+              "jobs_failed",
+              "instances_failed"
+            ],
+            "properties": {
+              "emails_failed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "jobs_failed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "instances_failed": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "JobStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "interval_seconds",
+          "last_started_at",
+          "last_finished_at",
+          "last_status",
+          "last_detail",
+          "last_success_at",
+          "next_due_at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "interval_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last_started_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_finished_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_status": {
+            "enum": [
+              "running",
+              "succeeded",
+              "failed",
+              null
+            ]
+          },
+          "last_detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_success_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_due_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "JobStatusList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobStatus"
+            }
+          }
+        }
+      },
       "Owasp": {
         "type": "string",
         "pattern": "^A(0[1-9]|10)$"
@@ -5192,6 +6626,58 @@
       },
       "DeletionConflict": {
         "description": "The caller already has an open request of this kind, the request is not open any more, the attempt is not over, or the account is not a learner (ATT-INVALID-STATE).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "examples": {
+              "default": {
+                "value": {
+                  "type": "urn:vulnmart:error:ATT-INVALID-STATE",
+                  "title": "This action is not allowed in the attempt's current state.",
+                  "status": 409,
+                  "code": "ATT-INVALID-STATE",
+                  "request_id": "req-0a1b2c3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AdminNotFound": {
+        "description": "Not found: no such company, account, attempt, setting or quota, or the caller is not an admin with a second factor (the same answer, REQ-ROUTE-UNKNOWN).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "examples": {
+              "default": {
+                "value": {
+                  "type": "urn:vulnmart:error:REQ-ROUTE-UNKNOWN",
+                  "title": "Route not found.",
+                  "status": 404,
+                  "code": "REQ-ROUTE-UNKNOWN",
+                  "request_id": "req-0a1b2c3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AdminConflict": {
+        "description": "The change does not start from the state it is asked for (a company already decided, an account not active), or it names an admin account or the admin's own (ATT-INVALID-STATE).",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/CacheControl"

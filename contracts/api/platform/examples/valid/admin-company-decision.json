@@ -1,0 +1,7 @@
+{
+  "schema": "CompanyDecisionRequest",
+  "body": {
+    "decision": "reject",
+    "reason": "The company domain could not be matched to a real business."
+  }
+}

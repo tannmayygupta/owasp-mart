@@ -414,6 +414,250 @@ class DataViewList(BaseModel):
     has_more: bool
 
 
+class PendingCompany(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    org_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        ),
+    ]
+    name: Annotated[str, Field(max_length=120)]
+    owner_name: Annotated[str, Field(max_length=60)]
+    owner_email_domain: Annotated[str, Field(max_length=253)]
+    applied_at: Timestamp
+
+
+class PendingCompanyList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[PendingCompany], Field(max_length=100)]
+
+
+class Decision2(Enum):
+    approve = 'approve'
+    reject = 'reject'
+    suspend = 'suspend'
+    reinstate = 'reinstate'
+
+
+class CompanyDecisionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    decision: Decision2
+    reason: Annotated[str | None, Field(max_length=500, min_length=1)] = None
+
+
+class Status2(Enum):
+    active = 'active'
+    disabled = 'disabled'
+
+
+class Role(Enum):
+    learner = 'learner'
+    candidate = 'candidate'
+
+
+class AdminUser(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    user_id: UserId
+    display_name: Annotated[str, Field(max_length=60)]
+    email: Annotated[str, Field(max_length=254)]
+    account_type: AccountType
+    status: Status2
+    roles: list[Role]
+    email_verified: bool
+    created_at: Timestamp
+    last_login_at: Timestamp | None
+
+
+class AdminUserList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[AdminUser], Field(max_length=100)]
+
+
+class Action1(Enum):
+    lock = 'lock'
+    unlock = 'unlock'
+    reset_password = 'reset_password'
+    delete = 'delete'
+
+
+class UserActionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    action: Action1
+    reason: Annotated[str | None, Field(max_length=500, min_length=1)] = None
+
+
+class Outcome(Enum):
+    locked = 'locked'
+    unlocked = 'unlocked'
+    reset_sent = 'reset_sent'
+    deleted = 'deleted'
+    locked_instead = 'locked_instead'
+
+
+class UserActionResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outcome: Outcome
+
+
+class ForceStopResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: AttemptId
+    instance_stopped: bool
+
+
+class AdminSetting(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str
+    value: int | bool | str
+    default: int | bool | str
+    overridden: bool
+    minimum: int | None
+    maximum: int | None
+
+
+class AdminSettingList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[AdminSetting]
+
+
+class Value(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class SettingUpdateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: int | bool | Value
+
+
+class Scope(Enum):
+    user = 'user'
+    org = 'org'
+    global_ = 'global'
+
+
+class Quota(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: Scope
+    scope_id: Annotated[str | None, Field(max_length=64)]
+    max_instances: Annotated[int, Field(ge=0, le=10000)]
+
+
+class QuotaList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[Quota]
+
+
+class QuotaRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: Scope
+    scope_id: Annotated[str | None, Field(max_length=64)] = None
+    max_instances: Annotated[int, Field(ge=0, le=10000)]
+
+
+class Instances(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    running: Annotated[int, Field(ge=0)]
+    reported: Annotated[int, Field(ge=0)]
+    failed: Annotated[int, Field(ge=0)]
+
+
+class Memory(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    capacity_mb: Annotated[int, Field(ge=0)]
+    used_mb: Annotated[int, Field(ge=0)]
+    health: str
+
+
+class Queue(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    emails_waiting: Annotated[int, Field(ge=0)]
+    events_unpublished: Annotated[int, Field(ge=0)]
+
+
+class Failures(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    emails_failed: Annotated[int, Field(ge=0)]
+    jobs_failed: Annotated[int, Field(ge=0)]
+    instances_failed: Annotated[int, Field(ge=0)]
+
+
+class Capacity(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    instances: Instances
+    memory: Annotated[
+        Memory | None, Field(description='Null when this process has no lab to ask.')
+    ]
+    queue: Queue
+    failures: Failures
+
+
+class LastStatus(Enum):
+    running = 'running'
+    succeeded = 'succeeded'
+    failed = 'failed'
+    NoneType_None = None
+
+
+class JobStatus(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str
+    interval_seconds: Annotated[int, Field(ge=1)]
+    last_started_at: Timestamp | None
+    last_finished_at: Timestamp | None
+    last_status: LastStatus
+    last_detail: str | None
+    last_success_at: Timestamp | None
+    next_due_at: Timestamp
+
+
+class JobStatusList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[JobStatus]
+
+
 class Owasp(RootModel[str]):
     root: Annotated[str, Field(pattern='^A(0[1-9]|10)$')]
 
@@ -1009,7 +1253,7 @@ class Type(Enum):
     similarity = 'similarity'
 
 
-class Status2(Enum):
+class Status3(Enum):
     open = 'open'
     accepted = 'accepted'
     rejected = 'rejected'
@@ -1027,7 +1271,7 @@ class IntegrityFlag(BaseModel):
     type: Type
     challenge_key: ChallengeKey | None
     explanation: Annotated[str, Field(max_length=500, min_length=1)]
-    status: Status2
+    status: Status3
     held: Annotated[
         bool,
         Field(
@@ -1052,7 +1296,7 @@ class IntegrityFlagList(BaseModel):
     ]
 
 
-class Decision2(Enum):
+class Decision3(Enum):
     accept = 'accept'
     reject = 'reject'
 
@@ -1061,7 +1305,7 @@ class IntegrityDecisionRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    decision: Decision2
+    decision: Decision3
     note: Annotated[str, Field(max_length=1000, min_length=1)]
 
 

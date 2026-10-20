@@ -49,6 +49,8 @@ from vulnmart.orgs.service import CompanyService
 from vulnmart.ports.attempts import AttemptPort
 from vulnmart.privacy.api import router as consent_router
 from vulnmart.privacy.deletion_api import router as deletion_router
+from vulnmart.admin.api import router as admin_router
+from vulnmart.kernel.quota import DbQuotaPort
 from vulnmart.privacy.consent import ConsentService
 from vulnmart.privacy.targets import ConsentTargets, FakeConsentTargets
 
@@ -272,6 +274,25 @@ def create_app(
                                               eraser=lab.erase if lab is not None else None, anchors=app.state.audit_anchors,
                                               streams=store if isinstance(store, ValkeyStreamStore) else None, public_origin=settings.public_origin,
                                               deletion=app.state.deletion_service)
+    # The admin's operations (story P-28): the queue, users, force-stop, settings, quotas, capacity and the scheduler's runs, behind admin-only routes. They need the database,
+    # the company and role services and the quota table; a lab in this process gives force-stop and the capacity view (without one force-stop answers 500 and capacity shows no hosts).
+    app.state.admin_ops = None
+    if (ports.sessions is not None and app.state.companies is not None and app.state.roles is not None and app.state.accounts is not None
+            and app.state.session_service is not None and isinstance(ports.quota, DbQuotaPort)):
+        from vulnmart.accounts.status import AccountStatusService as _Status
+        from vulnmart.admin.ops import AdminOps
+        from vulnmart.privacy.retention.records import SqlAttemptRecords as _Records
+        from vulnmart.privacy.subjects import SubjectService as _Subjects
+
+        _subjects = _Subjects(ports.audit_sessions) if ports.audit_sessions is not None else None
+        app.state.admin_ops = AdminOps(
+            sessions=ports.sessions, roles=app.state.roles, companies=app.state.companies, status=_Status(ports.sessions, app.state.roles, ports.audit),
+            accounts=app.state.accounts, settings=ports.settings, quotas=ports.quota, audit=ports.audit, records=_Records(ports.sessions), deletion=app.state.deletion_service,
+            end_sessions=app.state.session_service.revoke_all, stopper=lab.force_stop if lab is not None else None,
+            host_status=(lambda: lab.host.host_status()) if lab is not None else None, instance_states=(lambda: lab.instance_states) if lab is not None else None,
+            job_status=(lambda: app.state.scheduler.status()) if app.state.scheduler is not None else None,
+            pseudonym=_subjects.pseudonym if _subjects is not None else None)
+    app.include_router(admin_router)
     app.include_router(accounts_router)
     app.include_router(session_router)
     app.include_router(password_router)

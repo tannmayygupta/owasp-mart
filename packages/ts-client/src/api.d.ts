@@ -421,6 +421,234 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/companies/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Companies waiting for approval
+         * @description The approval queue (FR-ADM-01): the companies waiting for a decision, oldest first, with the owner's name and the domain of their address.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        get: operations["listPendingCompanies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{org_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve, reject, suspend or reinstate a company
+         * @description One decision on a company (FR-ADM-01). `reject`, `suspend` and `reinstate` need a `reason`; its text is not copied into the audit log. The company's owner is mailed the outcome. A company that is not in a state
+         *     the decision starts from (already decided) is 409; an unknown company is 404.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        post: operations["decideCompany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search accounts
+         * @description Accounts for user management (FR-ADM-02): name, address, type, status and roles, newest first, never a password or a hash. `q` matches part of the name or address, or a whole user id.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        get: operations["listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock, unlock, reset or delete an account
+         * @description An action on one account (FR-ADM-02), audited. `lock` disables the account and ends its sessions; `unlock` enables it again; `reset_password` mails a reset link to the account's own address (an admin never sees
+         *     or sets a password); `delete` erases a participant's practice data and account (an account that holds assessment data is locked instead, outcome `locked_instead`) or marks a recruiter's account deleted.
+         *     `lock`, `unlock` and `delete` need a `reason`, whose text is not copied into the audit log. An admin account, and the admin's own, cannot be changed here: 409. The outcome says what happened.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        post: operations["actOnUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/attempts/{attempt_id}/force-stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force-stop an instance
+         * @description Destroys the instance of an attempt whatever its state (FR-ADM-04); the attempt keeps its state and clock; the owner is mailed. The answer says whether an instance was alive. Audited.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        post: operations["forceStopInstance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All settings
+         * @description Every setting with its current value, its default, whether an admin changed it, and the range a number may be set to (FR-ADM-05).
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        get: operations["listSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/settings/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a setting
+         * @description Sets one setting (FR-ADM-05). The value has the type of the default; a number must be in its range (a candidate retention default outside 30 to 365 days is 422). Old and new value are audited.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        put: operations["updateSetting"];
+        post?: never;
+        /**
+         * Return a setting to its default
+         * @description Removes the admin's change of one setting (FR-ADM-05); audited.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        delete: operations["resetSetting"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/quotas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Instance quotas
+         * @description The quota rows an admin set (FR-ADM-05, OI-21): a user's, a company's and the global one. A user's beats a company's, which beats the global one; with none the limit is one instance.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        get: operations["listQuotas"];
+        /**
+         * Set an instance quota
+         * @description Inserts or changes one quota (FR-ADM-05); the lab enforces it from the next request. A global quota has no `scope_id`, a user quota a user id, a company quota the company's id. 0 stops a user or company. Audited.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        put: operations["setQuota"];
+        post?: never;
+        /**
+         * Remove an instance quota
+         * @description Removes one quota row; the next level applies (FR-ADM-05). `scope_id` is left out for the global quota. A quota that does not exist is 404. Audited.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        delete: operations["removeQuota"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Capacity
+         * @description Running instances, memory in use, queue depth (mails waiting, events not yet relayed) and failures (mails, jobs, instances) (FR-ADM-06). Counts and states only.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        get: operations["getCapacity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Scheduled jobs and their last runs
+         * @description Every scheduled job with its interval, its last run (status and a fixed summary, or the class of the error) and when it is next due (FR-PRV-18).
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        get: operations["listJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/challenges": {
         parameters: {
             query?: never;
@@ -1224,6 +1452,115 @@ export interface components {
             items: components["schemas"]["DataView"][];
             has_more: boolean;
         };
+        PendingCompany: {
+            org_id: string;
+            name: string;
+            owner_name: string;
+            owner_email_domain: string;
+            applied_at: components["schemas"]["Timestamp"];
+        };
+        PendingCompanyList: {
+            items: components["schemas"]["PendingCompany"][];
+        };
+        CompanyDecisionRequest: {
+            /** @enum {unknown} */
+            decision: "approve" | "reject" | "suspend" | "reinstate";
+            reason?: string;
+        };
+        AdminUser: {
+            user_id: components["schemas"]["UserId"];
+            display_name: string;
+            email: string;
+            /** @enum {unknown} */
+            account_type: "participant" | "recruiter" | "admin";
+            /** @enum {unknown} */
+            status: "active" | "disabled";
+            roles: ("learner" | "candidate")[];
+            email_verified: boolean;
+            created_at: components["schemas"]["Timestamp"];
+            last_login_at: components["schemas"]["Timestamp"] | null;
+        };
+        AdminUserList: {
+            items: components["schemas"]["AdminUser"][];
+        };
+        UserActionRequest: {
+            /** @enum {unknown} */
+            action: "lock" | "unlock" | "reset_password" | "delete";
+            reason?: string;
+        };
+        UserActionResult: {
+            /** @enum {unknown} */
+            outcome: "locked" | "unlocked" | "reset_sent" | "deleted" | "locked_instead";
+        };
+        ForceStopResult: {
+            attempt_id: components["schemas"]["AttemptId"];
+            instance_stopped: boolean;
+        };
+        AdminSetting: {
+            name: string;
+            value: number | boolean | string;
+            default: number | boolean | string;
+            overridden: boolean;
+            minimum: number | null;
+            maximum: number | null;
+        };
+        AdminSettingList: {
+            items: components["schemas"]["AdminSetting"][];
+        };
+        SettingUpdateRequest: {
+            value: number | boolean | string;
+        };
+        Quota: {
+            /** @enum {unknown} */
+            scope: "user" | "org" | "global";
+            scope_id: string | null;
+            max_instances: number;
+        };
+        QuotaList: {
+            items: components["schemas"]["Quota"][];
+        };
+        QuotaRequest: {
+            /** @enum {unknown} */
+            scope: "user" | "org" | "global";
+            scope_id?: string | null;
+            max_instances: number;
+        };
+        Capacity: {
+            instances: {
+                running: number;
+                reported: number;
+                failed: number;
+            };
+            /** @description Null when this process has no lab to ask. */
+            memory: {
+                capacity_mb: number;
+                used_mb: number;
+                health: string;
+            } | null;
+            queue: {
+                emails_waiting: number;
+                events_unpublished: number;
+            };
+            failures: {
+                emails_failed: number;
+                jobs_failed: number;
+                instances_failed: number;
+            };
+        };
+        JobStatus: {
+            name: string;
+            interval_seconds: number;
+            last_started_at: components["schemas"]["Timestamp"] | null;
+            last_finished_at: components["schemas"]["Timestamp"] | null;
+            /** @enum {unknown} */
+            last_status: "running" | "succeeded" | "failed" | null;
+            last_detail: string | null;
+            last_success_at: components["schemas"]["Timestamp"] | null;
+            next_due_at: components["schemas"]["Timestamp"];
+        };
+        JobStatusList: {
+            items: components["schemas"]["JobStatus"][];
+        };
         Owasp: string;
         CatalogueSummary: {
             challenge_key: components["schemas"]["ChallengeKey"];
@@ -1679,6 +2016,26 @@ export interface components {
         };
         /** @description The caller already has an open request of this kind, the request is not open any more, the attempt is not over, or the account is not a learner (ATT-INVALID-STATE). */
         DeletionConflict: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Not found: no such company, account, attempt, setting or quota, or the caller is not an admin with a second factor (the same answer, REQ-ROUTE-UNKNOWN). */
+        AdminNotFound: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The change does not start from the state it is asked for (a company already decided, an account not active), or it names an admin account or the admin's own (ATT-INVALID-STATE). */
+        AdminConflict: {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
                 [name: string]: unknown;
@@ -2480,6 +2837,369 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             422: components["responses"]["Invalid"];
+        };
+    };
+    listPendingCompanies: {
+        parameters: {
+            query?: {
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The queue. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingCompanyList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    decideCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description The decision is made. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            409: components["responses"]["AdminConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: "active" | "disabled";
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accounts. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    actOnUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserActionRequest"];
+            };
+        };
+        responses: {
+            /** @description What happened. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserActionResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            409: components["responses"]["AdminConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    forceStopInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["schemas"]["AttemptId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The instance is gone. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForceStopResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSettingList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+        };
+    };
+    updateSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The setting now. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSetting"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    resetSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting now. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSetting"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listQuotas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quotas. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+        };
+    };
+    setQuota: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaRequest"];
+            };
+        };
+        responses: {
+            /** @description The quota now. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quota"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    removeQuota: {
+        parameters: {
+            query: {
+                scope: "user" | "org" | "global";
+                scope_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quota is removed. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getCapacity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The capacity. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Capacity"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+        };
+    };
+    listJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The jobs. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStatusList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
         };
     };
     listCatalogue: {

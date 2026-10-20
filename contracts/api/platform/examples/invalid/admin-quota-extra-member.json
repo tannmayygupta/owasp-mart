@@ -1,0 +1,10 @@
+{
+  "schema": "QuotaRequest",
+  "body": {
+    "scope": "global",
+    "max_instances": 2,
+    "note": "why"
+  },
+  "path": "/note",
+  "rule": "no member besides scope, scope_id and max_instances"
+}

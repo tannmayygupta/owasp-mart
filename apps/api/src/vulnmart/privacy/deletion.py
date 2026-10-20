@@ -272,6 +272,11 @@ class DeletionService:
                 session.execute(update(DeletionRequest).where(DeletionRequest.id == request_id, DeletionRequest.status.in_(OPEN)).values(status="done", finished_at=now))
         return f"{learners} learner requests done ({kept} kept the account for assessment data), {candidates} candidate requests done, {escalated} escalated"
 
+    def delete_learner_account(self, user_id: str) -> bool:
+        """An admin deletes a participant's account now (story P-28, FR-ADM-02): the practice attempts are erased and, unless the account holds assessment data, the account and its
+        pseudonym go. True when the account went, False when it was kept for that data (the caller locks it instead)."""
+        return self._execute_learner(user_id, self._now())
+
     def _execute_learner(self, user_id: str, now: datetime) -> bool:
         """Delete the practice attempts and, unless the account holds assessment data, the account. True when the account went."""
         attempts = self._records.learner_attempts(user_id)

@@ -33,13 +33,14 @@ SAMPLES: dict[str, dict] = {
                                              "link": "https://vulnmart.example/requests/1"},
     "privacy.deletion_confirmed": {"completed_on": "2026-10-24"},
     "learner.retention_warning": {"delete_on": "2026-11-16", "login_url": "https://vulnmart.example/login"},
+    "instance.force_stopped": {},
 }
 FORBIDDEN_NAMES = ("password", "token", "flag", "secret", "api_key", "email", "address", "to")
 
 
 def test_the_samples_cover_every_type():
     # nine types of FR-NTF-01, `account.already_registered` that the signup contract asks for (story P-11) and `account.admin_created` (story P-13)
-    assert set(SAMPLES) == set(EMAIL_TYPES) and len(EMAIL_TYPES) == 11
+    assert set(SAMPLES) == set(EMAIL_TYPES) and len(EMAIL_TYPES) == 12
 
 
 @pytest.mark.parametrize("name", EMAIL_TYPES)
