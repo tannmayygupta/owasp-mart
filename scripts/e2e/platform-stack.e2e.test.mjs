@@ -1857,6 +1857,41 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal(refused.status, 404);
   }, { timeout: 300000 });
 
+  // Story P-30: the admin dashboard page is served with the CSP, and every admin read of personal data is in the audit log on the real stack: reading the users and
+  // the approval queue each adds one row, without the search text. A learner gets the answer of an unknown route.
+  test('admin dashboard (P-30): the page is served; reading users and the queue is audited without the search text; a learner gets 404', async () => {
+    const page = await fetch(`${ORIGIN}/admin`, { signal: AbortSignal.timeout(60000) });
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get('content-security-policy') ?? '', /'nonce-[A-Za-z0-9+/=]+'/);
+    const password = 'correct horse battery staple';
+    const adminEmail = `e2e-dash-admin2-${RUN}@example.com`;
+    const learner = `e2e-wall-${RUN}@example.org`;
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const seeded = docker('exec', '-e', `VULNMART_SEED_ADMIN_PASSWORD=${password}`, NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Dash Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    const login = await postJson('/api/v1/session', { email: adminEmail, password });
+    assert.equal(login.status, 200);
+    const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(login.headers.getSetCookie()[0])[1]}`;
+    psql(`UPDATE sessions SET mfa_at = now() WHERE user_id = '${adminId}'`); // the stack has no authenticator app: the second factor is marked as in the P-28 test
+    const count = (action) => Number(psql(`SELECT count(*) FROM audit_log WHERE action = '${action}'`));
+    const [users0, queue0] = [count('admin.users_read'), count('admin.queue_read')];
+    const searched = await call('GET', `/api/v1/admin/users?q=${encodeURIComponent('secret-search-text')}`, { headers: { cookie } });
+    assert.equal(searched.status, 200);
+    assert.equal((await call('GET', '/api/v1/admin/companies/pending', { headers: { cookie } })).status, 200);
+    assert.equal(count('admin.users_read'), users0 + 1, 'the users read is audited');
+    assert.equal(count('admin.queue_read'), queue0 + 1, 'the queue read is audited');
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE details::text LIKE '%secret-search-text%'`), '0', 'the search text is not in the audit log');
+    // a learner finds no admin route
+    assert.equal((await postJson('/api/v1/accounts', { email: learner, password, display_name: 'E2E Wall', age_declaration: true })).status, 202);
+    psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${learner}'`);
+    const lr = await postJson('/api/v1/session', { email: learner, password });
+    const lcookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(lr.headers.getSetCookie()[0])[1]}`;
+    const refused = await call('GET', '/api/v1/admin/users', { headers: { cookie: lcookie } });
+    assert.equal(refused.status, 404);
+    assert.equal((await refused.json()).code, 'REQ-ROUTE-UNKNOWN');
+  }, { timeout: 300000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

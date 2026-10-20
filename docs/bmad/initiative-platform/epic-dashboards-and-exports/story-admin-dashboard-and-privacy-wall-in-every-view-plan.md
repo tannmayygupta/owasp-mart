@@ -3,7 +3,7 @@ title: 'Admin dashboard and privacy wall in every view'
 type: 'feature'
 ticket: '4'
 created: '2026-10-20'
-status: in-progress
+status: built
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -52,7 +52,7 @@ context:
 
 **Execution:**
 - [x] Admin read audits; the privacy-wall test (2026-10-20: admin tests 90, privacy wall 7).
-- [ ] The admin dashboard page; the stack test.
+- [x] The admin dashboard page; the stack test (2026-10-20: the stack test 8 of 8 on real Docker).
 
 **Acceptance Criteria:**
 - Given an admin with a second factor, then the dashboard shows the queue, users, capacity, jobs, settings and quotas, and reading users or the queue is audited.
@@ -62,9 +62,20 @@ context:
 
 ## Review Triage Log
 
+### 2026-10-20, quick review (lens: quick), loop 1
+Run in the main session, not by an independent subagent.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | `users()` checked the admin twice | low | patch | the first check's id is reused |
+| 2 | Eve's consent try was refused by validation, not by the wall | medium | patch | the real notice values; 404 now proves ownership |
+| 3 | A candidate cannot start an assessment (no lab start route) | high | defer | handoff H-356 to stream L (OI-22) |
+
 ## Verification
 
 **Commands:**
 - `pytest apps/api/tests` with the Postgres and Valkey addresses set -- expected: pass
 - web tests, `tsc --noEmit`, `next build` -- expected: pass
 - `node --test scripts/e2e/platform-stack.e2e.test.mjs` (the P-30 test) -- expected: pass
+
+**Results (2026-10-20):** see the dev-log `docs/dev-log/2026-10-20-akshaay29-p30-admin-dashboard-and-privacy-wall.md`: privacy wall 7, admin 90, full pytest 2830 passed, stack 8 of 8.
