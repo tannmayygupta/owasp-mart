@@ -192,6 +192,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My sessions
+         * @description The caller's own live sessions, the newest 100, newest first (story 3.6, FR-ACC-04): a `ref` to end one by (the first 16 hex characters of the stored hash of the session value,
+         *     useless as a credential), when it began and was last used, a coarse network prefix (IPv4 /24, IPv6 /48, never the address), the kind of client
+         *     (`browser`, `mobile` or `tool`) and whether it is the session making this call. Ended, idle and expired sessions are not listed.
+         */
+        get: operations["listMySessions"];
+        put?: never;
+        post?: never;
+        /**
+         * Log out everywhere
+         * @description Ends every session of the caller at once, this one included (FR-ACC-04); the answer clears the cookie. Written to the audit log. The body is empty.
+         */
+        delete: operations["logOutEverywhere"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/sessions/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End one of my sessions
+         * @description Ends the caller's session with this `ref` (from listMySessions). The answer is 204 whether or not a live session of the caller had this ref (it may have ended
+         *     already, or belong to someone else): the list shows what is left. Ending the session making the call also clears the cookie. Written to the audit log when a
+         *     session ended. A ref that is not 16 lower-case hex characters is 422.
+         */
+        delete: operations["revokeMySession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/mfa": {
         parameters: {
             query?: never;
@@ -1868,6 +1916,22 @@ export interface components {
         DeletionRequestList: {
             items: components["schemas"]["DeletionRequest"][];
         };
+        /** @description A handle for one of the caller's sessions: the first 16 hex characters of the stored hash of the session value. */
+        SessionRef: string;
+        MySession: {
+            ref: components["schemas"]["SessionRef"];
+            created_at: components["schemas"]["Timestamp"];
+            last_seen_at: components["schemas"]["Timestamp"];
+            /** @description A network prefix (IPv4 /24, IPv6 /48), never the address. */
+            ip_trunc: string | null;
+            /** @enum {string|null} */
+            ua_class: "browser" | "mobile" | "tool" | null;
+            /** @description This is the session making the call. */
+            current: boolean;
+        };
+        MySessionList: {
+            items: components["schemas"]["MySession"][];
+        };
         DataView: {
             company_name: string;
             /** @enum {unknown} */
@@ -3143,6 +3207,75 @@ export interface operations {
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
             429: components["responses"]["RateLimited"];
+        };
+    };
+    listMySessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sessions. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySessionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    logOutEverywhere: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every session ended. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    "Set-Cookie": components["headers"]["SessionCookie"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+        };
+    };
+    revokeMySession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: components["schemas"]["SessionRef"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session is ended (or was not live). */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    "Set-Cookie": components["headers"]["SessionCookie"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            422: components["responses"]["Invalid"];
         };
     };
     startMfaEnrolment: {

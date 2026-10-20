@@ -1,0 +1,116 @@
+........................................................................ [  2%]
+........................................................................ [  4%]
+........................................................................ [  7%]
+........................................................................ [  9%]
+........................................................................ [ 12%]
+........................................................................ [ 14%]
+........................................................................ [ 17%]
+........................................................................ [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 29%]
+........................................................................ [ 32%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+........................................................................ [ 44%]
+........................................................................ [ 47%]
+........................................................................ [ 49%]
+........................................................................ [ 52%]
+........................................................................ [ 54%]
+..................................s..................................... [ 57%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+........................................................................ [ 64%]
+........................................................................ [ 67%]
+........................................................................ [ 69%]
+........................................................................ [ 72%]
+........................................................................ [ 74%]
+...................F.F.................................................. [ 77%]
+........................................................................ [ 79%]
+....................................................F................... [ 82%]
+........................................................................ [ 84%]
+........................................................................ [ 87%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+F....................................................................... [ 94%]
+........................................................................ [ 97%]
+........................................................................ [ 99%]
+........                                                                 [100%]
+================================== FAILURES ===================================
+___________________ test_the_fragment_has_the_planned_slice ___________________
+
+    def test_the_fragment_has_the_planned_slice():
+        ops = contract.operations(PLATFORM)
+>       assert len(ops) == 66  # story P-25 added four (deletion requests and the view history), story P-28 thirteen (the admin area), story P-26 three (the candidate's invites), story P-27 thirteen (the recruiter's company), story P-29 two (the exports), story P-31 six (the audit log and break-glass)
+        ^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 69 == 66
+E        +  where 69 = len([('/api/v1/health', 'get', {'tags': ['health'], 'operationId': 'getHealth', 'summary': 'Is the platform answering', 'd...was right). Repeated failures are throttled with\nback-off, never a permanent lockout (FR-ACC-08): 429.\n', ...}), ...])
+
+apps\api\tests\test_platform_contract.py:54: AssertionError
+________________ test_the_main_command_is_ok_on_the_real_files ________________
+
+capsys = <_pytest.capture.CaptureFixture object at 0x0000025AF80B7770>
+
+    def test_the_main_command_is_ok_on_the_real_files(capsys):
+        assert contract.main([]) == 0
+>       assert "OK: platform fragment 66 operations" in capsys.readouterr().out
+E       AssertionError: assert 'OK: platform fragment 66 operations' in 'OK: platform fragment 69 operations; bundle valid.\n'
+E        +  where 'OK: platform fragment 69 operations; bundle valid.\n' = CaptureResult(out='OK: platform fragment 69 operations; bundle valid.\n', err='').out
+E        +    where CaptureResult(out='OK: platform fragment 69 operations; bundle valid.\n', err='') = readouterr()
+E        +      where readouterr = <_pytest.capture.CaptureFixture object at 0x0000025AF80B7770>.readouterr
+
+apps\api\tests\test_platform_contract.py:66: AssertionError
+___________ test_every_operation_is_classified_and_has_a_wall_test ____________
+
+    def test_every_operation_is_classified_and_has_a_wall_test():
+        ops = operations()
+        missing = sorted(set(ops) - set(CLASSES))
+>       assert not missing, f"operations without a privacy-wall class: {missing}"
+E       AssertionError: operations without a privacy-wall class: ['listMySessions', 'logOutEverywhere', 'revokeMySession']
+E       assert not ['listMySessions', 'logOutEverywhere', 'revokeMySession']
+
+apps\api\tests\test_privacy_wall.py:89: AssertionError
+_ test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an_admin _
+
+sessions = sessionmaker(class_='Session', bind=Engine(sqlite://), autoflush=True, expire_on_commit=False)
+clock = <test_session_api.Clock object at 0x0000025A801F24E0>
+
+    def test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an_admin(sessions, clock):
+        with client(make_app(sessions, clock)) as c:
+            assert c.post("/api/v1/accounts", json=SIGNUP).status_code == 202
+            # the generated schema lists every route, including those of included routers
+            schema = c.app.openapi()["paths"]
+        with sessions() as s:
+            assert [(u.account_type) for u in s.scalars(select(User))] == ["participant"]
+        state_changing = {path for path, methods in schema.items() if set(methods) - {"get", "head", "options"} and not path.startswith(("/api/v1/_test", "/api/v1/admin/"))}
+        admin_area = {path for path, methods in schema.items() if path.startswith("/api/v1/admin/") and set(methods) - {"get", "head", "options"}}
+        assert "/api/v1/session" in schema and "get" in schema["/api/v1/session"], "the schema really lists the included routers"
+>       assert state_changing == {"/api/v1/accounts", "/api/v1/accounts/verify-email", "/api/v1/accounts/verify-email/resend", "/api/v1/session",
+                                  "/api/v1/password-reset/request", "/api/v1/password-reset/confirm", "/api/v1/me", "/api/v1/me/password",
+                                  "/api/v1/session/mfa", "/api/v1/me/mfa", "/api/v1/me/mfa/confirm", "/api/v1/consent", "/api/v1/me/deletion-requests",
+                                  "/api/v1/me/deletion-requests/{request_id}", "/api/v1/invites/open", "/api/v1/invites/accept", "/api/v1/recruiters",
+                                  "/api/v1/company/reapply", "/api/v1/company/terms", "/api/v1/company/templates", "/api/v1/company/templates/{template_id}",
+                                  "/api/v1/company/invites", "/api/v1/company/invites/{invite_id}/actions", "/api/v1/me/exports",
+                                  "/api/v1/company/exports"}
+E       AssertionError: assert {'/api/v1/acc...actions', ...} == {'/api/v1/acc...actions', ...}
+E         
+E         Extra items in the left set:
+E         '/api/v1/me/sessions/{ref}'
+E         '/api/v1/me/sessions'
+E         Use -v to get more diff
+
+apps\api\tests\test_role_gates.py:142: AssertionError
+---------------------------- Captured stderr call -----------------------------
+%(levelname)-5.5s [%(name)s] %(message)s
+------------------------------ Captured log call ------------------------------
+WARNING  vulnmart.kernel:services.py:99 ports audit, outbox, keys, quota are in-memory stubs until their stories (P-22)
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+FAILED apps/api/tests/test_platform_contract.py::test_the_fragment_has_the_planned_slice
+FAILED apps/api/tests/test_platform_contract.py::test_the_main_command_is_ok_on_the_real_files
+FAILED apps/api/tests/test_privacy_wall.py::test_every_operation_is_classified_and_has_a_wall_test
+FAILED apps/api/tests/test_role_gates.py::test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an_admin
+4 failed, 2883 passed, 1 skipped in 503.45s (0:08:23)
