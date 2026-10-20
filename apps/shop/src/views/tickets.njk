@@ -2,14 +2,15 @@
 {% block title %}Support{% endblock %}
 {% block body %}
 <h1>Support</h1>
+<p class="muted">Tell us what went wrong and an agent will get back to you.</p>
 <form method="post" action="/tickets" class="card">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <p><label>Subject<br><input name="subject" maxlength="120" required style="width:100%"></label></p>
-  <p><label>Message<br><textarea name="body" rows="5" maxlength="2000" style="width:100%"></textarea></label></p>
+  <label>Subject<input name="subject" maxlength="120" required></label>
+  <label>Message<textarea name="body" rows="5" maxlength="2000"></textarea></label>
   <button>Send to support</button>
 </form>
 <h2>Your tickets</h2>
 <table><tr><th>#</th><th>Subject</th><th>Status</th></tr>
-{% for t in tickets %}<tr><td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td><td>{{ t.subject }}</td><td>{{ t.status }}</td></tr>
+{% for t in tickets %}<tr><td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td><td>{{ t.subject }}</td><td><span class="badge b-{{ t.status }}">{{ t.status }}</span></td></tr>
 {% else %}<tr><td colspan="3" class="muted">No tickets yet.</td></tr>{% endfor %}</table>
 {% endblock %}

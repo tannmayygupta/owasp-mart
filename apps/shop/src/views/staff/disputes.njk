@@ -1,7 +1,7 @@
 {% extends "layout.njk" %}{% block title %}Disputes{% endblock %}{% block body %}
 <h1>Disputes</h1>
 <table><tr><th>#</th><th>Item</th><th>Status</th><th>Resolve</th></tr>
-{% for d in disputes %}<tr><td>{{ d.id }}</td><td>{{ d.order_item_id }}</td><td>{{ d.status }}</td>
+{% for d in disputes %}<tr><td>{{ d.id }}</td><td>{{ d.order_item_id }}</td><td><span class="badge b-{{ d.status }}">{{ d.status }}</span></td>
 <td><form class="inline" method="post" action="/staff/disputes/{{ d.id }}/move"><input type="hidden" name="csrf" value="{{ csrf }}">
 <select name="to"><option>under_review</option><option>resolved_customer</option><option>resolved_seller</option><option>escalated</option></select><button>Move</button></form></td>
 </tr>{% else %}<tr><td colspan="4" class="muted">No disputes.</td></tr>{% endfor %}</table>
