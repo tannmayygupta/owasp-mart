@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Refactor sweep (story 1.9): all 156 deferred platform findings recorded (fixed, closed, accepted, another stream, open decision); CI now typechecks and tests the dashboards and checks the two lockfiles; the injector exit codes are checked against the error registry; per-account limits on MFA enrolment and invite resends (placeholders); the seed command audits to the durable log; the consent screen has the unticked agree box with Start and Decline; D-98 to D-101 recorded; a lost-second-factor runbook.
 - Time warnings (story 2.3, FR-SES-03, FR-NTF-04): the attempt page shows 15 and 5 minutes left and the recruiter's live monitor marks each running candidate, both from `deadline_at`; the engine already records each warning once (`time_warning_sent`), now pinned by a test through the lab runtime; handoff H-359 (the report timeline does not list the warnings).
 - My sessions (story 3.6, FR-ACC-04; IF-1 1.7.0, re-approved in COMPAT.md): list my sessions, sign out one, sign out everywhere (routes and an account page section); the session ref must be hex, so a `%` ref can no longer end all of a user's sessions; both endings audited.
 - Recruiter and company routes (story 5.3, FR-ORG-01, FR-ORG-02): the routes were built by P-27 and P-28; one test now runs signup, the admin's queue and approval and the owner's standing through the routes with the real company service.

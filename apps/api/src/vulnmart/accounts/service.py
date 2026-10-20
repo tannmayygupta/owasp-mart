@@ -32,7 +32,7 @@ from .security import hash_password, new_token, new_user_id, normalize_email, sp
 logger = logging.getLogger("vulnmart.accounts")
 
 Clock = Callable[[], datetime]
-PASSWORD_MIN, PASSWORD_MAX = 12, 128
+PASSWORD_MIN = 12
 NAME_MAX = 60
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f  ]")
 _SPACE = re.compile(r"\s+")
@@ -64,12 +64,6 @@ def clean_display_name(raw: str) -> str:
     if not 1 <= len(text) <= NAME_MAX:
         raise InvalidInput("/display_name")
     return text
-
-
-def check_password(password: str) -> None:
-    """Length only, as the contract says (12 to 128). The breach-list check and the quality rules come with story P-14 (FR-ACC-08)."""
-    if not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
-        raise InvalidInput("/password")
 
 
 def check_new_password(policy: PasswordPolicy, password: str, *, pointer: str, email: str | None, display_name: str | None,

@@ -180,6 +180,23 @@ export function validateDir(dir) {
   return { problems, counts };
 }
 
+// The injector's exit codes in the instance contract (IF-6, contracts/instance/instance-contract.md) name IF-8 codes; the registry holds the same numbers as
+// `exit_code`. Story 1.9 (deferred item C2): the two lists must agree both ways. `markdown` is the contract's text; the rows are `| <number> | ... | `CODE` |`.
+export function exitCodeProblems(reg, markdown) {
+  const table = new Map();
+  for (const m of markdown.matchAll(/^\|\s*(\d+)\s*\|[^|\n]*\|\s*`([A-Z][A-Z0-9-]*)`\s*\|\s*$/gm)) table.set(m[2], Number(m[1]));
+  const problems = [];
+  const byCode = new Map(reg.codes.map((c) => [c.code, c]));
+  for (const [code, exit] of table) {
+    const entry = byCode.get(code);
+    if (!entry) problems.push(`the instance contract names ${code} for exit code ${exit}, which is not in ${REGISTRY_FILE}`);
+    else if (entry.exit_code !== exit) problems.push(`${code}: the instance contract says exit code ${exit}, ${REGISTRY_FILE} says ${entry.exit_code ?? 'none'}`);
+  }
+  for (const c of reg.codes) if (c.exit_code !== undefined && c.exit_code !== null && table.get(c.code) !== c.exit_code) problems.push(`${c.code}: exit code ${c.exit_code} in ${REGISTRY_FILE} is not in the instance contract's table`);
+  if (table.size === 0) problems.push('the instance contract has no exit-code table rows');
+  return problems;
+}
+
 export function main(argv = process.argv.slice(2), { log = console.log, err = console.error } = {}) {
   let dir = DEFAULT_DIR;
   for (let i = 0; i < argv.length; i++) {
@@ -194,6 +211,8 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
   }
   if (!fs.existsSync(dir)) { err(`Folder not found: ${dir}`); return 1; }
   const { problems, counts } = validateDir(dir);
+  const instanceContract = path.join(dir, '..', 'instance', 'instance-contract.md');
+  if (!problems.length && fs.existsSync(instanceContract)) problems.push(...exitCodeProblems(loadRegistry(dir), fs.readFileSync(instanceContract, 'utf8')));
   if (problems.length) {
     err(`FAIL: ${problems.length} problem(s)`);
     for (const p of problems) err(`  - ${p}`);

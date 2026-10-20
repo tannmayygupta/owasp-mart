@@ -62,6 +62,7 @@ async def start_enrolment(request: Request, auth: Authenticated = Depends(authen
     service = mfa_service(request)
     _, limiter = services(request)
     limit(request, limiter, "mfa-enrol:ip", ip_of(request), "rate_login_per_ip_per_hour")
+    limit(request, limiter, "mfa-enrol:user", auth.session.user.id, "rate_mfa_enrol_per_user_per_hour")  # one account from many addresses (story 1.9)
     try:
         uri = await asyncio.to_thread(service.start_enrolment, auth.session.user.id)
     except MfaState:

@@ -5,39 +5,24 @@ it comes from `VULNMART_SEED_ADMIN_PASSWORD`, or from one line on standard input
 makes a random one and prints it once. At least 16 characters. The account exists at once. It signs in with the password, but a session
 without a proved second factor has no admin role: the first thing the admin does is set up an authenticator app (story P-15). Nothing is changed when an account with that address exists already (exit code 3).
 
-Exit codes: 0 created, 2 a value is not acceptable, 3 the address already has an account, 1 anything else. The audit entry goes to the
-audit port; until the durable audit log exists (story P-17) it is also written to the log as a JSON line.
+Exit codes: 0 created, 2 a value is not acceptable, 3 the address already has an account, 1 anything else. The audit entry (`admin.created`) goes to the
+durable audit log in the same database, pseudonymised like every other entry (story P-17; story 1.9 replaced the in-memory stand-in).
 """
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import secrets
 import sys
-from collections.abc import Mapping
-from typing import Any
 
+from vulnmart.kernel.audit import DbAuditPort
 from vulnmart.kernel.db import make_engine, make_sessions
 from vulnmart.kernel.settings import DbSettingsPort, Settings
-from vulnmart.ports.audit import AuditRecord
-from vulnmart.ports.fakes import FakeAuditPort
+from vulnmart.privacy.subjects import PseudonymisingAudit, SubjectService
 
 from .admins import AdminService
 from .passwords import make_policy
 from .service import InvalidInput
-
-logger = logging.getLogger("vulnmart.audit")
-
-
-class LoggingAuditPort(FakeAuditPort):
-    """The in-memory audit stand-in that also writes each record to the log, so a seeded admin leaves a trace until story P-17."""
-
-    def append(self, *, actor: str, action: str, subject: str | None = None, details: Mapping[str, Any] | None = None) -> AuditRecord:
-        record = super().append(actor=actor, action=action, subject=subject, details=details)
-        logger.warning("audit (not durable until story P-17): %s by %s about %s %s", action, actor, subject, dict(record.details))
-        return record
-
 
 def parse(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="python -m vulnmart.accounts.seed_admin", description="Create the first admin account (FR-ACC-11).")
@@ -62,7 +47,8 @@ def main(argv: list[str] | None = None, *, settings: Settings | None = None, std
     else:
         password, generated = secrets.token_urlsafe(18), True  # 24 characters
     sessions = make_sessions(make_engine(settings.postgres_dsn), lambda: None)
-    service = AdminService(sessions, DbSettingsPort(sessions), LoggingAuditPort(), public_origin=settings.public_origin, policy=make_policy(settings))
+    audit = PseudonymisingAudit(DbAuditPort(sessions), SubjectService(sessions))
+    service = AdminService(sessions, DbSettingsPort(sessions), audit, public_origin=settings.public_origin, policy=make_policy(settings))
     try:
         created = service.seed_admin(email=args.email, display_name=args.name, password=password)
     except InvalidInput as exc:

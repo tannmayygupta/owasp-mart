@@ -287,3 +287,32 @@ def test_migrations_0009_and_0008_go_down_and_up_again(database, owner):
     with owner.connect() as c:
         assert c.execute(text("SELECT count(*) FROM pg_policies WHERE policyname IN ('admin_read', 'own_membership', 'own_join_request')")).scalar_one() == 3
         assert c.execute(text("SELECT to_regclass('dpa_acceptances')")).scalar_one() == "dpa_acceptances"
+
+def test_the_company_stream_is_granted_through_row_level_security_only_to_an_active_recruiter_of_an_active_company(companies, owner):
+    """Story 1.9 (deferred U5): the live hub's StreamAuthoriser with the real CompanyService.active_company_of on Postgres, as the application role with
+    row-level security, not only the SQLite test of story P-23."""
+    from vulnmart.accounts.sessions import ResolvedSession, UserView
+    from vulnmart.live.authorise import StreamAuthoriser
+
+    add_admin(owner)
+    signup(companies, "ana@acme.example", "Acme", "Ana A")
+    signup(companies, "bo@other.example", "Other", "Bo B")
+    with owner.begin() as c:
+        c.execute(text("UPDATE users SET email_verified_at = now()"))
+    for q in companies.pending(ADMIN_SCOPE):
+        companies.approve(ADMIN_SCOPE, q.org_id)
+    ana, bo = _uid(owner, "ana@acme.example"), _uid(owner, "bo@other.example")
+    acme, other = companies.standing(ana).org_id, companies.standing(bo).org_id
+    now = datetime.now(UTC)
+
+    def session(uid, org_id):
+        user = UserView(id=uid, email="x@example.org", display_name="X", account_type="recruiter", email_verified=True, mfa_enabled=False, created_at=now)
+        return ResolvedSession(token_hash="0" * 64, user=user, roles=frozenset({Role.RECRUITER}), last_seen_at=now, idle_expires_at=now, absolute_expires_at=now,
+                               org_id=org_id)
+
+    authorise = StreamAuthoriser(companies.active_company_of)
+    assert authorise.streams(session(ana, acme)) == [f"live:user:{ana}", f"live:org:{acme}"]
+    assert authorise.streams(session(ana, other)) == [f"live:user:{ana}"], "a session naming another company gets no company stream"
+    companies.suspend(ADMIN_SCOPE, acme, "Checking the company.")
+    assert authorise.streams(session(ana, acme)) == [f"live:user:{ana}"], "a suspended company has no stream"
+    assert authorise.streams(session(bo, other)) == [f"live:user:{bo}", f"live:org:{other}"], "the other company is unaffected"

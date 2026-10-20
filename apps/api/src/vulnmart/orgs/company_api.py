@@ -248,5 +248,7 @@ async def create_invites(request: Request, auth: Authenticated = Depends(recruit
 async def act_on_invite(request: Request, invite_id: Annotated[str, Path(pattern=INVITE_ID)], auth: Authenticated = Depends(recruiter_write)) -> JSONResponse:
     _, assessments = parts(request)
     body = await read_json(request, InviteActionBody)
+    if body.action == "resend":  # a resend sends a mail and the daily invite cap does not count it (a re-invite does); story 1.9, deferred R5
+        limit(request, services(request)[1], "invite-resend:user", auth.session.user.id, "rate_invite_resend_per_user_per_hour")
     fn = {"resend": assessments.resend, "cancel": assessments.cancel, "revoke": assessments.revoke, "reinvite": assessments.reinvite}[body.action]
     return JSONResponse(invite_body(await run(fn, auth.session.scope, invite_id)), headers=NO_STORE)
