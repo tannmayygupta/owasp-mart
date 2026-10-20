@@ -1,0 +1,23 @@
+PASS            registry: 10 contracts, 17 folders under contracts/ all registered
+PASS            base: compared with origin/main (merge base bc8e69695b); 34 file(s) differ
+                NOTICE: no tag contracts-v* exists, so the comparison with the latest tag did not run (only the pull request base is compared)
+PASS            contract[IF-6]: no file of this contract changed
+PASS            contract[IF-4]: no file of this contract changed
+PASS            contract[IF-5]: no file of this contract changed
+PASS            contract[IF-2]: no file of this contract changed
+PASS            changelog[IF-1]: new entry for IF-1: 1.5.0 (2026-10-20, Akshay, story P-29, ADR 0060)
+PASS            mock[IF-1]: waived: - Additive, not breaking (the sign-offs of COMPAT.md stay on 1.0.0 until the owners confirm the minor label; the OpenAPI `info.version` is not changed here): two export operations, the tag `exports`: `exportMyData` `POST /api/v1/me/exports` and `exportCompanyResults` `POST /api/v1/company/exports` (the schema `CompanyExportRequest`), both answering `application/zip` with `Content-Disposition: attachment`; no new error code. OI-27 answered by the developer: scores as CSV and JSON, no evidence. The bundle (60 platform operations, 80 in all) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (one valid and one invalid request example added; `scripts/platform-mock.test.mjs` 20 of 20).
+PASS            breaking[IF-1]: no breaking change in the schema or OpenAPI files
+PASS            contract[DB]: no file of this contract changed
+PASS            contract[IF-7]: no file of this contract changed
+PASS            contract[IF-8]: no file of this contract changed
+PASS            contract[IF-3]: no file of this contract changed
+PASS            contract[GATE]: no file of this contract changed
+PASS            compat: 10 row(s), every listed version exists; 20 approver row(s)
+NOT-APPLICABLE  approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet
+PASS            table-owners: 49 tables, every owner is a module in CODEOWNERS
+PASS            alembic: one head 0015 in 15 revisions
+PASS            bundle: contracts:bundle:check passed
+
+SUMMARY: 18 PASS, 0 FAIL, 1 NOT-APPLICABLE
+NOT-APPLICABLE: approvals: the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet

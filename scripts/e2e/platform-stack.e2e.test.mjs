@@ -1789,6 +1789,74 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal((await refused.json()).code, 'REQ-ROUTE-UNKNOWN');
   }, { timeout: 300000 });
 
+  // Story P-29: the exports through the web origin on the real stack: a learner downloads their own data (a zip with their profile; the stack has no lab in the API
+  // process, so the attempts part is empty and says why), a recruiter downloads one template's results, both answers are zips and both are in the audit log.
+  test('exports (P-29): a learner downloads their own data, a recruiter one template\'s results; both are zips and both are audited', async () => {
+    const password = 'correct horse battery staple';
+    const learner = `exp-learner-${RUN}@example.org`;
+    const owner = `owner@exp-${RUN}.example`;
+    const adminEmail = `e2e-exp-admin-${RUN}@example.com`;
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-c', sql).stdout.trim();
+    const signIn = async (email) => {
+      const r = await postJson('/api/v1/session', { email, password });
+      assert.equal(r.status, 200, email);
+      const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(r.headers.getSetCookie()[0])[1]}`;
+      return { cookie, csrf: (await r.json()).csrf_token };
+    };
+    // a zip's file names, read from its central directory (no unzip tool needed)
+    const zipNames = (buf) => {
+      const names = [];
+      for (let i = 0; i + 46 <= buf.length; i += 1) {
+        if (buf.readUInt32LE(i) === 0x02014b50) {
+          const len = buf.readUInt16LE(i + 28);
+          names.push(buf.subarray(i + 46, i + 46 + len).toString('utf8'));
+        }
+      }
+      return names.sort();
+    };
+    const auditCount = (action) => Number(psql(`SELECT count(*) FROM audit_log WHERE action = '${action}'`));
+
+    // the learner
+    assert.equal((await postJson('/api/v1/accounts', { email: learner, password, display_name: 'E2E Exporter', age_declaration: true })).status, 202);
+    psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${learner}'`);
+    const me = await signIn(learner);
+    assert.equal((await call('POST', '/api/v1/me/exports', { headers: { cookie: me.cookie } })).status, 403, 'the CSRF header is needed');
+    const before = auditCount('export.own');
+    const own = await call('POST', '/api/v1/me/exports', { headers: { cookie: me.cookie, 'x-csrf-token': me.csrf } });
+    assert.equal(own.status, 200);
+    assert.equal(own.headers.get('content-type'), 'application/zip');
+    assert.equal(own.headers.get('content-disposition'), 'attachment; filename="vulnmart-my-data.zip"');
+    const ownZip = Buffer.from(await own.arrayBuffer());
+    assert.deepEqual(zipNames(ownZip), ['README.txt', 'attempts.csv', 'attempts.json', 'consents.csv', 'consents.json', 'data_views.csv', 'data_views.json',
+      'deletion_requests.json', 'profile.json']);
+    assert.equal(auditCount('export.own'), before + 1, 'the export is in the audit log');
+
+    // the recruiter: sign up, approval, terms, a template, the export
+    assert.equal((await postJson('/api/v1/recruiters', { email: owner, password, display_name: 'E2E Exp Owner', company_name: `Exp Ltd ${RUN}` })).status, 202);
+    psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${owner}'`);
+    const seeded = docker('exec', '-e', 'VULNMART_SEED_ADMIN_PASSWORD=a long admin password 123', NAME('api'), 'python', '-m', 'vulnmart.accounts.seed_admin', '--email', adminEmail, '--name', 'E2E Exp Admin');
+    assert.equal(seeded.status, 0, seeded.stdout + seeded.stderr);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    const orgId = psql(`SELECT o.id FROM organizations o JOIN users u ON u.id = o.owner_user_id WHERE u.email_ci = '${owner}'`);
+    const approved = docker('exec', NAME('api'), 'python', '-c', ['from vulnmart.main import app', 'from vulnmart.ports.scope import Scope, Role',
+      `app.state.companies.approve(Scope(user_id="${adminId}", roles=frozenset({Role.ADMIN})), "${orgId}")`].join('\n'));
+    assert.equal(approved.status, 0, approved.stderr);
+    const rec = await signIn(owner);
+    const send = (method, path, body) => call(method, path, { body, headers: { cookie: rec.cookie, 'x-csrf-token': rec.csrf } });
+    const terms = await (await call('GET', '/api/v1/company/terms', { headers: { cookie: rec.cookie } })).json();
+    assert.equal((await send('POST', '/api/v1/company/terms', { version: terms.version, sha256: terms.sha256 })).status, 204);
+    const tid = (await (await send('POST', '/api/v1/company/templates', { title: 'E2E export', challenge_keys: ['C01', 'C02'] })).json()).template_id;
+    const beforeCompany = auditCount('export.company');
+    const results = await send('POST', '/api/v1/company/exports', { template_id: tid });
+    assert.equal(results.status, 200);
+    assert.equal(results.headers.get('content-type'), 'application/zip');
+    assert.deepEqual(zipNames(Buffer.from(await results.arrayBuffer())), ['README.txt', 'results.csv', 'results.json']);
+    assert.equal(auditCount('export.company'), beforeCompany + 1);
+    // the learner cannot export a company's results
+    const refused = await call('POST', '/api/v1/company/exports', { body: { template_id: tid }, headers: { cookie: me.cookie, 'x-csrf-token': me.csrf } });
+    assert.equal(refused.status, 404);
+  }, { timeout: 300000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);
