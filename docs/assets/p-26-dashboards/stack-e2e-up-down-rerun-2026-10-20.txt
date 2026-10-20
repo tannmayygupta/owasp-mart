@@ -1,0 +1,12 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (2190.5047ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (7315.1259ms)
+✔ platform and web profiles on a real Docker engine (55302.7081ms)
+ℹ tests 2
+ℹ suites 1
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55564.8033
