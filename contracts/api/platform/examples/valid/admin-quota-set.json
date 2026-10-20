@@ -1,0 +1,8 @@
+{
+  "schema": "QuotaRequest",
+  "body": {
+    "scope": "user",
+    "scope_id": "u-AAAAAAAAAAAAAAAA",
+    "max_instances": 2
+  }
+}

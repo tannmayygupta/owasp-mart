@@ -15,6 +15,8 @@ SETTINGS: dict[str, int | bool | str] = {
     "session_absolute_hours": 12,  # FR-ACC-04
     "instance_idle_minutes": 30,  # FR-INS (placeholder until spike S-4)
     "instance_max_minutes": 240,  # FR-INS (placeholder)
+    "instance_company_cap": 5,  # FR-ADM-05, OI-21 (placeholder, story P-28): live instances one company may hold together
+    "instance_total_cap": 20,  # FR-ADM-05, OI-21 (placeholder, story P-28): live instances on the whole platform (the global cap)
     "hints_enabled_default": True,
     "evidence_max_bytes": 8192,  # FR-DET-03
     "learner_evidence_days": 30,  # FR-PRV-06

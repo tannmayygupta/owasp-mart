@@ -200,6 +200,13 @@ def _deletion_confirmed(p: dict[str, str]) -> Rendered:
     ])
 
 
+def _force_stopped(p: dict[str, str]) -> Rendered:
+    return _compose("Your VulnMart instance was stopped", [
+        "A VulnMart administrator stopped your running instance. Anything you had not submitted in it is gone.",
+        "If your attempt is still open you can start a new instance from your dashboard; your attempt and its clock were not changed.",
+    ])
+
+
 def _retention(p: dict[str, str]) -> Rendered:
     return _compose("Your VulnMart data will be deleted soon", [
         f"You have not signed in to VulnMart for almost a year. Your learner data will be deleted on {p['delete_on']}.",
@@ -230,6 +237,7 @@ TEMPLATES: dict[str, TemplateSpec] = {s.name: s for s in (
           optional={"link"}, links={"link"}),
     _spec("privacy.deletion_confirmed", set(), _deletion_confirmed, optional={"completed_on"}),
     _spec("learner.retention_warning", {"delete_on", "login_url"}, _retention, links={"login_url"}),
+    _spec("instance.force_stopped", set(), _force_stopped),
     _spec("system.test", set(), _system_test),
 )}
 

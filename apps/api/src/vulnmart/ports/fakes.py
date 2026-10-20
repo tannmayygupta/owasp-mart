@@ -207,16 +207,31 @@ class FakeSettingsPort:
     def __init__(self, overrides: Mapping[str, int | bool | str] | None = None):
         self._lock = threading.Lock()
         self._values = dict(SETTINGS)
+        self._by: dict[str, str | None] = {}
         for name, value in (overrides or {}).items():
             self.set(name, value)
 
-    def set(self, name: str, value: int | bool | str) -> None:
+    def set(self, name: str, value: int | bool | str, *, updated_by: str | None = None) -> None:
         if name not in SETTINGS:
             raise UnknownSetting(f"unknown setting {name!r}")
         if type(value) is not type(SETTINGS[name]):
             raise ValueError(f"{name} is a {type(SETTINGS[name]).__name__}")
         with self._lock:
             self._values[name] = value
+            self._by[name] = updated_by
+
+    def clear(self, name: str) -> bool:
+        if name not in SETTINGS:
+            raise UnknownSetting(f"unknown setting {name!r}")
+        with self._lock:
+            was = self._values.get(name) != SETTINGS[name] or name in self._by
+            self._values[name] = SETTINGS[name]
+            self._by.pop(name, None)
+            return was
+
+    def overrides(self) -> dict[str, tuple[int | bool | str, str | None]]:
+        with self._lock:
+            return {n: (self._values[n], self._by.get(n)) for n in self._by}
 
     def get(self, name: str) -> int | bool | str:
         with self._lock:

@@ -1,0 +1,27 @@
+# tickets.toml: every planned story of this epic in build order. tickets.py reads it.
+# Inception 2026-10-20: one story per task of docs/dev/dev2-akshay.md that names this epic (P-28, P-31), as START-HERE.md section 5 asks (the developer chose
+# "continue automatically" and "go with the recommended flow"). OI-12 answered by the developer: the break-glass window is 15 minutes and the company whose data is
+# opened is alerted too; OI-34 answered: a short incident procedure, no time target, marked as a draft for legal review; OI-33 (legal review) stays open and recorded.
+# None of the three answers is written into initial.md yet.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Admin operations: approval queue, users, force-stop, settings, quotas, capacity"
+description = "Admin-only routes for the company approval queue, user management (lock, unlock, reset link, delete), force-stop of an instance, settings with their ranges and instance quotas that the lab enforces (a real QuotaPort over the quotas table), the capacity view and the scheduler's last runs; every change audited, nothing a candidate wrote shown."
+verify = "An admin approves a company, force-stops an instance and changes a quota that the lab then enforces; a non-admin, and an admin without a second factor, get the answer of a route that does not exist."
+covers = ["FR-ADM-01", "FR-ADM-02", "FR-ADM-04", "FR-ADM-05", "FR-ADM-06"]
+after = ["5.1", "4.3"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Break-glass, audit access, admin limits, legal review and incident handling"
+description = "Time-boxed break-glass access to a candidate's answers with a written reason and alerts, audit log access that is itself logged, admins cannot read candidate answers by default, the legal review action and the incident procedure draft."
+verify = "Break-glass is audited and alerted, admins cannot read candidate answers without it, and the open items are decided or recorded."
+covers = ["FR-ADM-03", "FR-ADM-07", "FR-ADM-08", "FR-PRV-19", "FR-PRV-20"]
+after = [1, "4.2"]
+hitl = false
+risk = "high"

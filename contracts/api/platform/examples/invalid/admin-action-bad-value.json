@@ -1,0 +1,9 @@
+{
+  "schema": "UserActionRequest",
+  "body": {
+    "action": "promote",
+    "reason": "x"
+  },
+  "path": "/action",
+  "rule": "lock, unlock, reset_password or delete only: no action makes or promotes an admin"
+}

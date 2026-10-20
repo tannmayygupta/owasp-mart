@@ -1,0 +1,9 @@
+{
+  "schema": "QuotaRequest",
+  "body": {
+    "scope": "global",
+    "max_instances": -1
+  },
+  "path": "/max_instances",
+  "rule": "a quota is 0 to 10000"
+}
