@@ -65,7 +65,7 @@ No flag value or secret was read or written. All weaknesses stay in the target o
 
 ## Limitations and follow-ups
 Gaps and proposals, each for the developer to approve (the catalogue and shop belong to Sahil's stream):
-1. `fixed_build: challenges/fixed/cNN` in all eleven files points to folders that do not exist (only `.gitkeep`). The fixed build is a switch (`VM_CHALLENGE_*=fixed`). Proposal: change the field text or drop it.
+1. WITHDRAWN (2026-10-20): `fixed_build: challenges/fixed/cNN` points to folders that do not exist, but `contracts/catalog/challenge.schema.json` defines it as a logical reference to the env switch (`VM_CHALLENGE_*`), so it is by design.
 2. C06 title: change to the 2025 name "Software Supply Chain Failures" (keep the 2021 name in the tags). C09: "Security Logging and Alerting Failures". Titles show in the console and the dashboards.
 3. C06 milestone 3 summary: "the worker exits; the pollution does not escape" does not describe a flag capture. Needs a look by whoever wrote the signal.
 4. Hint 3 of C02, C04, C05 and C10 is nearly the full recipe. The console labels hint 3 "Nearly the answer", so this may be intended. The tester brief asks for a "strong clue, leave the verification to the learner". Proposal: keep, or soften C02 and C04 only.

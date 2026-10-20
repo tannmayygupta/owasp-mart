@@ -36,7 +36,7 @@ hints:
   - level: 2
     text: The instant-refund rule looks at each request alone. Does anything add the requests up?
   - level: 3
-    text: Ask for a refund below the instant limit twice, so the sum is more than you paid.
+    text: Try two small refunds on the same order, each below the instant limit, and compare the total refunded with what you paid.
 exploit_test: challenges/tests/c04
 fixed_build: challenges/fixed/c04
 brief: >-

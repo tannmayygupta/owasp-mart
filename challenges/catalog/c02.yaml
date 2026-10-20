@@ -37,7 +37,7 @@ hints:
   - level: 2
     text: The code is a fingerprint of something printed on the receipt. Which common hash gives 32 hex characters?
   - level: 3
-    text: Hash the serial of the oldest card the same way; use the first 12 characters with the same prefix.
+    text: Try that hash on the serial number of one of your own cards and compare it with your code. When it matches, build the code of an older card.
 exploit_test: challenges/tests/c02
 fixed_build: challenges/fixed/c02
 brief: Gift-card codes are derived from a predictable serial, so any card's code can be forged.
