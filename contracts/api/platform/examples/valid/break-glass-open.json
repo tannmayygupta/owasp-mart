@@ -1,0 +1,7 @@
+{
+  "schema": "BreakGlassRequest",
+  "body": {
+    "attempt_id": "a-AAAAAAAAAAAAAAAA",
+    "reason": "A candidate disputes the score of C01; checking the capture."
+  }
+}

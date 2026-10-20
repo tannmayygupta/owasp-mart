@@ -268,6 +268,22 @@ export type Capacity = {
 };
 export type JobStatus = { name: string; interval_seconds: number; last_started_at: string | null; last_status: string | null; last_detail: string | null; next_due_at: string | null };
 
+export type AuditEntry = { seq: number; at: string; actor: string; action: string; subject: string | null; details: Record<string, unknown> };
+export type BreakGlassSession = {
+  session_id: string;
+  admin_id: string;
+  admin_name: string;
+  attempt_id: string;
+  reason: string;
+  started_at: string;
+  expires_at: string;
+  closed_at: string | null;
+  reads: { at: string; what: string[] }[];
+  reviewed_by: string | null;
+  review_note: string | null;
+  state: 'open' | 'over' | 'reviewed';
+};
+
 /** Seconds as "1h 02m 03s" (or "-"). */
 export function duration(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '-';

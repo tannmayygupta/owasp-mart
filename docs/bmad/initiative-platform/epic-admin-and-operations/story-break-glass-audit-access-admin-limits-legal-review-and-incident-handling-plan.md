@@ -51,7 +51,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Audit log route; break-glass service, table, routes, alerts; the admin-limit test.
+- [x] Audit log route; break-glass service, table, routes, alerts; the admin-limit test (2026-10-20: break-glass 5, Postgres 3, incident 4).
 - [ ] Legal review pack, incident procedure and notice command; the admin page; the stack test.
 
 **Acceptance Criteria:**

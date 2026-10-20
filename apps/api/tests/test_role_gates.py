@@ -149,5 +149,6 @@ def test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an
     assert not any("admin" in p for p in state_changing), "no route can create an admin (FR-ACC-11): admins come from a seed command or an admin"
     # the admin area (story P-28) is behind `requires(Role.ADMIN)` and changes companies, accounts, settings and quotas; none of its routes makes or promotes an admin account
     assert admin_area == {"/api/v1/admin/companies/{org_id}/decision", "/api/v1/admin/users/{user_id}/actions", "/api/v1/admin/attempts/{attempt_id}/force-stop",
-                          "/api/v1/admin/settings/{name}", "/api/v1/admin/quotas"}
+                          "/api/v1/admin/settings/{name}", "/api/v1/admin/quotas", "/api/v1/admin/break-glass", "/api/v1/admin/break-glass/{session_id}/close",
+                          "/api/v1/admin/break-glass/{session_id}/review"}
     assert not any(p.rstrip("/").endswith(("admins", "roles")) for p in admin_area)

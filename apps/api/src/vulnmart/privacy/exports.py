@@ -90,36 +90,37 @@ def dumps(value: Any) -> str:
     return json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
 
 
+def attempt_results(rt: Any, rec: Any, now: datetime, *, evidence: bool) -> dict[str, Any]:
+    """One attempt's results read from the lab runtime (read only): score, per challenge, times, hints and, with `evidence`, the captured requests with
+    anything shaped like a flag redacted. Used by the exports and by break-glass (story P-31)."""
+    total, rows = rt.score_rows(rec.id)
+    metrics = rt.time_metrics(rec.id)
+    end = rec.submitted_at or now
+    elapsed = max(0, int((end - rec.started_at).total_seconds())) if rec.started_at else None
+    per = [{"challenge_key": r["challenge_key"], "best_milestone": r["best_milestone"], "points": r["points"], "held": r["held"],
+            "hints_used": r["hints_used"], "time_to_capture_seconds": metrics.headline.get(r["challenge_key"])} for r in rows]
+    out: dict[str, Any] = {"attempt_id": rec.id, "mode": "candidate" if getattr(rec, "org_id", None) else "learner", "state": rec.state.value,
+                           "created_at": stamp(rec.created_at), "started_at": stamp(rec.started_at), "submitted_at": stamp(rec.submitted_at),
+                           "score": total, "elapsed_seconds": elapsed, "active_seconds": metrics.active_seconds if rec.started_at else None,
+                           "hints_used_total": sum(r["hints_used"] for r in rows), "per_challenge": per}
+    if evidence:
+        items = []
+        for item in rt.reports.evidence(rec.id):
+            text = rt.reports.evidence_body(rec.id, item.evidence_id).decode("utf-8", "replace")
+            head, _, rest = text.partition("\n")
+            parts = head.split(" ")
+            body = rest[1:] if rest.startswith("\n") else rest
+            items.append({"challenge_key": item.challenge_key, "captured_at": stamp(item.captured_at), "method": parts[0] if parts else "GET",
+                          "path": redact(parts[1] if len(parts) > 1 else "/"), "body": redact(body[:MAX_EVIDENCE_BODY]) if body else None})
+        out["evidence"] = items
+    return out
+
+
 class ExportService:
     def __init__(self, *, sessions: sessionmaker[Session], audit: AuditPort, consent: Any, views: Any, deletion: Any, assessments: Any, companies: Any,
                  lab: Callable[[], Any | None], now: Callable[[], datetime] = lambda: datetime.now(UTC)):
         self._sessions, self._audit, self._consent, self._views, self._deletion = sessions, audit, consent, views, deletion
         self._assessments, self._companies, self._lab, self._now = assessments, companies, lab, now
-
-    # ---- the lab's results of one attempt (read only) ----
-
-    def _results(self, rt: Any, rec: Any, *, evidence: bool) -> dict[str, Any]:
-        total, rows = rt.score_rows(rec.id)
-        metrics = rt.time_metrics(rec.id)
-        end = rec.submitted_at or self._now()
-        elapsed = max(0, int((end - rec.started_at).total_seconds())) if rec.started_at else None
-        per = [{"challenge_key": r["challenge_key"], "best_milestone": r["best_milestone"], "points": r["points"], "held": r["held"],
-                "hints_used": r["hints_used"], "time_to_capture_seconds": metrics.headline.get(r["challenge_key"])} for r in rows]
-        out: dict[str, Any] = {"attempt_id": rec.id, "mode": "candidate" if getattr(rec, "org_id", None) else "learner", "state": rec.state.value,
-                               "created_at": stamp(rec.created_at), "started_at": stamp(rec.started_at), "submitted_at": stamp(rec.submitted_at),
-                               "score": total, "elapsed_seconds": elapsed, "active_seconds": metrics.active_seconds if rec.started_at else None,
-                               "hints_used_total": sum(r["hints_used"] for r in rows), "per_challenge": per}
-        if evidence:
-            items = []
-            for item in rt.reports.evidence(rec.id):
-                text = rt.reports.evidence_body(rec.id, item.evidence_id).decode("utf-8", "replace")
-                head, _, rest = text.partition("\n")
-                parts = head.split(" ")
-                body = rest[1:] if rest.startswith("\n") else rest
-                items.append({"challenge_key": item.challenge_key, "captured_at": stamp(item.captured_at), "method": parts[0] if parts else "GET",
-                              "path": redact(parts[1] if len(parts) > 1 else "/"), "body": redact(body[:MAX_EVIDENCE_BODY]) if body else None})
-            out["evidence"] = items
-        return out
 
     # ---- a person's own data (FR-EXP-01, 02) ----
 
@@ -147,7 +148,7 @@ class ExportService:
         else:
             for rec in rt.engine.for_user(user_id):
                 if getattr(rec, "purged_at", None) is None and rec.state.value != "deleted":
-                    attempts.append(self._results(rt, rec, evidence=True))
+                    attempts.append(attempt_results(rt, rec, self._now(), evidence=True))
         attempt_rows = [[a["attempt_id"], a["mode"], a["state"], a["score"], c["challenge_key"], c["best_milestone"], c["points"], c["hints_used"],
                          c["time_to_capture_seconds"]] for a in attempts for c in a["per_challenge"]]
         files = {
@@ -184,7 +185,7 @@ class ExportService:
                 except Exception:  # noqa: BLE001 - an attempt the lab no longer has is exported without results
                     rec = None
                 if rec is not None and str(getattr(rec, "org_id", "") or "") == str(actor.org_id) and getattr(rec, "purged_at", None) is None:
-                    result = self._results(rt, rec, evidence=False)
+                    result = attempt_results(rt, rec, self._now(), evidence=False)
             rows.append({"email": invite.email, "invite_state": invite.state, "invite_id": invite.invite_id, "attempt_id": invite.attempt_id,
                          "generation": invite.generation, "results": result})
         keys = list(template.challenge_keys)

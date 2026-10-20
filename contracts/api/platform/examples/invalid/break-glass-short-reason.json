@@ -1,0 +1,9 @@
+{
+  "schema": "BreakGlassRequest",
+  "body": {
+    "attempt_id": "a-AAAAAAAAAAAAAAAA",
+    "reason": "too short"
+  },
+  "path": "/reason",
+  "rule": "a reason is 20 to 500 characters"
+}
