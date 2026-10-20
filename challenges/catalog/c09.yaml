@@ -20,7 +20,7 @@ tier: Medium
 flag:
   placement: database-seed
   delivery: db
-start_state: a seeded customer; the player brings a wordlist
+start_state: "Sign in as the customer player.customer@vulnmart.test with the password player-customer-demo-b2. Bring your own wordlist: the shop has an old way in that it never watched."
 milestones:
   m1:
     summary: the player used the legacy login route

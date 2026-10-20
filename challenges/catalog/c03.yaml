@@ -19,7 +19,7 @@ tier: Medium
 flag:
   placement: catalogue-store
   delivery: catalogue
-start_state: part A needs no account (anonymous search); part B needs a seeded customer ticket author
+start_state: "Part A needs no account: use the product search. Part B needs a customer: sign in as player.customer@vulnmart.test with the password player-customer-demo-b2 and open a support ticket."
 milestones:
   m1:
     summary: the player found a weakness in product search or stored ticket markup

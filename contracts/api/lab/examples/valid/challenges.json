@@ -6,7 +6,13 @@
       "solved": true,
       "held": true,
       "hints_used": 0,
-      "hints_available": true
+      "hints_available": true,
+      "brief": "A seller order-detail endpoint checks that you are a seller, but not that the order is yours. Read a competitor order.",
+      "start": "Sign in to the shop as the seller staff of Harbor Crafts (the demo account of the lab). Everything you may see starts from your own store's orders.",
+      "write_up": {
+        "vulnerable": "Order lookup by order number only; no store-ownership check.",
+        "fix": "Scope the lookup to the caller's store and test that a second tenant gets 403 or 404."
+      }
     },
     {
       "challenge_key": "C02",

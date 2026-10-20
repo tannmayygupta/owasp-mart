@@ -1,11 +1,11 @@
 'use client';
 
 // One attempt on a dashboard (story P-26): its state and clock, the instance controls, and per challenge the stars, both OWASP tags, the difficulty, the progress,
-// the hints, the flag box and, after a solve, the write-up (FR-DSH-01, FR-HNT-01, FR-HNT-02). Shared by the learner and the candidate pages; the differences
+// the hints, the flag box and, after a solve, the write-up (FR-DSH-01, FR-HNT-01, FR-HNT-02; the brief, start text and write-up come from IF-2 1.2.0, stream L). Shared by the learner and the candidate pages; the differences
 // are props: whether hints cost points (a candidate confirms the cost first, FR-HNT-02) and whether results may be shown (OI-15, `results_visibility`).
 // Everything the server sends is rendered as text. A flag is sent and the box is cleared; it is never kept in the page.
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError, api, say, type Attempt, type CatalogueItem, type Hint, type Instance, type Progress, type Score, type Writeup } from '../lib/api';
+import { ApiError, api, say, type Attempt, type CatalogueItem, type Hint, type Instance, type Progress, type Score } from '../lib/api';
 import { useLive } from '../lib/live';
 
 const LIVE_INSTANCE = ['ready', 'active', 'idle'];
@@ -32,7 +32,6 @@ export function AttemptBoard({ attemptId, catalog, resultsAllowed, onChanged }: 
   const [progress, setProgress] = useState<Progress[]>([]);
   const [score, setScore] = useState<Score | null>(null);
   const [hints, setHints] = useState<Record<string, Hint[]>>({});
-  const [writeups, setWriteups] = useState<Record<string, Writeup>>({});
   const [message, setMessage] = useState<{ text: string; kind: 'ok' | 'bad' } | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -181,16 +180,13 @@ export function AttemptBoard({ attemptId, catalog, resultsAllowed, onChanged }: 
                     <td>
                       <strong>{p.challenge_key}</strong> {c?.title ?? ''}
                       {c && <span className="tag">OWASP 2025 {c.owasp_2025}{c.owasp_2021 ? ` · 2021 ${c.owasp_2021}` : ''}</span>}
-                      {p.solved && (writeups[p.challenge_key] ? (
+                      {p.brief && <span className="tag">{p.brief}</span>}
+                      {p.start && !p.solved && <span className="tag">How to start: {p.start}</span>}
+                      {p.write_up && (
                         <div className="writeup" data-testid="writeup">
-                          <strong>Why it was vulnerable.</strong> {writeups[p.challenge_key].vulnerable}{'\n'}<strong>The fix.</strong> {writeups[p.challenge_key].fix}
+                          <strong>Why it was vulnerable.</strong> {p.write_up.vulnerable}{'\n'}<strong>The fix.</strong> {p.write_up.fix}
                         </div>
-                      ) : (
-                        <button type="button" className="ghost" onClick={() => act(async () => {
-                          const w = await api<Writeup>('GET', `/api/v1/attempts/${attemptId}/challenges/${p.challenge_key}/writeup`);
-                          setWriteups((all) => ({ ...all, [p.challenge_key]: w }));
-                        })}>Read the write-up</button>
-                      ))}
+                      )}
                     </td>
                     <td>{c ? <><Stars difficulty={c.difficulty} /> <span className="tag">{c.tier}</span></> : '-'}</td>
                     <td><span className={`pill ${p.solved ? 'ok' : p.held ? 'warn' : ''}`}>{p.held ? 'held for review' : MILESTONE_LABEL[p.best_milestone] ?? p.best_milestone}</span></td>

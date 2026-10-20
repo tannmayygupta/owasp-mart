@@ -108,10 +108,19 @@ export type CatalogueItem = { challenge_key: string; title: string; owasp_2021: 
 export type AttemptSummary = { attempt_id: string; mode: 'learner' | 'candidate'; state: string; instance_id: string | null; created_at: string; deadline_at: string | null };
 export type Attempt = AttemptSummary & { hints_enabled: boolean; started_at: string | null; submitted_at: string | null; delete_after?: string | null };
 export type Instance = { instance_id: string; state: string; access: string; epoch: number };
-export type Progress = { challenge_key: string; best_milestone: string; solved: boolean; held: boolean; hints_used: number; hints_available: boolean };
+export type Progress = {
+  challenge_key: string;
+  best_milestone: string;
+  solved: boolean;
+  held: boolean;
+  hints_used: number;
+  hints_available: boolean;
+  brief?: string; // IF-2 1.2.0 (stream L): what the challenge is about
+  start?: string; // how to begin (the lab shop's documented demo accounts)
+  write_up?: { vulnerable: string; fix: string }; // only for the owner of a practice attempt after the capture, never in an assessment
+};
 export type Hint = { level: number; kind: string; unlocked: boolean; cost_pct: number; text: string | null };
 export type Score = { score: number; per_challenge: { challenge_key: string; points: number; held: boolean }[] };
-export type Writeup = { challenge_key: string; vulnerable: string; fix: string };
 export type MyInvite = {
   invite_id: string;
   attempt_id: string | null;

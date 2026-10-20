@@ -20,7 +20,7 @@ tier: Easy
 flag:
   placement: database-seed
   delivery: db
-start_state: logged in as the seeded Harbor seller staff (staff.harbor); no onboarding needed
+start_state: "Sign in to the shop as staff.harbor@vulnmart.test with the password harbor-staff-demo-a1: you are a seller staff member of Harbor Crafts. Everything you may see starts from your own store's orders."
 milestones:
   m1:
     summary: the server returned another store’s order to the player

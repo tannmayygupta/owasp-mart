@@ -21,7 +21,7 @@ tier: Medium
 flag:
   placement: sentinel-table
   delivery: sentinel
-start_state: self-registration of a new seller store (no seeded account)
+start_state: "Create a new customer account, then register a new seller store from the shop (no seeded account for this one)."
 milestones:
   m1:
     summary: the player saw the verbose KYC error

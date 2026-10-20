@@ -19,7 +19,7 @@ tier: Easy
 flag:
   placement: sentinel-table
   delivery: sentinel
-start_state: none (anonymous visitor)
+start_state: "No account needed: you are an anonymous visitor of the shop."
 milestones:
   m1:
     summary: a verbose error was served to the player
