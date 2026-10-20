@@ -3,7 +3,7 @@ title: 'Learner signup, email verification and signup abuse protection'
 type: 'feature'
 ticket: '1'
 created: '2026-10-17'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'medium'

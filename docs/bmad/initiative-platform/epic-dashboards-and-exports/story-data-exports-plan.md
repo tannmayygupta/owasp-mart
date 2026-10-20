@@ -3,7 +3,7 @@ title: 'Data exports'
 type: 'feature'
 ticket: '3'
 created: '2026-10-20'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

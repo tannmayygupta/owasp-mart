@@ -3,7 +3,7 @@ title: 'Deletion workflow, 7-day undo and who viewed me'
 type: 'feature'
 ticket: '4'
 created: '2026-10-19'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'
