@@ -99,3 +99,46 @@ test('collector: records what it is sent and counts hits', async () => {
     assert.equal((await (await get(base, '/hits')).json()).count, 2);
   } finally { server.close(); }
 });
+
+test('collector /c/<id>: a tagged hit from the bot and an untagged one are told apart, the id is checked, the sidecar hears ids and counts only', async () => {
+  const sent = [];
+  const { server } = createCollector({ instanceId: 'i-ABCDEFGHIJKLMNOP', eventsUrl: 'http://sidecar:9000', post: (url, event) => sent.push({ url, event }) });
+  const base = await start(server);
+  const flag = 'VM{ABCDEFGHIJKLMNOPQRSTUVWX}';
+  try {
+    const tagged = await fetch(`${base}/c/abcdefghijklmnop?d=${encodeURIComponent(`{"console_key":"${flag}"}`)}`, { headers: { 'x-vm-visit': `v-${crypto.randomUUID()}` } });
+    assert.equal(tagged.status, 200);
+    assert.equal(tagged.headers.get('content-type'), 'image/gif');
+    assert.equal(tagged.headers.get('access-control-allow-origin'), '*');
+    await fetch(`${base}/c/wrongid`, { method: 'POST', body: 'hello' });
+    await fetch(`${base}/c/abcdefghijklmnop`, { headers: { 'x-vm-visit': 'forged' } });
+    assert.equal((await fetch(`${base}/c/abcdefghijklmnop`, { method: 'OPTIONS' })).status, 204);
+    assert.equal(sent.length, 3);
+    assert.deepEqual(sent.map((s) => [s.event.data.collector_id_ok, s.event.data.bot_tagged]), [[true, true], [false, false], [true, false]]);
+    assert.equal(sent[0].event.data.candidate_sha256, crypto.createHash('sha256').update(flag).digest('hex'));
+    assert.equal(sent[1].event.data.candidate_sha256, undefined);
+    for (const s of sent) {
+      assert.equal(s.event.type, 'collector.hit');
+      assert.equal(s.event.source, 'mock');
+      assert.deepEqual(Object.keys(s.event.data).filter((k) => !['collector_id_ok', 'bot_tagged', 'size', 'candidate_sha256'].includes(k)), [], 'no content in the event');
+      assert.doesNotMatch(JSON.stringify(s.event), /VM\{|console_key/);
+    }
+    const inbox = await (await get(base, '/inbox')).json();
+    assert.equal(inbox.id, 'abcdefghijklmnop');
+    assert.equal(inbox.hits.length, 3);
+    assert.match(inbox.hits[0].data, /console_key/);
+    assert.equal(inbox.hits[0].bot_tagged, true);
+  } finally { server.close(); }
+});
+
+test('collector keeps the last 20 hits only', async () => {
+  const { server } = createCollector({ instanceId: 'i-ABCDEFGHIJKLMNOP', eventsUrl: '' });
+  const base = await start(server);
+  try {
+    for (let i = 0; i < 25; i++) await fetch(`${base}/c/abcdefghijklmnop?n=${i}`);
+    const inbox = await (await get(base, '/inbox')).json();
+    assert.equal(inbox.hits.length, 20);
+    assert.match(inbox.hits.at(-1).data, /n=24/);
+    assert.match(inbox.hits[0].data, /n=5/);
+  } finally { server.close(); }
+});

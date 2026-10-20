@@ -49,3 +49,4 @@ Stream L work. Where a part belongs to another stream (the invite and company fl
 - 2026-10-20: every challenge verified live, C06 C07 C10 fixed, docs/dev-log/2026-10-20-tannmayygupta-live-exploits-c06-c07-c10.md
 - 2026-10-20: player experience of the lab console built (IF-2 1.2.0), docs/dev-log/2026-10-20-tannmayygupta-player-experience.md
 - 2026-10-20: player experience deployed and checked live (36 PASS), docs/dev-log/2026-10-20-tannmayygupta-player-experience.md
+- 2026-10-20: C03 part B built end to end (support bot runs the player's script), docs/dev-log/2026-10-20-tannmayygupta-c03b-support-bot.md

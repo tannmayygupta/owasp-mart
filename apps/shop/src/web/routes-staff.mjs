@@ -6,6 +6,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../domain/shop-s
 import * as staff from '../domain/staff-service.mjs';
 import * as money from '../domain/money-service.mjs';
 import { renderTicketMessageHtml } from '../challenges/c03b-ticket-xss.mjs';
+import { agentProfile, PROFILE_PATH } from '../challenges/c03b-bot.mjs';
 import { financeSettlementReference } from '../challenges/c07-password-reset.mjs';
 import { caseNoteReference } from '../challenges/c09-logging-failures.mjs';
 
@@ -23,7 +24,7 @@ const FINANCE = requireRole('finance', 'admin');
 const ADMIN = requireRole('admin');
 const back = (res, title, message) => res.render('message', { title, message });
 
-export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {} } = {}) {
+export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {}, flagOf = () => undefined } = {}) {
   void emit;
   // Support: tickets, disputes, review moderation, order read.
   app.get('/staff/tickets', SUPPORT, h((req, res) => res.render('staff/tickets', { tickets: staff.listTickets(db, req.user) })));
@@ -32,6 +33,8 @@ export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {} 
   // through the challenge render helper (FIXED escapes it; VULNERABLE leaves raw
   // HTML — the stored XSS the support bot would then open). The precomputed HTML
   // is inserted by the view with `| safe`, the one deliberate unescaped spot.
+  // C03 part B: the agent profile the support console loads. The bot session's console key is the flag in the vulnerable build (challenge module).
+  app.get(PROFILE_PATH, SUPPORT, (req, res) => res.json(agentProfile(req.user, req.session, { flag: flagOf('C03'), challenges })));
   app.get('/staff/tickets/:id', SUPPORT, h((req, res) => {
     const ticket = staff.getTicketWithMessages(db, req.user, req.params.id);
     const messages = ticket.messages.map((m) => ({ ...m, body_html: renderTicketMessageHtml(m.body, { challenges }) }));

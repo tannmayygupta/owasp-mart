@@ -19,7 +19,7 @@ tier: Medium
 flag:
   placement: catalogue-store
   delivery: catalogue
-start_state: "Part A needs no account: use the product search. Part B needs a customer: sign in as player.customer@vulnmart.test with the password player-customer-demo-b2 and open a support ticket."
+start_state: "Part A needs no account: use the product search. Part B needs a customer: sign in as player.customer@vulnmart.test with the password player-customer-demo-b2, open Support and send a ticket, then watch the Listener page (/lab/listener). A support agent opens your ticket a few seconds later in a browser that runs scripts."
 milestones:
   m1:
     summary: the player found a weakness in product search or stored ticket markup
@@ -34,15 +34,16 @@ hints:
   - level: 1
     text: >-
       Part A: what happens when your search text contains a single quote? Part B: how does the agent screen show your
-      message?
+      message? The Listener page tells you where the agent's browser can send things.
   - level: 2
     text: >-
       Part A: your text ends up inside a database query; UNION can add rows from another table. Part B: text may be
-      shown as page code.
+      shown as page code, and the code runs in the agent's browser a few seconds after you send the ticket.
   - level: 3
     text: >-
       Part A: the query has four columns; read a table of merchandising notes. Part B: put a small script in a ticket
-      message that reads the agent profile.
+      message (an image with an onerror handler is enough) that fetches /staff/api/agent-profile and sends the answer
+      to the collector address on the Listener page, for example by setting the src of a new Image.
 exploit_test: challenges/tests/c03
 fixed_build: challenges/fixed/c03
 brief: >-

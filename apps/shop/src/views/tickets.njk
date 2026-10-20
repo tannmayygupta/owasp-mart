@@ -1,0 +1,15 @@
+{% extends "layout.njk" %}
+{% block title %}Support{% endblock %}
+{% block body %}
+<h1>Support</h1>
+<form method="post" action="/tickets" class="card">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p><label>Subject<br><input name="subject" maxlength="120" required style="width:100%"></label></p>
+  <p><label>Message<br><textarea name="body" rows="5" maxlength="2000" style="width:100%"></textarea></label></p>
+  <button>Send to support</button>
+</form>
+<h2>Your tickets</h2>
+<table><tr><th>#</th><th>Subject</th><th>Status</th></tr>
+{% for t in tickets %}<tr><td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td><td>{{ t.subject }}</td><td>{{ t.status }}</td></tr>
+{% else %}<tr><td colspan="3" class="muted">No tickets yet.</td></tr>{% endfor %}</table>
+{% endblock %}

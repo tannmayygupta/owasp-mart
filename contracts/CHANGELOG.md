@@ -95,6 +95,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance contract (IF-6), `contracts/instance/`
 
+### 1.0.1 (2026-10-20, Tanmay, story L-30 support bot, ADR 0058)
+
+- The example templates give the two components of the live C03 part B loop the addresses they need, using names that were already allowed in section 2: `mock-services` gets `VM_INSTANCE_ID` (the collector checks its id against it) and `VM_SIDECAR_EVENTS_URL` (it reports `collector.hit`); `bot-controller` gets `VM_SIDECAR_EVENTS_URL` (it reports `bot.visit`) and `VM_MOCK_URL` (the collector is the one address besides the shop its browser may reach). No schema change, no new name, no change to the injection document or the sidecar start.
+- registry change: none to `contracts/registry.json`.
+
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.

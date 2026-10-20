@@ -125,18 +125,64 @@ export function createMetadata({ placementDir = PLACEMENT_DIR } = {}) {
 }
 
 // ---- 9104 XSS collector ---------------------------------------------------
-// Records what it is sent (a stored-XSS payload would exfiltrate here, C03). It
-// only collects; it never serves a flag.
-export function createCollector() {
+// Records what it is sent (a stored-XSS payload running in the support bot exfiltrates here, C03 part B). It only collects; it never serves a flag.
+//   /c/<id>[...]  any method: one hit. `collector_id_ok` is true when <id> is this instance's collector id (the instance id without "i-", lowercase; any id when the instance id
+//                 is not known), `bot_tagged` is true when the request carries the visit tag the bot's network layer adds (x-vm-visit), `size` counts the query string and body.
+//                 The answer is a 1x1 GIF with open CORS, so an image or a fetch of the page both succeed.
+//   POST / and /collect: the original JSON drop, kept for the other tests.
+//   GET /inbox    the last 20 hits, newest last (what the shop's listener page shows the player); GET /hits the count.
+// Each hit on /c/ is reported to the sidecar as `collector.hit` (IF-4), ids and counts only, never the content. The flag never passes through the sidecar: the player pastes it.
+const GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+const TAG = /^v-[0-9a-f-]{36}$/;
+const FLAG_LIKE = /VM\{[A-Z2-7]{24}\}/;
+const INBOX_CAP = 20;
+const DATA_CAP = 2048;
+
+export const collectorIdFor = (instanceId) => String(instanceId ?? '').replace(/^i-/, '').toLowerCase();
+
+export function createCollector({ instanceId = process.env.VM_INSTANCE_ID, eventsUrl = process.env.VM_SIDECAR_EVENTS_URL, post = postEvent } = {}) {
   const hits = [];
+  const expectedId = collectorIdFor(instanceId);
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (req.method === 'GET' && url.pathname === '/healthz') return sendJson(res, 200, { status: 'ok' });
     if (req.method === 'GET' && url.pathname === '/hits') return sendJson(res, 200, { count: hits.length });
+    if (req.method === 'GET' && url.pathname === '/inbox') return sendJson(res, 200, { id: expectedId || null, hits: hits.slice(-INBOX_CAP) });
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts[0] === 'c' && parts.length >= 2) {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
+      if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+      let body = '';
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const chunks = [];
+        let size = 0;
+        await new Promise((resolve) => {
+          req.on('data', (c) => { size += c.length; if (size <= 16384) chunks.push(c); });
+          req.on('end', resolve); req.on('error', resolve); req.on('close', resolve);
+        });
+        body = Buffer.concat(chunks).toString('utf8');
+      }
+      const query = url.search.slice(1);
+      const content = `${query}${query && body ? ' | ' : ''}${body}`;
+      const tagged = TAG.test(String(req.headers['x-vm-visit'] ?? ''));
+      const idOk = expectedId ? parts[1].toLowerCase() === expectedId : true;
+      const record = { at: new Date().toISOString(), method: req.method, path: url.pathname, bot_tagged: tagged, collector_id_ok: idOk, size: Buffer.byteLength(content), data: safeDecode(content).slice(0, DATA_CAP) };
+      hits.push(record);
+      if (hits.length > INBOX_CAP) hits.shift();
+      if (eventsUrl) {
+        const flag = FLAG_LIKE.exec(record.data)?.[0];
+        const data = { collector_id_ok: idOk, bot_tagged: tagged, size: record.size };
+        if (flag) data.candidate_sha256 = crypto.createHash('sha256').update(flag).digest('hex');
+        post(eventsUrl, { schema_version: '0.1', type: 'collector.hit', source: 'mock', session_kind: 'anon', user_id: null, ts: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'), data });
+      }
+      res.writeHead(200, { 'content-type': 'image/gif', 'content-length': GIF.length, 'cache-control': 'no-store', ...cors });
+      return res.end(GIF);
+    }
     if (req.method === 'POST' && (url.pathname === '/' || url.pathname === '/collect')) {
       const b = await readJson(req);
       if (b.tooLarge) return sendJson(res, 413, { error: 'too_large' });
       hits.push({ at: new Date().toISOString(), size: JSON.stringify(b.value ?? null).length });
+      if (hits.length > INBOX_CAP) hits.shift();
       return sendJson(res, 202, { status: 'collected' });
     }
     return sendJson(res, 404, { error: 'not_found' });
@@ -144,6 +190,14 @@ export function createCollector() {
   return { server, hits };
 }
 
+const safeDecode = (s) => { try { return decodeURIComponent(s.replace(/\+/g, ' ')); } catch { return s; } };
+
+// Best effort: a hit must never fail because the sidecar is slow or absent.
+function postEvent(eventsUrl, event) {
+  try {
+    fetch(new URL('/v1/events', eventsUrl), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event), signal: AbortSignal.timeout(3000) }).catch(() => {});
+  } catch { /* no usable URL */ }
+}
 export function createMockServices(opts = {}) {
   return {
     payment: createPayment(),
