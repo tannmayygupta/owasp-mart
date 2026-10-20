@@ -305,9 +305,9 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Waits on: P-28.
   - Done when: No view shows data the privacy wall forbids, checked by a test per view.
 
-- [ ] **P-31. Break-glass, audit access, admin limits, legal review and incident handling**
+- [x] **P-31. Break-glass, audit access, admin limits, legal review and incident handling**  (OI-12 and OI-34 answered (D-94, D-95); OI-33 open: the legal review waits for a reviewer; the incident procedure is a draft and does not name who decides; the alert is a mail; not browser-tested (OI-30))
   - Epic: `epic-admin-and-operations`
-  - BMAD story: planned, ref `9.2` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `in-progress`
+  - BMAD story: planned, ref `9.2` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `built` (marked done once merged)
   - Build: Break-glass access, audit access, admins cannot read candidate answers by default, the legal review action, breach and incident handling.
   - Covers: FR-ADM-03, 07, 08, FR-PRV-19, 20
   - Waits on: P-17, P-28. Open: OI-12, OI-33, OI-34.

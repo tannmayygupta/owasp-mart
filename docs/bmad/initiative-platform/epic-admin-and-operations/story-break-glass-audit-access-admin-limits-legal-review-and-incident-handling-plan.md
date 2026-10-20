@@ -3,7 +3,7 @@ title: 'Break-glass, audit access, admin limits, legal review and incident handl
 type: 'feature'
 ticket: '2'
 created: '2026-10-20'
-status: in-progress
+status: built
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -52,7 +52,7 @@ context:
 
 **Execution:**
 - [x] Audit log route; break-glass service, table, routes, alerts; the admin-limit test (2026-10-20: break-glass 5, Postgres 3, incident 4).
-- [ ] Legal review pack, incident procedure and notice command; the admin page; the stack test.
+- [x] Legal review pack, incident procedure and notice command; the admin page; the stack test (2026-10-20: the stack test 10 of 10 on real Docker).
 
 **Acceptance Criteria:**
 - Given an admin, then reading the audit log works and is itself logged.
@@ -63,6 +63,17 @@ context:
 
 ## Review Triage Log
 
+### 2026-10-20, quick review (lens: quick), loop 1
+Run in the main session, not by an independent subagent.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | A new table name differed from the architecture's planned `break_glass_sessions` | medium | patch | renamed, the architecture's columns |
+| 2 | A second database session inside the open transaction lost the insert (500) | high | patch | the owner read before the transaction |
+| 3 | The company-owner lookup reached into a private helper | low | patch | `CompanyService.owner_of_org` |
+| 4 | The incident procedure named a decider nobody chose | medium | patch | "not named yet" |
+| 5 | The alert is a mail, not a live push | low | defer | ADR 0062 |
+
 ## Verification
 
 **Commands:**
@@ -70,3 +81,5 @@ context:
 - web tests, `tsc --noEmit`, `next build` -- expected: pass
 - `node --test scripts/e2e/platform-stack.e2e.test.mjs` (the P-31 test) -- expected: pass
 - `node scripts/check-contract-rules.mjs` -- expected: 0 FAIL
+
+**Results (2026-10-20):** see the dev-log `docs/dev-log/2026-10-20-akshaay29-p31-break-glass-audit-and-incidents.md`: full pytest 2878 passed, contract rules 18 PASS, web 17 of 17, stack 10 of 10.

@@ -1,0 +1,110 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+........................................................................ [  7%]
+........................................................................ [ 10%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+.................................F...................................... [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 22%]
+........................................................................ [ 25%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 32%]
+........................................................................ [ 35%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+........................................................................ [ 42%]
+......................F...F............................................. [ 45%]
+........................................................................ [ 47%]
+........................................................................ [ 50%]
+........................................................................ [ 52%]
+........................................................................ [ 55%]
+.................................s...................................... [ 57%]
+........................................................................ [ 60%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+........................................................................ [ 67%]
+........................................................................ [ 70%]
+........................................................................ [ 72%]
+........................................................................ [ 75%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 97%]
+.......................................................................  [100%]
+================================== FAILURES ===================================
+_ test_every_table_with_an_organisation_column_is_scoped_or_listed_here_on_purpose _
+
+    def test_every_table_with_an_organisation_column_is_scoped_or_listed_here_on_purpose():
+        """A new table with an `org_id` must register with `org_scoped` (and get a row-level security policy), or be added below with the reason."""
+        import vulnmart.accounts.models  # noqa: F401
+        import vulnmart.kernel.models  # noqa: F401
+        import vulnmart.lab.models  # noqa: F401  (so the answer does not depend on which test imported them first)
+        import vulnmart.privacy.models  # noqa: F401
+    
+        on_purpose = {
+            "attempts": "stream L: the lab runtime and the event receiver work without a session scope, so a row-level policy would stop them; access is decided in the lab API "
+                        "(the owner, or a reviewer of the company: vulnmart.lab.api reviewable, same 404 for anyone else). A follow-up may add a policy once the runtime acts with a scope",
+            "consent_records": "an append-only proof that outlives the company; org_id is a plain pointer, read by the candidate (story P-16)",
+            "deletion_requests": "a person's request, read and decided by service code that checks the caller (the person, or the company named on the request); org_id is a plain pointer, never a scope (story P-25)",
+            "data_views": "the candidate reads their own history; org_id and the company name are plain values written when a company looks (story P-25)",
+        }
+        with_org_column = {name for name, table in Base.metadata.tables.items() if "org_id" in table.columns}
+>       assert with_org_column - set(ORG_SCOPED) == set(on_purpose), sorted(with_org_column - set(ORG_SCOPED) - set(on_purpose))
+E       AssertionError: ['break_glass_sessions']
+E       assert {'attempts', ...ion_requests'} == {'attempts', ...ion_requests'}
+E         
+E         Extra items in the left set:
+E         'break_glass_sessions'
+E         Use -v to get more diff
+
+apps\api\tests\test_company_members.py:265: AssertionError
+_________________ test_the_history_has_one_root_and_one_head __________________
+
+    def test_the_history_has_one_root_and_one_head():
+        script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
+>       assert script.get_heads() == ["0015"]
+E       AssertionError: assert ['0016'] == ['0015']
+E         
+E         At index 0 diff: '0016' != '0015'
+E         Use -v to get more diff
+
+apps\api\tests\test_kernel_settings.py:90: AssertionError
+________ test_every_table_of_the_metadata_is_in_the_table_owners_file _________
+
+    def test_every_table_of_the_metadata_is_in_the_table_owners_file():
+        import yaml
+    
+        owners = {row["table"] for row in yaml.safe_load((ROOT / "contracts" / "db" / "table-owners.yaml").read_text(encoding="utf-8"))["tables"]}
+        assert set(Base.metadata.tables) <= owners
+        import vulnmart.accounts.models  # noqa: F401 - registers the account tables whichever test ran first
+        import vulnmart.lab.models  # noqa: F401 - registers the lab tables (migration 0005) whichever test ran first
+        import vulnmart.notifications.models  # noqa: F401 - registers email_outbox whichever test ran first
+        import vulnmart.privacy.models  # noqa: F401 - registers consent_records whichever test ran first
+        import vulnmart.assessments.models  # noqa: F401 - registers the templates and invites whichever test ran first
+        import vulnmart.live.models  # noqa: F401 - registers domain_events whichever test ran first
+    
+>       assert json.dumps(sorted(Base.metadata.tables)) == json.dumps(
+            sorted(["domain_events", "email_outbox", "email_tokens", "job_runs", "org_members", "organizations", "quotas", "sessions", "settings", "user_roles", "users",
+                    "activity_buckets", "attempt_events", "attempts", "bot_visits", "evidence", "events", "flag_submissions", "held_captures",
+                    "hint_unlocks", "instance_epochs", "instances", "integrity_flags", "milestones", "review_audit", "security_events",
+                    "audit_anchor", "audit_checkpoint", "audit_log", "consent_records", "mfa_credentials", "recovery_codes", "subject_map",
+                    "dpa_acceptances", "join_requests", "assessment_templates", "invites", "template_challenges", "deletion_requests", "data_views"]))
+E       assert '["activity_b...es", "users"]' == '["activity_b...es", "users"]'
+E         
+E         Skipping 129 identical leading characters in diff, use -v to show
+E         - visits", "consent_records", "data_views", "deletion_requests", "domain_events", "dpa_acceptances", "email_outbox", "email_tokens", "events", "evidence", "flag_submissions", "held_captures", "hint_unlocks", "instance_epochs", "instances", "integrity_flags", "invites", "job_runs", "join_requests", "mfa_credentials", "milestones", "org_members", "organizations", "quotas", "recovery_codes", "review_audit", "security_events", "sessions", "settings", "subject_map", "template_challenges", "user_roles", "users"]
+E         ...
+E         
+E         ...Full output truncated (3 lines hidden), use '-vv' to show
+
+apps\api\tests\test_kernel_settings.py:139: AssertionError
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+3 failed, 2875 passed, 1 skipped in 531.20s (0:08:51)
