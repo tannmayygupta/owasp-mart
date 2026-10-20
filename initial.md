@@ -775,6 +775,18 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-97 - Where a recruiter's report view is recorded (FR-DSH-02, story P-31)
 - **Decision (CONFIRMED by the developer 2026-10-20):** a recruiter's view of a candidate report or evidence is recorded in the **attempt log** (`recruiter_viewed_report`) and the **candidate's view history** (FR-PRV-11); it is **not** also written to the platform audit log. FR-DSH-02's "audit log" is read as these two records (ADR 0059).
+
+### D-98 - Recruiter signup: free webmail and re-applying (OI-10, OI-11, story P-18)
+- **Decision (CONFIRMED by the developer 2026-10-18, answers OI-10 and the first half of OI-11; written here in story 1.9):** a recruiter may sign up with a **free webmail address, with no extra check**, and a rejected recruiter may **re-apply at any time** (no waiting period). The one admin approval is the only gate against fake recruiters (ADR 0048). **Open:** OI-11's second half (company-name verification beyond the email domain) was not asked.
+
+### D-99 - Write-up and result timing are template settings (OI-14, OI-15, story P-20)
+- **Decision (CONFIRMED by the developer 2026-10-18, answers OI-14 and OI-15; written here in story 1.9):** both are settings of the assessment template: the write-up is **optional by default**, and a candidate sees results **right after submit by default** (`results_visibility`). Built in story P-20 (ADR 0050).
+
+### D-100 - Platform PostgreSQL and Valkey are self-hosted (OI-28, story P-17)
+- **Decision (CONFIRMED by the developer 2026-10-18, answers OI-28; written here in story 1.9):** the platform's PostgreSQL and Valkey run **self-hosted on VM-P**, not on managed free tiers. The backups and the daily audit-log anchor follow from that (ADR 0047; the anchor and backup shipping are deployment work, stream L).
+
+### D-101 - How long the consent record is kept (OI-37, story P-16)
+- **Decision (CONFIRMED by the developer 2026-10-18, answers OI-37; written here in story 1.9):** the short consent record is kept for **the assessment record's retention plus 12 months** (`consent_record_extra_months`, a setting), after which the purge job of story P-24 (`ConsentPurge`, records past their `erase_after`) removes it. Pending the legal review (OI-33).
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.

@@ -167,6 +167,7 @@ export type InviteSummary = Omit<MyInvite, 'invite_id' | 'attempt_id'>;
 export type ConsentNotice = { attempt_id: string; notice_version: string; notice_text: string; notice_text_sha256: string; retention_days_shown: number; company_name: string };
 export type DeletionRequest = { request_id: string; kind: string; status: string; execute_after: string | null; can_undo: boolean; company_name: string | null; attempt_id: string | null };
 export type DataView = { company_name: string; action: string; at: string };
+export type MySession = { ref: string; created_at: string; last_seen_at: string; ip_trunc: string | null; ua_class: string | null; current: boolean };
 
 // ---- the recruiter's shapes (IF-1 1.4.0, story P-27; the candidate's results are the lab's reviewer routes, IF-2) ----
 
@@ -289,6 +290,16 @@ export function duration(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '-';
   const s = Math.max(0, Math.round(seconds));
   return `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m ${String(s % 60).padStart(2, '0')}s`;
+}
+
+/** The time warnings (story 2.3, FR-SES-03, FR-NTF-04), worked out from the deadline on the reader's clock: the minutes of the warning now in force, or null. The
+ * thresholds are the engine's default rules (15 and 5 minutes, placeholders); the engine records each warning once in the attempt log (`time_warning_sent`). */
+export const WARNING_MINUTES = [15, 5] as const;
+export function timeWarning(secondsLeft: number | null | undefined): number | null {
+  if (secondsLeft === null || secondsLeft === undefined || !Number.isFinite(secondsLeft) || secondsLeft <= 0) return null;
+  let due: number | null = null;
+  for (const m of WARNING_MINUTES) if (secondsLeft <= m * 60) due = m;
+  return due;
 }
 
 /** "2026-10-20T10:00:00Z" as the reader's local date and time. */

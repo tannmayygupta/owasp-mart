@@ -393,6 +393,48 @@ class DeletionRequestList(BaseModel):
     items: Annotated[list[DeletionRequest], Field(max_length=100)]
 
 
+class SessionRef(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="A handle for one of the caller's sessions: the first 16 hex characters of the stored hash of the session value.",
+            pattern='^[0-9a-f]{16}$',
+        ),
+    ]
+
+
+class UaClass(Enum):
+    browser = 'browser'
+    mobile = 'mobile'
+    tool = 'tool'
+    NoneType_None = None
+
+
+class MySession(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ref: SessionRef
+    created_at: Timestamp
+    last_seen_at: Timestamp
+    ip_trunc: Annotated[
+        str | None,
+        Field(
+            description='A network prefix (IPv4 /24, IPv6 /48), never the address.',
+            max_length=64,
+        ),
+    ]
+    ua_class: UaClass | None
+    current: Annotated[bool, Field(description='This is the session making the call.')]
+
+
+class MySessionList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[MySession], Field(max_length=100)]
+
+
 class Action(Enum):
     viewed = 'viewed'
     exported = 'exported'

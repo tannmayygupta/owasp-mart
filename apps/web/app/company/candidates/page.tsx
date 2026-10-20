@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { api, say, when, type Attempt, type CompanyInvite, type Progress } from '../../../lib/api';
+import { api, say, timeWarning, when, type Attempt, type CompanyInvite, type Progress } from '../../../lib/api';
 import { useLive } from '../../../lib/live';
 import { useRequireUser } from '../../../lib/session';
 
@@ -74,7 +74,10 @@ export default function CandidatesPage() {
                     </td>
                     <td><span className="pill">{invite.state}</span></td>
                     <td>{attempt ? <span className={`pill ${attempt.state === 'running' ? 'ok' : ''}`}>{attempt.state}</span> : '-'}</td>
-                    <td>{left !== null ? `${Math.floor(left / 3600)}h ${String(Math.floor(left / 60) % 60).padStart(2, '0')}m ${String(left % 60).padStart(2, '0')}s` : '-'}</td>
+                    <td>
+                      {left !== null ? `${Math.floor(left / 3600)}h ${String(Math.floor(left / 60) % 60).padStart(2, '0')}m ${String(left % 60).padStart(2, '0')}s` : '-'}
+                      {timeWarning(left) !== null && <> <span className="pill bad" data-testid="time-alert">{timeWarning(left)} min left</span></>}
+                    </td>
                     <td>
                       {progress.length > 0 ? (
                         <>

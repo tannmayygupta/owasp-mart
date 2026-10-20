@@ -39,3 +39,6 @@ All checks run on main at `493ecb6` plus this branch (output: `docs/assets/p-08-
 - **H-83** re-confirmed against the current IF-5 text (1.1.0): the open points stand as written; nothing in IF-5 1.0.0 to 1.1.0 changes stream P's side.
 - **H-79** (stream P's part): the provisional `InstancePort`, `AttemptPort` and `ReportPort` of P-05 stand; since P-25 the platform reaches the lab in process (`LabRuntime`: `force_stop`, `attempts`, the read side used by the exports and break-glass). Stream L closes the row and ticks the checklist line.
 - **H-352**: stream P's approval rows are set (this pull request).
+
+## Later the same day
+- IF-1 1.7.0 (story 3.6, the caller's session routes, additive): re-approved by the developer in that pull request; COMPAT.md updated.

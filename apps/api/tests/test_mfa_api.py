@@ -144,6 +144,22 @@ def test_enrolment_through_the_routes_gives_the_address_the_codes_and_a_new_sess
     assert me.status_code == 200 and me.json()["mfa_enabled"] is True, "the new cookie works and shows the factor on"
 
 
+def test_one_account_can_start_only_so_many_enrolments_an_hour_and_others_are_not_affected(sessions, clock):
+    """Story 1.9 (deferred F6): each start makes a new secret; the per-address limit (60) does not stop one account, the per-account one does."""
+    add_user(sessions, "u-RRRRRRRRRRRRRRRR", "rec@example.com", "recruiter")
+    add_user(sessions, "u-SSSSSSSSSSSSSSSS", "sam@example.com", "recruiter")
+    app = make_app(sessions, clock)
+    allowed = int(app.state.ports.settings.get("rate_mfa_enrol_per_user_per_hour"))
+    with client(app) as c, client(app) as other:
+        csrf = log_in(c, "rec@example.com").json()["csrf_token"]
+        answers = [c.post("/api/v1/me/mfa", headers=headers(csrf)).status_code for _ in range(allowed + 1)]
+        refused = c.post("/api/v1/me/mfa", headers=headers(csrf))
+        sams = other.post("/api/v1/me/mfa", headers=headers(log_in(other, "sam@example.com").json()["csrf_token"]))
+    assert answers == [200] * allowed + [429]
+    assert refused.json()["code"] == "REQ-RATE-LIMITED" and int(refused.headers["retry-after"]) > 0
+    assert sams.status_code == 200, "another account from the same address still enrols"
+
+
 def test_enrolment_needs_a_session_the_csrf_token_and_the_dashboard_origin(sessions, clock):
     add_user(sessions, "u-RRRRRRRRRRRRRRRR", "rec@example.com", "recruiter")
     app = make_app(sessions, clock)

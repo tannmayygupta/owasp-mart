@@ -5,7 +5,7 @@
 | Date | 2026-10-20 |
 | Developer | akshaay29 |
 | Branch / commit | `sprint-4-akshay-5-3-recruiter-routes` |
-| Status | Done (story `built`; marked done once merged) |
+| Status | Done (story `done`, merged in pull request 69) |
 | Report tag | platform, companies |
 
 ## Requirements covered

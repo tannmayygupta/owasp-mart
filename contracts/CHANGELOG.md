@@ -12,6 +12,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
+### 1.7.0 (2026-10-20, Akshay, story 3.6)
+
+- Additive, not breaking: three operations for the caller's own sessions (FR-ACC-04): `listMySessions` `GET /api/v1/me/sessions` (the newest 100 live sessions: `ref`, times, a network prefix, the client kind, `current`), `logOutEverywhere` `DELETE /api/v1/me/sessions` (every session, this one included; clears the cookie) and `revokeMySession` `DELETE /api/v1/me/sessions/{ref}` (204 whether or not a live session had the ref; 422 for a malformed ref); the schemas `SessionRef`, `MySession`, `MySessionList`; no new error code. The bundle (69 platform operations, 89 in all) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples; none of them takes a body, so no request example is added.
+- registry change: `contracts/COMPAT.md` is edited: the IF-1 row of Versions and Akshay's owner row of Approvals name 1.7.0 (approved by the developer for this change, 2026-10-20), so the tag's version check still matches the newest entry.
+
 ### 1.6.0 (2026-10-20, Akshay, story P-31, ADR 0062)
 
 - Additive, not breaking (the sign-offs of COMPAT.md stay on 1.0.0 until the owners confirm the minor label; the OpenAPI `info.version` is not changed here): six admin operations: `listAuditLog` `GET /api/v1/admin/audit`, `listBreakGlassSessions` and `openBreakGlass` on `/api/v1/admin/break-glass`, `readBreakGlassAttempt` `GET /api/v1/admin/break-glass/{session_id}/attempt`, `closeBreakGlass` and `reviewBreakGlass` (`POST .../close`, `.../review`); the schemas `AuditEntry`, `AuditEntryList`, `BreakGlassRequest`, `BreakGlassReviewRequest`, `BreakGlassSession`, `BreakGlassSessionList`, `BreakGlassRead`; no new error code (the admin area's `AdminNotFound` and `AdminConflict`). The bundle (66 platform operations, 86 in all) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (two valid and one invalid request example added; `scripts/platform-mock.test.mjs` 20 of 20).
@@ -345,6 +350,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Full content (briefs, write-ups, decoys, filled hints, official-site id re-check) is T-30; each challenge's real milestone signals and confirmed flag placement come with its own story.
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
+
+### 2026-10-20 (Sahil, IF-6 1.0.1 consumer re-sign-off)
+- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0058) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
+
 
 ### 2026-10-20 (Sahil, IF-7 1.2.0 owner + DB 2.1.0 consumer sign-off)
 - registry change: in `contracts/COMPAT.md` the stream-T Approvals rows for IF-7 (owner) and DB (consumer) are set to `approved` at 1.2.0 and 2.1.0 (date 2026-10-20). Sahil's review: IF-7 1.2.0 is data-only (the player-facing `start_state` text of C01–C11 now names the seeded demo account and where to look; no schema change, no flag/placement/test-path in any text, the accounts match `apps/shop/seed/contributions/010-challenge-accounts.mjs`); DB 2.1.0 is additive table-owner rows (`data_views`, lab tables, `security_events`) that do not touch the shop (own SQLite) or the catalogue tables. No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.

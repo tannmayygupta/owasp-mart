@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DEFAULT_DIR, REGISTRY_FILE, errorPath, loadRegistry, main, semanticBody, semanticRegistry, validateDir } from './validate-errors.mjs';
+import { DEFAULT_DIR, REGISTRY_FILE, errorPath, exitCodeProblems, loadRegistry, main, semanticBody, semanticRegistry, validateDir } from './validate-errors.mjs';
 
 // A throwaway copy of contracts/errors that a test may damage.
 function copyDir() {
@@ -203,4 +203,18 @@ test('a manifest entry with an unknown stage is reported', () => {
 test('CLI: --dir without a value exits 2', () => {
   assert.equal(main(['--dir'], { log: () => {}, err: () => {} }), 2);
   assert.equal(main(['--dir', '--help'], { log: () => {}, err: () => {} }), 2);
+});
+
+test('story 1.9: the injector exit codes of the instance contract and the registry agree both ways', () => {
+  const reg = loadRegistry(DEFAULT_DIR);
+  const contract = fs.readFileSync(path.join(DEFAULT_DIR, '..', 'instance', 'instance-contract.md'), 'utf8');
+  assert.deepEqual(exitCodeProblems(reg, contract), []);
+  const row = (n, code) => `| ${n} | x | \`${code}\` |\n`;
+  const wrongNumber = contract.replace('| 11 | The snapshot patch failed | `INST-INJECT-SNAPSHOT-PATCH` |', row(14, 'INST-INJECT-SNAPSHOT-PATCH').trim());
+  assert.match(exitCodeProblems(reg, wrongNumber).join('\n'), /INST-INJECT-SNAPSHOT-PATCH: the instance contract says exit code 14, error-codes.yaml says 11/);
+  assert.match(exitCodeProblems(reg, contract + row(15, 'INST-NOT-A-CODE')).join('\n'), /names INST-NOT-A-CODE for exit code 15, which is not in/);
+  const dropped = contract.replace(/^\| 12 \|.*INST-INJECT-PLACEMENT-WRITE.*$/m, '');
+  assert.notEqual(dropped, contract);
+  assert.match(exitCodeProblems(reg, dropped).join('\n'), /INST-INJECT-PLACEMENT-WRITE: exit code 12 in error-codes.yaml is not in the instance contract's table/);
+  assert.ok(exitCodeProblems(reg, 'no table').includes('the instance contract has no exit-code table rows'));
 });

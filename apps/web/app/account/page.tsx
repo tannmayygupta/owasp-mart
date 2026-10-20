@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { api, download, say, when, type DataView, type DeletionRequest } from '../../lib/api';
+import { api, download, say, when, type DataView, type DeletionRequest, type MySession } from '../../lib/api';
 import { useRequireUser, useSession } from '../../lib/session';
 
-// The account page (H-134, H-135, FR-DSH-04, FR-PRV-08, 09, 11): name, password, the authenticator app, a deletion request with its 7-day undo, and which
-// companies viewed my data. The authenticator address and the recovery codes are shown once and kept only in this page's memory.
+// The account page (H-134, H-135, FR-DSH-04, FR-PRV-08, 09, 11, FR-ACC-04): name, password, the authenticator app, my sessions (story 3.6), a deletion request with its
+// 7-day undo, and which companies viewed my data. The authenticator address and the recovery codes are shown once and kept only in this page's memory.
 export default function AccountPage() {
   const user = useRequireUser();
   const { refresh } = useSession();
@@ -14,15 +14,18 @@ export default function AccountPage() {
   const [codes, setCodes] = useState<string[] | null>(null);
   const [requests, setRequests] = useState<DeletionRequest[]>([]);
   const [views, setViews] = useState<DataView[]>([]);
+  const [sessions, setSessions] = useState<MySession[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [r, v] = await Promise.all([
+      const [r, v, s] = await Promise.all([
         api<{ items: DeletionRequest[] }>('GET', '/api/v1/me/deletion-requests'),
         api<{ items: DataView[] }>('GET', '/api/v1/me/data-views'),
+        api<{ items: MySession[] }>('GET', '/api/v1/me/sessions'),
       ]);
       setRequests(r.items);
       setViews(v.items);
+      setSessions(s.items);
     } catch (e) {
       setBanner({ text: say(e), kind: 'bad' });
     }
@@ -152,6 +155,50 @@ export default function AccountPage() {
             <button type="button" className="ghost" onClick={() => setCodes(null)}>I have saved them</button>
           </div>
         )}
+      </section>
+
+      <section className="card" data-testid="sessions">
+        <h2>Where you are signed in</h2>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Device</th><th>Network</th><th>Signed in</th><th>Last used</th><th></th></tr></thead>
+            <tbody>
+              {sessions.map((s) => (
+                <tr key={s.ref}>
+                  <td>{s.ua_class ?? '-'}{s.current && <strong> (this one)</strong>}</td>
+                  <td>{s.ip_trunc ?? '-'}</td>
+                  <td>{when(s.created_at)}</td>
+                  <td>{when(s.last_seen_at)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={async () => {
+                        if (await act(() => api('DELETE', `/api/v1/me/sessions/${s.ref}`), 'That session is signed out.')) {
+                          if (s.current) await refresh();
+                          else await load();
+                        }
+                      }}
+                    >
+                      Sign out
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => {
+              if (window.confirm('Sign out on every device, this one included?')) void act(() => api('DELETE', '/api/v1/me/sessions'), 'Signed out everywhere.').then(refresh);
+            }}
+          >
+            Sign out everywhere
+          </button>
+        </p>
       </section>
 
       {user.account_type === 'participant' && (
