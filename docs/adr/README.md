@@ -54,5 +54,6 @@
 | 0054 | [Retention: a scheduler with leased runs, two privileged purge functions, and the candidate's clock](0054-retention-scheduler-leased-runs-privileged-purge-functions-and-the-candidate-clock.md) | Proposed (the builder's design for the developer to confirm) |
 | 0055 | [Deletion requests: the 7-day undo window, the company's part, and company-level view history](0055-deletion-requests-the-undo-window-the-company-s-part-and-company-level-view-history.md) | Proposed (the builder's design for the developer to confirm) |
 | 0057 | [Admin operations: admin-only routes, a real quota port, and setting ranges](0057-admin-operations-admin-only-routes-a-real-quota-port-and-setting-ranges.md) | Proposed (the builder's design for the developer to confirm) |
+| 0058 | [Candidate invite routes, and the dashboards as client pages over the same-origin API](0058-candidate-invite-routes-and-dashboards-as-client-pages.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

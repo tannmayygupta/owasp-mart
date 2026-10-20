@@ -1,0 +1,9 @@
+{
+  "schema": "InviteTokenRequest",
+  "body": {
+    "token": "aaaaaaaaaaaaaaaaaaaaaaaaaa.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "email": "someone@example.org"
+  },
+  "path": "/email",
+  "rule": "no member other than the token"
+}

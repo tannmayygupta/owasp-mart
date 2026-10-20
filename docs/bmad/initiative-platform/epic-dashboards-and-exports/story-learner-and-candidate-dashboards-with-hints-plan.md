@@ -52,7 +52,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] The three invite routes, the contract change and their tests.
+- [x] The three invite routes, the contract change and their tests (2026-10-20: 9 route tests, contract rules 18 PASS).
 - [ ] The web pages and their tests; the stack test.
 
 **Acceptance Criteria:**

@@ -40,6 +40,9 @@
       "name": "privacy"
     },
     {
+      "name": "invites"
+    },
+    {
       "name": "admin"
     },
     {
@@ -1442,6 +1445,226 @@
                         }
                       ],
                       "has_more": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/invites/open": {
+      "post": {
+        "tags": [
+          "invites"
+        ],
+        "operationId": "openInvite",
+        "summary": "Open an invite link",
+        "description": "The candidate opened the link of an invite (story P-26 over story P-21, FR-ASM-04): no session is needed, because the candidate may have no account yet. The invite becomes `opened`\n(a link that was opened was delivered) and the answer says what the assessment is: the company, the title, the time limit, how many challenges, the hints, write-up and results\nrules (OI-14, OI-15) and the expiry. A closed invite (expired, cancelled, revoked, declined) answers its state. The answer never contains the invite's address. A link that opens\nnothing (malformed, unknown, or emptied by the invite purge) is 400 AUTH-TOKEN-INVALID, as for the email links; opening is rate limited per visitor.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What the assessment is.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteSummary"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "state": "opened",
+                      "company_name": "Acme Security Ltd",
+                      "title": "Web security screening",
+                      "expires_at": "2026-10-27T10:00:00Z",
+                      "time_limit_min": 120,
+                      "challenge_count": 3,
+                      "hints_mode": "off",
+                      "hint_cost_pct": 0,
+                      "writeup_required": false,
+                      "results_visibility": "after_submit"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/TokenInvalid"
+          },
+          "403": {
+            "$ref": "#/components/responses/OriginForbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/invites/accept": {
+      "post": {
+        "tags": [
+          "invites"
+        ],
+        "operationId": "acceptInvite",
+        "summary": "Accept an invite",
+        "description": "Binds the invite to the signed-in candidate (FR-ASM-04) and answers the `attempt_id` the consent screen is for (`getConsentNotice`, then `recordConsent`); the attempt is created\nwhen consent is granted. Repeating it for the same account answers the same attempt. A closed invite, an invite another account accepted, an account that cannot take an\nassessment (not an active, verified participant) and an account whose verified address is not the one the invite was sent to are one 409 ATT-INVALID-STATE: the answer must\nnot say what the invite's address is, and the registry has no invite codes (ADR 0058).\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The invite, bound to the caller.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyInvite"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "invite_id": "i-AAAAAAAAAAAAAAAA",
+                      "attempt_id": "a-AAAAAAAAAAAAAAAA",
+                      "state": "opened",
+                      "company_name": "Acme Security Ltd",
+                      "title": "Web security screening",
+                      "expires_at": "2026-10-27T10:00:00Z",
+                      "time_limit_min": 120,
+                      "challenge_count": 3,
+                      "hints_mode": "off",
+                      "hint_cost_pct": 0,
+                      "writeup_required": false,
+                      "results_visibility": "after_submit"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/TokenInvalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "409": {
+            "$ref": "#/components/responses/InviteConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/me/invites": {
+      "get": {
+        "tags": [
+          "invites"
+        ],
+        "operationId": "listMyInvites",
+        "summary": "My invitations",
+        "description": "The invites bound to the caller, newest first (FR-DSH-04): the company, the title, the state, the expiry, the rules the candidate needs to see, and the attempt id. Only the\ncaller's own invites (the database policy `own_invite`); an account that accepted none gets an empty list.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitations.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyInviteList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "invite_id": "i-AAAAAAAAAAAAAAAA",
+                          "attempt_id": "a-AAAAAAAAAAAAAAAA",
+                          "state": "consented",
+                          "company_name": "Acme Security Ltd",
+                          "title": "Web security screening",
+                          "expires_at": "2026-10-27T10:00:00Z",
+                          "time_limit_min": 120,
+                          "challenge_count": 3,
+                          "hints_mode": "on",
+                          "hint_cost_pct": 10,
+                          "writeup_required": false,
+                          "results_visibility": "after_submit"
+                        }
+                      ]
                     }
                   }
                 }
@@ -4368,6 +4591,201 @@
           }
         }
       },
+      "InviteTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The token of the invite link (the company prefix and the secret); never logged."
+          }
+        }
+      },
+      "InviteSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "company_name",
+          "title",
+          "expires_at",
+          "time_limit_min",
+          "challenge_count",
+          "hints_mode",
+          "hint_cost_pct",
+          "writeup_required",
+          "results_visibility"
+        ],
+        "properties": {
+          "state": {
+            "enum": [
+              "created",
+              "sent",
+              "opened",
+              "consented",
+              "started",
+              "declined",
+              "expired",
+              "cancelled",
+              "revoked"
+            ]
+          },
+          "company_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "time_limit_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "challenge_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11
+          },
+          "hints_mode": {
+            "enum": [
+              "off",
+              "on"
+            ]
+          },
+          "hint_cost_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "writeup_required": {
+            "type": "boolean"
+          },
+          "results_visibility": {
+            "enum": [
+              "after_submit",
+              "after_release"
+            ]
+          }
+        }
+      },
+      "MyInvite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "invite_id",
+          "attempt_id",
+          "state",
+          "company_name",
+          "title",
+          "expires_at",
+          "time_limit_min",
+          "challenge_count",
+          "hints_mode",
+          "hint_cost_pct",
+          "writeup_required",
+          "results_visibility"
+        ],
+        "properties": {
+          "invite_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "attempt_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AttemptId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "created",
+              "sent",
+              "opened",
+              "consented",
+              "started",
+              "declined",
+              "expired",
+              "cancelled",
+              "revoked"
+            ]
+          },
+          "company_name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "time_limit_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "challenge_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11
+          },
+          "hints_mode": {
+            "enum": [
+              "off",
+              "on"
+            ]
+          },
+          "hint_cost_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "writeup_required": {
+            "type": "boolean"
+          },
+          "results_visibility": {
+            "enum": [
+              "after_submit",
+              "after_release"
+            ]
+          }
+        }
+      },
+      "MyInviteList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/MyInvite"
+            }
+          }
+        }
+      },
       "PendingCompany": {
         "type": "object",
         "additionalProperties": false,
@@ -6583,6 +7001,32 @@
                 }
               },
               "invalid_state": {
+                "value": {
+                  "type": "urn:vulnmart:error:ATT-INVALID-STATE",
+                  "title": "This action is not allowed in the attempt's current state.",
+                  "status": 409,
+                  "code": "ATT-INVALID-STATE",
+                  "request_id": "req-0a1b2c3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InviteConflict": {
+        "description": "The invite is closed or taken, or this account cannot accept it (not an active, verified participant, or not the address the invite was sent to) (ATT-INVALID-STATE).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/CacheControl"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "examples": {
+              "default": {
                 "value": {
                   "type": "urn:vulnmart:error:ATT-INVALID-STATE",
                   "title": "This action is not allowed in the attempt's current state.",
