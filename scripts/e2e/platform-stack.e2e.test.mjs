@@ -1524,6 +1524,87 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.equal((await call('GET', '/api/v1/me', { headers: { cookie } })).status, 401, 'the session of a deleted account is over');
   }, { timeout: 300000 });
 
+  // Story P-28: the admin area on the real stack. An admin is seeded inside the API container, signs in through the proxy and (the stack has no authenticator app) the second
+  // factor is marked on the session with psql; without it every admin route answers like a route that does not exist. The admin approves a company, locks and unlocks a learner,
+  // changes a setting and a quota that the API process's own quota port then reads, and sees capacity and the scheduler's runs. Force-stop needs a lab in the API process, and the
+  // stack has none: it is tested with a stand-in in test_admin_ops.py and test_admin_api.py only.
+  test('admin (P-28): approve a company, lock a learner, change a setting and a quota the lab reads, capacity and jobs; nothing without the second factor', async () => {
+    const psql = (sql) => docker('exec', NAME('postgres'), 'psql', '-U', 'vulnmart', '-d', 'vulnmart', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql).stdout.trim();
+    const py = (...lines) => {
+      const run = docker('exec', NAME('api'), 'python', '-c', ['import json', 'from vulnmart.main import app', 'c = app.state.companies', ...lines].join('\n'));
+      assert.equal(run.status, 0, run.stderr);
+      return JSON.parse(run.stdout.trim().split('\n').pop());
+    };
+    const password = 'correct horse battery staple';
+    const adminEmail = `e2e-ops-admin-${RUN}@example.com`; // not the P-13 address: a second seed for an existing address changes nothing
+    assert.equal(py(`print(json.dumps(app.state.admins.seed_admin(email="${adminEmail}", display_name="E2E Ops Admin", password="${password}")))`), true);
+    const adminId = psql(`SELECT id FROM users WHERE email_ci = '${adminEmail}'`);
+    // a learner to lock, and a company waiting for approval
+    const learnerEmail = `e2e-adminlearner-${RUN}@example.com`;
+    assert.equal((await postJson('/api/v1/accounts', { email: learnerEmail, password, display_name: 'E2E Locked', age_declaration: true })).status, 202);
+    const learnerId = psql(`SELECT id FROM users WHERE email_ci = '${learnerEmail}'`);
+    psql(`UPDATE users SET email_verified_at = now() WHERE id = '${learnerId}'`);
+    const ownerEmail = `owner-${RUN}@e2e-${RUN}.example`;
+    py(`c.signup_recruiter(email="${ownerEmail}", password="${password}", display_name="E2E Owner", company_name="E2E Admin Co ${RUN}")`, 'print(json.dumps(True))');
+    psql(`UPDATE users SET email_verified_at = now() WHERE email_ci = '${ownerEmail}'`);
+    const orgId = psql(`SELECT o.id FROM organizations o JOIN users u ON u.id = o.owner_user_id WHERE u.email_ci = '${ownerEmail}'`);
+
+    const login = await postJson('/api/v1/session', { email: adminEmail, password });
+    assert.equal(login.status, 200);
+    const cookie = `__Host-vm_session=${/__Host-vm_session=([^;]+)/.exec(login.headers.getSetCookie()[0])[1]}`;
+    const csrf = (await login.json()).csrf_token;
+    const get = (path) => call('GET', path, { headers: { cookie } });
+    const send = (method, path, body) => call(method, path, { body, headers: { cookie, 'x-csrf-token': csrf, origin: ORIGIN } });
+
+    // without the second factor the admin area is not there
+    const before = await get('/api/v1/admin/settings');
+    assert.equal(before.status, 404);
+    assert.equal((await before.json()).code, 'REQ-ROUTE-UNKNOWN');
+    psql(`UPDATE sessions SET mfa_at = now() WHERE user_id = '${adminId}'`);
+
+    // the queue and a decision
+    const queue = await get('/api/v1/admin/companies/pending');
+    assert.equal(queue.status, 200);
+    assert.equal(queue.headers.get('cache-control'), 'private, no-store');
+    assert.ok((await queue.json()).items.some((i) => i.org_id === orgId), 'the company waits');
+    assert.equal((await send('POST', `/api/v1/admin/companies/${orgId}/decision`, { decision: 'approve' })).status, 204);
+    assert.equal(psql(`SELECT status FROM organizations WHERE id = '${orgId}'`), 'active');
+    assert.equal((await send('POST', `/api/v1/admin/companies/${orgId}/decision`, { decision: 'approve' })).status, 409);
+
+    // lock and unlock: the learner cannot sign in while locked
+    const users = await (await get(`/api/v1/admin/users?q=${encodeURIComponent(learnerEmail)}`)).json();
+    assert.deepEqual(users.items.map((u) => u.user_id), [learnerId]);
+    assert.doesNotMatch(JSON.stringify(users), /argon2|password/i);
+    assert.deepEqual(await (await send('POST', `/api/v1/admin/users/${learnerId}/actions`, { action: 'lock', reason: 'e2e' })).json(), { outcome: 'locked' });
+    assert.notEqual((await postJson('/api/v1/session', { email: learnerEmail, password })).status, 200, 'a locked account cannot sign in');
+    assert.deepEqual(await (await send('POST', `/api/v1/admin/users/${learnerId}/actions`, { action: 'unlock', reason: 'e2e' })).json(), { outcome: 'unlocked' });
+    assert.equal((await postJson('/api/v1/session', { email: learnerEmail, password })).status, 200);
+    assert.equal((await send('POST', `/api/v1/admin/users/${adminId}/actions`, { action: 'lock', reason: 'e2e' })).status, 409, 'not the admin\'s own account');
+
+    // a setting with its range, and a quota the API process's quota port reads at once
+    assert.equal((await send('PUT', '/api/v1/admin/settings/candidate_retention_days', { value: 20 })).status, 422);
+    const changed = await send('PUT', '/api/v1/admin/settings/candidate_retention_days', { value: 90 });
+    assert.equal((await changed.json()).value, 90);
+    assert.equal(py('print(json.dumps(app.state.ports.settings.get("candidate_retention_days")))'), 90);
+    assert.equal((await send('PUT', '/api/v1/admin/quotas', { scope: 'user', scope_id: learnerId, max_instances: 3 })).status, 200);
+    assert.equal(py(`print(json.dumps(app.state.ports.quota.max_instances("${learnerId}")))`), 3, 'the lab reads the new quota');
+    assert.equal((await send('DELETE', `/api/v1/admin/quotas?scope=user&scope_id=${learnerId}`)).status, 204);
+    assert.equal(py(`print(json.dumps(app.state.ports.quota.max_instances("${learnerId}")))`), 1);
+    assert.equal((await (await send('DELETE', '/api/v1/admin/settings/candidate_retention_days')).json()).value, 180);
+
+    // capacity and the scheduler's runs
+    const capacity = await (await get('/api/v1/admin/capacity')).json();
+    assert.deepEqual(Object.keys(capacity).sort(), ['failures', 'instances', 'memory', 'queue']);
+    const jobs = await (await get('/api/v1/admin/jobs')).json();
+    assert.ok(jobs.items.some((j) => j.name === 'log_purge' && j.last_status === 'succeeded'), 'the admin sees the last run');
+
+    // every change is in the audit log, under pseudonyms
+    for (const action of ['org.approved', 'account.suspended', 'admin.setting_changed', 'admin.quota_changed']) {
+      assert.ok(Number(psql(`SELECT count(*) FROM audit_log WHERE action = '${action}'`)) >= 1, action);
+    }
+    assert.equal(psql(`SELECT count(*) FROM audit_log WHERE actor = '${adminId}' OR subject = '${learnerId}'`), '0', 'no raw user id in the log');
+  }, { timeout: 300000 });
+
   test('ports: only web, API and Mailpit are published, on 127.0.0.1; Postgres and Valkey are not published', () => {
     for (const s of ['postgres', 'valkey']) {
       assert.deepEqual(inspect(s).NetworkSettings.Ports && Object.values(inspect(s).NetworkSettings.Ports).filter(Boolean), [], `${s} must publish nothing`);

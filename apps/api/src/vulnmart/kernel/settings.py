@@ -177,3 +177,39 @@ class DbSettingsPort:
         if type(value) is not type(default):
             raise UnknownSetting(f"setting {name!r} holds a {type(value).__name__}, not a {type(default).__name__}")
         return value
+
+    def set(self, name: str, value: int | bool | str, *, updated_by: str | None = None) -> None:
+        """An admin's override (story P-28): the name must be in `SETTINGS` and the value of the type of its default (a bool is not a number here). The range rules are the admin
+        service's; this only keeps the table well formed."""
+        from .models import SettingRow
+
+        if name not in SETTINGS:
+            raise UnknownSetting(f"unknown setting {name!r}")
+        if type(value) is not type(SETTINGS[name]):
+            raise ValueError(f"{name} is a {type(SETTINGS[name]).__name__}")
+        with self._sessions.begin() as session:
+            row = session.get(SettingRow, name)
+            if row is None:
+                session.add(SettingRow(key=name, value=value, updated_by=updated_by))
+            else:
+                row.value, row.updated_by = value, updated_by
+
+    def clear(self, name: str) -> bool:
+        """Back to the default: delete the override. True when there was one."""
+        from .models import SettingRow
+
+        if name not in SETTINGS:
+            raise UnknownSetting(f"unknown setting {name!r}")
+        with self._sessions.begin() as session:
+            row = session.get(SettingRow, name)
+            if row is None:
+                return False
+            session.delete(row)
+            return True
+
+    def overrides(self) -> dict[str, tuple[int | bool | str, str | None]]:
+        """The rows of the table: name -> (value, who set it). A name with no row holds its default."""
+        from .models import SettingRow
+
+        with self._sessions() as session:
+            return {r.key: (r.value, r.updated_by) for r in session.scalars(select(SettingRow)) if r.key in SETTINGS}

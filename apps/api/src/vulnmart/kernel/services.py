@@ -34,6 +34,7 @@ from vulnmart.privacy.subjects import PseudonymisingAudit, SubjectService
 from .audit import DbAuditPort
 from .db import ScopedSession, make_engine, make_sessions
 from .keys import DbKeyPort, KekRing, decode_key
+from .quota import DbQuotaPort
 from .scope import ContextScopePort, scope_or_none
 from .settings import DbSettingsPort, Settings
 
@@ -90,10 +91,14 @@ def build_ports(settings: Settings, *, engine: Engine | None = None, session_sou
     if settings.keystore_dsn:
         keys = key_port_from(settings)
         stubs.remove("keys")
+    quota: QuotaPort = FakeQuotaPort()
+    if sessions is not None:
+        quota = DbQuotaPort(sessions, settings_port)  # story P-28: the admin's quotas are what the lab enforces
+        stubs.remove("quota")
     if stubs:
         logger.warning("ports %s are in-memory stubs until their stories (P-22)", ", ".join(stubs))
     return Ports(
-        scope=scope, settings=settings_port, quota=FakeQuotaPort(), audit=audit, outbox=outbox, keys=keys,
+        scope=scope, settings=settings_port, quota=quota, audit=audit, outbox=outbox, keys=keys,
         engine=engine, sessions=sessions, audit_db=audit_db, audit_sessions=audit_sessions,
     )
 

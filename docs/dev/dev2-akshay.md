@@ -280,9 +280,9 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Waits on: P-19, P-22.
   - Done when: A recruiter sees only their company's candidates live.
 
-- [ ] **P-28. Admin operations: queue, users, force-stop, settings, quotas, capacity**
+- [x] **P-28. Admin operations: queue, users, force-stop, settings, quotas, capacity**  (force-stop needs a lab in the API process, so it is tested with a stand-in, not on the Compose stack; quota and cap numbers are placeholders (OI-21); no admin dashboard pages (P-30))
   - Epic: `epic-admin-and-operations`
-  - BMAD story: not planned yet; created when you incept `epic-admin-and-operations` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `1` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Approval queue screen, user management, force-stop, settings and quotas (provides SettingsPort and QuotaPort to Tanmay), capacity view.
   - Covers: FR-ADM-01, 02, 04, 05, 06
   - Waits on: P-18 and Tanmay's L-16 (InstancePort, capacity).

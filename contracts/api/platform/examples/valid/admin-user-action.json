@@ -1,0 +1,7 @@
+{
+  "schema": "UserActionRequest",
+  "body": {
+    "action": "lock",
+    "reason": "Repeated abuse of the signup form."
+  }
+}

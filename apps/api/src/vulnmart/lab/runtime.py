@@ -544,6 +544,15 @@ class LabRuntime:
         if rec.instance_id and self.instance_alive(rec.instance_id):
             self.host.destroy(rec.instance_id)
         return rec.instance_id or ""
+    def force_stop(self, attempt_id: str) -> str:
+        """An admin stops the attempt's instance whatever the attempt's state (story P-28, FR-ADM-04). The attempt keeps its state and clock. Returns the instance id that was
+        destroyed, or '' when there was none alive."""
+        rec = self.engine.get(attempt_id)
+        if rec.instance_id and self.instance_alive(rec.instance_id):
+            self.host.destroy(rec.instance_id)
+            return rec.instance_id
+        return ""
+
     def withdraw(self, attempt_id: str) -> str:
         return self.attempts.withdraw(attempt_id).state.value
 

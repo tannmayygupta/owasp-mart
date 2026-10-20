@@ -1,0 +1,8 @@
+{
+  "schema": "CompanyDecisionRequest",
+  "body": {
+    "decision": "delete"
+  },
+  "path": "/decision",
+  "rule": "approve, reject, suspend or reinstate only"
+}
