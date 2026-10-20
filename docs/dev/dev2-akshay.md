@@ -289,9 +289,9 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Done when: An admin approves a company, force-stops an instance and changes a quota that the lab then enforces.
   - Handoffs: H-15, H-122, H-128, H-133 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [ ] **P-29. Data exports**
+- [x] **P-29. Data exports**  (OI-27 answered: scores as CSV and JSON, no evidence; the export reads the lab runtime in the API process (ADR 0060); the rate limit is a placeholder; not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: planned, ref `8.3` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `in-progress`
+  - BMAD story: planned, ref `8.3` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `built`, awaiting the developer's confirmation to mark it done
   - Build: Candidate, learner and recruiter exports, each audited.
   - Covers: FR-EXP-01 to 04
   - Waits on: P-17. Open: OI-27.

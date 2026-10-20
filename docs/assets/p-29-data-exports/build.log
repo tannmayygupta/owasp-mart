@@ -1,0 +1,209 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.74kB done
+#1 DONE 0.0s
+
+#2 [web internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.78kB 0.0s done
+#2 DONE 0.0s
+
+#3 [api internal] load build definition from Dockerfile
+#3 transferring dockerfile: 3.92kB 0.0s done
+#3 DONE 0.0s
+
+#4 [api internal] load metadata for docker.io/library/python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+#4 ...
+
+#5 [auth] library/node:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#6 [auth] library/python:pull token for registry-1.docker.io
+#6 DONE 0.0s
+
+#7 [api internal] load metadata for ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+#7 DONE 1.5s
+
+#8 [web internal] load metadata for docker.io/library/node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+#8 DONE 2.0s
+
+#4 [migrate internal] load metadata for docker.io/library/python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+#4 DONE 2.0s
+
+#9 [web internal] load .dockerignore
+#9 transferring context: 70B done
+#9 DONE 0.0s
+
+#10 [api uv 1/1] FROM ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21
+#10 resolve ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 0.0s done
+#10 DONE 0.0s
+
+#11 [web internal] load build context
+#11 DONE 0.0s
+
+#12 [migrate builder  1/12] FROM docker.io/library/python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+#12 resolve docker.io/library/python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 0.0s done
+#12 DONE 0.1s
+
+#13 [api internal] load build context
+#13 transferring context: 114.34kB 0.1s done
+#13 DONE 0.1s
+
+#14 [web 1/6] FROM docker.io/library/node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+#14 resolve docker.io/library/node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 0.0s done
+#14 DONE 0.0s
+
+#11 [web internal] load build context
+#11 transferring context: 69B done
+#11 DONE 0.0s
+
+#15 [web 2/6] RUN npm install -g pnpm@12.10.1
+#15 CACHED
+
+#16 [web 5/6] COPY --chown=65532:65532 package.json pnpm-lock.yaml ./
+#16 CACHED
+
+#17 [web 4/6] WORKDIR /app
+#17 CACHED
+
+#18 [web 3/6] RUN mkdir -p /app/node_modules /app/.next && chown -R 65532:65532 /app
+#18 CACHED
+
+#19 [web 6/6] RUN pnpm install --frozen-lockfile --ignore-workspace
+#19 CACHED
+
+#20 [api builder  2/12] COPY --from=uv /uv /usr/local/bin/uv
+#20 CACHED
+
+#21 [api builder  5/12] COPY apps/api/pyproject.toml apps/api/pyproject.toml
+#21 CACHED
+
+#22 [api builder  4/12] COPY pyproject.toml uv.lock .python-version ./
+#22 CACHED
+
+#23 [api builder  6/12] COPY packages/py-models/pyproject.toml packages/py-models/pyproject.toml
+#23 CACHED
+
+#24 [api builder  3/12] WORKDIR /src
+#24 CACHED
+
+#25 [api builder  7/12] COPY packages/py-attempts/pyproject.toml packages/py-attempts/pyproject.toml
+#25 CACHED
+
+#26 [api builder  8/12] RUN uv sync --frozen --no-dev --no-editable --package vulnmart-api --no-install-workspace
+#26 CACHED
+
+#21 [migrate builder  5/12] COPY apps/api/pyproject.toml apps/api/pyproject.toml
+#21 CACHED
+
+#23 [migrate builder  6/12] COPY packages/py-models/pyproject.toml packages/py-models/pyproject.toml
+#23 CACHED
+
+#22 [migrate builder  4/12] COPY pyproject.toml uv.lock .python-version ./
+#22 CACHED
+
+#24 [migrate builder  3/12] WORKDIR /src
+#24 CACHED
+
+#25 [migrate builder  7/12] COPY packages/py-attempts/pyproject.toml packages/py-attempts/pyproject.toml
+#25 CACHED
+
+#20 [migrate builder  2/12] COPY --from=uv /uv /usr/local/bin/uv
+#20 CACHED
+
+#27 [web] exporting to image
+#27 exporting layers done
+#27 exporting manifest sha256:251d5c47fdc1affd4faf7ef046197390abd33d03e22f6ee25033427ad235d732 done
+#27 exporting config sha256:2c0daf363cf9896f3a07223c8730c4d263ab94c5e18843391eaa341d94d806b0 done
+#27 exporting attestation manifest sha256:0172e28b2b340b9c563cfb5e5eaea320fb8e044c1d594966f95293604b8596cd 0.0s done
+#27 exporting manifest list sha256:22bac5dd52f797b17abebebf9e54262dd7485017dfa1dbb7d0d77d1d33a61cb8 0.0s done
+#27 naming to docker.io/library/vulnmart-web:local done
+#27 unpacking to docker.io/library/vulnmart-web:local 0.0s done
+#27 DONE 0.2s
+
+#28 [migrate builder  9/12] COPY packages/py-models/src packages/py-models/src
+#28 DONE 0.1s
+
+#29 [api builder 10/12] COPY packages/py-attempts/src packages/py-attempts/src
+#29 DONE 0.1s
+
+#29 [migrate builder 10/12] COPY packages/py-attempts/src packages/py-attempts/src
+#29 DONE 0.1s
+
+#30 [web] resolving provenance for metadata file
+#30 DONE 0.0s
+
+#31 [api builder 11/12] COPY apps/api/src apps/api/src
+#31 DONE 0.2s
+
+#31 [migrate builder 11/12] COPY apps/api/src apps/api/src
+#31 DONE 0.2s
+
+#32 [api builder 12/12] RUN uv sync --frozen --no-dev --no-editable --package vulnmart-api
+#32 1.132    Building vulnmart-api @ file:///src/apps/api
+#32 1.133    Building vulnmart-attempts @ file:///src/packages/py-attempts
+#32 1.135    Building vulnmart-models @ file:///src/packages/py-models
+#32 1.139       Built vulnmart-models @ file:///src/packages/py-models
+#32 1.142       Built vulnmart-attempts @ file:///src/packages/py-attempts
+#32 1.185       Built vulnmart-api @ file:///src/apps/api
+#32 1.211 Prepared 3 packages in 85ms
+#32 1.275 Installed 3 packages in 62ms
+#32 1.684 Bytecode compiled 1496 files in 409ms
+#32 1.684  + vulnmart-api==0.0.0 (from file:///src/apps/api)
+#32 1.684  + vulnmart-attempts==0.0.0 (from file:///src/packages/py-attempts)
+#32 1.684  + vulnmart-models==0.0.0 (from file:///src/packages/py-models)
+#32 DONE 1.7s
+
+#12 [migrate builder  1/12] FROM docker.io/library/python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+#12 CACHED
+
+#33 [api stage-2 2/6] COPY --from=builder /opt/venv /opt/venv
+#33 DONE 1.2s
+
+#33 [api stage-2 2/6] COPY --from=builder /opt/venv /opt/venv
+#33 DONE 1.2s
+
+#34 [migrate stage-2 3/6] WORKDIR /app
+#34 DONE 0.1s
+
+#35 [api stage-2 4/6] COPY apps/api/alembic.ini /app/alembic.ini
+#35 DONE 0.0s
+
+#35 [migrate stage-2 4/6] COPY apps/api/alembic.ini /app/alembic.ini
+#35 DONE 0.0s
+
+#36 [migrate stage-2 5/6] COPY apps/api/migrations /app/migrations
+#36 DONE 0.0s
+
+#37 [api stage-2 6/6] COPY contracts/events/instance-events.schema.json /app/contracts/events/instance-events.schema.json
+#37 DONE 0.0s
+
+#38 [api] exporting to image
+#38 exporting layers 3.4s done
+#38 exporting manifest sha256:c74bdfedb4cb36f20c5fc1ac0db8700d1f14c911f7cbed7ba92704e5f6a17679 0.0s done
+#38 exporting config sha256:4d7aaae3480cf971473907b68934e7cf7447c524a727e85a78e79a0345642460 0.0s done
+#38 exporting attestation manifest sha256:2c5493f933acb0cfa96f10c370ab25c670227b7cf4f5c867c106c83d4f42fd82 0.0s done
+#38 exporting manifest list sha256:3a1f583c6a5082b8e5c67d8189f0da84bdf361430305a69e67127b63a864bd8d
+#38 exporting manifest list sha256:3a1f583c6a5082b8e5c67d8189f0da84bdf361430305a69e67127b63a864bd8d 0.0s done
+#38 naming to docker.io/library/vulnmart-api:local done
+#38 unpacking to docker.io/library/vulnmart-api:local
+#38 unpacking to docker.io/library/vulnmart-api:local 1.6s done
+#38 DONE 5.2s
+
+#39 [migrate] exporting to image
+#39 exporting layers 3.4s done
+#39 exporting manifest sha256:601047176732e1ac88f32bf785e96168023708ac7ecdd2669dc4581622c6f21e 0.0s done
+#39 exporting config sha256:d5b941e15cb9e959f8277ec18de04ca6cd3753932599a3faf752cb12e3169c14 0.0s done
+#39 exporting attestation manifest sha256:dcec033085ddda39ea60f423dbf97ca933da932524a6955043a975e50399c7c5 0.0s done
+#39 exporting manifest list sha256:e3fc156bfaeec0474151f2cfb3f9f5ec1cff9d71b18ad70df3b3d3c16f7d1e2f 0.0s done
+#39 naming to docker.io/library/vulnmart-api:local done
+#39 unpacking to docker.io/library/vulnmart-api:local 1.6s done
+#39 DONE 5.1s
+
+#40 [migrate] resolving provenance for metadata file
+#40 DONE 0.1s
+
+#41 [api] resolving provenance for metadata file
+#41 DONE 0.0s
+ vulnmart-api:local  Built
+ vulnmart-api:local  Built
+ vulnmart-web:local  Built
+build exit 0

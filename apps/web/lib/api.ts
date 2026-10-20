@@ -57,6 +57,34 @@ export async function api<T = unknown>(method: Method, path: string, body?: unkn
   return data as T;
 }
 
+/** POST a request whose answer is a file (the exports, story P-29) and hand it to the browser as a download. Errors are the same ApiError as `api`. */
+export async function download(path: string, body: unknown, filename: string): Promise<void> {
+  const headers: Record<string, string> = { accept: 'application/zip, application/problem+json' };
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  if (csrfToken) headers['x-csrf-token'] = csrfToken;
+  let res: Response;
+  try {
+    res = await fetch(path, { method: 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' });
+  } catch {
+    throw new ApiError(0, 'NETWORK');
+  }
+  if (!res.ok) {
+    const problem = ((await res.json().catch(() => null)) ?? {}) as { code?: string };
+    throw new ApiError(res.status, problem.code ?? `HTTP-${res.status}`);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+}
+
 // What a person reads for each registry code. Unknown codes get a general sentence that still names the code for support.
 const MESSAGES: Record<string, string> = {
   NETWORK: 'The site cannot be reached. Check your connection and try again.',

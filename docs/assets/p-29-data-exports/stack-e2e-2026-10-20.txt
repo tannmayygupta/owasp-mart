@@ -1,0 +1,16 @@
+▶ platform and web profiles on a real Docker engine
+  ✔ up: exits 0, the migrations ran first, and all five services are healthy (711.3623ms)
+  ✔ healthy stack: /api/v1/health through the web origin is ok (the /api prefix reaches the API) (238.9063ms)
+  ✔ dashboards (P-26): the pages are served with the CSP; open, accept and list an invite through the web origin; another account sees nothing (13810.6999ms)
+  ✔ recruiter (P-27): sign up, approval, terms, template, invite, the candidate accepts, the list shows it; another company and a learner see nothing (14840.9777ms)
+  ✔ exports (P-29): a learner downloads their own data, a recruiter one template's results; both are zips and both are audited (6080.595ms)
+  ✔ down: `node scripts/dev.mjs down` leaves no platform or web container behind (6286.2942ms)
+✔ platform and web profiles on a real Docker engine (69885.0825ms)
+ℹ tests 6
+ℹ suites 1
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 70062.5282

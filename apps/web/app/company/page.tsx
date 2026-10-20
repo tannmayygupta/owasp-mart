@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { api, say, type CatalogueItem, type CompanyStanding, type CompanyTerms, type InvitesResult, type Template } from '../../lib/api';
+import { api, download, say, type CatalogueItem, type CompanyStanding, type CompanyTerms, type InvitesResult, type Template } from '../../lib/api';
 import { useRequireUser } from '../../lib/session';
 
 // The recruiter's company page (story P-27, FR-ORG-02, 07, FR-ASM-01, 02, 06): where the company stands, the data-processing terms for the owner, the assessment
@@ -103,7 +103,12 @@ export default function CompanyPage() {
                         <td>{t.time_limit_min} min</td>
                         <td>{t.hints_mode === 'on' ? `on, ${t.hint_cost_pct}%` : 'off'}</td>
                         <td>{t.results_visibility === 'after_submit' ? 'after submit' : 'when you release'}</td>
-                        <td><button type="button" className="ghost" onClick={() => { if (window.confirm(`Delete "${t.title}"?`)) void act(() => api('DELETE', `/api/v1/company/templates/${t.template_id}`), 'Template deleted.'); }}>Delete</button></td>
+                        <td className="row">
+                          <button type="button" className="ghost" onClick={() => act(() => download('/api/v1/company/exports', { template_id: t.template_id }, 'vulnmart-results.zip'), 'Your download has started. The export is recorded.')}>
+                            Export results
+                          </button>
+                          <button type="button" className="ghost" onClick={() => { if (window.confirm(`Delete "${t.title}"?`)) void act(() => api('DELETE', `/api/v1/company/templates/${t.template_id}`), 'Template deleted.'); }}>Delete</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

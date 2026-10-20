@@ -3,7 +3,7 @@ title: 'Data exports'
 type: 'feature'
 ticket: '3'
 created: '2026-10-20'
-status: in-progress
+status: built
 route: 'full'
 route_source: 'auto'
 risk: 'high'
@@ -50,7 +50,7 @@ context:
 
 **Execution:**
 - [x] The service, the routes, the contract change and their tests (2026-10-20: 9 export tests, contract rules 18 PASS).
-- [ ] The download buttons; the stack test.
+- [x] The download buttons; the stack test (2026-10-20: web tests 17 of 17, the stack test 6 of 6 on real Docker).
 
 **Acceptance Criteria:**
 - Given a learner who captured a flag, then their export holds the attempt's results and no flag value, and an audit entry is written.
@@ -61,6 +61,16 @@ context:
 
 ## Review Triage Log
 
+### 2026-10-20, quick review (lens: quick), loop 1
+Run in the main session, not by an independent subagent (the subagent does not survive this machine's session restarts).
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | The service reached into the assessment service's private `_companies` | low | patch | the company service is passed in |
+| 2 | A captured request could hold a flag value | high | patch | `redact` on path and body; the real-lab test checks the flag is absent |
+| 3 | Emails and names in CSV could run as spreadsheet formulas | medium | patch | `cell` prefixes a quote |
+| 4 | The export reads the lab runtime in process; a split deployment needs a port | low | defer | ADR 0060 |
+
 ## Verification
 
 **Commands:**
@@ -68,3 +78,5 @@ context:
 - web tests, `tsc --noEmit`, `next build` -- expected: pass
 - `node --test scripts/e2e/platform-stack.e2e.test.mjs` (the P-29 test) -- expected: pass
 - `node scripts/check-contract-rules.mjs` -- expected: 0 FAIL
+
+**Results (2026-10-20):** see the dev-log `docs/dev-log/2026-10-20-akshaay29-p29-data-exports.md`: export tests 9, full pytest 2822 passed, contract rules 18 PASS, web 17 of 17, stack 6 of 6.

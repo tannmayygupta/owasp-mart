@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { api, say, when, type DataView, type DeletionRequest } from '../../lib/api';
+import { api, download, say, when, type DataView, type DeletionRequest } from '../../lib/api';
 import { useRequireUser, useSession } from '../../lib/session';
 
 // The account page (H-134, H-135, FR-DSH-04, FR-PRV-08, 09, 11): name, password, the authenticator app, a deletion request with its 7-day undo, and which
@@ -193,6 +193,13 @@ export default function AccountPage() {
           )}
         </section>
       )}
+
+      <section className="card" data-testid="export">
+        <h2>Download my data</h2>
+        <p>A zip of JSON and CSV files: your profile, consents, attempts with results, timings, hints and the requests that captured flags, who viewed your data and your
+          deletion requests. Flag values are never included.</p>
+        <button type="button" onClick={() => act(() => download('/api/v1/me/exports', undefined, 'vulnmart-my-data.zip'), 'Your download has started.')}>Download my data</button>
+      </section>
 
       <section className="card" data-testid="data-views">
         <h2>Who viewed my data</h2>
