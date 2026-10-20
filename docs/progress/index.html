@@ -59,7 +59,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <h2>The three streams</h2>
 <div class="cards">
 <div class="card"><h3><a href="#lab">Lab: Tanmay</a></h3><p>Builds the part that starts a private copy of the shop for each person, keeps it isolated, detects the attacks, and scores the attempt.</p><p class="summary">22 done, 3 being implemented, 6 next, of 31 tasks.</p></div>
-<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">30 done, 1 being implemented, 1 next, of 32 tasks.</p></div>
+<div class="card"><h3><a href="#platform">Platform: Akshay</a></h3><p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p><p class="summary">31 done, 0 being implemented, 1 next, of 32 tasks.</p></div>
 <div class="card"><h3><a href="#target">Target: Sahil</a></h3><p>Builds the online shop that is deliberately vulnerable, with its 11 challenges, hints and the tests that prove each one can be solved.</p><p class="summary">31 done, 0 being implemented, 1 next, of 32 tasks.</p></div>
 </div>
 <h2>Contracts between the streams</h2>
@@ -181,7 +181,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <section id="platform">
 <h2>Platform stream: Akshay</h2>
 <p>Builds the website people use: sign-up, login, invitations from recruiters, and the dashboards that show progress and results.</p>
-<p class="summary"><strong>30 done, 1 being implemented, 1 next, 32 tasks in total.</strong></p>
+<p class="summary"><strong>31 done, 0 being implemented, 1 next, 32 tasks in total.</strong></p>
 <p class="source">source: docs/dev/dev2-akshay.md (working tree)</p>
 <h3>Sprint 1 <span class="dates">(2026-10-08 to 2026-10-14)</span></h3>
 <ul class="tasks">
@@ -192,7 +192,7 @@ ul.tasks{list-style:none;padding:0;margin:0}
 <li class="task done"><div class="head"><span class="tid">P-05</span> <span class="ttitle">Ports, in-memory fakes and table ownership (IF-9, IF-10)</span> <span class="status">Done</span></div><p class="build">Define the ports the platform provides (AuditPort, OutboxPort, KeyPort, ScopePort, SettingsPort, QuotaPort) as Python protocols with in-memory fakes, fakes of the lab ports and the table-owners file.</p><p class="waits">Waits on: P-02, P-03.</p></li>
 <li class="task done"><div class="head"><span class="tid">P-06</span> <span class="ttitle">API skeleton: kernel and single-head migrations</span> <span class="status">Done</span></div><p class="build">Settings, session and organisation scope, audit, outbox and key-service stubs, request IDs and structured logs, health, readiness and version endpoints, one Alembic history.</p><p class="waits">Waits on: P-01, P-03, P-05.</p></li>
 <li class="task done"><div class="head"><span class="tid">P-07</span> <span class="ttitle">Dashboards skeleton with the same-origin proxy (local)</span> <span class="status">Done</span></div><p class="build">Next.js skeleton with the `/api/*` proxy, origin secret header, no-store and security headers, run locally.</p><p class="waits">Waits on: P-01, P-04.</p></li>
-<li class="task late"><div class="head"><span class="tid">P-08</span> <span class="ttitle">Sign off contracts v1.0.0 as provider and consumer</span> <span class="status">Being implemented (late)</span></div><p class="build">Review and sign the contracts you provide and consume and record the versions you build against.</p><p class="waits">Waits on: P-03, P-04, P-05.</p></li>
+<li class="task done"><div class="head"><span class="tid">P-08</span> <span class="ttitle">Sign off contracts v1.0.0 as provider and consumer</span> <span class="status">Done</span></div><p class="build">Review and sign the contracts you provide and consume and record the versions you build against.</p><p class="waits">Waits on: P-03, P-04, P-05.</p></li>
 </ul>
 <h3>Sprint 2 <span class="dates">(2026-10-15 to 2026-10-21)</span></h3>
 <ul class="tasks">
