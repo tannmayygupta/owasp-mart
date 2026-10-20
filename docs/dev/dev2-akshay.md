@@ -94,7 +94,7 @@ Goal: Platform contracts, ports, the API skeleton and the dashboards skeleton ex
   - Waits on: P-01, P-04.
   - Done when: A page reaches the API health through `/api/*` and two different users never receive each other's response in a caching test.
 
-- [ ] **P-08. Sign off contracts v1.0.0 as provider and consumer**
+- [x] **P-08. Sign off contracts v1.0.0 as provider and consumer**  (2026-10-20: re-reviewed and approved at the current versions in COMPAT.md; the GitHub review of L-09's tag pull request follows when Tanmay opens it)
   - Epic: `epic-platform-baseline`
   - BMAD story: already planned, ref `1.8` in `epic-platform-baseline` (find it with `bmad-ticket`)
   - Build: Review and sign the contracts you provide and consume and record the versions you build against.
@@ -297,17 +297,17 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Waits on: P-17. Open: OI-27.
   - Done when: Each export produces the right data and writes an audit entry.
 
-- [ ] **P-30. Admin dashboard and privacy wall in every view**
+- [x] **P-30. Admin dashboard and privacy wall in every view**  (the audit log view and break-glass are P-31; found that a candidate cannot start an assessment until the lab adds the start route (H-356, OI-22); not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.4` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `done` (merged in pull request 64)
   - Build: The admin dashboard and the privacy wall checks across every view.
   - Covers: FR-DSH-05, 06
   - Waits on: P-28.
   - Done when: No view shows data the privacy wall forbids, checked by a test per view.
 
-- [ ] **P-31. Break-glass, audit access, admin limits, legal review and incident handling**
+- [x] **P-31. Break-glass, audit access, admin limits, legal review and incident handling**  (OI-12 and OI-34 answered (D-94, D-95); OI-33 open: the legal review waits for a reviewer; the incident procedure is a draft and does not name who decides; the alert is a mail; not browser-tested (OI-30))
   - Epic: `epic-admin-and-operations`
-  - BMAD story: not planned yet; created when you incept `epic-admin-and-operations` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `9.2` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `done` (merged in pull request 65)
   - Build: Break-glass access, audit access, admins cannot read candidate answers by default, the legal review action, breach and incident handling.
   - Covers: FR-ADM-03, 07, 08, FR-PRV-19, 20
   - Waits on: P-17, P-28. Open: OI-12, OI-33, OI-34.
@@ -315,7 +315,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [ ] **P-32. Deployed verification and ASVS checklist**
   - Epic: `All platform epics`
-  - BMAD story: not planned yet; created when you incept `All platform epics` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `1.10` in `epic-platform-baseline` (find it with `bmad-ticket`); state `blocked`: the script and the ASVS chapter table are done, the deployed run waits for stream L's redeploy (H-358)
   - EARLY PR: yes. L-30 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
   - Build: Verify every platform epic on the deployed site and compile the ASVS 5.0 checklist rows in docs/traceability.md.
   - Covers: Done-when of every platform epic; NFR-SEC

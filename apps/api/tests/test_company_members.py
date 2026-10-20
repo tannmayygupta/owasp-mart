@@ -252,6 +252,7 @@ def test_every_table_with_an_organisation_column_is_scoped_or_listed_here_on_pur
     import vulnmart.accounts.models  # noqa: F401
     import vulnmart.kernel.models  # noqa: F401
     import vulnmart.lab.models  # noqa: F401  (so the answer does not depend on which test imported them first)
+    import vulnmart.admin.models  # noqa: F401 - break_glass_sessions (story P-31)
     import vulnmart.privacy.models  # noqa: F401
 
     on_purpose = {
@@ -260,6 +261,7 @@ def test_every_table_with_an_organisation_column_is_scoped_or_listed_here_on_pur
         "consent_records": "an append-only proof that outlives the company; org_id is a plain pointer, read by the candidate (story P-16)",
         "deletion_requests": "a person's request, read and decided by service code that checks the caller (the person, or the company named on the request); org_id is a plain pointer, never a scope (story P-25)",
         "data_views": "the candidate reads their own history; org_id and the company name are plain values written when a company looks (story P-25)",
+        "break_glass_sessions": "an admin-only record of break-glass access; org_id names the candidate's company for the alert, never a scope (story P-31)",
     }
     with_org_column = {name for name, table in Base.metadata.tables.items() if "org_id" in table.columns}
     assert with_org_column - set(ORG_SCOPED) == set(on_purpose), sorted(with_org_column - set(ORG_SCOPED) - set(on_purpose))

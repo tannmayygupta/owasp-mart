@@ -303,6 +303,13 @@ def create_app(
             host_status=(lambda: lab.host.host_status()) if lab is not None else None, instance_states=(lambda: lab.instance_states) if lab is not None else None,
             job_status=(lambda: app.state.scheduler.status()) if app.state.scheduler is not None else None,
             pseudonym=_subjects.pseudonym if _subjects is not None else None)
+    # Break-glass and the audit log for admins (story P-31): a 15-minute session per candidate attempt (D-94), read from this process's lab runtime.
+    app.state.break_glass = None
+    if ports.sessions is not None and app.state.roles is not None:
+        from vulnmart.admin.breakglass import BreakGlassService
+
+        app.state.break_glass = BreakGlassService(sessions=ports.sessions, roles=app.state.roles, audit=ports.audit, companies=app.state.companies,
+                                                  lab=lambda: getattr(app.state, "lab", None))
     app.include_router(admin_router)
     app.include_router(accounts_router)
     app.include_router(session_router)

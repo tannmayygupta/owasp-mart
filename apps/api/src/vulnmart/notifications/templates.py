@@ -207,6 +207,29 @@ def _force_stopped(p: dict[str, str]) -> Rendered:
     ])
 
 
+def _break_glass_admins(p: dict[str, str]) -> Rendered:
+    return _compose("VulnMart break-glass access was opened", [
+        f"Another VulnMart administrator opened break-glass access to a candidate's answers ({p['grant_id']}) for {p['minutes']} minutes.",
+        "The reason, the reads and the end are recorded. Please review it in the admin area once it is over: an administrator cannot review their own access.",
+    ])
+
+
+def _break_glass_company(p: dict[str, str]) -> Rendered:
+    return _compose("A VulnMart administrator opened a candidate's answers", [
+        f"A VulnMart administrator opened break-glass access to the answers of one of your company's candidates for {p['minutes']} minutes.",
+        "This happens only for a written reason, such as a dispute or a security problem, and every read is recorded and reviewed by another administrator.",
+        "If you did not expect this, reply to the VulnMart administrators.",
+    ])
+
+
+def _incident_notice(p: dict[str, str]) -> Rendered:
+    return _compose("A security incident at VulnMart may affect your data", [
+        f"What happened: {p['summary']}",
+        f"What you can do: {p['advice']}",
+        "We will tell you if we learn more. This notice follows the VulnMart incident procedure.",
+    ])
+
+
 def _retention(p: dict[str, str]) -> Rendered:
     return _compose("Your VulnMart data will be deleted soon", [
         f"You have not signed in to VulnMart for almost a year. Your learner data will be deleted on {p['delete_on']}.",
@@ -238,6 +261,9 @@ TEMPLATES: dict[str, TemplateSpec] = {s.name: s for s in (
     _spec("privacy.deletion_confirmed", set(), _deletion_confirmed, optional={"completed_on"}),
     _spec("learner.retention_warning", {"delete_on", "login_url"}, _retention, links={"login_url"}),
     _spec("instance.force_stopped", set(), _force_stopped),
+    _spec("admin.break_glass_opened", {"grant_id", "minutes"}, _break_glass_admins),
+    _spec("company.break_glass_opened", {"minutes"}, _break_glass_company),
+    _spec("security.incident_notice", {"summary", "advice"}, _incident_notice),
     _spec("system.test", set(), _system_test),
 )}
 

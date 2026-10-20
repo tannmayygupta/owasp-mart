@@ -1386,6 +1386,189 @@ paths:
         '415': { $ref: '#/components/responses/UnsupportedMedia' }
         '422': { $ref: '#/components/responses/Invalid' }
         '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/admin/audit:
+    get:
+      tags: [admin]
+      operationId: listAuditLog
+      summary: Read the audit log
+      description: |
+        The audit log in order (FR-ADM-07): entries after `after_seq`, optionally of one `action`; actor and subject are pseudonyms. Each read writes its own entry
+        (`admin.audit_read`). `next_after_seq` is the cursor for the next page (null when this page was not full). Only an admin with a second factor.
+      parameters:
+        - { name: action, in: query, required: false, schema: { type: string, maxLength: 64, pattern: '^[a-z_]+(\.[a-z_]+)*$' } }
+        - { name: after_seq, in: query, required: false, schema: { type: integer, minimum: 0 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 } }
+      responses:
+        '200':
+          description: The entries.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditEntryList' }
+              examples:
+                default:
+                  value: {"items": [{"seq": 41, "at": "2026-10-20T09:00:00Z", "actor": "p-AAAAAAAAAAAAAAAA", "action": "breakglass.opened", "subject": null, "details": {"session": "g-AAAAAAAAAAAAAAAA", "minutes": 15}}], "next_after_seq": null}
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AdminNotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/admin/break-glass:
+    get:
+      tags: [admin]
+      operationId: listBreakGlassSessions
+      summary: Break-glass sessions
+      description: Every break-glass session, newest first, with its admin, reason, window, reads and review (FR-ADM-03).
+      parameters:
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: The sessions.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BreakGlassSessionList' }
+              examples:
+                default:
+                  value: {"items": [{"session_id": "g-AAAAAAAAAAAAAAAA", "admin_id": "u-ADMINADMINADMIN2", "admin_name": "Alice Admin", "attempt_id": "a-AAAAAAAAAAAAAAAA", "org_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01", "reason": "A candidate disputes the score of C01; checking the capture.", "started_at": "2026-10-20T09:00:00Z", "expires_at": "2026-10-20T09:15:00Z", "closed_at": null, "reads": [], "reviewed_by": null, "reviewed_at": null, "review_note": null, "state": "open"}]}
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AdminNotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+    post:
+      tags: [admin]
+      operationId: openBreakGlass
+      summary: Open break-glass access to a candidate's answers
+      description: |
+        Opens a 15-minute session (D-94) for one candidate attempt, for a written reason (20 to 500 characters). The other admins and the owner of the candidate's company
+        are mailed at once. A learner's practice attempt, or an attempt that does not exist, is 404 REQ-ROUTE-UNKNOWN. The reason is kept with the session, not in the
+        audit log.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BreakGlassRequest' }
+      responses:
+        '201':
+          description: The session.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BreakGlassSession' }
+              examples:
+                default:
+                  value: {"session_id": "g-AAAAAAAAAAAAAAAA", "admin_id": "u-ADMINADMINADMIN2", "admin_name": "Alice Admin", "attempt_id": "a-AAAAAAAAAAAAAAAA", "org_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01", "reason": "A candidate disputes the score of C01; checking the capture.", "started_at": "2026-10-20T09:00:00Z", "expires_at": "2026-10-20T09:15:00Z", "closed_at": null, "reads": [], "reviewed_by": null, "reviewed_at": null, "review_note": null, "state": "open"}
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/AdminNotFound' }
+        '409': { $ref: '#/components/responses/AdminConflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/admin/break-glass/{session_id}/attempt:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string, pattern: '^g-[A-Z2-7]{16}$' }
+    get:
+      tags: [admin]
+      operationId: readBreakGlassAttempt
+      summary: Read the attempt through an open session
+      description: |
+        The attempt's results, evidence (flag-shaped text redacted) and timeline, for the session's own admin while it is open; another admin is 404, a session that is
+        over is 409 ATT-INVALID-STATE. Every read is recorded in the session and audited (`breakglass.read`).
+      responses:
+        '200':
+          description: The attempt's data.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BreakGlassRead' }
+              examples:
+                default:
+                  value: {"session_id": "g-AAAAAAAAAAAAAAAA", "attempt_id": "a-AAAAAAAAAAAAAAAA", "expires_at": "2026-10-20T09:15:00Z", "results": {"score": 420, "per_challenge": [], "evidence": []}, "timeline": []}
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AdminNotFound' }
+        '409': { $ref: '#/components/responses/AdminConflict' }
+  /api/v1/admin/break-glass/{session_id}/close:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string, pattern: '^g-[A-Z2-7]{16}$' }
+    post:
+      tags: [admin]
+      operationId: closeBreakGlass
+      summary: Close a session early
+      description: Only the session's own admin, while it is open; the body is empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200':
+          description: The session.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BreakGlassSession' }
+              examples:
+                default:
+                  value: {"session_id": "g-AAAAAAAAAAAAAAAA", "admin_id": "u-ADMINADMINADMIN2", "admin_name": "Alice Admin", "attempt_id": "a-AAAAAAAAAAAAAAAA", "org_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01", "reason": "A candidate disputes the score of C01; checking the capture.", "started_at": "2026-10-20T09:00:00Z", "expires_at": "2026-10-20T09:15:00Z", "closed_at": "2026-10-20T09:05:00Z", "reads": [], "reviewed_by": null, "reviewed_at": null, "review_note": null, "state": "over"}
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/AdminNotFound' }
+        '409': { $ref: '#/components/responses/AdminConflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/admin/break-glass/{session_id}/review:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema: { type: string, pattern: '^g-[A-Z2-7]{16}$' }
+    post:
+      tags: [admin]
+      operationId: reviewBreakGlass
+      summary: Review a session that is over
+      description: |
+        The later review of FR-ADM-03, by an admin who is not the session's own, once the session is over (expired or closed); once only. Otherwise 409
+        ATT-INVALID-STATE.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BreakGlassReviewRequest' }
+      responses:
+        '200':
+          description: The session.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BreakGlassSession' }
+              examples:
+                default:
+                  value: {"session_id": "g-AAAAAAAAAAAAAAAA", "admin_id": "u-ADMINADMINADMIN2", "admin_name": "Alice Admin", "attempt_id": "a-AAAAAAAAAAAAAAAA", "org_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01", "reason": "A candidate disputes the score of C01; checking the capture.", "started_at": "2026-10-20T09:00:00Z", "expires_at": "2026-10-20T09:15:00Z", "closed_at": "2026-10-20T09:05:00Z", "reads": [], "reviewed_by": "u-OTHERADMINOTHER2", "reviewed_at": "2026-10-20T10:00:00Z", "review_note": "The reason matches the ticket.", "state": "reviewed"}
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/AdminNotFound' }
+        '409': { $ref: '#/components/responses/AdminConflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/admin/companies/pending:
     get:
       tags: [admin]
@@ -2869,6 +3052,84 @@ components:
       required: [template_id]
       properties:
         template_id: { type: string, format: uuid }
+    AuditEntry:
+      type: object
+      additionalProperties: false
+      required: [seq, at, actor, action, subject, details]
+      properties:
+        seq: { type: integer, minimum: 1 }
+        at: { type: string, maxLength: 40 }
+        actor: { type: string, maxLength: 80 }
+        action: { type: string, maxLength: 64 }
+        subject: { type: [string, 'null'], maxLength: 80 }
+        details: { type: object }
+    AuditEntryList:
+      type: object
+      additionalProperties: false
+      required: [items, next_after_seq]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/AuditEntry' }
+        next_after_seq: { type: [integer, 'null'] }
+    BreakGlassRequest:
+      type: object
+      additionalProperties: false
+      required: [attempt_id, reason]
+      properties:
+        attempt_id: { $ref: '#/components/schemas/AttemptId' }
+        reason: { type: string, minLength: 20, maxLength: 500 }
+    BreakGlassReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1, maxLength: 500 }
+    BreakGlassSession:
+      type: object
+      additionalProperties: false
+      required: [session_id, admin_id, admin_name, attempt_id, org_id, reason, started_at, expires_at, closed_at, reads, reviewed_by, reviewed_at, review_note, state]
+      properties:
+        session_id: { type: string, pattern: '^g-[A-Z2-7]{16}$' }
+        admin_id: { type: string, maxLength: 32 }
+        admin_name: { type: string, maxLength: 80 }
+        attempt_id: { $ref: '#/components/schemas/AttemptId' }
+        org_id: { type: string, maxLength: 40 }
+        reason: { type: string, maxLength: 500 }
+        started_at: { $ref: '#/components/schemas/Timestamp' }
+        expires_at: { $ref: '#/components/schemas/Timestamp' }
+        closed_at: { oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }] }
+        reads:
+          type: array
+          maxItems: 500
+          items: { type: object }
+        reviewed_by: { type: [string, 'null'], maxLength: 32 }
+        reviewed_at: { oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }] }
+        review_note: { type: [string, 'null'], maxLength: 500 }
+        state: { enum: [open, over, reviewed] }
+    BreakGlassSessionList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/BreakGlassSession' }
+    BreakGlassRead:
+      type: object
+      additionalProperties: false
+      required: [session_id, attempt_id, expires_at, results, timeline]
+      properties:
+        session_id: { type: string, pattern: '^g-[A-Z2-7]{16}$' }
+        attempt_id: { $ref: '#/components/schemas/AttemptId' }
+        expires_at: { type: string, maxLength: 40 }
+        results: { type: object }
+        timeline:
+          type: array
+          maxItems: 1000
+          items: { type: object }
     PendingCompany:
       type: object
       additionalProperties: false

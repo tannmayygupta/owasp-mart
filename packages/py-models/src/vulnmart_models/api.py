@@ -1,7 +1,7 @@
 # GENERATED from contracts/api/bundle/openapi.json (IF-1 and IF-2). Do not edit: run `node scripts/generate-api-code.mjs`.
 
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
@@ -696,6 +696,85 @@ class CompanyExportRequest(BaseModel):
     template_id: UUID
 
 
+class AuditEntry(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    seq: Annotated[int, Field(ge=1)]
+    at: Annotated[str, Field(max_length=40)]
+    actor: Annotated[str, Field(max_length=80)]
+    action: Annotated[str, Field(max_length=64)]
+    subject: Annotated[str | None, Field(max_length=80)]
+    details: dict[str, Any]
+
+
+class AuditEntryList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[AuditEntry], Field(max_length=200)]
+    next_after_seq: int | None
+
+
+class BreakGlassRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: AttemptId
+    reason: Annotated[str, Field(max_length=500, min_length=20)]
+
+
+class BreakGlassReviewRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    note: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class State4(Enum):
+    open = 'open'
+    over = 'over'
+    reviewed = 'reviewed'
+
+
+class BreakGlassSession(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    session_id: Annotated[str, Field(pattern='^g-[A-Z2-7]{16}$')]
+    admin_id: Annotated[str, Field(max_length=32)]
+    admin_name: Annotated[str, Field(max_length=80)]
+    attempt_id: AttemptId
+    org_id: Annotated[str, Field(max_length=40)]
+    reason: Annotated[str, Field(max_length=500)]
+    started_at: Timestamp
+    expires_at: Timestamp
+    closed_at: Timestamp | None
+    reads: Annotated[list[dict[str, Any]], Field(max_length=500)]
+    reviewed_by: Annotated[str | None, Field(max_length=32)]
+    reviewed_at: Timestamp | None
+    review_note: Annotated[str | None, Field(max_length=500)]
+    state: State4
+
+
+class BreakGlassSessionList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[BreakGlassSession], Field(max_length=100)]
+
+
+class BreakGlassRead(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    session_id: Annotated[str, Field(pattern='^g-[A-Z2-7]{16}$')]
+    attempt_id: AttemptId
+    expires_at: Annotated[str, Field(max_length=40)]
+    results: dict[str, Any]
+    timeline: Annotated[list[dict[str, Any]], Field(max_length=1000)]
+
+
 class PendingCompany(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -998,7 +1077,7 @@ class Mode(Enum):
     candidate = 'candidate'
 
 
-class State4(Enum):
+class State5(Enum):
     invited = 'invited'
     consent = 'consent'
     ready = 'ready'
@@ -1018,7 +1097,7 @@ class AttemptSummary(BaseModel):
     attempt_id: AttemptId
     mode: Mode
     state: Annotated[
-        State4,
+        State5,
         Field(
             description='The ten attempt states of the architecture (04 section 10.1); the same as IF-2 and IF-3.'
         ),
@@ -1036,7 +1115,7 @@ class AttemptSummaryList(BaseModel):
     has_more: bool
 
 
-class State5(Enum):
+class State6(Enum):
     requested = 'requested'
     provisioning = 'provisioning'
     starting = 'starting'
@@ -1079,7 +1158,7 @@ class InstanceSummary(BaseModel):
     instance_id: InstanceId
     attempt_id: AttemptId
     state: Annotated[
-        State5,
+        State6,
         Field(
             description='The ten instance states of IF-5 (identical in IF-2 and IF-3).'
         ),
@@ -1253,7 +1332,7 @@ class Instance(BaseModel):
     )
     instance_id: InstanceId
     attempt_id: AttemptId
-    state: State5
+    state: State6
     access: Access
     health: Health
     epoch: Annotated[int, Field(ge=1)]

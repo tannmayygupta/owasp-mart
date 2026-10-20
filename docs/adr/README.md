@@ -57,5 +57,6 @@
 | 0058 | [Candidate invite routes, and the dashboards as client pages over the same-origin API](0058-candidate-invite-routes-and-dashboards-as-client-pages.md) | Proposed (the builder's design for the developer to confirm) |
 | 0059 | [Recruiter routes, and the recruiter dashboard over the lab's reviewer routes](0059-recruiter-routes-and-the-recruiter-dashboard.md) | Proposed (the builder's design for the developer to confirm) |
 | 0060 | [Exports built on the server as audited zips](0060-exports-built-on-the-server-as-audited-zips.md) | Proposed (the builder's design for the developer to confirm) |
+| 0062 | [Break-glass sessions and the admin's audit log](0062-break-glass-sessions-and-the-admin-audit-log.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

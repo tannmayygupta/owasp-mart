@@ -732,6 +732,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the audit log
+         * @description The audit log in order (FR-ADM-07): entries after `after_seq`, optionally of one `action`; actor and subject are pseudonyms. Each read writes its own entry
+         *     (`admin.audit_read`). `next_after_seq` is the cursor for the next page (null when this page was not full). Only an admin with a second factor.
+         */
+        get: operations["listAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/break-glass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Break-glass sessions
+         * @description Every break-glass session, newest first, with its admin, reason, window, reads and review (FR-ADM-03).
+         */
+        get: operations["listBreakGlassSessions"];
+        put?: never;
+        /**
+         * Open break-glass access to a candidate's answers
+         * @description Opens a 15-minute session (D-94) for one candidate attempt, for a written reason (20 to 500 characters). The other admins and the owner of the candidate's company
+         *     are mailed at once. A learner's practice attempt, or an attempt that does not exist, is 404 REQ-ROUTE-UNKNOWN. The reason is kept with the session, not in the
+         *     audit log.
+         */
+        post: operations["openBreakGlass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/break-glass/{session_id}/attempt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Read the attempt through an open session
+         * @description The attempt's results, evidence (flag-shaped text redacted) and timeline, for the session's own admin while it is open; another admin is 404, a session that is
+         *     over is 409 ATT-INVALID-STATE. Every read is recorded in the session and audited (`breakglass.read`).
+         */
+        get: operations["readBreakGlassAttempt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/break-glass/{session_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a session early
+         * @description Only the session's own admin, while it is open; the body is empty.
+         */
+        post: operations["closeBreakGlass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/break-glass/{session_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review a session that is over
+         * @description The later review of FR-ADM-03, by an admin who is not the session's own, once the session is over (expired or closed); once only. Otherwise 409
+         *     ATT-INVALID-STATE.
+         */
+        post: operations["reviewBreakGlass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/pending": {
         parameters: {
             query?: never;
@@ -1913,6 +2028,52 @@ export interface components {
         CompanyExportRequest: {
             /** Format: uuid */
             template_id: string;
+        };
+        AuditEntry: {
+            seq: number;
+            at: string;
+            actor: string;
+            action: string;
+            subject: string | null;
+            details: Record<string, never>;
+        };
+        AuditEntryList: {
+            items: components["schemas"]["AuditEntry"][];
+            next_after_seq: number | null;
+        };
+        BreakGlassRequest: {
+            attempt_id: components["schemas"]["AttemptId"];
+            reason: string;
+        };
+        BreakGlassReviewRequest: {
+            note: string;
+        };
+        BreakGlassSession: {
+            session_id: string;
+            admin_id: string;
+            admin_name: string;
+            attempt_id: components["schemas"]["AttemptId"];
+            org_id: string;
+            reason: string;
+            started_at: components["schemas"]["Timestamp"];
+            expires_at: components["schemas"]["Timestamp"];
+            closed_at: components["schemas"]["Timestamp"] | null;
+            reads: Record<string, never>[];
+            reviewed_by: string | null;
+            reviewed_at: components["schemas"]["Timestamp"] | null;
+            review_note: string | null;
+            /** @enum {unknown} */
+            state: "open" | "over" | "reviewed";
+        };
+        BreakGlassSessionList: {
+            items: components["schemas"]["BreakGlassSession"][];
+        };
+        BreakGlassRead: {
+            session_id: string;
+            attempt_id: components["schemas"]["AttemptId"];
+            expires_at: string;
+            results: Record<string, never>;
+            timeline: Record<string, never>[];
         };
         PendingCompany: {
             org_id: string;
@@ -3855,6 +4016,186 @@ export interface operations {
             403: components["responses"]["CsrfFailed"];
             404: components["responses"]["CompanyNotFound"];
             409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listAuditLog: {
+        parameters: {
+            query?: {
+                action?: string;
+                after_seq?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entries. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntryList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    listBreakGlassSessions: {
+        parameters: {
+            query?: {
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sessions. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakGlassSessionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    openBreakGlass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreakGlassRequest"];
+            };
+        };
+        responses: {
+            /** @description The session. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakGlassSession"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            409: components["responses"]["AdminConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    readBreakGlassAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The attempt's data. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakGlassRead"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            409: components["responses"]["AdminConflict"];
+        };
+    };
+    closeBreakGlass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakGlassSession"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            409: components["responses"]["AdminConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    reviewBreakGlass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreakGlassReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description The session. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakGlassSession"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            409: components["responses"]["AdminConflict"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];

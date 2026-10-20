@@ -3,17 +3,22 @@ rate-limit layers, over the services of P-18 to P-21 on SQLite. The services the
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 import vulnmart.assessments.models  # noqa: F401
 import vulnmart.lab.models  # noqa: F401
 from test_assessments import ANA, CAND, active_company, assessments, basic, mail_rows  # noqa: F401
 from test_companies import ADMIN_SCOPE, GOOD, add_admin, audit, clock, companies, ended, org_row, sessions, signup, user_id, verify  # noqa: F401
 from test_consent import add_user, client, make_app, sign_in
-from vulnmart.accounts.models import User
+from vulnmart.accounts import security
+from vulnmart.accounts.models import User, UserSession
+from vulnmart.accounts.roles import RoleService
+from vulnmart.admin.ops import AdminOps
+from vulnmart.ports.fakes import FakeAuditPort
 
 OTHER_OWNER = "olga@globex.example"
 LEARNER_ID = "u-LEARNERLEARNERLE"
+ROUTE_ADMIN, ROUTE_ADMIN_EMAIL = "u-ROUTEADMIN555555", "root@vulnmart.example"
 
 
 @pytest.fixture
@@ -63,6 +68,36 @@ def test_a_rejected_owner_reapplies(web, companies, sessions):
     assert web.get("/api/v1/company").json()["state"] == "rejected"
     assert web.post("/api/v1/company/reapply", headers=csrf).status_code == 204
     assert web.get("/api/v1/company").json()["state"] == "pending_approval"
+
+
+def test_a_recruiter_signs_up_and_an_admin_approves_through_the_routes(web, companies, sessions, clock):
+    """Story 5.3: the whole path over HTTP with the real company service, from signupRecruiter to the admin's listPendingCompanies and decideCompany (P-28) and back to
+    the owner's getMyCompany."""
+    audit = FakeAuditPort()
+    web.app.state.admin_ops = AdminOps(sessions=sessions, roles=RoleService(sessions, audit), companies=companies, status=None, accounts=None, settings=None, quotas=None,
+                                       audit=audit, records=None, deletion=None, end_sessions=lambda uid: None, now=clock)
+    with sessions.begin() as s:
+        s.add(User(id=ROUTE_ADMIN, account_type="admin", email=ROUTE_ADMIN_EMAIL, email_ci=ROUTE_ADMIN_EMAIL, password_hash=security.hash_password(GOOD),
+                   display_name="Admin", status="active", email_verified_at=clock.now))
+    body = {"email": ANA, "password": GOOD, "display_name": "Ana", "company_name": "Acme Routes Ltd"}
+    assert web.post("/api/v1/recruiters", json=body).status_code == 202
+    verify(sessions, ANA)
+    login(web, ANA)
+    assert web.get("/api/v1/company").json()["state"] == "pending_approval"
+
+    web.cookies.clear()
+    admin_csrf = login(web, ROUTE_ADMIN_EMAIL)
+    with sessions.begin() as s:  # an admin session carries the admin role only after the second factor (FR-ACC-07)
+        s.execute(update(UserSession).where(UserSession.user_id == ROUTE_ADMIN).values(mfa_at=clock.now))
+    queue = web.get("/api/v1/admin/companies/pending")
+    assert queue.status_code == 200, queue.text
+    org_id = next(i["org_id"] for i in queue.json()["items"] if i["name"] == "Acme Routes Ltd")
+    assert web.post(f"/api/v1/admin/companies/{org_id}/decision", json={"decision": "approve"}, headers=admin_csrf).status_code == 204
+    assert web.post(f"/api/v1/admin/companies/{org_id}/decision", json={"decision": "approve"}, headers=admin_csrf).status_code == 409
+
+    web.cookies.clear()
+    login(web, ANA)
+    assert web.get("/api/v1/company").json()["state"] == "active"
 
 
 def test_the_owner_reads_and_accepts_the_terms_then_invites(web, companies, sessions):

@@ -3,7 +3,7 @@
     {
       "name": "platform",
       "version": "1.0.0",
-      "operations": 60
+      "operations": 66
     },
     {
       "name": "lab",
@@ -11,7 +11,7 @@
       "operations": 20
     }
   ],
-  "operations": 80,
+  "operations": 86,
   "shared_components": [
     {
       "section": "headers",
