@@ -52,7 +52,7 @@ Command output above.
 None. A candidate cannot release their own results; the same 404 as for a stranger.
 
 ## Correction (2026-10-21, found by the role-scenario audit)
-Story 10 was not effective on a real candidate attempt: InviteConsentTargets.proceed (ssessments/accept.py) created the attempt WITHOUT the invite's rules, so the time limit, reset limit and results visibility of the template never reached the attempt. Fixed: ules=view.rules is passed; 	est_privacy_wall.py now checks that a template with 45 minutes and fter_release gives an attempt with both (the full privacy-wall file: 7 passed; assessment, invite and consent tests: 311 passed). Lesson: the unit tests used a hand-built attempt, never the real consent path.
+Story 10 was not effective on a real candidate attempt: InviteConsentTargets.proceed (`assessments/accept.py) created the attempt WITHOUT the invite's rules, so the time limit, reset limit and results visibility of the template never reached the attempt. Fixed: ules=view.rules is passed; 	est_privacy_wall.py now checks that a template with 45 minutes and `after_release gives an attempt with both (the full privacy-wall file: 7 passed; assessment, invite and consent tests: 311 passed). Lesson: the unit tests used a hand-built attempt, never the real consent path.
 
 ## Limitations and follow-ups
 The timeline of the candidate still lists milestones; if results must be hidden there too, that is a later decision. Akshay signs off IF-2 2.1.0 (row `pending`).
