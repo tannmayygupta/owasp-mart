@@ -299,7 +299,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [ ] **P-30. Admin dashboard and privacy wall in every view**
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.4` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `in-progress`
   - Build: The admin dashboard and the privacy wall checks across every view.
   - Covers: FR-DSH-05, 06
   - Waits on: P-28.
