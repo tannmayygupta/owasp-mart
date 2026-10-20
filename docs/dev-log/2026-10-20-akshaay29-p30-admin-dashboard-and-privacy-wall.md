@@ -5,7 +5,7 @@
 | Date | 2026-10-20 |
 | Developer | akshaay29 |
 | Branch / commit | `sprint-4-akshay-p30` |
-| Status | Done (story `built`; marked done once merged, as the developer asked) |
+| Status | Done (story `done`, merged in pull request 64) |
 | Report tag | platform, dashboards, privacy, sprint 4 |
 
 ## Requirements covered

@@ -34,13 +34,16 @@ SAMPLES: dict[str, dict] = {
     "privacy.deletion_confirmed": {"completed_on": "2026-10-24"},
     "learner.retention_warning": {"delete_on": "2026-11-16", "login_url": "https://vulnmart.example/login"},
     "instance.force_stopped": {},
+    "admin.break_glass_opened": {"grant_id": "g-AAAAAAAAAAAAAAAA", "minutes": "15"},
+    "company.break_glass_opened": {"minutes": "15"},
+    "security.incident_notice": {"summary": "A test incident.", "advice": "Change your password."},
 }
 FORBIDDEN_NAMES = ("password", "token", "flag", "secret", "api_key", "email", "address", "to")
 
 
 def test_the_samples_cover_every_type():
     # nine types of FR-NTF-01, `account.already_registered` that the signup contract asks for (story P-11) and `account.admin_created` (story P-13)
-    assert set(SAMPLES) == set(EMAIL_TYPES) and len(EMAIL_TYPES) == 12
+    assert set(SAMPLES) == set(EMAIL_TYPES) and len(EMAIL_TYPES) == 15  # story P-31 added the two break-glass alerts and the incident notice
 
 
 @pytest.mark.parametrize("name", EMAIL_TYPES)

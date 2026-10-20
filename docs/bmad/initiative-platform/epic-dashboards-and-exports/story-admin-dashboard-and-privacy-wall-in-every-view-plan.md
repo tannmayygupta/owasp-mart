@@ -3,7 +3,7 @@ title: 'Admin dashboard and privacy wall in every view'
 type: 'feature'
 ticket: '4'
 created: '2026-10-20'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

@@ -763,6 +763,18 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 ### D-93 - Cohort view and ranking aid (OI-26, story L-28)
 - **Decision (CONFIRMED by the developer 2026-10-17, answers OI-26):** a private cohort view, scoped to one organisation and one assessment, off unless the assessment turns it on (`cohort_board`, default false). The ranking aid uses the tie-break order score, more full captures, lower hint cost, lower estimated active time, earlier last capture; it is labelled "ranking aid, the recruiter decides" and never ranks anyone out. No global or public leaderboard exists anywhere.
 - **Built:** `packages/py-attempts/src/vulnmart_attempts/ranking.py`, `cohort.py`. Open: the platform port and recruiter screen (Akshay, H-346).
+
+### D-94 - Break-glass window and alerts (OI-12, story P-31)
+- **Decision (CONFIRMED by the developer 2026-10-20, answers OI-12; recorded at the inception of `epic-admin-and-operations`):** a break-glass grant lasts **15 minutes**; the alert goes to the other admins **and to the company whose candidate's data is opened**. Built in story P-31 (ADR 0062).
+
+### D-95 - Incident procedure (OI-34, story P-31)
+- **Decision (CONFIRMED by the developer 2026-10-20, answers OI-34):** a **short incident procedure with no time target**, marked as a **draft for legal review** (the 72-hour figure of RS-H is not verified and not adopted). Written in story P-31 (`docs/runbooks/incident-procedure.md`). OI-33 (who does the legal review, and when) stays open.
+
+### D-96 - Recruiter export (OI-27, story P-29)
+- **Decision (CONFIRMED by the developer 2026-10-20, answers OI-27):** a recruiter exports one assessment's **scores as CSV and JSON, without evidence**. Built in story P-29 (ADR 0060).
+
+### D-97 - Where a recruiter's report view is recorded (FR-DSH-02, story P-31)
+- **Decision (CONFIRMED by the developer 2026-10-20):** a recruiter's view of a candidate report or evidence is recorded in the **attempt log** (`recruiter_viewed_report`) and the **candidate's view history** (FR-PRV-11); it is **not** also written to the platform audit log. FR-DSH-02's "audit log" is read as these two records (ADR 0059).
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.

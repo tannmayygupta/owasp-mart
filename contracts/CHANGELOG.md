@@ -12,6 +12,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
+### 1.6.0 (2026-10-20, Akshay, story P-31, ADR 0062)
+
+- Additive, not breaking (the sign-offs of COMPAT.md stay on 1.0.0 until the owners confirm the minor label; the OpenAPI `info.version` is not changed here): six admin operations: `listAuditLog` `GET /api/v1/admin/audit`, `listBreakGlassSessions` and `openBreakGlass` on `/api/v1/admin/break-glass`, `readBreakGlassAttempt` `GET /api/v1/admin/break-glass/{session_id}/attempt`, `closeBreakGlass` and `reviewBreakGlass` (`POST .../close`, `.../review`); the schemas `AuditEntry`, `AuditEntryList`, `BreakGlassRequest`, `BreakGlassReviewRequest`, `BreakGlassSession`, `BreakGlassSessionList`, `BreakGlassRead`; no new error code (the admin area's `AdminNotFound` and `AdminConflict`). The bundle (66 platform operations, 86 in all) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (two valid and one invalid request example added; `scripts/platform-mock.test.mjs` 20 of 20).
+
 ### 1.5.0 (2026-10-20, Akshay, story P-29, ADR 0060)
 
 - Additive, not breaking (the sign-offs of COMPAT.md stay on 1.0.0 until the owners confirm the minor label; the OpenAPI `info.version` is not changed here): two export operations, the tag `exports`: `exportMyData` `POST /api/v1/me/exports` and `exportCompanyResults` `POST /api/v1/company/exports` (the schema `CompanyExportRequest`), both answering `application/zip` with `Content-Disposition: attachment`; no new error code. OI-27 answered by the developer: scores as CSV and JSON, no evidence. The bundle (60 platform operations, 80 in all) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (one valid and one invalid request example added; `scripts/platform-mock.test.mjs` 20 of 20).

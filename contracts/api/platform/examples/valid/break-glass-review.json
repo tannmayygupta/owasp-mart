@@ -1,0 +1,6 @@
+{
+  "schema": "BreakGlassReviewRequest",
+  "body": {
+    "note": "The reason matches the dispute ticket; one read."
+  }
+}

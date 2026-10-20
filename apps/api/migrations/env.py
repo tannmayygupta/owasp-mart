@@ -8,6 +8,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 import vulnmart.accounts.models  # noqa: F401 - registers the account tables
+import vulnmart.admin.models  # noqa: F401 - registers the break-glass grants (story P-31)
 import vulnmart.assessments.models  # noqa: F401 - registers the templates and invites
 import vulnmart.kernel.models  # noqa: F401 - registers the kernel tables
 import vulnmart.lab.models  # noqa: F401 - registers the lab tables (stream L)

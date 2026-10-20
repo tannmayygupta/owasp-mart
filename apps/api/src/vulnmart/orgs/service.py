@@ -322,6 +322,16 @@ class CompanyService:
             with self._sessions() as session:
                 return session.scalar(select(Organization.name).where(Organization.id == uuid.UUID(org_id)))
 
+    def owner_of_org(self, org_id: str) -> str | None:
+        """The owner's user id of a company, read under that company's scope (story P-31: the company is told when a candidate's answers are opened)."""
+        try:
+            oid = uuid.UUID(str(org_id))
+        except ValueError:
+            return None
+        with self._as("system:companies", str(oid)):
+            with self._sessions() as session:
+                return session.scalar(select(Organization.owner_user_id).where(Organization.id == oid))
+
     def standing(self, user_id: str) -> Standing:
         brief = self._directory.brief(user_id)
         if brief is None or brief.account_type != "recruiter":

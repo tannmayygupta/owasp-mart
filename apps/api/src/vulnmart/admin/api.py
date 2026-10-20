@@ -25,6 +25,7 @@ from vulnmart.orgs.service import InvalidTransition
 from vulnmart.ports.scope import Role
 from vulnmart.problem import ProblemError
 
+from .breakglass import BreakGlassService, SessionNotFound, SessionState, SessionView
 from .ops import AdminOps, NoStopper, NotAllowed, NotFound, SettingRow
 
 router = APIRouter(tags=["admin"])
@@ -69,9 +70,9 @@ async def run(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     """Run a service call off the event loop and turn its refusals into the contract's answers."""
     try:
         return await asyncio.to_thread(lambda: fn(*args, **kwargs))
-    except (NotFound, NotAnAdmin):
+    except (NotFound, NotAnAdmin, SessionNotFound):
         raise ProblemError(ErrorCode.REQ_ROUTE_UNKNOWN) from None
-    except (NotAllowed, InvalidAccountState, InvalidTransition):
+    except (NotAllowed, InvalidAccountState, InvalidTransition, SessionState):
         raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
     except InvalidInput as exc:
         raise invalid(exc) from None
@@ -187,3 +188,70 @@ async def list_jobs(request: Request, auth: Authenticated = Depends(admin_read))
     return JSONResponse({"items": [{"name": j.name, "interval_seconds": int(j.interval.total_seconds()), "last_started_at": when(j.last_started_at),
                                     "last_finished_at": when(j.last_finished_at), "last_status": j.last_status, "last_detail": j.last_detail,
                                     "last_success_at": when(j.last_success_at), "next_due_at": when(j.next_due_at)} for j in rows]}, headers=NO_STORE)
+
+
+# ---- the audit log and break-glass (story P-31, FR-ADM-03, FR-ADM-07, FR-ADM-08) ----
+
+SESSION_ID = r"^g-[A-Z2-7]{16}$"
+
+
+class BreakGlassBody(Strict):
+    attempt_id: str = Field(pattern=ATTEMPT_ID)
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class ReviewBody(Strict):
+    note: str = Field(min_length=1, max_length=2000)
+
+
+def glass_of(request: Request) -> BreakGlassService:
+    service = getattr(request.app.state, "break_glass", None)
+    if service is None:
+        raise ProblemError(ErrorCode.REQ_INTERNAL)
+    return service
+
+
+def session_body(v: SessionView) -> dict[str, Any]:
+    def when(moment: Any) -> str | None:
+        return None if moment is None else timestamp(moment)
+
+    return {"session_id": v.session_id, "admin_id": v.admin_id, "admin_name": v.admin_name, "attempt_id": v.attempt_id, "org_id": v.org_id, "reason": v.reason,
+            "started_at": timestamp(v.started_at), "expires_at": timestamp(v.expires_at), "closed_at": when(v.closed_at), "reads": list(v.reads),
+            "reviewed_by": v.reviewed_by, "reviewed_at": when(v.reviewed_at), "review_note": v.review_note, "state": v.state}
+
+
+@router.get("/api/v1/admin/audit", operation_id="listAuditLog")
+async def list_audit_log(request: Request, auth: Authenticated = Depends(admin_read), action: Annotated[str | None, Query(pattern=r"^[a-z_]+(\.[a-z_]+)*$", max_length=64)] = None,
+                         after_seq: Annotated[int, Query(ge=0)] = 0, limit: Annotated[int, Query(ge=1, le=200)] = 100) -> JSONResponse:
+    rows = await run(glass_of(request).audit_entries, auth.session.scope, action=action, after_seq=after_seq, limit=limit)
+    items = [{"seq": r.seq, "at": r.at, "actor": r.actor, "action": r.action, "subject": r.subject, "details": dict(r.details)} for r in rows]
+    return JSONResponse({"items": items, "next_after_seq": items[-1]["seq"] if len(items) == limit else None}, headers=NO_STORE)
+
+
+@router.get("/api/v1/admin/break-glass", operation_id="listBreakGlassSessions")
+async def list_break_glass(request: Request, auth: Authenticated = Depends(admin_read), limit: Annotated[int, Query(ge=1, le=100)] = 50) -> JSONResponse:
+    rows = await run(glass_of(request).sessions, auth.session.scope, limit)
+    return JSONResponse({"items": [session_body(v) for v in rows]}, headers=NO_STORE)
+
+
+@router.post("/api/v1/admin/break-glass", operation_id="openBreakGlass", status_code=201)
+async def open_break_glass(request: Request, auth: Authenticated = Depends(admin_write)) -> JSONResponse:
+    body = await read_json(request, BreakGlassBody)
+    view = await run(glass_of(request).open, auth.session.scope, body.attempt_id, body.reason)
+    return JSONResponse(session_body(view), status_code=201, headers=NO_STORE)
+
+
+@router.get("/api/v1/admin/break-glass/{session_id}/attempt", operation_id="readBreakGlassAttempt")
+async def read_break_glass(request: Request, session_id: Annotated[str, Path(pattern=SESSION_ID)], auth: Authenticated = Depends(admin_read)) -> JSONResponse:
+    return JSONResponse(await run(glass_of(request).read, auth.session.scope, session_id), headers=NO_STORE)
+
+
+@router.post("/api/v1/admin/break-glass/{session_id}/close", operation_id="closeBreakGlass")
+async def close_break_glass(request: Request, session_id: Annotated[str, Path(pattern=SESSION_ID)], auth: Authenticated = Depends(admin_write)) -> JSONResponse:
+    return JSONResponse(session_body(await run(glass_of(request).close, auth.session.scope, session_id)), headers=NO_STORE)
+
+
+@router.post("/api/v1/admin/break-glass/{session_id}/review", operation_id="reviewBreakGlass")
+async def review_break_glass(request: Request, session_id: Annotated[str, Path(pattern=SESSION_ID)], auth: Authenticated = Depends(admin_write)) -> JSONResponse:
+    body = await read_json(request, ReviewBody)
+    return JSONResponse(session_body(await run(glass_of(request).review, auth.session.scope, session_id, body.note)), headers=NO_STORE)

@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { ApiError, api, say, when, type AdminSetting, type AdminUser, type Capacity, type JobStatus, type PendingCompany, type Quota } from '../../lib/api';
+import {
+  ApiError, api, say, when, type AdminSetting, type AdminUser, type AuditEntry, type BreakGlassSession, type Capacity, type JobStatus, type PendingCompany, type Quota,
+} from '../../lib/api';
 import { useRequireUser } from '../../lib/session';
 
 // The admin dashboard (story P-30, FR-DSH-05) over the admin routes of story P-28: the approval queue, users, capacity, the retention jobs, settings, quotas and
-// force-stop. Reading the users or the queue is audited by the server (every admin read of personal data is logged). The audit log and break-glass are story P-31.
+// force-stop; the audit log and break-glass (story P-31). Reading the users, the queue or the audit log is audited by the server; a candidate's content is only
+// readable through a break-glass session.
 // Only an admin with a second factor reaches these routes; anyone else gets "not found", and an admin without the factor is sent to set it up.
 export default function AdminPage() {
   const user = useRequireUser();
@@ -18,16 +21,21 @@ export default function AdminPage() {
   const [quotas, setQuotas] = useState<Quota[]>([]);
   const [banner, setBanner] = useState<{ text: string; kind: 'ok' | 'bad' } | null>(null);
   const [locked, setLocked] = useState(false);
+  const [audit, setAudit] = useState<AuditEntry[] | null>(null);
+  const [glass, setGlass] = useState<BreakGlassSession[]>([]);
+  const [glassRead, setGlassRead] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [q, c, j, s, qu] = await Promise.all([
+      const [q, c, j, s, qu, bg] = await Promise.all([
         api<{ items: PendingCompany[] }>('GET', '/api/v1/admin/companies/pending'),
         api<Capacity>('GET', '/api/v1/admin/capacity'),
         api<{ items: JobStatus[] }>('GET', '/api/v1/admin/jobs'),
         api<{ items: AdminSetting[] }>('GET', '/api/v1/admin/settings'),
         api<{ items: Quota[] }>('GET', '/api/v1/admin/quotas'),
+        api<{ items: BreakGlassSession[] }>('GET', '/api/v1/admin/break-glass'),
       ]);
+      setGlass(bg.items);
       setQueue(q.items);
       setCapacity(c);
       setJobs(j.items);
@@ -229,9 +237,86 @@ export default function AdminPage() {
         </form>
       </section>
 
-      <section className="card">
-        <h2>Audit log and break-glass</h2>
-        <p className="muted">Reading the audit log and break-glass access to a candidate&apos;s answers come with the next story (P-31).</p>
+      <section className="card" data-testid="audit">
+        <h2>Audit log</h2>
+        <p className="muted">Each time you read the audit log, that read is itself recorded.</p>
+        <form className="row" onSubmit={(ev: FormEvent<HTMLFormElement>) => {
+          ev.preventDefault();
+          const action = String(new FormData(ev.currentTarget).get('action') ?? '').trim();
+          void act(async () => setAudit((await api<{ items: AuditEntry[] }>('GET', `/api/v1/admin/audit?limit=200${action ? `&action=${encodeURIComponent(action)}` : ''}`)).items), 'Audit log read.');
+        }}>
+          <input name="action" placeholder="Action, for example breakglass.opened" maxLength={64} aria-label="Filter by action" />
+          <button type="submit">Read</button>
+        </form>
+        {audit && (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>When</th><th>Who</th><th>Action</th><th>About</th><th>Details</th></tr></thead>
+              <tbody>
+                {audit.map((e) => (
+                  <tr key={e.seq}><td>{e.seq}</td><td>{when(e.at)}</td><td>{e.actor}</td><td>{e.action}</td><td>{e.subject ?? '-'}</td><td><code>{JSON.stringify(e.details)}</code></td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card" data-testid="break-glass">
+        <h2>Break-glass</h2>
+        <p className="muted">
+          Admins cannot see a candidate&apos;s answers, write-ups or evidence. Only for a written reason you can open one candidate attempt for 15 minutes: the other admins and
+          the candidate&apos;s company are told at once, every read is recorded, and another admin reviews it afterwards.
+        </p>
+        <form onSubmit={(ev: FormEvent<HTMLFormElement>) => {
+          ev.preventDefault();
+          const f = new FormData(ev.currentTarget);
+          const attempt_id = String(f.get('attempt') ?? '').trim();
+          const reason = String(f.get('reason') ?? '').trim();
+          if (window.confirm('Open this candidate’s answers for 15 minutes? The other admins and the company are told.')) {
+            void act(() => api('POST', '/api/v1/admin/break-glass', { attempt_id, reason }), 'Break-glass opened for 15 minutes.');
+          }
+        }}>
+          <label htmlFor="bg-attempt">Candidate attempt id</label>
+          <input id="bg-attempt" name="attempt" placeholder="a-..." pattern="a-[A-Z2-7]{16}" required />
+          <label htmlFor="bg-reason">Reason (at least 20 characters; kept with the session)</label>
+          <textarea id="bg-reason" name="reason" rows={2} minLength={20} maxLength={500} required />
+          <p><button type="submit" className="danger">Open break-glass</button></p>
+        </form>
+        {glass.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Admin</th><th>Attempt</th><th>Reason</th><th>Window</th><th>Reads</th><th>State</th><th /></tr></thead>
+              <tbody>
+                {glass.map((g) => (
+                  <tr key={g.session_id}>
+                    <td>{g.admin_name}</td>
+                    <td>{g.attempt_id}</td>
+                    <td>{g.reason}</td>
+                    <td>{when(g.started_at)} to {when(g.closed_at ?? g.expires_at)}</td>
+                    <td>{g.reads.length}</td>
+                    <td><span className={`pill ${g.state === 'open' ? 'warn' : g.state === 'reviewed' ? 'ok' : ''}`}>{g.state}</span>{g.review_note && <span className="tag">{g.review_note}</span>}</td>
+                    <td className="row">
+                      {g.state === 'open' && g.admin_id === user.user_id && (
+                        <>
+                          <button type="button" onClick={() => act(async () => setGlassRead(JSON.stringify(await api('GET', `/api/v1/admin/break-glass/${g.session_id}/attempt`), null, 2)), 'Read recorded.')}>Read</button>
+                          <button type="button" className="ghost" onClick={() => act(() => api('POST', `/api/v1/admin/break-glass/${g.session_id}/close`), 'Closed.')}>Close</button>
+                        </>
+                      )}
+                      {g.state === 'over' && g.admin_id !== user.user_id && (
+                        <button type="button" className="ghost" onClick={() => {
+                          const note = window.prompt('Review note (was the reason sound, were the reads needed?)');
+                          if (note) void act(() => api('POST', `/api/v1/admin/break-glass/${g.session_id}/review`, { note }), 'Reviewed.');
+                        }}>Review</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {glassRead && <pre className="writeup" data-testid="break-glass-read">{glassRead}</pre>}
       </section>
     </>
   );

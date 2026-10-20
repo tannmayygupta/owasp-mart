@@ -73,6 +73,9 @@ CLASSES: dict[str, tuple[str, str]] = {
     **{op: ("admin", W + "test_admin_routes_answer_everyone_else_like_unknown_routes") for op in (
         "listPendingCompanies", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
         "setQuota", "removeQuota", "getCapacity", "listJobs")},
+    "listAuditLog": ("admin", "test_breakglass.py::test_reading_the_audit_log_is_itself_audited_and_only_for_admins"),
+    **{op: ("admin", "test_breakglass.py::test_a_session_alerts_the_other_admin_and_the_company_records_reads_and_is_reviewed_by_the_other_admin") for op in (
+        "listBreakGlassSessions", "openBreakGlass", "readBreakGlassAttempt", "closeBreakGlass", "reviewBreakGlass")},
 }
 
 

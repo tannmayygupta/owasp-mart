@@ -299,15 +299,15 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [x] **P-30. Admin dashboard and privacy wall in every view**  (the audit log view and break-glass are P-31; found that a candidate cannot start an assessment until the lab adds the start route (H-356, OI-22); not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: planned, ref `8.4` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `built` (marked done once merged)
+  - BMAD story: planned, ref `8.4` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `done` (merged in pull request 64)
   - Build: The admin dashboard and the privacy wall checks across every view.
   - Covers: FR-DSH-05, 06
   - Waits on: P-28.
   - Done when: No view shows data the privacy wall forbids, checked by a test per view.
 
-- [ ] **P-31. Break-glass, audit access, admin limits, legal review and incident handling**
+- [x] **P-31. Break-glass, audit access, admin limits, legal review and incident handling**  (OI-12 and OI-34 answered (D-94, D-95); OI-33 open: the legal review waits for a reviewer; the incident procedure is a draft and does not name who decides; the alert is a mail; not browser-tested (OI-30))
   - Epic: `epic-admin-and-operations`
-  - BMAD story: not planned yet; created when you incept `epic-admin-and-operations` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `9.2` in `epic-admin-and-operations` (find it with `bmad-ticket`); state `built` (marked done once merged)
   - Build: Break-glass access, audit access, admins cannot read candidate answers by default, the legal review action, breach and incident handling.
   - Covers: FR-ADM-03, 07, 08, FR-PRV-19, 20
   - Waits on: P-17, P-28. Open: OI-12, OI-33, OI-34.
