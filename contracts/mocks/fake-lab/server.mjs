@@ -444,7 +444,10 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     const a = readable(res, user, params.attempt_id);
     if (!a || !queryOf(res, url, [])) return;
     send(res, 200, { items: KEYS.map((k) => { const p = a.progress.get(k);
-      return { challenge_key: k, best_milestone: MILESTONES[p.best], solved: p.best === 3, held: p.held, hints_used: p.hints.size, hints_available: a.hintsEnabled }; }), has_more: false });
+      const item = { challenge_key: k, best_milestone: MILESTONES[p.best], solved: p.best === 3, held: p.held, hints_used: p.hints.size, hints_available: a.hintsEnabled,
+        brief: `Mock brief of ${k}: what the weakness is, in plain words.`, start: `Mock start of ${k}: sign in with the demo account of the mock lab.` };
+      if (p.best === 3 && a.mode === 'learner' && a.ownerId === user.id) item.write_up = { vulnerable: `Mock write-up of ${k}: the idea that made it vulnerable.`, fix: `Mock write-up of ${k}: how to fix it.` };
+      return item; }), has_more: false });
   };
   function hintContext(res, user, params) {
     const a = owned(res, user, params.attempt_id);

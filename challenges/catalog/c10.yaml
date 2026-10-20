@@ -18,7 +18,7 @@ tier: Hard
 flag:
   placement: file-mock-services
   delivery: file
-start_state: the seeded approved seller owner (owner.harbor, Harbor Crafts)
+start_state: "Sign in as the seller owner owner.harbor@vulnmart.test with the password vulnmart-seed-demo (Harbor Crafts) and open the product editor's \"Import image from URL\"."
 milestones:
   m1:
     summary: the player pointed the image importer at an internal-looking address

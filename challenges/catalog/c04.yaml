@@ -19,7 +19,7 @@ tier: Medium
 flag:
   placement: database-seed
   delivery: db
-start_state: seeded customer with one delivered order, total paid 2,500 (placeholder)
+start_state: "Sign in as the customer player.customer@vulnmart.test with the password player-customer-demo-b2: you have one delivered order (VM-190001) that you paid 2,500 for."
 milestones:
   m1:
     summary: the player used the instant-refund rule on the seeded order

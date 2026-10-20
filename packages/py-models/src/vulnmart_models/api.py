@@ -1088,6 +1088,14 @@ class Score(BaseModel):
     per_challenge: Annotated[list[ChallengeScore], Field(max_length=11)]
 
 
+class WriteUp(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    vulnerable: Annotated[str, Field(max_length=800)]
+    fix: Annotated[str, Field(max_length=1200)]
+
+
 class ChallengeProgress(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -1100,6 +1108,26 @@ class ChallengeProgress(BaseModel):
     hints_available: Annotated[
         bool, Field(description='False when the attempt has hints off.')
     ]
+    brief: Annotated[
+        str | None,
+        Field(
+            description='Optional. What the challenge is about, in a few plain words (the catalogue text; never a flag).',
+            max_length=600,
+        ),
+    ] = None
+    start: Annotated[
+        str | None,
+        Field(
+            description='Optional. How to begin, for example the demo account to sign in with and where to look. The accounts are documented demo accounts of the lab shop, not real credentials.',
+            max_length=600,
+        ),
+    ] = None
+    write_up: Annotated[
+        WriteUp | None,
+        Field(
+            description='Optional. Present only for the owner of a practice attempt once the challenge is captured (M3); never in an assessment. The weakness and the fix.'
+        ),
+    ] = None
 
 
 class ChallengeProgressList(BaseModel):

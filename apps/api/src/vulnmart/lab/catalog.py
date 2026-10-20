@@ -1,8 +1,8 @@
 """The challenge catalogue as the lab API needs it (IF-7): titles, tags, tier and hint texts, read from `challenges/catalog/cNN.yaml`.
 
 Stream T owns the files (T-30 writes the hint texts); this reads them, never writes them. A hint with no text yet shows a plain
-placeholder, so the route answers before the content exists. A flag, a placement, a test path or a write-up never leaves this module
-(IF-2: no answer shows a flag or where it is). `YAML` is parsed with `safe_load` only.
+placeholder, so the route answers before the content exists. A flag, a placement or a test path never leaves this module (IF-2: no answer shows a flag or where it is). The brief and the start text are
+for the player; the write-up (the weakness and the fix) is handed out only after the challenge is captured, and only in practice mode (`write_up`). `YAML` is parsed with `safe_load` only.
 """
 from __future__ import annotations
 
@@ -33,6 +33,9 @@ class CatalogEntry:
     difficulty: int
     tier: str
     hints: tuple[str | None, str | None, str | None]
+    brief: str = ""
+    start: str = ""  # how to begin: the account to sign in with, where to look (player-facing text of `start_state`)
+    write_up: tuple[str, str] | None = None  # (the weakness, the fix)
 
 
 class Catalog:
@@ -62,7 +65,19 @@ def _entry(data: Mapping[str, Any]) -> CatalogEntry:
         key=str(data["key"]).upper(), title=str(data["title"]), owasp_2021=_s(owasp.get("2021")), owasp_2025=_s(owasp.get("2025")),
         cwe=tuple(x for x in [cwe.get("primary"), *(cwe.get("related") or ())] if isinstance(x, str)),
         attack=tuple(str(a) for a in (data.get("attack") or ())), difficulty=int(data.get("difficulty", 1)),
-        tier=str(data.get("tier", "")), hints=(hints[0], hints[1], hints[2]))
+        tier=str(data.get("tier", "")), hints=(hints[0], hints[1], hints[2]), brief=_text(data.get("brief"), 600), start=_text(data.get("start_state"), 600),
+        write_up=_write_up(data.get("write_up")))
+
+
+def _text(value: Any, limit: int) -> str:
+    return " ".join(str(value).split())[:limit] if isinstance(value, str) else ""
+
+
+def _write_up(value: Any) -> tuple[str, str] | None:
+    if not isinstance(value, Mapping):
+        return None
+    vulnerable, fix = _text(value.get("vulnerable"), 800), _text(value.get("fix"), 1200)
+    return (vulnerable, fix) if vulnerable and fix else None
 
 
 def _s(value: Any) -> str | None:

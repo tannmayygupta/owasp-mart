@@ -18,7 +18,7 @@ tier: Medium
 flag:
   placement: sentinel-table
   delivery: sentinel
-start_state: a seeded customer who creates an order and stops at "Pay"
+start_state: "Sign in as the customer player.customer@vulnmart.test with the password player-customer-demo-b2, put something in the cart and go as far as the Pay step."
 milestones:
   m1:
     summary: the player posted their own payment event to the webhook

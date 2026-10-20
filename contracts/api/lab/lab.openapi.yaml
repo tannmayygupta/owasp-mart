@@ -1,8 +1,8 @@
 openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
-  title: Lab API (IF-2), browser-facing fragment, contract v1.1.0
-  version: 1.1.0
+  title: Lab API (IF-2), browser-facing fragment, contract v1.2.0
+  version: 1.2.0
   description: |
     The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
     flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
@@ -937,6 +937,22 @@ components:
         held: { type: boolean }
         hints_used: { type: integer, minimum: 0, maximum: 3 }
         hints_available: { type: boolean, description: False when the attempt has hints off. }
+        brief:
+          description: Optional. What the challenge is about, in a few plain words (the catalogue text; never a flag).
+          type: string
+          maxLength: 600
+        start:
+          description: Optional. How to begin, for example the demo account to sign in with and where to look. The accounts are documented demo accounts of the lab shop, not real credentials.
+          type: string
+          maxLength: 600
+        write_up:
+          description: Optional. Present only for the owner of a practice attempt once the challenge is captured (M3); never in an assessment. The weakness and the fix.
+          type: object
+          additionalProperties: false
+          required: [vulnerable, fix]
+          properties:
+            vulnerable: { type: string, maxLength: 800 }
+            fix: { type: string, maxLength: 1200 }
     ChallengeProgressList:
       type: object
       additionalProperties: false

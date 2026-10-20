@@ -636,3 +636,23 @@ def test_a_recruiters_view_of_the_report_and_the_evidence_is_logged_and_noted_in
     recruiter = act_as("u-RECRUITER", Role.RECRUITER, "org-1")  # the overrides are shared: the owner call above replaced them
     assert recruiter.get(f"/api/v1/attempts/{aid}/report").status_code == 200, "a failing note never blocks the read"
     assert len(viewed()) == 2
+
+
+def test_the_challenge_list_tells_a_player_what_it_is_and_how_to_begin_and_hands_out_the_write_up_only_after_the_capture_in_practice(world, ada):
+    """L-30 (player experience): a player who opens the shop has nothing to go on without the brief and the start text; the write-up (weakness and fix) is a reward."""
+    iid, aid = start(world, ada)
+    items = ada.get(f"/api/v1/attempts/{aid}/challenges").json()["items"]
+    check("ChallengeProgressList", {"items": items, "has_more": False})
+    by = {i["challenge_key"]: i for i in items}
+    assert len(items) == 11 and all(i["brief"] and i["start"] for i in items), "every challenge says what it is and how to begin"
+    assert "staff.harbor@vulnmart.test" in by["C01"]["start"] and "harbor-staff-demo-a1" in by["C01"]["start"], "C01 starts with the seller staff login"
+    assert "owner.harbor@vulnmart.test" in by["C06"]["start"] and "owner.harbor@vulnmart.test" in by["C10"]["start"]
+    assert all("write_up" not in i for i in items), "no write-up before the capture"
+    play(world.lab, iid)
+    assert world.lab.submit_flag(aid, "C05", world.lab.keys.flag(iid, "C05", 1)).credit == "credited"
+    after = {i["challenge_key"]: i for i in ada.get(f"/api/v1/attempts/{aid}/challenges").json()["items"]}
+    assert set(after["C05"]["write_up"]) == {"vulnerable", "fix"} and after["C05"]["write_up"]["fix"]
+    assert "write_up" not in after["C01"], "only the captured challenge"
+    text = json.dumps(after)
+    assert not any(world.lab.keys.flag(iid, k, 1) in text for k in ("C01", "C05", "C11")), "no flag in the answer"
+    check("ChallengeProgressList", {"items": list(after.values()), "has_more": False})
