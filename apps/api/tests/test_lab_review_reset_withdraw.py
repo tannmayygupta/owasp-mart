@@ -107,10 +107,11 @@ def test_start_after_withdrawal_is_refused_and_creates_no_instance():
     # review finding A1: a second start used to build and open an instance, then fail at instance_ready
     clock, host = FakeClock(T0), FakeInstanceHost()
     rt = build_lab_runtime({}, host=host, clock=clock)
-    s = rt.start_attempt("u-1")
+    # a learner may start a new run after a withdrawn one (ADR 0063); the attempt of a company assessment may not
+    s = rt.start_attempt("u-1", org_id="o-1")
     rt.withdraw(s.attempt_id)
     before = len(host.list()) if hasattr(host, "list") else None
     with pytest.raises(AttemptStateInvalid):
-        rt.start_attempt("u-1")
+        rt.start_attempt("u-1", org_id="o-1")
     if before is not None:
         assert len(host.list()) == before

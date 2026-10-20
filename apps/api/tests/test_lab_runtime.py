@@ -417,12 +417,13 @@ def test_an_attempt_created_from_a_consent_runs_under_the_rules_of_its_invite():
 
     rt, clock, host = make_runtime()
     invite_rules = {"challenge_keys": ["C01", "C02"], "time_limit_min": 45, "hints_mode": "off", "hint_cost_pct": 10, "reset_limit": 1, "retention_days": 90,
-                    "invite_expiry_days": 7, "writeup_required": False, "results_visibility": "company", "flag_submissions_per_minute": 3, "template_version": 2}
+                    "invite_expiry_days": 7, "writeup_required": False, "results_visibility": "after_release", "flag_submissions_per_minute": 3, "template_version": 2}
     a = rt.attempts.create_from_consent(user_id="u-cand", org_id="o-acme", template_id="shop-v0~2", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-1",
                                         attempt_id="a-CANDIDATEATTEMPT", rules=invite_rules)
     assert a.attempt_id == "a-CANDIDATEATTEMPT" and a.mode.value == "candidate"
     rec = rt.engine.get(a.attempt_id)
     assert (rec.rules.time_limit_minutes, rec.rules.reset_limit) == (45, 1) and rec.rules.grace_seconds == 60, "the rest stays as the engine's defaults"
+    assert rec.rules.results_visibility == "after_release", "H-355: the setting reaches the attempt"
     assert attempt_rules(None).time_limit_minutes == 120 and attempt_rules({}).reset_limit == 3
     with pytest.raises(ValueError):
         attempt_rules({"time_limit_min": "45"})  # a string is not a whole number

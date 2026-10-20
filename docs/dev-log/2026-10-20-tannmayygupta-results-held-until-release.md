@@ -38,6 +38,7 @@ OI-15 applies (2026-10-18). Release kept in the attempt log (no migration); only
 - `pytest tests/test_lab_results_release.py` — 4 passed (rule storage, candidate hidden then released, release only after the end and only by the company, default unaffected).
 - `pytest` of lab results, privacy wall, lab contract, lab api, sequence api, sequence, start and timeline tests — 245 passed. `packages/py-attempts` — 357 passed.
 - `node --test scripts/fake-lab.test.mjs scripts/platform-mock.test.mjs` — 29 passed. `pnpm run contracts:rules` — 20 PASS, 0 FAIL. `pnpm run api:check` — OK. `pnpm --filter @vulnmart/web typecheck` — no error.
+- Full API suite (no Postgres, no Valkey): 5 failed, 2679 passed, 244 skipped. All five were stale tests from stories 6 and 10 and are fixed: migration head 0017 and the table list (challenge_opens) in 	est_kernel_settings.py; a withdrawn learner run may start again (ADR 0063), so the old refusal test now uses a company attempt; the invite test used an invalid visibility value; the run-order test depended on a random id when the test clock stands still. The four files rerun: 59 passed.
 - Not run: the recruiter page in a browser; the Postgres store with the new rule member (the rules go through the same `to_dict` and `from_dict`).
 
 ## Evidence
