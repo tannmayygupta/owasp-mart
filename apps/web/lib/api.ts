@@ -245,6 +245,29 @@ export type IntegrityFlag = {
 };
 export type TimelineEntry = { at: string; type: string; challenge_key: string | null; milestone: string | null; result: string | null };
 
+// ---- the admin's shapes (IF-1, story P-28; the dashboard is story P-30) ----
+
+export type PendingCompany = { org_id: string; name: string; owner_name: string; owner_email_domain: string; applied_at: string };
+export type AdminUser = {
+  user_id: string;
+  display_name: string;
+  email: string;
+  account_type: string;
+  status: string;
+  roles: string[];
+  email_verified: boolean;
+  last_login_at: string | null;
+};
+export type AdminSetting = { name: string; value: number | boolean | string; default: number | boolean | string; overridden: boolean; minimum: number | null; maximum: number | null };
+export type Quota = { scope: 'user' | 'org' | 'global'; scope_id: string | null; max_instances: number };
+export type Capacity = {
+  instances: { running: number; reported: number; failed: number };
+  memory: { capacity_mb: number; used_mb: number; health: string } | null;
+  queue: { emails_waiting: number; events_unpublished: number };
+  failures: { emails_failed: number; jobs_failed: number; instances_failed: number };
+};
+export type JobStatus = { name: string; interval_seconds: number; last_started_at: string | null; last_status: string | null; last_detail: string | null; next_due_at: string | null };
+
 /** Seconds as "1h 02m 03s" (or "-"). */
 export function duration(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '-';

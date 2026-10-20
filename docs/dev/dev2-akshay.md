@@ -297,9 +297,9 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
   - Waits on: P-17. Open: OI-27.
   - Done when: Each export produces the right data and writes an audit entry.
 
-- [ ] **P-30. Admin dashboard and privacy wall in every view**
+- [x] **P-30. Admin dashboard and privacy wall in every view**  (the audit log view and break-glass are P-31; found that a candidate cannot start an assessment until the lab adds the start route (H-356, OI-22); not browser-tested (OI-30))
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.4` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `built` (marked done once merged)
   - Build: The admin dashboard and the privacy wall checks across every view.
   - Covers: FR-DSH-05, 06
   - Waits on: P-28.

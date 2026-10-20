@@ -14,6 +14,7 @@ export function Nav() {
             <Link href="/dashboard">Dashboard</Link>
             {user.account_type === 'recruiter' && <Link href="/company/candidates">Candidates</Link>}
             {user.account_type === 'recruiter' && <Link href="/company">Company</Link>}
+            {user.account_type === 'admin' && <Link href="/admin">Admin</Link>}
             <Link href="/account">Account</Link>
             <span className="muted" data-testid="who">{user.display_name}</span>
             <button
