@@ -16,7 +16,7 @@ Every version listed here must be an entry of the contract's own section in `con
 | IF-2 | 1.2.0 | L | `contracts/api/lab/` |
 | IF-4 | 1.0.0 | L | `contracts/events/` |
 | IF-5 | 1.1.0 | L | `contracts/orchestrator/` |
-| IF-6 | 1.0.0 | L | `contracts/instance/` |
+| IF-6 | 1.0.1 | L | `contracts/instance/` |
 | IF-7 | 1.2.0 | T | `contracts/catalog/` |
 | DB | 2.1.0 | P | `contracts/db/` |
 | GATE | 1.0.0 | L | `contracts/edge/` |
@@ -41,8 +41,8 @@ IF-4 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
 IF-4 | P | @akshaay29 | consumer | 1.0.0 | - | pending
 IF-5 | L | @tannmayygupta | owner | 1.1.0 | 2026-10-19 | approved
 IF-5 | P | @akshaay29 | consumer | 1.1.0 | - | pending
-IF-6 | L | @tannmayygupta | owner | 1.0.0 | 2026-10-19 | approved
-IF-6 | L | @tannmayygupta | consumer | 1.0.0 | 2026-10-19 | approved
+IF-6 | L | @tannmayygupta | owner | 1.0.1 | 2026-10-20 | approved
+IF-6 | L | @tannmayygupta | consumer | 1.0.1 | 2026-10-20 | approved
 IF-6 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
 IF-7 | T | @sahillroy | owner | 1.2.0 | 2026-10-20 | approved
 IF-7 | P | @akshaay29 | consumer | 1.2.0 | - | pending

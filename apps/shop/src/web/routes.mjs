@@ -7,6 +7,7 @@ import * as shop from '../domain/shop-service.mjs';
 import * as giftcards from '../challenges/c02-gift-card-codes.mjs';
 import { searchCatalog } from '../challenges/c03a-catalog-search.mjs';
 import { noteTicketMarkup } from '../challenges/c03b-ticket-xss.mjs';
+import { collectorBase, collectorIdFor, readInbox } from '../challenges/c03b-bot.mjs';
 import { quickRefund, refundStatement } from '../challenges/c04-quick-refund.mjs';
 import { createPendingOrder } from '../challenges/c08-payment-webhook.mjs';
 import { isLocked, recordAuth } from '../challenges/c09-logging-failures.mjs';
@@ -39,7 +40,7 @@ const hj = (fn) => async (req, res, next) => {
   try { await fn(req, res); } catch (e) { try { handleJsonError(e, res); } catch (u) { next(u); } }
 };
 
-export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getCatalogDb = null } = {}) {
+export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getCatalogDb = null, bot = null, mockUrl, instanceId } = {}) {
   app.get('/', (_req, res) => res.redirect('/shop'));
 
   // C03 part A (Injection): product search over the separate read-only catalog
@@ -161,13 +162,26 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
     shop.openDispute(db, req.user, req.body.order_item_id, req.body.reason);
     res.render('message', { title: 'Dispute opened', message: 'Your dispute was opened.' });
   }));
+  app.get('/tickets', requireCustomer, h((req, res) => res.render('tickets', { tickets: shop.listTickets(db, req.user) })));
   app.post('/tickets', requireCustomer, h((req, res) => {
     const id = shop.createTicket(db, req.user, req.body.subject, req.body.body);
     // C03 part B signal: a stored ticket message that carries an HTML tag. The
     // message is stored as data in both builds; only the support-console render
     // differs (see the challenge module + staff ticket-detail view).
     noteTicketMarkup(req.body.body, { challenges, emit, ticketId: id, userId: req.user.id });
+    // The support bot opens the ticket a few seconds later (C03 part B; a no-op where there is no bot).
+    bot?.enqueue(id, req.body.body);
     res.redirect(`/tickets/${id}`);
   }));
-  app.get('/tickets/:id', requireCustomer, h((req, res) => res.render('ticket', { ticket: shop.getTicket(db, req.user, req.params.id) })));
+  app.get('/tickets/:id', requireCustomer, h((req, res) => {
+    const ticket = shop.getTicket(db, req.user, req.params.id);
+    const at = bot?.viewedAt(ticket.id);
+    res.render('ticket', { ticket, viewed_at: at ? new Date(at).toISOString().slice(11, 16) : null });
+  }));
+  // The listener (C03 part B): where the collector inside the instance shows what the support agent's browser sent it.
+  app.get('/lab/listener', requireCustomer, h(async (req, res) => {
+    const inbox = await readInbox({ mockUrl });
+    const id = inbox.id ?? collectorIdFor(instanceId);
+    res.render('lab/listener', { collector_url: `${collectorBase(mockUrl)}/c/${id || 'ID'}`, reachable: inbox.reachable, hits: inbox.hits });
+  }));
 }

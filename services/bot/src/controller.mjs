@@ -7,10 +7,13 @@
 //   - its memory is measurable per instance (spike S-5).
 //
 // This is the CONTROLLER with a pluggable visitor. The default visitor is an HTTP
-// GET (Node built-ins). The headless-browser visitor that actually executes page
-// JS (needed for C03) and its full memory profile are the S-5 spike / C03 work.
+// GET (Node built-ins). The visitor that executes page JS (C03 part B) is browser.mjs
+// (jsdom in a child process per visit, ADR 0058); main.mjs plugs it in.
 import http from 'node:http';
 import crypto from 'node:crypto';
+
+const COOKIE_VALUE = /^[A-Za-z0-9_.-]{10,2048}$/; // a signed session value of the shop; anything else is refused
+const ID = /^[A-Za-z0-9_.-]{1,64}$/;
 
 function sendJson(res, status, obj) {
   if (res.writableEnded || res.destroyed) return;
@@ -70,9 +73,11 @@ export function createBotController({
   allowPrefixes = ['/tickets/', '/staff/tickets', '/product/', '/disputes/'],
   maxVisitMs = 5000,
   visit = visitHttp,
+  emit = () => {}, // emit(type, data): the bot.visit events (start, end); best effort
 } = {}) {
   const targetOrigin = new URL(target).origin;
   const visits = [];
+  let busy = false; // one visit at a time per instance (challenge-specs 3.2)
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (req.method === 'GET' && url.pathname === '/healthz') return sendJson(res, 200, { status: 'ok' });
@@ -87,9 +92,23 @@ export function createBotController({
       if (!isAllowed(targetOrigin, dest, allowPrefixes)) {
         return sendJson(res, 403, { refused: true, reason: 'not a page of this instance, or not allow-listed', path });
       }
+      const session = b.value.session;
+      if (session !== undefined && (typeof session !== 'string' || !COOKIE_VALUE.test(session))) return sendJson(res, 400, { error: 'bad session' });
+      const ticketId = b.value.ticket_id;
+      if (ticketId !== undefined && (typeof ticketId !== 'string' || !ID.test(ticketId))) return sendJson(res, 400, { error: 'bad ticket_id' });
+      if (busy) return sendJson(res, 429, { error: 'busy', reason: 'one visit at a time' });
+      busy = true;
+      const visitId = `v-${crypto.randomUUID()}`;
       const started = Date.now();
-      const result = await visit(dest.href, { timeoutMs: maxVisitMs });
-      const record = { visit_id: crypto.randomUUID(), path: dest.pathname, status: result.status, duration_ms: Date.now() - started };
+      let result;
+      try {
+        if (ticketId) emit('bot.visit', { visit_id: visitId, ticket_id: ticketId, phase: 'start' });
+        result = await visit(dest.href, { timeoutMs: maxVisitMs, session, visitId });
+      } finally {
+        busy = false;
+      }
+      const record = { visit_id: visitId, path: dest.pathname, status: result.status, duration_ms: Date.now() - started };
+      if (ticketId) emit('bot.visit', { visit_id: visitId, ticket_id: ticketId, phase: 'end', duration_ms: record.duration_ms });
       visits.push(record);
       return sendJson(res, 200, { visited: true, ...record });
     }
