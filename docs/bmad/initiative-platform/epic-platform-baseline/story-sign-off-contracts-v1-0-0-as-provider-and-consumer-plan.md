@@ -3,7 +3,7 @@ title: 'Sign off contracts v1.0.0 as provider and consumer'
 type: 'chore'
 ticket: '8'
 created: '2026-10-12'
-status: 'built'
+status: done
 baseline_revision: 'a31021bc54015d8c90780f5180b967ccfcdb621c'
 route: 'oneshot'
 route_source: 'auto'
