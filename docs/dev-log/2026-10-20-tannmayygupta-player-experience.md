@@ -5,7 +5,7 @@
 | Date | 2026-10-20 |
 | Developer | tannmayygupta |
 | Branch / commit | l-player-experience |
-| Status | Partly done (code and tests done; live deploy and a real browser look still to do) |
+| Status | Done on the live platform; not yet looked at in a real browser |
 | Report tag | Lab stream, player experience, IF-2 1.2.0 |
 
 ## Requirements covered
@@ -36,7 +36,7 @@ IF-2 change is additive (minor 1.2.0); no ADR (no new technology). The write-up 
 ## Tests
 - `node --test scripts/lab-console.test.mjs`: 5 tests pass (fake DOM plus a scripted API: cards, hints, Burp link, steps, markup shown as text).
 - `node --test scripts/fake-lab.test.mjs`: pass. `node scripts/check-contract-rules.mjs`: 18 PASS, 0 FAIL.
-- `uv run --locked --package vulnmart-api pytest -q tests/test_lab_api.py tests/test_lab_contract.py`: 206 passed. `uv run --locked --package vulnmart-api pytest -q` (whole API suite): 2458 passed, 233 skipped. `check_lab_contract.py`: PASS (20 operations, 41 valid and 101 invalid examples). Live check: not yet run.
+- `uv run --locked --package vulnmart-api pytest -q tests/test_lab_api.py tests/test_lab_contract.py`: 206 passed. `uv run --locked --package vulnmart-api pytest -q` (whole API suite): 2458 passed, 233 skipped. `check_lab_contract.py`: PASS (20 operations, 41 valid and 101 invalid examples). Deployed with `live-deploy build`, `ship-p`, `platform` (api and worker healthy). Live: `node scripts/e2e-live.mjs` 36 PASS, 0 FAIL, including the new checks (11 challenges with brief and start text; write-up only on the 1 solved challenge); evidence `docs/assets/production-readiness/e2e-run-player-experience.json`. The served console has the Copy link and steps markup.
 
 ## Evidence
 Test output only; no browser screenshot yet (the Chrome extension was not connected).
@@ -49,4 +49,4 @@ Test output only; no browser screenshot yet (the Chrome extension was not connec
 No new weakness. Credentials in start texts are the seeded demo accounts of the lab only (no real secrets, no flag values).
 
 ## Limitations and follow-ups
-Not yet deployed to the live platform; the look in a real browser is unchecked. C03 part B (needs a JS-running bot) is still open.
+Deployed; the look in a real browser is unchecked. C03 part B (needs a JS-running bot) is still open.

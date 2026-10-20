@@ -176,6 +176,11 @@ export async function journey(o) {
   await sleep(2500);
   const afterSeen = (await c.request('GET', `/api/v1/attempts/${aid}/challenges`)).data?.items?.find((x) => x.challenge_key === 'C05');
   check('the sidecar saw the flag and the platform credited the challenge', afterSeen?.solved === true || afterSeen?.held === true, `${afterSeen?.best_milestone}${afterSeen?.held ? ' held' : ''}`);
+  // player experience (IF-2 1.2.0): every challenge says what it is and how to begin; the write-up appears only after a capture
+  const progress = (await c.request('GET', `/api/v1/attempts/${aid}/challenges`)).data?.items ?? [];
+  const bare = progress.filter((x) => !x.brief || !x.start).map((x) => x.challenge_key);
+  check('every challenge carries a brief and a start text', progress.length >= 11 && bare.length === 0, bare.length ? `missing: ${bare.join(',')}` : `${progress.length} challenges`);
+  check('a write-up is shown only for solved challenges', progress.every((x) => (x.write_up !== undefined) === (x.solved === true)), `${progress.filter((x) => x.write_up).length} shown`);
   // audit blocker B1: the platform tells the orchestrator that the player is active, so the idle limit counts from play and not from "ready"
   let act; for (let i = 0; i < 45; i++) { act = (await c.request('GET', `/api/v1/instances/${iid}`)).data; if (act?.state === 'active') break; await sleep(2000); }
   check('the orchestrator is told the player is active (the idle limit counts from play)', act?.state === 'active', act?.state);
