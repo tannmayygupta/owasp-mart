@@ -1,8 +1,8 @@
 openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
-  title: Lab API (IF-2), browser-facing fragment, contract v1.2.0
-  version: 1.2.0
+  title: Lab API (IF-2), browser-facing fragment, contract v2.1.0
+  version: 2.1.0
   description: |
     The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
     flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
@@ -176,12 +176,12 @@ paths:
     post:
       tags: [attempts]
       operationId: startAttempt
-      summary: Start the clock of a ready attempt (PENDING OI-22)
+      summary: Ask for the instance of a ready attempt (the candidate's Start)
       description: |
-        PENDING OI-22: whether the candidate presses Start or the clock starts when the instance becomes
-        ready is open. Both outcomes are recorded in lab-api.md. This route exists for the first outcome;
-        if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 ATT-INVALID-STATE.
-        The body is empty.
+        D-80 (OI-22 resolved): Start only asks for the instance; the clock starts when the instance is ready, so the cold start
+        never counts against the candidate. Answers at once with the attempt (still ready while the instance starts); pressing
+        again, or after it runs, answers the same attempt. Only the owner of an assessment attempt in state ready or running;
+        a learner starts through requestInstance, and any other state answers 409 ATT-INVALID-STATE. The body is empty.
       security:
         - sessionCookie: []
           csrfHeader: []
@@ -218,6 +218,28 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/TooLarge' }
         '415': { $ref: '#/components/responses/UnsupportedMedia' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/release:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [attempts]
+      operationId: releaseResults
+      summary: Release a candidate's results (the recruiter of the company)
+      description: |
+        Since v2.1.0 (handoff H-355, OI-15). When the invite says `results_visibility: after_release`, the candidate sees no score and no earned progress
+        (`getScore` answers 404, `listChallenges` shows nothing earned) until the recruiter of the owning company calls this once the attempt has ended
+        (`submitted`, `reported` or `expired`; otherwise 409 ATT-INVALID-STATE). Repeating it changes nothing. The candidate and anyone else get the 404 of every
+        attempt route. The answer is the attempt with `results_released: true`. The body is empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Invalid' }
   /api/v1/attempts/{attempt_id}/withdraw:
     parameters:
@@ -336,10 +358,16 @@ paths:
       tags: [results]
       operationId: listChallenges
       summary: Progress per challenge (milestone, solved, hints used)
-      description: Progress only. Titles, tags and difficulty are catalogue data (IF-7) served by the platform.
+      description: |
+        Progress per challenge. Titles, tags and difficulty are catalogue data (IF-7) served by the platform.
+
+        A learner's practice run is sequenced (v1.3.0): the learner works on one challenge at a time, so the list holds only the challenges
+        that have been reached (the ones solved or timed out and the current one) and each entry carries `state`, `title`, `tier` and the
+        countdown fields. Challenges after the current one are not listed. `total` says how many challenges the run has and `current_key`
+        names the one to work on. A company assessment is not sequenced: every challenge is listed and the optional fields are absent.
       responses:
         '200':
-          description: One entry per challenge of the attempt.
+          description: One entry per challenge the learner has reached (all of them for an attempt that is not sequenced).
           headers:
             Cache-Control: { $ref: '#/components/headers/CacheControl' }
           content:
@@ -348,6 +376,55 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '410': { $ref: '#/components/responses/Gone' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+      - $ref: '#/components/parameters/ChallengeKeyPath'
+    post:
+      tags: [results]
+      operationId: beginChallenge
+      summary: Begin the current challenge and start its countdown
+      description: |
+        Only for a sequenced practice run (v1.3.0). Starts the countdown of the current challenge: Easy 20, Medium 40, Hard 60 minutes
+        (the tier of the catalogue). Repeating the call changes nothing and answers the same entry. Until the challenge is begun no flag, hint
+        or milestone counts for it. A challenge that is not the current one, and a run that is not sequenced, answer 404
+        ATT-CHALLENGE-NOT-FOUND; an attempt that is not running, or a challenge that already ended (solved or out of time), answers 409
+        ATT-INVALID-STATE. The body is empty.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      responses:
+        '200':
+          description: The challenge with its countdown running.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChallengeProgress' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/Gone' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/me/progress:
+    get:
+      tags: [results]
+      operationId: getMyProgress
+      summary: The points on the learner's account
+      description: |
+        The best result per challenge over every practice run of the signed-in learner, so a challenge repeated in a new run never counts
+        twice. `total_points` is shown out of 1000 on the same scale as the score of one run. A learner with no run gets zero everywhere.
+      responses:
+        '200':
+          description: The account points.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProgress' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
         '422': { $ref: '#/components/responses/Invalid' }
   /api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints:
     parameters:
@@ -517,6 +594,7 @@ paths:
         Cursor-paged: pass `next_cursor` as `cursor` to get the entries after the last one already read. Entries are neither skipped
         nor repeated when a late event with a smaller key is stored between two page requests; such an event is shown only when the
         client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /query/cursor.
+        Since v2.0.0 the time warnings the attempt received are entries too (`attempt.time_warning` with `minutes_left`), so the recruiter's report shows when the candidate was told time was running out.
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -880,6 +958,9 @@ components:
           anyOf:
             - { $ref: '#/components/schemas/Timestamp' }
             - { type: 'null' }
+        results_released:
+          description: Optional (v2.1.0). Only on a company assessment whose invite says `after_release`; true once the recruiter released the results. Absent otherwise.
+          type: boolean
         server_time:
           description: The server clock; the browser timer is cosmetic (FR-SES-02).
           $ref: '#/components/schemas/Timestamp'
@@ -946,13 +1027,45 @@ components:
           type: string
           maxLength: 600
         write_up:
-          description: Optional. Present only for the owner of a practice attempt once the challenge is captured (M3); never in an assessment. The weakness and the fix.
+          description: Optional. Present only for the owner of a practice attempt once the challenge is captured (M3) or timed out; never in an assessment. The weakness and the fix.
           type: object
           additionalProperties: false
           required: [vulnerable, fix]
           properties:
             vulnerable: { type: string, maxLength: 800 }
             fix: { type: string, maxLength: 1200 }
+        state:
+          description: |
+            Optional (a sequenced practice run only, v1.3.0). `ready`: the current challenge, not begun. `active`: begun, the countdown runs.
+            `solved`: captured (or held for review). `expired`: the time ran out; nothing counts for it any more.
+          enum: [ready, active, solved, expired]
+        title:
+          description: Optional (sequenced run). The catalogue title of the challenge.
+          type: string
+          maxLength: 120
+        tier:
+          description: Optional (sequenced run). The tier of the catalogue; it sets the time (Easy 20, Medium 40, Hard 60 minutes).
+          enum: [Easy, Medium, Hard]
+        time_limit_seconds:
+          description: Optional (sequenced run). The time the challenge has once begun.
+          type: integer
+          minimum: 1
+          maximum: 86400
+        opened_at:
+          description: Optional (sequenced run). When the challenge was begun; null before.
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        expires_at:
+          description: Optional (sequenced run). When the countdown ends; null before the challenge is begun.
+          anyOf:
+            - { $ref: '#/components/schemas/Timestamp' }
+            - { type: 'null' }
+        seconds_left:
+          description: Optional (sequenced run). Seconds left when the answer was made; null unless the challenge is `active`. The browser counts down from it.
+          anyOf:
+            - { type: integer, minimum: 0, maximum: 86400 }
+            - { type: 'null' }
     ChallengeProgressList:
       type: object
       additionalProperties: false
@@ -965,6 +1078,37 @@ components:
         has_more:
           description: Always false here; the list is complete and has a fixed size (not truncated).
           const: false
+        total:
+          description: Optional (sequenced run). How many challenges the run has in all, so the browser can show "3 of 11" without listing the ones ahead.
+          type: integer
+          minimum: 1
+          maximum: 11
+        current_key:
+          description: Optional (sequenced run). The challenge to work on now; null when every challenge is solved or timed out.
+          anyOf:
+            - { $ref: '#/components/schemas/ChallengeKey' }
+            - { type: 'null' }
+        server_time:
+          description: Optional (sequenced run). The server clock when the answer was made.
+          $ref: '#/components/schemas/Timestamp'
+    AccountChallengePoints:
+      type: object
+      additionalProperties: false
+      required: [challenge_key, best_points]
+      properties:
+        challenge_key: { $ref: '#/components/schemas/ChallengeKey' }
+        best_points: { type: integer, minimum: 0, description: The best net points of this challenge over all runs (the points of one challenge, not out of 1000). }
+    AccountProgress:
+      type: object
+      additionalProperties: false
+      required: [total_points, runs, per_challenge]
+      properties:
+        total_points: { type: integer, minimum: 0, maximum: 1000, description: The best points of every challenge added up and shown out of 1000, as the score of one run is. }
+        runs: { type: integer, minimum: 0, description: How many practice runs the learner has started. }
+        per_challenge:
+          type: array
+          maxItems: 11
+          items: { $ref: '#/components/schemas/AccountChallengePoints' }
     Hint:
       type: object
       additionalProperties: false
@@ -1117,7 +1261,7 @@ components:
       properties:
         at: { $ref: '#/components/schemas/Timestamp' }
         type:
-          enum: [attempt.started, milestone.reached, flag.submitted, hint.unlocked, instance.reset, attempt.submitted, attempt.expired]
+          enum: [attempt.started, milestone.reached, flag.submitted, hint.unlocked, instance.reset, attempt.submitted, attempt.expired, attempt.time_warning]
         challenge_key:
           anyOf:
             - { $ref: '#/components/schemas/ChallengeKey' }
@@ -1130,6 +1274,11 @@ components:
           anyOf:
             - { $ref: '#/components/schemas/FlagResult' }
             - { type: 'null' }
+        minutes_left:
+          description: Optional (v2.0.0). Only on `attempt.time_warning`, how many minutes the attempt had left when the warning went out (the default rules warn at 15 and at 5).
+          type: integer
+          minimum: 1
+          maximum: 1440
     Timeline:
       description: |
         One page of the timeline, sorted by the key (epoch, seq) of the event, oldest first. The key is not part of

@@ -1,6 +1,6 @@
 """Check the lab API contract (IF-2) in contracts/api/lab/.
 
-Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 20 operations exist and no other; every operation
+Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 23 operations exist and no other; every operation
 declares its security; the state, access and health values equal those of IF-5; no GET answer schema or valid answer example
 can hold a secret-looking name; every valid example matches its schema; every invalid example fails at the path its manifest
 names; no real-looking flag is in the contract; the flag result names no oracle reason; every problem example is an IF-8 body (the closed schema, a registered code, its status and title). Run through `pnpm run contracts:check` (last part) or on its own:
@@ -40,6 +40,10 @@ OPERATIONS = {
     ("get", "/api/v1/attempts/{attempt_id}/evidence"), ("get", "/api/v1/attempts/{attempt_id}/integrity-flags"),
     ("post", "/api/v1/attempts/{attempt_id}/integrity-flags/{integrity_flag_id}/decision"),
     ("get", "/api/v1/attempts/{attempt_id}/report"), ("get", "/api/v1/attempts/{attempt_id}/timeline"),
+    # v1.3.0: one challenge at a time with a countdown each, and the points on the learner's account
+    ("post", "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin"), ("get", "/api/v1/me/progress"),
+    # v2.1.0: the recruiter releases a candidate's results (H-355)
+    ("post", "/api/v1/attempts/{attempt_id}/release"),
 }
 # The names of IF-5 plus what a browser must never learn about the lab host.
 SECRET_NAMES = base.SECRET_NAMES | {"host_id", "hostname", "orchestrator_url", "stack", "stack_trace", "traceback", "digest"}
@@ -50,7 +54,7 @@ REQUEST_SUFFIX = "Request"
 NEEDED = {
     "RequestInstanceRequest", "Instance", "OpenTicket", "ConfirmRequest", "Attempt", "FlagSubmissionRequest", "FlagSubmissionResult",
     "Score", "ChallengeProgressList", "HintList", "Hint", "EvidenceList", "IntegrityFlagList", "IntegrityFlag",
-    "IntegrityDecisionRequest", "Report", "Timeline", "Problem",
+    "IntegrityDecisionRequest", "Report", "Timeline", "Problem", "ChallengeProgress", "AccountProgress",
 }
 METHODS = {"get", "post", "put", "delete", "patch"}
 PROBLEM_MEDIA = "application/problem+json"

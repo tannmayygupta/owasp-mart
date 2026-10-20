@@ -17,11 +17,14 @@ class Rules:
     instant_capture_seconds: int = 5
     activity_check_mode: str = "hold"  # D-94: "hold" or "flag" (flag only, the capture counts)
     withdrawal_undo_days: int = 7
+    results_visibility: str = "after_submit"  # H-355, OI-15: "after_submit" or "after_release" (the recruiter releases the candidate's results)
 
     def __post_init__(self) -> None:
         if min(self.min_capture_seconds, self.idle_capture_seconds, self.instant_capture_seconds,
                self.withdrawal_undo_days) < 0:
             raise ValueError("integrity thresholds and the undo window cannot be negative")
+        if self.results_visibility not in ("after_submit", "after_release"):
+            raise ValueError("results_visibility must be 'after_submit' or 'after_release'")
         if self.activity_check_mode not in ("hold", "flag"):
             raise ValueError("activity_check_mode must be 'hold' or 'flag'")
         if self.time_limit_minutes <= 0:
@@ -48,6 +51,7 @@ class Rules:
             "instant_capture_seconds": self.instant_capture_seconds,
             "activity_check_mode": self.activity_check_mode,
             "withdrawal_undo_days": self.withdrawal_undo_days,
+            "results_visibility": self.results_visibility,
         }
 
     @classmethod
@@ -70,9 +74,12 @@ class Rules:
         mode = data.get("activity_check_mode", defaults.activity_check_mode)
         if not isinstance(mode, str):
             raise ValueError("activity_check_mode must be text")
+        visibility = data.get("results_visibility", defaults.results_visibility)
+        if not isinstance(visibility, str):
+            raise ValueError("results_visibility must be text")
         return cls(
             time_limit_minutes=whole("time_limit_minutes"), grace_seconds=whole("grace_seconds"), warning_minutes=tuple(warnings),
             freeze_minutes=whole("freeze_minutes"), reset_limit=whole("reset_limit"), min_capture_seconds=whole("min_capture_seconds"),
             idle_capture_seconds=whole("idle_capture_seconds"), instant_capture_seconds=whole("instant_capture_seconds"),
-            activity_check_mode=mode, withdrawal_undo_days=whole("withdrawal_undo_days"),
+            activity_check_mode=mode, withdrawal_undo_days=whole("withdrawal_undo_days"), results_visibility=visibility,
         )

@@ -1,17 +1,17 @@
 VulnMart local end-to-end loop (node --test --test-concurrency=1 scripts/e2e/loop.e2e.test.mjs)
-Date: 2026-10-17
-Run id: vmloop729209
+Date: 2026-10-20
+Run id: vmloop4590be
 Machine: laptop with Docker Desktop (numbers are laptop numbers)
 
 PASS step 1 preflight: Docker, uv, openssl, no leftovers, nothing else of the lab on the machine: docker, uv and openssl present; no leftovers; stub and edge images built; three loopback ports reserved (Caddy gets a free host port from Docker on <addr>)
 PASS step 2 start the lab runtime (uvicorn, VULNMART_LAB_RUNTIME=1, demo routes with a random token): runtime listening on loopback; demo route without the token 401, with the token 404 for an unknown attempt
 PASS step 3 start the real orchestrator (Docker backend, three-component template, stub image, edge flags): real Python service, Docker backend, stub image in shop, sidecar and injector roles, --edge-container and --gate-url on loopback
 PASS step 4 start Caddy and the edge gate with the compose run flags; the relay points at the lab runtime: gate and Caddy running with the compose flags; Caddy published on <addr> only; unknown host gets the fixed 404; admin forwarder on <addr>
-PASS step 5 POST /attempts through the demo route: the orchestrator creates the instance, state running: attempt <hex>: running; instance i-SJJEP5GPGB2RFOKT ready and open in the orchestrator (access epoch 1); containers vm-i-sjjep5gpgb2rfokt-e1-shop and vm-i-sjjep5gpgb2rfokt-e1-sidecar
+PASS step 5 POST /attempts through the demo route: the orchestrator creates the instance, state running: attempt a-WQJZ7KBCQMKE7V2K: running; instance i-ASZWKZAOESXY3OHJ ready and open in the orchestrator (access epoch 1); containers vm-i-aszwkzaoesxy3ohj-e1-shop and vm-i-aszwkzaoesxy3ohj-e1-sidecar
 PASS step 6 mint a gate ticket, open the instance host name through Caddy (self-signed certificate), reach the stub shop: ticket accepted (302 and cookie); no cookie is refused 403; /version of the stub shop answered 200 through Caddy, the gate and the sidecar
 PASS step 7 the stub exploit path: signed event over the edge relay, milestone credited in the score: stub /_stub/emit then the sidecar answered 202; C03 credited M1 for 18 points; score 19
-PASS step 8 read the planted flag from the shop container file, submit it: M3 and the score of the hand calculation: wrong flag not credited; right flag credited; C03 milestone M3, 90 points, score 94 (hand number 94)
-PASS step 9 deadline: auto-submit and freeze (the gate shows its paused page), then the destroy tick leaves no instance: after the deadline: attempt submitted, access frozen, gate 423 paused page; after the destroy tick: destroyed true, attempt reported, orchestrator 200, no instance container, gate 410
+PASS step 8 read the planted flag from the shop container file, submit it: M3 and the score of the hand calculation: wrong flag not credited; right flag HELD for review (no recorded activity, D-94), twice the same; C03 stays M1, score 19 unchanged
+PASS step 9 deadline: auto-submit and freeze (the gate shows its paused page), then the destroy tick leaves no instance: after the deadline: attempt submitted, access frozen, gate 423 paused page; after the destroy tick: destroyed true, attempt submitted, orchestrator 200, no instance container, gate 410
 PASS step 10 cleanup: everything labelled with the run id is removed and a check proves none is left: cleanup check: containers 0, networks 0, volumes 0; no ticket or cookie value in the Caddy or gate log
 
 Cleanup check: containers 0, networks 0, volumes 0; temp folder present false

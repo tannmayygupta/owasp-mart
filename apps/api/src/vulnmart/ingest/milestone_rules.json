@@ -67,7 +67,7 @@
     },
     "C11": {
       "m1": {"kind": "event", "type": "kyc.result", "where": {"outcome": "invalid_verbose"}},
-      "m2": {"kind": "event", "type": "store.approved", "where": {"approved_by": "system:kyc-fallback"}},
+      "m2": {"kind": "event", "type": "store.approved", "where": {"approved_by": "system_kyc_fallback"}},
       "m3": {"kind": "flag"}
     }
   }

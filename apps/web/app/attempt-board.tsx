@@ -141,7 +141,7 @@ export function AttemptBoard({ attemptId, catalog, resultsAllowed, onChanged }: 
       <div className="row">
         {canRequest && <button type="button" onClick={() => act(() => api('POST', '/api/v1/instances', { kind: 'learner' }), 'Starting your instance. This takes a few seconds.')}>Start an instance</button>}
         {!learner && attempt.state === 'ready' && (
-          <button type="button" onClick={() => { if (window.confirm('The clock starts now and cannot be paused. Start?')) void act(() => api('POST', `/api/v1/attempts/${attemptId}/start`), 'Started. Your instance is being prepared.'); }}>
+          <button type="button" onClick={() => { if (window.confirm('Your instance is prepared first. The clock starts when it is ready and cannot be paused. Start?')) void act(() => api('POST', `/api/v1/attempts/${attemptId}/start`), 'Started. Your instance is being prepared.'); }}>
             Start the assessment
           </button>
         )}

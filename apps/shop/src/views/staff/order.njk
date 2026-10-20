@@ -3,5 +3,5 @@
 <p>Status: {{ order.status }} · Total {{ order.total_cents | cents }}</p>
 {% if not order.redacted and order.ship_line1 %}<p class="muted">Ship: {{ order.ship_line1 }}, {{ order.ship_city }}, {{ order.ship_country }}</p>{% endif %}
 <table><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Status</th></tr>
-{% for it in order.items %}<tr><td>{{ it.product_id }}</td><td>{{ it.qty }}</td><td>{{ it.unit_price_cents | cents }}</td><td>{{ it.status }}</td></tr>{% endfor %}</table>
+{% for it in order.items %}<tr><td>{{ it.product_id }}</td><td>{{ it.qty }}</td><td>{{ it.unit_price_cents | cents }}</td><td><span class="badge b-{{ it.status }}">{{ it.status }}</span></td></tr>{% endfor %}</table>
 {% endblock %}

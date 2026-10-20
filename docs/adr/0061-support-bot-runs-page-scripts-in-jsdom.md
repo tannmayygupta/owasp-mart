@@ -1,4 +1,4 @@
-# 0058. The support bot runs page scripts in jsdom, one child process per visit
+# 0061. The support bot runs page scripts in jsdom, one child process per visit
 
 - **Status:** Proposed. Implemented and tested; it is not in `initial.md` Section 15 until the developer confirms it (CLAUDE.md working rule 1).
 - **Date:** 2026-10-20

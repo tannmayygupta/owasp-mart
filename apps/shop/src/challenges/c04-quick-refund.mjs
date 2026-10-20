@@ -37,10 +37,13 @@ function loadOwnDeliveredOrder(db, user, orderId) {
 export function quickRefund(db, user, orderId, { amount, idempotencyKey } = {}, { challenges = {}, emit = () => {} } = {}) {
   const order = loadOwnDeliveredOrder(db, user, orderId);
   const amt = Number(amount);
-  const decide = (decision, extra = {}) => emit('shop.refund_decision', { path: 'quick', order_id: String(order.id), decision, ...extra });
+  // The event of IF-4 (data_shop_refund_decision, no other member): which refund, how much, and what the order has had refunded after this decision.
+  const decide = (decision, refundId = 'none') => emit('shop.refund_decision', {
+    path: 'quick', order_id: String(order.id), refund_id: String(refundId), amount: Number.isInteger(amt) && amt > 0 ? amt : 0, decision, cumulative_after: orderRefundedCents(db, order.id),
+  });
 
-  if (!Number.isInteger(amt) || amt <= 0) { decide('refused', { reason: 'bad_amount' }); throw new ValidationError('the amount must be a positive integer'); }
-  if (amt > QUICK_REFUND_LIMIT_CENTS) { decide('refused', { reason: 'over_limit' }); throw new ValidationError(`above the instant-refund limit (${QUICK_REFUND_LIMIT_CENTS})`); }
+  if (!Number.isInteger(amt) || amt <= 0) { decide('refused'); throw new ValidationError('the amount must be a positive integer'); }
+  if (amt > QUICK_REFUND_LIMIT_CENTS) { decide('refused'); throw new ValidationError(`above the instant-refund limit (${QUICK_REFUND_LIMIT_CENTS})`); }
 
   if (idempotencyKey) {
     const prior = db.prepare('SELECT * FROM refund_ledger WHERE idempotency_key = ?').get(idempotencyKey);
@@ -50,11 +53,11 @@ export function quickRefund(db, user, orderId, { amount, idempotencyKey } = {}, 
   if (!isVulnerable('C04', challenges)) {
     // FIXED: the shared cumulative invariant — the whole reason C04 exists.
     const remaining = orderPaidCents(db, order.id) - orderRefundedCents(db, order.id);
-    if (amt > remaining) { decide('refused', { reason: 'cumulative_cap' }); throw new ValidationError('the cumulative refund would exceed the amount paid'); }
+    if (amt > remaining) { decide('refused'); throw new ValidationError('the cumulative refund would exceed the amount paid'); }
   }
 
-  db.prepare('INSERT INTO refund_ledger (order_id, amount_cents, path, idempotency_key) VALUES (?, ?, \'quick\', ?)').run(order.id, amt, idempotencyKey ?? null);
-  decide('auto_approved');
+  const inserted = db.prepare('INSERT INTO refund_ledger (order_id, amount_cents, path, idempotency_key) VALUES (?, ?, \'quick\', ?)').run(order.id, amt, idempotencyKey ?? null);
+  decide('auto_approved', inserted.lastInsertRowid);
 
   // Sentinel reconcile: once the refunded total passes the amount paid, the
   // goodwill row (the flag) appears. This only ever happens on the vulnerable
@@ -64,7 +67,7 @@ export function quickRefund(db, user, orderId, { amount, idempotencyKey } = {}, 
   if (refunded > paid && !db.prepare('SELECT 1 FROM goodwill_adjustment WHERE order_id = ?').get(order.id)) {
     const ref = db.prepare("SELECT value FROM sentinel WHERE key = 'c04'").get()?.value ?? 'C04-GOODWILL-FLAG-MARKER';
     db.prepare('INSERT INTO goodwill_adjustment (order_id, reference, amount_cents) VALUES (?, ?, ?)').run(order.id, ref, refunded - paid);
-    emit('shop.refund_invariant_broken', { order_id: String(order.id), refunded_cents: refunded, paid_cents: paid });
+    emit('shop.refund_invariant_broken', { order_id: String(order.id), paid, refunded_total: refunded });
   }
   return { refunded_cents: amt };
 }

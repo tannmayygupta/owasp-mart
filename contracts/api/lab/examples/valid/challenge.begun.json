@@ -1,0 +1,17 @@
+{
+  "challenge_key": "C03",
+  "best_milestone": "none",
+  "solved": false,
+  "held": false,
+  "hints_used": 0,
+  "hints_available": true,
+  "state": "active",
+  "title": "Injection",
+  "tier": "Medium",
+  "time_limit_seconds": 2400,
+  "opened_at": "2026-10-20T10:05:00Z",
+  "expires_at": "2026-10-20T10:45:00Z",
+  "seconds_left": 2400,
+  "brief": "Product search and the support ticket both carry text further than they should.",
+  "start": "Sign in as the customer player (the demo account of the lab)."
+}

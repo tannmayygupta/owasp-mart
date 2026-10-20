@@ -2,7 +2,7 @@
 # Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c09
-title: Logging and Alerting Failures
+title: Security Logging and Alerting Failures
 status: complete
 owasp:
   "2021": A09

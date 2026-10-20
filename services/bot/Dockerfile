@@ -2,7 +2,7 @@
 #
 # Node program with one dependency (jsdom, pinned in package.json and pnpm-lock.yaml): each visit runs in a child process (visit-worker.mjs) with no environment, a capped heap and
 # the Node permission model (read-only access to /app, nothing else). Listens on 9200 on the instance network. Hardening follows the instance contract section 7: non-root uid
-# 65532, read-only root filesystem, no added capabilities, writable only on tmpfs. Why jsdom and not a full browser: docs/adr/0058-support-bot-runs-page-scripts-in-jsdom.md.
+# 65532, read-only root filesystem, no added capabilities, writable only on tmpfs. Why jsdom and not a full browser: docs/adr/0061-support-bot-runs-page-scripts-in-jsdom.md.
 
 # ---- builder: install production dependencies (same pinned base and pnpm as apps/shop and services/sidecar) ----
 FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS builder

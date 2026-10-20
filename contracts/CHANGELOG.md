@@ -117,7 +117,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance contract (IF-6), `contracts/instance/`
 
-### 1.0.1 (2026-10-20, Tanmay, story L-30 support bot, ADR 0058)
+### 1.0.1 (2026-10-20, Tanmay, story L-30 support bot, ADR 0061)
 
 - The example templates give the two components of the live C03 part B loop the addresses they need, using names that were already allowed in section 2: `mock-services` gets `VM_INSTANCE_ID` (the collector checks its id against it) and `VM_SIDECAR_EVENTS_URL` (it reports `collector.hit`); `bot-controller` gets `VM_SIDECAR_EVENTS_URL` (it reports `bot.visit`) and `VM_MOCK_URL` (the collector is the one address besides the shop its browser may reach). No schema change, no new name, no change to the injection document or the sidecar start.
 - registry change: none to `contracts/registry.json`.
@@ -166,6 +166,23 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - No change to the other three schemas, to IF-4, IF-5, IF-1 or IF-2.
 
 ## Lab API (IF-2), `contracts/api/lab/`
+
+### 2.1.0 (2026-10-20, Tanmay, backlog story 10, handoff H-355: the recruiter releases a candidate's results)
+- Additive: one operation, `releaseResults` (`POST /api/v1/attempts/{attempt_id}/release`), for the recruiter of the owning company; the optional member `results_released` (boolean) of `Attempt`, present only on a company assessment whose invite says `after_release`. No existing value, member or route changed.
+- Behaviour: when the invite says `after_release` the candidate's own `getScore` answers 404 and `listChallenges` shows nothing earned until the recruiter releases the finished attempt (OI-15, the developer's answer of 2026-10-18). `after_submit` (the default) and a learner's practice are as before.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs`; examples `examples/valid/attempt.released.json` and `examples/invalid/attempt-released-string.json`. Generated code and bundle regenerated.
+
+### 2.0.0 (2026-10-20, Tanmay, backlog story 8, handoff H-359: time warnings in the timeline)
+- Additive: the timeline type `attempt.time_warning` and the optional member `minutes_left` (1 to 1440) of `TimelineEntry`, present only on that type. `getTimeline` now lists the warnings the engine wrote (`time_warning_sent`, 15 and 5 minutes before the end by default), so the recruiter's report shows when the candidate was told time was running out. Nothing a client sends changed; a client that does not know the type shows it as text.
+- BREAKING: the response enum `TimelineEntry.type` gains `attempt.time_warning` (the diff tool counts a new value of a response enum as breaking, because a client that switches exhaustively on the enum would not know it). Why it is safe here: the only consumer, the recruiter page of stream P (`apps/web`), printed the type as text and now maps it to words with a fallback for an unknown type; no value is removed or renamed, so there is no contract step to follow. The rule of this repository raises the major number for any new value of a response enum, which is why an additive change is labelled 2.0.0.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (a seeded warning, the test hook accepts the type); examples `examples/valid/timeline.json` and `examples/invalid/timeline-bad-minutes.json`. Generated code and bundle regenerated.
+
+### 1.3.0 (2026-10-20, Tanmay, backlog story 6: one challenge at a time with a countdown each)
+- Additive: two operations. `beginChallenge` (`POST /api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin`) starts the countdown of the current challenge of a learner's practice run (Easy 20, Medium 40, Hard 60 minutes) and answers the challenge entry. `getMyProgress` (`GET /api/v1/me/progress`) answers the points on the learner's account: the best result per challenge over every run, `total_points` out of 1000, `runs`.
+- Additive: `ChallengeProgress` gets optional members `state` (ready, active, solved, expired), `title`, `tier`, `time_limit_seconds`, `opened_at`, `expires_at`, `seconds_left`; `ChallengeProgressList` gets optional `total`, `current_key`, `server_time`. A sequenced run lists only the challenges the learner has reached; a company assessment and an attempt that is not sequenced answer exactly as before. New schemas `AccountProgress` and `AccountChallengePoints`.
+- Behaviour (no new error code): a challenge that is not reached answers 404 ATT-CHALLENGE-NOT-FOUND on begin, hints and flags; a challenge not begun, or already ended, answers 409 ATT-INVALID-STATE. Nothing a client sends changed.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (a sequenced seed attempt `a-HHHHHHHHHHHHHHHH`, the two operations, the gates); examples `examples/valid/challenges.sequenced.json`, `challenge.begun.json`, `account-progress.json` and two invalid ones. Generated code and bundle regenerated.
+- registry change: none; `scripts/check_lab_contract.py` now lists the 22 operations and the schemas `ChallengeProgress` and `AccountProgress` among the ones that need an example.
 
 ### 1.2.0 (2026-10-20, Tanmay, story L-30 player experience)
 - Additive: `ChallengeProgress` gets three optional members: `brief` (what the challenge is about), `start` (how to begin: the documented demo account to sign in with and where to look) and `write_up` (the weakness and the fix; only for the owner of a practice attempt once the challenge is captured, never in an assessment, never a flag). The route `listChallenges` fills them from the catalogue. Nothing a client sends changed.
@@ -296,6 +313,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Table owners (DB), `contracts/db/`
 
+### 2.2.0 (2026-10-20, Tanmay, backlog story 6)
+- Additive: one row in `table-owners.yaml`, `challenge_opens` (owner attempts), created by migration `0017`: when a learner began each challenge of a sequenced run, the start of its countdown. The same migration replaces the unique constraint `uq_attempts_user_id_template_id` of `attempts` by the partial unique index `uq_attempts_current`, so a learner can start a new run after a finished one (a company attempt stays one per invite). The schema is unchanged.
+- no mock change: nothing runs against the table-owners list (`noMock` in the registry).
+
 ### 2.1.0 (2026-10-19, Akshay, story P-25)
 - Additive: one row in `table-owners.yaml`, `data_views` (owner privacy), created by migration `0015` (the company-level view history, FR-PRV-11); `deletion_requests` was already listed and its columns are updated in architecture 04 section 2.7. The schema is unchanged.
 - no mock change: nothing runs against the table-owners list (`noMock` in the registry).
@@ -341,7 +362,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
 ### 2026-10-20 (Sahil, IF-6 1.0.1 consumer re-sign-off)
-- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0058) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
+- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0061) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
 
 
 ### 2026-10-20 (Sahil, IF-7 1.2.0 owner + DB 2.1.0 consumer sign-off)

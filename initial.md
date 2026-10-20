@@ -787,6 +787,9 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-101 - How long the consent record is kept (OI-37, story P-16)
 - **Decision (CONFIRMED by the developer 2026-10-18, answers OI-37; written here in story 1.9):** the short consent record is kept for **the assessment record's retention plus 12 months** (`consent_record_extra_months`, a setting), after which the purge job of story P-24 (`ConsentPurge`, records past their `erase_after`) removes it. Pending the legal review (OI-33).
+### D-102 - The team is the leader and Claude only (team change, 2026-10-21)
+- **Decision (CONFIRMED by the leader 2026-10-21, by his instruction in the conversation):** the project has **two parties: the leader (Tanmay) and Claude Code**. The other developers (Akshay, Sahil) are no longer on the project. The leader decides, Claude implements everything end to end (platform, lab, shop, challenges, contracts, infrastructure, tests, docs). Stream ownership, per-developer trackers, handoffs to other developers, sign-offs by other developers, sprint branches and the hand-kept Excel tracker are retired. Old documents keep the former developers' names as history. The rules are in `CLAUDE.md`; ADR 0064. Decisions D-29 to D-31 (BMAD, one tracker per developer) and D-37 (review optional) are read through this decision.
+
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.

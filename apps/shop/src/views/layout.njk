@@ -3,34 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}{{ brand.name }}{% endblock %} · {{ brand.name }}</title>
-  <style>
-    body{font-family:system-ui,Arial,sans-serif;margin:0;color:#1b1f24;background:#f6f7f9}
-    header{background:#fff;border-bottom:1px solid #e3e6ea;padding:.75rem 1rem;display:flex;gap:1rem;align-items:center}
-    header a{color:#1b5fb0;text-decoration:none;margin-right:.75rem}
-    main{max-width:900px;margin:1rem auto;padding:0 1rem}
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem}
-    .card{background:#fff;border:1px solid #e3e6ea;border-radius:8px;padding:1rem}
-    .muted{color:#5a6472}.price{font-weight:600}
-    form.inline{display:inline}
-    input,button,textarea{font:inherit;padding:.4rem;border:1px solid #c3c9d0;border-radius:6px}
-    button{background:#1b5fb0;color:#fff;border-color:#1b5fb0;cursor:pointer}
-    table{width:100%;border-collapse:collapse}td,th{padding:.4rem;border-bottom:1px solid #e3e6ea;text-align:left}
-    .flash{background:#eef7ee;border:1px solid #cbe6cb;padding:.5rem;border-radius:6px;margin:.5rem 0}
-  </style>
+  <style>{% include "partials/theme.css" %}</style>
 </head>
 <body>
-  <header>
-    <a href="/shop"><strong>{{ brand.name }}</strong></a>
-    <span class="muted">{{ brand.tagline }}</span>
-    <span style="flex:1"></span>
-    {% if user %}<a href="/orders">Orders</a><a href="/cart">Cart</a>{% if user.role == "customer" %}<a href="/tickets">Support</a>{% endif %}
-      <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Log out ({{ user.email }})</button></form>
-    {% else %}<a href="/login">Log in</a>{% endif %}
+  <header class="topbar">
+    <div class="topbar-in">
+      <a class="brand" href="/shop" aria-label="{{ brand.name }} home">
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="9" fill="#e8553d"/><path d="M8 11h18l-2 11a3 3 0 0 1-3 2.5H13a3 3 0 0 1-3-2.5L8 11Z" fill="#fff" opacity=".95"/><path d="M12.5 11V9.5a4.5 4.5 0 0 1 9 0V11" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+        <span><strong>{{ brand.name }}</strong><small>{{ brand.tagline }}</small></span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="/shop"{% if path == '/shop' or path == '/' %} class="on"{% endif %}>Shop</a>
+        {% if user %}
+          {% if user.role == "customer" %}
+            <a href="/orders"{% if path == '/orders' %} class="on"{% endif %}>Orders</a>
+            <a href="/cart"{% if path == '/cart' %} class="on"{% endif %}>Cart</a>
+            <a href="/tickets"{% if path == '/tickets' %} class="on"{% endif %}>Support</a>
+          {% endif %}
+          {% if user.role == "seller_owner" or user.role == "seller_staff" %}
+            <a href="/seller"{% if path == '/seller' %} class="on"{% endif %}>Seller</a>
+          {% endif %}
+          {% if user.role == "seller_owner" %}
+            <a href="/seller/payouts"{% if path == '/seller/payouts' %} class="on"{% endif %}>Payouts</a>
+          {% endif %}
+          {% if user.role == "support_agent" or user.role == "admin" %}
+            <a href="/staff/tickets"{% if path == '/staff/tickets' %} class="on"{% endif %}>Tickets</a>
+            <a href="/staff/disputes"{% if path == '/staff/disputes' %} class="on"{% endif %}>Disputes</a>
+            <a href="/staff/refunds"{% if path == '/staff/refunds' %} class="on"{% endif %}>Refunds</a>
+          {% endif %}
+          {% if user.role == "finance" or user.role == "admin" %}
+            <a href="/staff/payouts"{% if path == '/staff/payouts' %} class="on"{% endif %}>Payouts</a>
+          {% endif %}
+          {% if user.role == "admin" %}
+            <a href="/staff/users"{% if path == '/staff/users' %} class="on"{% endif %}>Users</a>
+            <a href="/staff/audit"{% if path == '/staff/audit' %} class="on"{% endif %}>Audit</a>
+          {% endif %}
+        {% endif %}
+      </nav>
+      <span class="spacer"></span>
+      {% if user %}
+      <div class="who">
+        <span class="avatar" aria-hidden="true">{{ user.email | first | upper }}</span>
+        {% if user.role != "customer" %}<span class="role">{{ user.role | replace("_", " ") }}</span>{% endif %}
+        <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Log out ({{ user.email }})</button></form>
+      </div>
+      {% else %}<a class="signin" href="/login">Log in</a>{% endif %}
+    </div>
   </header>
   <main>
-    {% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+    {% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}
     {% block body %}{% endblock %}
   </main>
+  <footer class="footer">© {{ brand.name }} · {{ brand.tagline }}</footer>
 </body>
 </html>

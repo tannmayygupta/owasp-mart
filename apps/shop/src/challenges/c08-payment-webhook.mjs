@@ -19,6 +19,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { ValidationError } from '../domain/shop-service.mjs';
 import { isVulnerable } from './mode.mjs';
+import { safeId } from './event-fields.mjs';
 
 const GATEWAY_KEY = process.env.VM_GATEWAY_HMAC_KEY || 'dev-gateway-key';
 
@@ -63,18 +64,20 @@ export function handlePaymentWebhook(db, rawBody, { signature, sandboxHeader } =
   // it for a sandbox-mode request (the bypass).
   const bypass = isVulnerable('C08', challenges) && sandboxHeader === 'sandbox';
   const verified = signedOk; // only a valid signature is "verified"
+  // The event of IF-4 (data_webhook_received, no other member): which order the call named, who it came from, whether the signature held, and whether it was accepted.
+  const received = (accepted) => emit('webhook.received', { order_id: safeId(event?.order_no), source, verified, sandbox_header: Boolean(sandboxHeader), accepted });
   if (!signedOk && !bypass) {
-    emit('webhook.received', { source, accepted: false, sandbox_header: Boolean(sandboxHeader) });
+    received(false);
     throw new ValidationError('invalid or missing gateway signature');
   }
 
   const order = event.order_no ? db.prepare('SELECT * FROM orders WHERE order_no = ?').get(String(event.order_no)) : null;
   if (!order || order.status !== 'payment_pending') {
-    emit('webhook.received', { source, accepted: false, sandbox_header: Boolean(sandboxHeader) });
+    received(false);
     throw new ValidationError('no pending order for that number');
   }
   if (Number(event.amount_cents) !== order.total_cents) {
-    emit('webhook.received', { source, accepted: false, sandbox_header: Boolean(sandboxHeader) });
+    received(false);
     throw new ValidationError('amount does not match the order total');
   }
 
@@ -85,7 +88,7 @@ export function handlePaymentWebhook(db, rawBody, { signature, sandboxHeader } =
     : (db.prepare("SELECT value FROM sentinel WHERE key = 'c08'").get()?.value ?? 'C08-WEBHOOK-FLAG-MARKER');
   db.prepare("UPDATE orders SET status = 'paid', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(order.id);
   db.prepare("UPDATE payments SET status = 'paid', verified = ?, payment_ref = ? WHERE order_id = ?").run(verified ? 1 : 0, paymentRef, order.id);
-  emit('webhook.received', { source, accepted: true, sandbox_header: Boolean(sandboxHeader) });
+  received(true);
   emit('order.paid', { order_id: String(order.id), verified, via: 'webhook' });
   return { accepted: true, verified, payment_ref: paymentRef, order_no: order.order_no };
 }

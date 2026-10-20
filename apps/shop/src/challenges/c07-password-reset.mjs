@@ -22,9 +22,38 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto
 import { hash as hashPassword } from '../identity/password.mjs';
 import { ValidationError } from '../domain/shop-service.mjs';
 import { isVulnerable } from './mode.mjs';
+import { safeClass } from './event-fields.mjs';
 
 const RESET_TTL_MS = 15 * 60 * 1000;
 const FIXED_ATTEMPT_LIMIT = 5;
+
+// Wrong confirm tries are reported in batches (the event of IF-4 is `auth.reset_confirm_batch`: failures and successes of one account in a window), not one event
+// per try: a brute force makes thousands. A batch goes out when it holds BATCH_MAX tries, BATCH_WINDOW_S seconds after its first try, or at once on a success.
+const BATCH_MAX = 50;
+const BATCH_WINDOW_S = 10;
+const batches = new WeakMap(); // emit function -> Map(account id -> { fail, ok, since, timer })
+
+function flushBatch(emit, accountId) {
+  const open = batches.get(emit)?.get(accountId);
+  if (!open) return;
+  clearTimeout(open.timer);
+  batches.get(emit).delete(accountId);
+  emit('auth.reset_confirm_batch', { account_id: accountId, fail_count: open.fail, ok_count: open.ok, window_s: Math.min(3600, Math.max(1, Math.round((Date.now() - open.since) / 1000))) });
+}
+
+function noteConfirm(emit, accountId, ok) {
+  let perEmit = batches.get(emit);
+  if (!perEmit) { perEmit = new Map(); batches.set(emit, perEmit); }
+  let open = perEmit.get(accountId);
+  if (!open) {
+    open = { fail: 0, ok: 0, since: Date.now(), timer: null };
+    open.timer = setTimeout(() => flushBatch(emit, accountId), BATCH_WINDOW_S * 1000);
+    open.timer.unref?.();
+    perEmit.set(accountId, open);
+  }
+  if (ok) open.ok += 1; else open.fail += 1;
+  if (ok || open.fail + open.ok >= BATCH_MAX) flushBatch(emit, accountId);
+}
 
 function codeHash(code) {
   return createHash('sha256').update(String(code)).digest('hex');
@@ -50,8 +79,9 @@ export function requestReset(db, email, { challenges = {}, emit = () => {} } = {
     const expires = new Date(Date.now() + RESET_TTL_MS).toISOString();
     db.prepare('INSERT INTO password_resets (user_id, code_hash, expires_at) VALUES (?, ?, ?)').run(user.id, codeHash(code), expires);
     db.prepare('INSERT INTO mailbox (to_email, subject, body) VALUES (?, ?, ?)').run(e, 'Reset your VulnMart password', `Your reset ${vuln ? 'code' : 'token'} is: ${code}`);
-    emit('auth.reset_requested', { account_role: accountRole(user), route: 'web' });
   }
+  // The event of IF-4 (data_auth_reset_requested, no other member). It is sent for an unknown address too: whether the account exists is a field of it.
+  emit('auth.reset_requested', { account_id: user ? String(user.id) : 'unknown', account_role: user ? safeClass(accountRole(user)) : 'unknown', account_found: Boolean(user) });
 
   if (vuln) {
     // VULNERABLE: the response reveals whether the account exists.
@@ -86,7 +116,7 @@ export function confirmReset(db, email, code, newPassword, { challenges = {}, em
   if (!ok) {
     db.prepare('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?').run(reset.id);
     // Failures are logged normally and batched (never the silent C09 signal).
-    emit('auth.reset_confirm_batch', { account_role: accountRole(user), result: 'failed' });
+    noteConfirm(emit, String(user.id), false);
     return fail();
   }
 
@@ -95,7 +125,8 @@ export function confirmReset(db, email, code, newPassword, { challenges = {}, em
   db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(reset.id);
   // Fixed build also ends other sessions; the shop's session cookie is stateless,
   // so that is represented by the completion event the platform acts on.
-  emit('auth.password_reset_completed', { account_role: accountRole(user) });
+  noteConfirm(emit, String(user.id), true); // the failures so far go out first, then the completion
+  emit('auth.password_reset_completed', { account_id: String(user.id), account_role: safeClass(accountRole(user)) });
   return { reset: true };
 }
 

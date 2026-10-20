@@ -1,14 +1,22 @@
 {% extends "layout.njk" %}
 {% block title %}Shop{% endblock %}
 {% block body %}
-<form method="get" action="/shop"><input name="q" value="{{ q }}" placeholder="Search products"><button>Search</button></form>
-<div class="grid" style="margin-top:1rem">
+<section class="hero" style="margin-top:0">
+  <h1>Find something made with care.</h1>
+  <p>Independent sellers, everyday goods, delivered to your door.</p>
+  <form class="search" method="get" action="/shop" role="search"><input name="q" value="{{ q }}" placeholder="Search products" aria-label="Search products"><button>Search</button></form>
+</section>
+{% if q %}<p class="muted">Results for <strong>{{ q }}</strong></p>{% endif %}
+<div class="grid">
   {% for p in products %}
-  <div class="card">
-    <a href="/product/{{ p.id }}"><strong>{{ p.title }}</strong></a>
-    <p class="muted">{{ p.description }}</p>
-    <p class="price">{{ p.price_cents | cents }}</p>
-  </div>
-  {% else %}<p class="muted">No products found.</p>{% endfor %}
+  <article class="card product">
+    <div class="art a{{ p.id % 6 }}" aria-hidden="true">{{ p.title | first | upper }}</div>
+    <div class="body">
+      <a href="/product/{{ p.id }}">{{ p.title }}</a>
+      <p>{{ p.description }}</p>
+      <span class="price">{{ p.price_cents | cents }}</span>
+    </div>
+  </article>
+  {% else %}<p class="empty card" style="grid-column:1/-1">No products found.</p>{% endfor %}
 </div>
 {% endblock %}

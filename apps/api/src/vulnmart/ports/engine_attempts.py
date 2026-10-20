@@ -18,7 +18,7 @@ from vulnmart.ports.errors import AttemptGone, AttemptNotFound, AttemptStateInva
 
 def attempt_rules(invite_rules: Mapping[str, Any] | None) -> Rules:
     """The engine's rules from the rules an invite carries (H-140: `Invite.rules`, copied from the template when the invite was made). Only the members the engine knows
-    are taken (`time_limit_min` and `reset_limit`); the others (hints, challenge list, retention, visibility) belong to other layers. Strict: a value of the wrong type
+    are taken (`time_limit_min`, `reset_limit` and `results_visibility`); the others (hints, challenge list, retention) belong to other layers. Strict: a value of the wrong type
     is a ValueError, never a silent default."""
     if not invite_rules:
         return Rules()
@@ -27,6 +27,8 @@ def attempt_rules(invite_rules: Mapping[str, Any] | None) -> Rules:
         data["time_limit_minutes"] = invite_rules["time_limit_min"]
     if "reset_limit" in invite_rules:
         data["reset_limit"] = invite_rules["reset_limit"]
+    if "results_visibility" in invite_rules:  # H-355: the recruiter's setting reaches the attempt, so the lab can hold a candidate's results back
+        data["results_visibility"] = invite_rules["results_visibility"]
     return Rules.from_dict(data)
 
 

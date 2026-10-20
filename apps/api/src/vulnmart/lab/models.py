@@ -30,6 +30,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,7 +54,9 @@ class Attempt(Base):
     __table_args__ = (
         CheckConstraint("state IN ('ready', 'running', 'expired', 'submitted', 'reported', 'cancelled', 'withdrawn', 'deleted')", name="state"),
         CheckConstraint("version >= 0", name="version"),
-        UniqueConstraint("user_id", "template_id", name="uq_attempts_user_id_template_id"),
+        # a company attempt in any state, or an unfinished practice run, holds the (user, template) pair; a finished practice run does not (migration 0017)
+        Index("uq_attempts_current", "user_id", "template_id", unique=True,
+              postgresql_where=text("org_id IS NOT NULL OR state IN ('ready', 'running', 'expired')")),
         Index("ix_attempts_state", "state"),
     )
 
@@ -198,6 +201,17 @@ class FlagSubmission(Base):
     challenge_key: Mapped[str] = mapped_column(String(16), nullable=False)
     result: Mapped[str] = mapped_column(String(24), nullable=False)
     at: Mapped[datetime] = mapped_column(_tz(), nullable=False)
+
+
+class ChallengeOpen(Base):
+    """When a learner began a challenge of a sequenced run: the start of its countdown (migration 0017)."""
+
+    __tablename__ = "challenge_opens"
+    __table_args__ = (PrimaryKeyConstraint("attempt_id", "challenge_key", name="pk_challenge_opens"),)
+
+    attempt_id: Mapped[str] = mapped_column(String(64), ForeignKey("attempts.id", ondelete="CASCADE"), nullable=False)
+    challenge_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(_tz(), nullable=False)
 
 
 class HintUnlock(Base):

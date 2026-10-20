@@ -24,6 +24,7 @@ export function loadUser(db) {
     res.locals = res.locals || {};
     res.locals.user = req.user;
     res.locals.csrf = session.csrf;
+    res.locals.path = req.path; // the layout marks the current link in the top bar
     next();
   };
 }

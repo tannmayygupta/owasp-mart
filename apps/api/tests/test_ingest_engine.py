@@ -52,7 +52,7 @@ STAGES = {
     "C10": [("M1", [("importer.fetch_attempt", {"job_id": "j-1", "url_class": "loopback", "blocked": False, "status": 200})]),
             ("M2", [("meta.request_served", {"path": "/healthz", "ua_class": "importer"})])],
     "C11": [("M1", [("kyc.result", {"store_id": "s-9", "outcome": "invalid_verbose"})]),
-            ("M2", [("store.approved", {"store_id": "s-9", "approved_by": "system:kyc-fallback"})])],
+            ("M2", [("store.approved", {"store_id": "s-9", "approved_by": "system_kyc_fallback"})])],
 }
 NEAR_MISS = {
     "C01": [([xs("o-1"), xs("o-1"), xs("o-1")], "M1")],  # the same order three times is one distinct order: M1 only

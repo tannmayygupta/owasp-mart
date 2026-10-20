@@ -2,7 +2,7 @@
 # Tags/CWE/ATT&CK from docs/design/challenge-specs.md; brief never contains a flag.
 schema_version: "0.1"
 key: c06
-title: Vulnerable and Outdated Components
+title: Software Supply Chain Failures
 status: complete
 owasp:
   "2021": A06
@@ -22,13 +22,13 @@ start_state: "Sign in as the seller owner owner.harbor@vulnmart.test with the pa
 milestones:
   m1:
     summary: the player sent import options containing a prototype-style key
-    signal: the import worker reports proto_check = polluted (prototype pollution occurred)
+    signal: import.job with a non-empty flagged_keys (the import worker saw a prototype-style key)
   m2:
     summary: prototype pollution really happened in the import job
-    signal: the preview reflects an injected prototype property
+    signal: import.job with polluted = true (the pollution is contained in the per-job process)
   m3:
     summary: flag captured
-    signal: the worker exits; the pollution does not escape the per-job process
+    signal: the audit token (the flag) appears in the /seller/import-preview response, or the player pastes it
 hints:
   - level: 1
     text: The import preview merges your fields over the defaults. What keys can change an object's prototype?

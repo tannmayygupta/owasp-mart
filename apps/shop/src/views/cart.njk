@@ -2,18 +2,26 @@
 {% block title %}Cart{% endblock %}
 {% block body %}
 <h1>Your cart</h1>
-<table><tr><th>Item</th><th>Qty</th><th>Line</th></tr>
-{% for i in cart.items %}<tr><td>{{ i.title }}</td><td>{{ i.qty }}</td><td>{{ i.line_cents | cents }}</td></tr>
-{% else %}<tr><td colspan="3" class="muted">Empty.</td></tr>{% endfor %}
-<tr><th>Total</th><th></th><th>{{ cart.total_cents | cents }}</th></tr></table>
-{% if cart.items|length %}
-<form method="post" action="/checkout" class="card" style="margin-top:1rem">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h3>Checkout</h3>
-  <p><input name="line1" placeholder="Address line 1" required></p>
-  <p><input name="city" placeholder="City" required> <input name="country" placeholder="Country" required></p>
-  <p><input name="card" placeholder="Card number (simulated)" required></p>
-  <button>Pay {{ cart.total_cents | cents }}</button>
-</form>
-{% endif %}
+<div class="cols">
+  <div>
+    <table><tr><th>Item</th><th class="num">Qty</th><th class="num">Line</th></tr>
+    {% for i in cart.items %}<tr><td>{{ i.title }}</td><td class="num">{{ i.qty }}</td><td class="num">{{ i.line_cents | cents }}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">Empty.</td></tr>{% endfor %}
+    <tr><th>Total</th><th></th><th class="num">{{ cart.total_cents | cents }}</th></tr></table>
+    {% if not cart.items|length %}<p><a href="/shop">Keep shopping</a></p>{% endif %}
+  </div>
+  {% if cart.items|length %}
+  <form method="post" action="/checkout" class="card summary">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h3>Checkout</h3>
+    <div class="fields">
+      <input name="line1" placeholder="Address line 1" aria-label="Address line 1" required>
+      <div class="fields two"><input name="city" placeholder="City" aria-label="City" required> <input name="country" placeholder="Country" aria-label="Country" required></div>
+      <input name="card" placeholder="Card number (simulated)" aria-label="Card number (simulated)" required>
+    </div>
+    <div class="total"><span>Total</span><span>{{ cart.total_cents | cents }}</span></div>
+    <button style="width:100%;padding:.75rem">Pay {{ cart.total_cents | cents }}</button>
+  </form>
+  {% endif %}
+</div>
 {% endblock %}

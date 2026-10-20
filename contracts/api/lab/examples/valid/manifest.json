@@ -9,6 +9,7 @@
   "instance.stop.json": "Instance",
   "attempt.json": "Attempt",
   "attempt.start.json": "Attempt",
+  "attempt.released.json": "Attempt",
   "attempt.submit.request.json": "ConfirmRequest",
   "attempt.submitted.json": "Attempt",
   "attempt.withdraw.request.json": "ConfirmRequest",
@@ -39,5 +40,8 @@
   "error.unsupported-media.json": "Problem",
   "flags.result.incorrect.json": "FlagSubmissionResult",
   "timeline.last-page.json": "Timeline",
-  "error.validation-errors.json": "Problem"
+  "error.validation-errors.json": "Problem",
+  "challenges.sequenced.json": "ChallengeProgressList",
+  "challenge.begun.json": "ChallengeProgress",
+  "account-progress.json": "AccountProgress"
 }

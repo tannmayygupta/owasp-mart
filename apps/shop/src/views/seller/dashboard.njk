@@ -17,7 +17,7 @@
   <h2>Products</h2>
   <table><tr><th>#</th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>
   {% for p in products %}<tr>
-    <td>{{ p.id }}</td><td>{{ p.title }}</td><td>{{ p.price_cents | cents }}</td><td>{{ p.stock }}</td><td>{{ p.status }}</td>
+    <td>{{ p.id }}</td><td>{{ p.title }}</td><td>{{ p.price_cents | cents }}</td><td>{{ p.stock }}</td><td><span class="badge b-{{ p.status }}">{{ p.status }}</span></td>
     <td>
       {% if p.status == 'draft' %}<form class="inline" method="post" action="/seller/products/{{ p.id }}/submit"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Submit for review</button></form>{% endif %}
       {% if p.status == 'published' %}<form class="inline" method="post" action="/seller/products/{{ p.id }}/unlist"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Unlist</button></form>{% endif %}
@@ -39,7 +39,7 @@
   <h2>Orders to fulfil</h2>
   <table><tr><th>Item</th><th>Product</th><th>Qty</th><th>Ship to</th><th>Status</th><th></th></tr>
   {% for it in items %}<tr>
-    <td>{{ it.id }}</td><td>{{ it.title }}</td><td>{{ it.qty }}</td><td>{{ it.ship_city }}, {{ it.ship_country }}</td><td>{{ it.status }}</td>
+    <td>{{ it.id }}</td><td>{{ it.title }}</td><td>{{ it.qty }}</td><td>{{ it.ship_city }}, {{ it.ship_country }}</td><td><span class="badge b-{{ it.status }}">{{ it.status }}</span></td>
     <td>
       {% if it.status == 'paid' %}<form class="inline" method="post" action="/seller/items/{{ it.id }}/fulfil"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="to" value="processing"><button>Start</button></form>{% endif %}
       {% if it.status == 'processing' %}<form class="inline" method="post" action="/seller/items/{{ it.id }}/fulfil"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="to" value="shipped"><button>Ship</button></form>{% endif %}
@@ -52,7 +52,7 @@
   <h2>Refund requests</h2>
   <table><tr><th>#</th><th>Item</th><th>Amount</th><th>Status</th><th></th></tr>
   {% for r in refunds %}<tr>
-    <td>{{ r.id }}</td><td>{{ r.order_item_id }}</td><td>{{ r.amount_cents | cents }}</td><td>{{ r.status }}</td>
+    <td>{{ r.id }}</td><td>{{ r.order_item_id }}</td><td>{{ r.amount_cents | cents }}</td><td><span class="badge b-{{ r.status }}">{{ r.status }}</span></td>
     <td>{% if r.status == 'requested' %}
       <form class="inline" method="post" action="/seller/refunds/{{ r.id }}/approve"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="number" name="amount" min="1" placeholder="amount (cents)"><button>Approve</button></form>
       <form class="inline" method="post" action="/seller/refunds/{{ r.id }}/reject"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Reject</button></form>

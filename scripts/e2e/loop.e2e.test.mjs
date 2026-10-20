@@ -232,13 +232,14 @@ step(4, 'start Caddy and the edge gate with the compose run flags; the relay poi
   assert.equal(g.status, 0, g.stderr.slice(-200));
   fs.writeFileSync(path.join(secDir, 'gate_key_current'), `${S.gateKey.toString('hex')}\n`, { mode: 0o644 });
   fs.writeFileSync(path.join(secDir, 'gate_key_previous'), '', { mode: 0o644 });
+  fs.writeFileSync(path.join(secDir, 'ingest_ca.pem'), '', { mode: 0o644 }); // the compose file mounts the CA of an https ingest; this test uses http and the edge reads an empty file as none
   fs.writeFileSync(path.join(secDir, 'gate_admin_secret'), `${S.adminSecret}\n`, { mode: 0o644 });
   await dk(['network', 'create', ...LABEL, NET_PUB]);
   await dk(['network', 'create', ...LABEL, NET_CORE]); // an ordinary network here (compose has the same): the admin forwarder below needs a published port
   const vars = { VULNMART_LABS_ZONE: ZONE, VULNMART_EDGE_INGEST_URL: `http://host.docker.internal:${S.ports.runtime}` };
   const gateSvc = compose.services['edge-gate'];
   await dk(['create', '--name', GATE, '--network', NET_PUB, ...gateSvc.networks['edge-public'].aliases.flatMap((a) => ['--network-alias', a]), '--add-host', 'host.docker.internal:host-gateway', ...LABEL,
-    ...composeFlags(gateSvc, { vars, mounts: { '/run/secrets/gate_key_current': path.join(secDir, 'gate_key_current'), '/run/secrets/gate_key_previous': path.join(secDir, 'gate_key_previous'), '/run/secrets/gate_admin_secret': path.join(secDir, 'gate_admin_secret') } }), EDGE_IMAGE]);
+    ...composeFlags(gateSvc, { vars, mounts: { '/run/secrets/gate_key_current': path.join(secDir, 'gate_key_current'), '/run/secrets/gate_key_previous': path.join(secDir, 'gate_key_previous'), '/run/secrets/gate_admin_secret': path.join(secDir, 'gate_admin_secret'), '/run/secrets/ingest_ca': path.join(secDir, 'ingest_ca.pem') } }), EDGE_IMAGE]);
   await dk(['network', 'connect', ...gateSvc.networks['labs-core'].aliases.flatMap((a) => ['--alias', a]), NET_CORE, GATE]);
   await dk(['start', GATE]);
   await pollUntil(async () => /edge-gate: player/.test((await docker(['logs', GATE])).stdout), { timeoutMs: 30000, label: 'the gate to start' });
@@ -321,15 +322,18 @@ step(8, 'read the planted flag from the shop container file, submit it: M3 and t
   assert.notEqual(wrong.json.credit, 'credited', 'a wrong flag is not credited');
   const ok = await demo('POST', `/attempts/${S.attempt}/flags`, { challenge_key: CHALLENGE, text: S.flag });
   assert.equal(ok.status, 200, ok.text.slice(0, 150));
-  assert.equal(ok.json.credit, 'credited', `result ${ok.json.result}`);
+  // The stub instance reports no recorded activity, and since audit blocker B6 (D-94, FR-ACH-02) a correct flag pasted without enough recorded activity is
+  // HELD for a named reviewer, not counted. That is the designed outcome here; the credited M3 and its hand number (94) are proved by the in-process loop (story 8.2).
+  assert.equal(ok.json.result, 'correct');
+  assert.equal(ok.json.credit, 'held', `result ${ok.json.result}`);
+  const again = await demo('POST', `/attempts/${S.attempt}/flags`, { challenge_key: CHALLENGE, text: S.flag });
+  assert.equal(again.json.credit, 'held', 'pasting the held flag again changes nothing');
   const sc = (await demo('GET', `/attempts/${S.attempt}/score`)).json;
   const row = sc.per_challenge.find((c) => c.challenge_key === CHALLENGE);
-  assert.equal(row.milestone, 'M3');
-  // hand number (story 8.2): weight 90 of 960, M3 = 100 %, no hint: 1000 x 90 / 960 = 93.75, half up = 94
-  assert.equal(row.points, 90);
-  assert.equal(sc.score, 94);
+  assert.equal(row.milestone, S.afterM1.row.milestone, 'a held capture does not raise the milestone');
+  assert.equal(sc.score, S.afterM1.sc.score, 'a held capture does not change the score');
   S.flag = undefined; // not kept longer than needed
-  note(`wrong flag not credited; right flag credited; ${CHALLENGE} milestone ${row.milestone}, ${row.points} points, score ${sc.score} (hand number 94)`);
+  note(`wrong flag not credited; right flag HELD for review (no recorded activity, D-94), twice the same; ${CHALLENGE} stays ${row.milestone}, score ${sc.score} unchanged`);
 });
 
 step(9, 'deadline: auto-submit and freeze (the gate shows its paused page), then the destroy tick leaves no instance', async (note) => {

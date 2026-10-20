@@ -1,9 +1,9 @@
 {% extends "layout.njk" %}
 {% block title %}Ticket #{{ ticket.id }}{% endblock %}
 {% block body %}
+<p class="crumbs"><a href="/tickets">Support</a> / #{{ ticket.id }}</p>
 <h1>{{ ticket.subject }}</h1>
-<p class="muted">Status: {{ ticket.status }}</p>
-{% for m in ticket.messages %}<div class="card">{{ m.body }}</div>{% endfor %}
+<p class="muted">Status: <span class="badge b-{{ ticket.status }}">{{ ticket.status }}</span></p>
+<div class="thread">{% for m in ticket.messages %}<div class="card">{{ m.body }}</div>{% endfor %}</div>
 {% if viewed_at %}<p class="flash">Agent has viewed this ticket at {{ viewed_at }} UTC.</p>{% else %}<p class="muted">An agent will look at this ticket shortly.</p>{% endif %}
-<p><a href="/tickets">Back to support</a></p>
 {% endblock %}

@@ -19,7 +19,7 @@ from .instances import InstanceControl
 from .rules import Rules
 from .schedule import accepts_request, deadline_for, destroy_due, expiry_due, frozen_until_for, warnings_due
 from .states import CANCELLABLE, AttemptState, InvalidTransition, move
-from .store import AttemptRecord, AttemptStore, Conflict
+from .store import AttemptRecord, AttemptStore, Conflict, allows_new_run
 
 log = logging.getLogger(__name__)
 
@@ -88,9 +88,10 @@ class AttemptEngine:
 
     def create(self, user_id: str, template_id: str, consent_id: str, rules: Rules | None = None,
                instance_id: str | None = None, attempt_id: str | None = None, org_id: str | None = None) -> AttemptRecord:
-        """A `ready` attempt. One attempt per user per template: a second call returns the first."""
+        """A `ready` attempt. One attempt per user per template: a second call returns the first. The exception is a learner's finished practice run
+        (submitted, reported, withdrawn or cancelled): the next call starts a new run and the old one stays as history."""
         existing = self._store.find(user_id, template_id)
-        if existing is not None:
+        if existing is not None and not allows_new_run(existing):
             return existing
         now = self._clock()
         rec = AttemptRecord(
