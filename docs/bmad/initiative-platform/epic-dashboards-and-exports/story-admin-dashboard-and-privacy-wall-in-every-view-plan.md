@@ -51,7 +51,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] Admin read audits; the privacy-wall test.
+- [x] Admin read audits; the privacy-wall test (2026-10-20: admin tests 90, privacy wall 7).
 - [ ] The admin dashboard page; the stack test.
 
 **Acceptance Criteria:**

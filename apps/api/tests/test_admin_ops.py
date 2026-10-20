@@ -155,6 +155,18 @@ def test_reject_suspend_and_reinstate_need_a_reason_and_an_unknown_company_is_no
 
 # ---- users ------------------------------------------------------------------------------------------------------------------------------------
 
+def test_every_admin_read_of_personal_data_is_audited_without_the_search_text(rig):
+    """Story P-30 (FR-DSH-05): reading the users or the approval queue writes an audit entry with the count, never what was searched for."""
+    rig.user(LEARNER, name="Lena Learner", email="lena@college.example")
+    rig.ops.users(ADMIN_SCOPE, query="lena@college.example")
+    rig.ops.queue(ADMIN_SCOPE)
+    [(_, actor, subject, details)] = rig.actions("admin.users_read")
+    assert actor == ADMIN and subject is None and details == {"count": 1, "searched": True, "status": None}
+    assert "lena" not in repr(rig.audit.records).lower()
+    [(_, actor, _, details)] = rig.actions("admin.queue_read")
+    assert actor == ADMIN and details == {"count": 0}
+
+
 def test_users_are_found_by_name_address_or_id_and_nothing_secret_is_in_a_row(rig):
     rig.user(LEARNER, name="Lena Learner", email="lena@college.example")
     rig.user(LEARNER2, name="Other Person", email="other@school.example")

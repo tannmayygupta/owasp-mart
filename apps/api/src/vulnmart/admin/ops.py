@@ -135,7 +135,11 @@ class AdminOps:
     # ---- the approval queue (FR-ADM-01) ----
 
     def queue(self, actor: Scope, limit: int = 100) -> list[PendingCompany]:
-        return self._companies.pending(actor, limit=limit)
+        """The companies waiting. The queue shows the owners' names and address domains, personal data, so the read is audited (FR-DSH-05, story P-30)."""
+        admin_id = self._admin(actor)
+        rows = self._companies.pending(actor, limit=limit)
+        self._audit.append(actor=admin_id, action="admin.queue_read", subject=None, details={"count": len(rows)})
+        return rows
 
     def decide_company(self, actor: Scope, org_id: str, decision: str, reason: str | None = None) -> None:
         """approve, reject (reason needed), suspend (reason needed) or reinstate (reason needed) a company. Raises NotFound, InvalidInput (`/reason`), and the company service's
@@ -162,7 +166,7 @@ class AdminOps:
     # ---- users (FR-ADM-02) ----
 
     def users(self, actor: Scope, *, query: str | None = None, status: str | None = None, limit: int = 50) -> list[UserRow]:
-        self._admin(actor)
+        admin_id = self._admin(actor)
         limit = max(1, min(limit, MAX_SEARCH))
         stmt = select(User).where(User.status != "deleted")
         if status is not None:
@@ -177,8 +181,12 @@ class AdminOps:
             if rows:
                 for uid, role in session.execute(select(UserRole.user_id, UserRole.role).where(UserRole.user_id.in_([r.id for r in rows]))):
                     roles.setdefault(uid, []).append(role)
-            return [UserRow(u.id, u.display_name, u.email, u.account_type, u.status, tuple(sorted(roles.get(u.id, ()))), u.email_verified_at is not None,
-                            _aware(u.created_at), _aware(u.last_login_at)) for u in rows]
+            found = [UserRow(u.id, u.display_name, u.email, u.account_type, u.status, tuple(sorted(roles.get(u.id, ()))), u.email_verified_at is not None,
+                             _aware(u.created_at), _aware(u.last_login_at)) for u in rows]
+        # every admin read of personal data is itself logged (FR-DSH-05, story P-30): who and how many, never the search text (it may be an address)
+        self._audit.append(actor=admin_id, action="admin.users_read", subject=None,
+                           details={"count": len(found), "searched": bool(query), "status": status})
+        return found
 
     def act_on_user(self, actor: Scope, user_id: str, action: str, reason: str | None = None) -> str:
         """lock, unlock, reset_password or delete. Returns the outcome word (`locked`, `unlocked`, `reset_sent`, `deleted`, `locked_instead` for an account that holds assessment data).
