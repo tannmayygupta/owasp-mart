@@ -1,0 +1,95 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+........................................................................ [  7%]
+........................................................................ [ 10%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+..................................E..................................... [ 28%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 35%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 43%]
+........................................................................ [ 46%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+.s...................................................................... [ 59%]
+........................................................................ [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 71%]
+........................................................................ [ 74%]
+........................................................................ [ 77%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 84%]
+........................................................................ [ 87%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 97%]
+....................................................................     [100%]
+=================================== ERRORS ====================================
+_ ERROR at setup of test_a_forbidden_field_is_refused_and_nothing_is_created[volumes-value4] _
+
+    @pytest.fixture
+    def svc():
+>       s = ServiceProcess()
+            ^^^^^^^^^^^^^^^^
+
+apps\api\tests\test_http_service.py:41: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <support.ServiceProcess object at 0x00000253CFB19E50>, capacity_mb = 8192
+step_delay_ms = 0, report_url = None, extra_args = (), tls = None
+tls_server = None
+
+    def __init__(self, *, capacity_mb: int = 8192, step_delay_ms: int = 0, report_url: str | None = None,
+                 extra_args: tuple[str, ...] = (), tls: "Pki | None" = None,
+                 tls_server: tuple[Path, Path] | None = None) -> None:
+        env = None
+        if PYTHON_SERVICE:
+            # the rate limit is off: a test polls far faster than the 20 requests per second a platform client is allowed
+            # the keys go in the environment, never on the command line (M6); the fake backend needs its explicit test switch (H3)
+            args = [sys.executable, "-m", "vulnmart_orchestrator", "--backend", "fake", "--allow-fake-backend", "--port", "0",
+                    "--capacity-mb", str(capacity_mb), "--step-delay-ms", str(step_delay_ms),
+                    "--templates-dir", str(python_templates_dir()), "--template-schema", str(TEMPLATE_SCHEMA), "--rate-per-s", "0"]
+            env = {**os.environ, "PYTHONPATH": str(ORCH_SRC), "VM_ORCH_PLATFORM_KEY": PLATFORM_KEY.decode(),
+                   "VM_ORCH_REPORT_KEY": ORCH_KEY.decode()}
+        else:
+            node = shutil.which("node")
+            if node is None:
+                raise RuntimeError("node is required for the fake orchestrator tests")
+            args = [node, str(SERVER), "--port", "0", "--capacity-mb", str(capacity_mb), "--step-delay-ms", str(step_delay_ms),
+                    "--key", PLATFORM_KEY.decode(), "--report-key", ORCH_KEY.decode()]
+        if report_url:
+            args += ["--report-url", report_url]
+        if tls is not None:
+            cert, key = tls_server or (tls.server_cert, tls.server_key)  # tls_server: another server certificate, for the refusal tests
+            args += ["--tls-cert", str(cert), "--tls-key", str(key), "--tls-ca", str(tls.ca_cert)]
+        if extra_args:
+            args += list(extra_args)
+        # stderr goes to a file, never to an undrained pipe (a full pipe would stall the service)
+        self._stderr = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
+        self.proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=self._stderr, text=True, env=env)
+        lines: queue.Queue[str] = queue.Queue()
+        threading.Thread(target=lambda: lines.put(self.proc.stdout.readline()), daemon=True).start()
+        try:
+            line = lines.get(timeout=START_TIMEOUT_SECONDS)
+        except queue.Empty:
+            self.stop()
+>           raise RuntimeError(f"the fake orchestrator printed no port within {START_TIMEOUT_SECONDS} s") from None
+E           RuntimeError: the fake orchestrator printed no port within 15 s
+
+apps\api\tests\support.py:274: RuntimeError
+=========================== short test summary info ===========================
+SKIPPED [1] apps\api\tests\test_lab_state_reports.py:103: Windows has no mode bits; the orchestrator skips this check there too
+2802 passed, 1 skipped, 1 error in 534.60s (0:08:54)

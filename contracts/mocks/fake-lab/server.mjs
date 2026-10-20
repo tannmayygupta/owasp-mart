@@ -592,6 +592,7 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/score$`), ['attempt_id'], 'getScore'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges$`), ['attempt_id'], 'listChallenges'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/hints$`), ['attempt_id', 'challenge_key'], 'listHints'],
+    ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/writeup$`), ['attempt_id', 'challenge_key'], 'getWriteup'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/hints/${ID}/unlock$`), ['attempt_id', 'challenge_key', 'level'], 'unlockHint', 'none'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/evidence$`), ['attempt_id'], 'listEvidence'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/integrity-flags$`), ['attempt_id'], 'listIntegrityFlags'],

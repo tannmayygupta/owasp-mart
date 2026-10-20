@@ -20,9 +20,13 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
+      // the lab's routes (catalogue, attempts) and the platform's (invites) are loaded side by side: one being down must not hide the other
       const [c, a, i] = await Promise.all([
-        api<{ items: CatalogueItem[] }>('GET', '/api/v1/challenges'),
-        api<{ items: AttemptSummary[] }>('GET', '/api/v1/me/attempts'),
+        api<{ items: CatalogueItem[] }>('GET', '/api/v1/challenges').catch(() => ({ items: [] as CatalogueItem[] })),
+        api<{ items: AttemptSummary[] }>('GET', '/api/v1/me/attempts').catch((e) => {
+          setError(say(e));
+          return { items: [] as AttemptSummary[] };
+        }),
         api<{ items: MyInvite[] }>('GET', '/api/v1/me/invites'),
       ]);
       setCatalog(c.items);

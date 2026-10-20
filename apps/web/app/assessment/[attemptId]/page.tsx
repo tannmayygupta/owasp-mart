@@ -21,8 +21,8 @@ export default function AssessmentPage() {
   const load = useCallback(async () => {
     try {
       const [mine, c] = await Promise.all([
-        api<{ items: MyInvite[] }>('GET', '/api/v1/me/invites', undefined),
-        api<{ items: CatalogueItem[] }>('GET', '/api/v1/challenges'),
+        api<{ items: MyInvite[] }>('GET', '/api/v1/me/invites'),
+        api<{ items: CatalogueItem[] }>('GET', '/api/v1/challenges').catch(() => ({ items: [] as CatalogueItem[] })), // titles only: the page works without them
       ]);
       const found = mine.items.find((i) => i.attempt_id === attemptId) ?? null;
       setInvite(found);

@@ -93,6 +93,8 @@ export default function InvitePage() {
           </dl>
           {CLOSED[summary.state] ? (
             <p className="banner bad">{CLOSED[summary.state]}</p>
+          ) : ['consented', 'started'].includes(summary.state) ? (
+            <p>This invitation was already accepted. Open it from <Link href="/dashboard">your dashboard</Link>.</p>
           ) : loading ? null : user ? (
             <>
               <p>Signed in as {user.email}. Accepting shows you the privacy notice next; nothing starts until you agree and press Start.</p>

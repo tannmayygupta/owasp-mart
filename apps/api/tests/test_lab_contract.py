@@ -184,7 +184,7 @@ def test_the_contract_check_passes_on_the_repository():
     assert errors == []
     valid = json.loads((LAB_DIR / "examples" / "valid" / "manifest.json").read_text(encoding="utf-8"))
     invalid = json.loads((LAB_DIR / "examples" / "invalid" / "manifest.json").read_text(encoding="utf-8"))
-    assert counts["operations"] == 20
+    assert counts["operations"] == 21  # story P-26 added getWriteup (H-354)
     assert counts["valid"] == len(valid) and counts["invalid"] == len(invalid)
     # every file in the folders is in its manifest, and every manifest entry is a file (the counts cannot drift apart)
     for folder, manifest in (("valid", valid), ("invalid", invalid)):
@@ -214,7 +214,7 @@ def test_states_access_and_health_are_identical_to_if5():
 
 def test_every_route_is_under_api_v1_and_every_operation_has_an_id():
     ids = [op["operationId"] for item in SPEC["paths"].values() for m, op in item.items() if m in contract.METHODS]
-    assert len(ids) == len(set(ids)) == 20
+    assert len(ids) == len(set(ids)) == 21
     assert all(p.startswith("/api/v1/") for p in SPEC["paths"])
 
 
@@ -381,6 +381,7 @@ def test_every_operation_answers_and_every_answer_conforms(fresh):
     ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}"), 200)
     ok(m.call("POST", f"/api/v1/attempts/{A_READY}/start", "cam"), 200)
     ok(m.call("POST", f"/api/v1/attempts/{A_LEARNER}/flags", "ada", {"challenge_key": "C01", "flag": flag("A")}), 200)
+    ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges/C01/writeup", "ada"), 200)  # story P-26: open after the solve
     ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}/score"), 200)
     ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges"), 200)
     ok(m.call("GET", f"/api/v1/attempts/{A_LEARNER}/challenges/C02/hints"), 200)

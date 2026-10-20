@@ -3,7 +3,7 @@ title: 'Learner and candidate dashboards with hints'
 type: 'feature'
 ticket: '1'
 created: '2026-10-20'
-status: in-progress
+status: built
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
@@ -53,7 +53,7 @@ context:
 
 **Execution:**
 - [x] The three invite routes, the contract change and their tests (2026-10-20: 9 route tests, contract rules 18 PASS).
-- [ ] The web pages and their tests; the stack test. (2026-10-20: 11 pages built, typecheck and production build pass, web unit tests 15 of 15; the stack test next.)
+- [x] The web pages and their tests; the stack test (2026-10-20: 11 pages, web unit tests 15 of 15, the stack test 4 of 4 on real Docker).
 
 **Acceptance Criteria:**
 - Given a learner, then the dashboard shows the catalogue and their own attempt, the instance state updates live, hints unlock with no cost and the write-up shows after a solve.
@@ -66,6 +66,17 @@ context:
 
 ## Review Triage Log
 
+### 2026-10-20, quick review (lens: quick), loop 1
+Run in the main session, not by an independent subagent: the reviewer subagent does not survive this machine's session restarts.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | The dashboard and the assessment page load the lab's catalogue together with the invites; a lab outage hides the invites (the assessment page says "not one of yours") | medium | patch | the catalogue (and the attempts on the dashboard) are optional |
+| 2 | An already accepted invite (consented, started) still offers "Accept", which then fails | low | patch | the invite page points to the dashboard |
+| 3 | A wrong flag shows "Something went wrong" | low | patch | the board says it is not the flag |
+| 4 | `after_release` results are hidden only in the page; the lab still answers them | medium | defer | handoff H-355 (stream L, P-27) |
+| 5 | The pages are not tested in a browser | medium | defer | dev-log limitation; OI-30 |
+
 ## Verification
 
 **Commands:**
@@ -73,3 +84,5 @@ context:
 - `node --test apps/web/test/*.test.mjs`, `pnpm --filter @vulnmart/web typecheck` and `build` -- expected: pass
 - `node --test scripts/e2e/platform-stack.e2e.test.mjs` -- expected: all pass
 - `node scripts/check-contract-rules.mjs` -- expected: 0 FAIL
+
+**Results (2026-10-20):** see the dev-log `docs/dev-log/2026-10-20-akshaay29-p26-learner-and-candidate-dashboards.md`: invite routes 9, write-up test, pins, contract rules 20 PASS, web 15 of 15, build of 11 routes, stack 4 of 4, full pytest in the dev-log.
