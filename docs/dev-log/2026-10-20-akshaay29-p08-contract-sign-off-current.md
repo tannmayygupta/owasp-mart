@@ -5,7 +5,7 @@
 | Date | 2026-10-20 |
 | Developer | akshaay29 |
 | Branch / commit | `sprint-4-akshay-p08` |
-| Status | Done for stream P (story `built`; marked done once merged). The GitHub review of L-09's tag pull request follows when it exists |
+| Status | Done for stream P (story `done`, merged in pull request 67). The GitHub review of L-09's tag pull request follows when it exists |
 | Report tag | contracts, sprint 1 (completed in sprint 4) |
 
 ## Requirements covered
