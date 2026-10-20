@@ -46,7 +46,7 @@ export function registerOpsRoutes(app, db, { challenges = {}, emit = () => {} } 
       parsed = JSON.parse(req.body || '');
     } catch {
       if (vulnerable()) {
-        emit('shop.verbose_error', { handler: 'c05_api' });
+        emit('shop.verbose_error', { route: '/api/cart', handler: 'c05_api' });
         // Verbose trace that leaks an internal route file path under _ops.
         return res.status(500).json({
           error: 'SyntaxError: Unexpected token in JSON',

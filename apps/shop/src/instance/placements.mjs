@@ -38,6 +38,8 @@ export function plantDatabase(db, flags) {
   }
   if (flags.C02) {
     issueCard(db, { serial: 1, message: flags.C02, amount_cents: 5000, ownerId: null }, { challenges: { C02: 'vulnerable' } });
+    // the unsold staff test cards (catalogue decoys of C02): forging one of them is the second milestone ("redeemed a card they did not buy"); they carry a marker, never the flag
+    for (const serial of [2, 3]) issueCard(db, { serial, message: 'STAFF-TEST-CARD: no prize on this card.', amount_cents: 100, ownerId: null }, { challenges: { C02: 'vulnerable' } });
     done.push('C02');
   }
   if (flags.C04) {

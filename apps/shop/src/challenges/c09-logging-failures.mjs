@@ -66,7 +66,7 @@ export function registerLegacyLoginRoute(app, db, express, { challenges = {}, em
     }
     const user = authenticate(db, email, req.body?.password);
     const active = !!user && user.status === 'active';
-    emit('auth.attempt', { route: 'legacy', account_id: user ? String(user.id) : 'unknown', result: active ? 'success' : user ? 'rejected' : 'unknown' });
+    emit('auth.attempt', { route: 'legacy', account_id: user ? String(user.id) : 'unknown', result: active ? 'success' : 'failure' }); // the platform's rule for C09 reads `failure` and `success` on the legacy route
     // The ONE difference: the vulnerable build skips the security pipeline here.
     if (!vuln) recordAuth(db, { userId: found?.id, success: active, route: 'legacy', emit });
 

@@ -23,6 +23,19 @@ export function buildJob(body = {}) {
   return { product: { title, description, price_cents: price, ...options } };
 }
 
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** The prototype-style keys found anywhere in the advanced options (for the `import.job` event of IF-4): which of __proto__, constructor and prototype the seller sent. */
+export function flaggedOptionKeys(options) {
+  const found = new Set();
+  const walk = (value, depth) => {
+    if (!value || typeof value !== 'object' || depth > 8) return;
+    for (const key of Object.keys(value)) { if (DANGEROUS_KEYS.has(key)) found.add(key); walk(value[key], depth + 1); }
+  };
+  walk(options, 0);
+  return [...found];
+}
+
 /** Send one job and read the one answer. Resolves { ok, preview, auditToken } or { ok: false, error } when the service is away, busy or silent. Never rejects. */
 export function sendJob(job, { socketPath = process.env.VM_IMPORT_SOCKET, timeoutMs = 8000 } = {}) {
   return new Promise((resolve) => {
@@ -42,7 +55,9 @@ export function sendJob(job, { socketPath = process.env.VM_IMPORT_SOCKET, timeou
 
 /** The preview page's answer: what the service computed, the audit token when it came back, and nothing of the worker's internals. */
 export async function importPreview(body, opts) {
-  const result = await sendJob(buildJob(body), opts);
-  if (!result.ok) return { ok: false, error: result.error === 'busy' ? 'the import service is busy, try again' : 'the import preview failed' };
-  return { ok: true, preview: result.preview, auditToken: result.auditToken ?? null };
+  const job = buildJob(body);
+  const result = await sendJob(job, opts);
+  const flagged = flaggedOptionKeys(job.product);
+  if (!result.ok) return { ok: false, error: result.error === 'busy' ? 'the import service is busy, try again' : 'the import preview failed', flagged };
+  return { ok: true, preview: result.preview, auditToken: result.auditToken ?? null, flagged };
 }

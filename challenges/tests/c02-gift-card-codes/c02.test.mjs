@@ -20,6 +20,8 @@ async function bootShop(mode) {
   // Seed the flag card (serial 1) in the same mode the shop runs in, so the
   // fixed build stores a real random code the player cannot derive.
   issueCard(db, { serial: 1, message: MARKER, amount_cents: 5000, ownerId: null }, { challenges: { C02: mode } });
+  // the unsold staff test cards (the catalogue decoys; the instance injector plants them too): the exploit tries one before the flag card
+  for (const serial of [2, 3]) issueCard(db, { serial, message: 'STAFF-TEST-CARD: no prize on this card.', amount_cents: 100, ownerId: null }, { challenges: { C02: mode } });
   const events = [];
   const app = createApp({ db, emit: (type, data) => events.push({ type, data }), challenges: { C02: mode } });
   const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
