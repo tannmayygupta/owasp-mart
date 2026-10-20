@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Fix: the template's rules (time limit, reset limit, results visibility) now reach the attempt that a consent creates; before, `accept.py` dropped them, so a recruiter's settings had no effect on a real candidate (found by the role-scenario audit).
 - Test repairs after the full API run: migration head 0017 and the table list in the settings tests, the withdrawn-run refusal test uses a company attempt, the invite-rules test uses a valid visibility, the run-order test no longer depends on a random id.
 - Learner console redesign (backlog story 11): one challenge at a time with a countdown ring by tier, a progress rail, account points in the top bar, new run after a finished one, light and dark, self-hosted open-licence fonts; works against a server that is not sequenced.
 - Results held until the recruiter releases them (backlog story 10, handoff H-355, OI-15, IF-2 2.1.0): when the invite says `after_release` the candidate's score and earned progress stay hidden until the recruiter of the company presses Release (new route `releaseResults`, finished attempts only); the default and learners' practice are unchanged. The recruiter's report page has the button; the Start confirmation now says the clock starts when the instance is ready.

@@ -188,7 +188,7 @@ def w(sessions, clock, companies, assessments, audit):
     world.ada_request = ada.post("/api/v1/me/deletion-requests", {"kind": "learner"}).json()["request_id"]
     # Rita's company invites Cam, who accepts, consents and starts
     owner = active_company(companies, sessions)
-    world.template = assessments.create_template(owner, basic(hints_mode="on", hint_cost_pct=10)).template_id
+    world.template = assessments.create_template(owner, basic(hints_mode="on", hint_cost_pct=10, time_limit_min=45, results_visibility="after_release")).template_id
     assessments.create_invite(owner, world.template, CAM_EMAIL)
     world.cam_token = token_in(mail_rows(sessions)[-1])
     world.learner(CAM, CAM_EMAIL)
@@ -202,6 +202,8 @@ def w(sessions, clock, companies, assessments, audit):
     assert granted.status_code in (200, 201), granted.text
     # the grant creates the attempt in the lab (state `ready`); the candidate starts it through startAttempt (H-356, D-80)
     assert world.lab.engine.get(world.cam_attempt).state.value == "ready"
+    rules = world.lab.engine.get(world.cam_attempt).rules  # the template's rules reach the attempt a consent creates (H-355; they were dropped before 2026-10-21)
+    assert (rules.time_limit_minutes, rules.results_visibility) == (45, "after_release")
     # Rob's company, approved, terms accepted, with a template of its own
     signup(companies, email=ROB, company="Globex", name="Rob Owner")
     verify(sessions, ROB)
