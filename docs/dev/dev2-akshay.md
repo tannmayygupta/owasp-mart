@@ -274,7 +274,7 @@ Goal: Deletion, the four dashboards, exports, the admin area and deployed verifi
 
 - [ ] **P-27. Recruiter dashboard, live monitor and hints used**
   - Epic: `epic-dashboards-and-exports`
-  - BMAD story: not planned yet; created when you incept `epic-dashboards-and-exports` (see START-HERE.md, section "First task of an epic")
+  - BMAD story: planned, ref `8.2` in `epic-dashboards-and-exports` (find it with `bmad-ticket`); state `in-progress`
   - Build: The recruiter dashboard, the live monitor of running attempts and the hints-used view.
   - Covers: FR-DSH-02, 03, FR-HNT-03
   - Waits on: P-19, P-22.
