@@ -8,10 +8,10 @@
     {
       "name": "lab",
       "version": "1.1.0",
-      "operations": 20
+      "operations": 21
     }
   ],
-  "operations": 65,
+  "operations": 66,
   "shared_components": [
     {
       "section": "headers",

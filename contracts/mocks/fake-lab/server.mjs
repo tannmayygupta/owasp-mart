@@ -461,6 +461,14 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     const a = hintContext(res, user, params);
     if (a && queryOf(res, url, [])) send(res, 200, { challenge_key: params.challenge_key, items: [1, 2, 3].map((l) => hintView(a, params.challenge_key, l)), has_more: false });
   };
+  // story P-26: the write-up of a challenge, for the owner, only once it is solved in that attempt (409 before the flag)
+  H.getWriteup = ({ res, user, params, url }) => {
+    const a = owned(res, user, params.attempt_id);
+    if (!a || !queryOf(res, url, [])) return;
+    if (!RE.challenge.test(params.challenge_key) || !a.progress.has(params.challenge_key)) return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge');
+    if (a.progress.get(params.challenge_key).best !== 3) return problem(res, 409, 'ATT-INVALID-STATE', 'the write-up opens after the challenge is solved');
+    send(res, 200, { challenge_key: params.challenge_key, vulnerable: `What made ${params.challenge_key} vulnerable (mock text).`, fix: `How ${params.challenge_key} is fixed (mock text).` });
+  };
   H.unlockHint = ({ res, user, params, take }) => {
     const a = hintContext(res, user, params);
     if (!a || take() === false) return;

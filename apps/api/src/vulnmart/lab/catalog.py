@@ -33,6 +33,7 @@ class CatalogEntry:
     difficulty: int
     tier: str
     hints: tuple[str | None, str | None, str | None]
+    write_up: tuple[str, str] | None = None  # (the vulnerable idea, the fix), IF-7 `write_up` (T-30); shown to a player only after a solve (story P-26)
 
 
 class Catalog:
@@ -62,7 +63,16 @@ def _entry(data: Mapping[str, Any]) -> CatalogEntry:
         key=str(data["key"]).upper(), title=str(data["title"]), owasp_2021=_s(owasp.get("2021")), owasp_2025=_s(owasp.get("2025")),
         cwe=tuple(x for x in [cwe.get("primary"), *(cwe.get("related") or ())] if isinstance(x, str)),
         attack=tuple(str(a) for a in (data.get("attack") or ())), difficulty=int(data.get("difficulty", 1)),
-        tier=str(data.get("tier", "")), hints=(hints[0], hints[1], hints[2]))
+        tier=str(data.get("tier", "")), hints=(hints[0], hints[1], hints[2]), write_up=_write_up(data.get("write_up")))
+
+
+def _write_up(value: Any) -> tuple[str, str] | None:
+    if not isinstance(value, Mapping):
+        return None
+    vulnerable, fix = value.get("vulnerable"), value.get("fix")
+    if not (isinstance(vulnerable, str) and vulnerable.strip() and isinstance(fix, str) and fix.strip()):
+        return None
+    return vulnerable.strip(), fix.strip()
 
 
 def _s(value: Any) -> str | None:

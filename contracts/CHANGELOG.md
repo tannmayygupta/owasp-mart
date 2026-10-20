@@ -144,6 +144,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 1.2.0 (2026-10-20, Akshay, story P-26; for Tanmay to confirm, handoff H-354)
+- Additive: `GET /api/v1/attempts/{attempt_id}/challenges/{challenge_key}/writeup` (`getWriteup`, schema `Writeup`: `challenge_key`, `vulnerable`, `fix` from the catalogue's IF-7 `write_up`): only the attempt's owner, only once the challenge is solved (M3) in that attempt; before that 409 ATT-INVALID-STATE; not the caller's attempt 404 ATT-NOT-FOUND; an unknown challenge or one with no write-up 404 ATT-CHALLENGE-NOT-FOUND. No new error code. FR-DSH-01 ("after a solve, the write-up is available on the same page"); added by Akshay in Tanmay's module (`lab/api.py`, `lab/catalog.py` reads `write_up`) with the developer's agreement, for Tanmay to check.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (`getWriteup`, mock text). Generated code and bundle regenerated; `scripts/check_lab_contract.py` lists the operation.
+
 ### 1.1.0 (2026-10-19, Tanmay, story L-26 routes; for Akshay to confirm, handoff H-353)
 - Additive: `POST /api/v1/attempts/{attempt_id}/withdraw` (`withdrawAttempt`, body `{ "confirm": true }`) and `POST /api/v1/attempts/{attempt_id}/withdraw/undo` (`undoWithdrawal`, empty body), both 200 with the `Attempt`; only the owner of a candidate attempt; a learner attempt, a wrong state is 409 `ATT-INVALID-STATE`, an unknown or foreign attempt is 404, a closed undo window is 410 `ATT-GONE` (no new error code). New optional field `Attempt.delete_after` (the end of the undo window while the attempt is `withdrawn` and its deletion is scheduled, otherwise null).
 - Why in this contract and not in IF-1: the lab already serves the attempt routes and owns the state machine and the undo window (D-91); the decision text "cancel, withdraw and purge are IF-1" of `lab-api.md` is changed by this entry for withdraw and undo only. Cancel (a recruiter's action) and purge stay with the platform.

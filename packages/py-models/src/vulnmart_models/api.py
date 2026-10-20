@@ -1231,6 +1231,15 @@ class Hint(BaseModel):
     ]
 
 
+class Writeup(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    challenge_key: ChallengeKey
+    vulnerable: Annotated[str, Field(max_length=4000)]
+    fix: Annotated[str, Field(max_length=4000)]
+
+
 class HintList(BaseModel):
     model_config = ConfigDict(
         extra='forbid',

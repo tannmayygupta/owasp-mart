@@ -62,6 +62,8 @@ context:
 
 ## Plan Change Log
 
+- 2026-10-20: the write-up after a solve (FR-DSH-01) had no route. The developer chose "I add it, tell Tanmay": P-26 adds `getWriteup` to IF-2 (1.2.0) in `lab/api.py`, owner only and only after the solve, with the mock, the lab check and a test; handoff H-354. This changes the plan's "no change to IF-2" for that one route. The server-side `after_release` rule is handoff H-355.
+
 ## Review Triage Log
 
 ## Verification

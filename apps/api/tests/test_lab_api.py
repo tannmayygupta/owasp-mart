@@ -449,6 +449,22 @@ def test_the_catalogue_shows_the_eleven_challenges_without_a_flag_a_hint_or_a_te
     assert eve.get("/api/v1/me/attempts").json() == {"items": [], "has_more": False}
     problem(ada.get("/api/v1/me/attempts?limit=101"), 422, "REQ-VALIDATION")
 
+def test_the_write_up_opens_only_to_the_owner_after_the_solve(world, ada, eve):
+    """Story P-26 (FR-DSH-01): the write-up of a challenge is readable on the dashboard after a solve, never before the flag and never by someone else."""
+    iid, aid = start(world, ada)
+    play(world.lab, iid)
+    problem(ada.get(f"/api/v1/attempts/{aid}/challenges/C01/writeup"), 409, "ATT-INVALID-STATE")
+    assert ada.post(f"/api/v1/attempts/{aid}/flags", {"challenge_key": "C01", "flag": world.lab.keys.flag(iid, "C01", 1)}).json()["credit"] == "credited"
+    got = ada.get(f"/api/v1/attempts/{aid}/challenges/C01/writeup")
+    assert got.status_code == 200 and got.headers["cache-control"] == "private, no-store"
+    check("Writeup", got.json())
+    assert got.json()["challenge_key"] == "C01" and got.json()["vulnerable"] and got.json()["fix"]
+    assert "VM{" not in got.text
+    problem(eve.get(f"/api/v1/attempts/{aid}/challenges/C01/writeup"), 404, "ATT-NOT-FOUND")
+    problem(ada.get(f"/api/v1/attempts/{aid}/challenges/C99/writeup"), 404, "ATT-CHALLENGE-NOT-FOUND")
+    problem(client(world.app).get(f"/api/v1/attempts/{aid}/challenges/C01/writeup"), 401, "AUTH-SESSION-REQUIRED")
+
+
 # ---- the ticket against the gate's own verifier ----
 
 def test_a_ticket_of_the_platform_is_accepted_by_the_edge_gate_verifier_with_the_key_file_as_the_gate_reads_it(tmp_path):

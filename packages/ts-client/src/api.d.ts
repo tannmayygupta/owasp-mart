@@ -1179,6 +1179,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/writeup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+                challenge_key: components["parameters"]["ChallengeKeyPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The write-up of a solved challenge
+         * @description The vulnerable idea and the fix of a challenge (the catalogue's `write_up`, IF-7), for the attempt's owner once the challenge is solved (flag captured, milestone M3) in that
+         *     attempt (story P-26, FR-DSH-01: the write-up is available on the same page after a solve). Not solved yet: 409 ATT-INVALID-STATE, so it is never readable before the flag.
+         *     Not the caller's attempt: 404 ATT-NOT-FOUND; an unknown challenge, or one with no write-up yet: 404 ATT-CHALLENGE-NOT-FOUND. Added by Akshay for Tanmay to confirm (handoff H-354).
+         */
+        get: operations["getWriteup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/hints/{level}/unlock": {
         parameters: {
             query?: never;
@@ -1903,6 +1928,11 @@ export interface components {
             cost_pct: number;
             /** @description Null until unlocked. A hint never reveals a flag (FR-HNT-01). */
             text: string | null;
+        };
+        Writeup: {
+            challenge_key: components["schemas"]["ChallengeKey"];
+            vulnerable: string;
+            fix: string;
         };
         HintList: {
             challenge_key: components["schemas"]["ChallengeKey"];
@@ -3879,6 +3909,34 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    getWriteup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+                challenge_key: components["parameters"]["ChallengeKeyPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The write-up. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Writeup"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
         };
     };
