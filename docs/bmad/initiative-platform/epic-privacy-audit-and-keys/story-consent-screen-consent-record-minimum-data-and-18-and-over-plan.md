@@ -3,7 +3,7 @@ title: 'Consent screen, consent record, minimum data and 18-and-over'
 type: 'feature'
 ticket: '1'
 created: '2026-10-18'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

@@ -3,7 +3,7 @@ title: 'Multi-factor login'
 type: 'feature'
 ticket: '5'
 created: '2026-10-18'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

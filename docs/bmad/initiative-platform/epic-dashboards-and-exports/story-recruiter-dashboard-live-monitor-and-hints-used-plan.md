@@ -3,7 +3,7 @@ title: 'Recruiter dashboard, live monitor and hints used'
 type: 'feature'
 ticket: '2'
 created: '2026-10-20'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

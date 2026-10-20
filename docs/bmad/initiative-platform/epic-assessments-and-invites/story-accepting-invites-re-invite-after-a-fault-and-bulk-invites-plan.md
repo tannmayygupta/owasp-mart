@@ -3,7 +3,7 @@ title: 'Accepting invites, re-invite after a fault and bulk invites'
 type: 'feature'
 ticket: '2'
 created: '2026-10-18'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'

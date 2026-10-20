@@ -3,7 +3,7 @@ title: 'Outbox, queue worker and email provider'
 type: 'feature'
 ticket: '1'
 created: '2026-10-17'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'medium'

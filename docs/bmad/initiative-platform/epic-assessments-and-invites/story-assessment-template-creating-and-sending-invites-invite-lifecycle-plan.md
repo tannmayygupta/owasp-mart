@@ -3,7 +3,7 @@ title: 'Assessment template, creating and sending invites, invite lifecycle'
 type: 'feature'
 ticket: '1'
 created: '2026-10-18'
-status: built
+status: done
 route: 'full'
 route_source: 'auto'
 risk: 'high'
