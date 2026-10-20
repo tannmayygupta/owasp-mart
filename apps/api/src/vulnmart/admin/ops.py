@@ -1,4 +1,4 @@
-"""The admin's operations (story P-28, FR-ADM-01, 02, 04, 05, 06, ADR 0056): the approval queue, user management, force-stop, settings and quotas, the capacity view, the scheduler's
+"""The admin's operations (story P-28, FR-ADM-01, 02, 04, 05, 06, ADR 0057): the approval queue, user management, force-stop, settings and quotas, the capacity view, the scheduler's
 last runs.
 
 Every method takes the caller's `Scope` and refuses anyone who is not an admin (`RoleService.require_admin`, the same check the company and status services make); the routes put

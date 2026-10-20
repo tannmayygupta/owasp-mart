@@ -1,6 +1,6 @@
 // Repeatable live audit of the labs host (vm-i): collects the read-only facts over SSH, redacts them, saves them as the input folder of scripts/vmi-audit.mjs and
 // runs that audit. Read-only on the host. Needs the SSH key in the agent, AWS credentials (profile vulnmart) for the IMDS facts, and terraform for the addresses.
-//   node scripts/live-audit.mjs --out <folder> [--instances N]
+//   node scripts/live-audit.mjs --out <folder> [--instances N] [--expect-runtime runsc|runc]
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -45,6 +45,8 @@ export function main(argv = process.argv.slice(2)) {
   if (i < 0 || !argv[i + 1]) { console.error('usage: node scripts/live-audit.mjs --out <folder> [--instances N]'); return 2; }
   const out = path.resolve(argv[i + 1]);
   const n = argv.includes('--instances') ? argv[argv.indexOf('--instances') + 1] : '1';
+  const rt = argv.includes('--expect-runtime') ? argv[argv.indexOf('--expect-runtime') + 1] : null;
+  if (rt !== null && !['runc', 'runsc'].includes(rt)) { console.error('--expect-runtime is runc or runsc'); return 2; }
   const tfDir = path.join(ROOT, 'infra', 'terraform', 'aws');
   const env = { ...process.env, AWS_PROFILE: process.env.AWS_PROFILE ?? 'vulnmart' };
   const host = run('terraform', ['output', '-raw', 'vm_i_public_ip'], { cwd: tfDir, env }).stdout.trim();
@@ -64,7 +66,7 @@ export function main(argv = process.argv.slice(2)) {
     const imds = run('aws', ['ec2', 'describe-instances', '--filters', 'Name=instance-state-name,Values=running', '--query', 'Reservations[].Instances[].MetadataOptions.HttpTokens', '--output', 'json'], { env });
     fs.writeFileSync(path.join(out, 'imds.json'), imds.status === 0 ? imds.stdout : '');
   } catch (e) { console.error(`FAIL ${e.message}`); return 1; } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
-  const a = run('node', [path.join(ROOT, 'scripts', 'vmi-audit.mjs'), '--from', out, '--instances', n], { encoding: 'utf8' });
+  const a = run('node', [path.join(ROOT, 'scripts', 'vmi-audit.mjs'), '--from', out, '--instances', n, ...(rt ? ['--expect-runtime', rt] : [])], { encoding: 'utf8' });
   console.log(a.stdout.trimEnd());
   return a.status ?? 1;
 }

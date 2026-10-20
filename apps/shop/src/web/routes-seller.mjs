@@ -8,6 +8,7 @@ import * as seller from '../domain/seller-service.mjs';
 import * as money from '../domain/money-service.mjs';
 import { getSellerOrderByNo } from '../challenges/c01-cross-store-order.mjs';
 import { importImageFromUrl } from '../challenges/c10-ssrf-import.mjs';
+import { importPreview } from '../domain/import-client.mjs';
 import { registerStoreWithKyc, sellerPayoutsView } from '../challenges/c11-kyc-failopen.mjs';
 
 function handleError(err, res) {
@@ -62,6 +63,19 @@ export function registerSellerRoutes(app, db, { emit = () => {}, challenges = {}
     try {
       const out = await importImageFromUrl(req.body?.url, { challenges, emit });
       res.json(out);
+    } catch (e) {
+      if (e instanceof ValidationError) return res.status(400).json({ error: e.message });
+      next(e);
+    }
+  });
+
+  // C06 (Vulnerable and Outdated Components). Bulk import preview: the shop sends the product to the isolated import service and shows its answer. Whether the service's
+  // merge is exploitable is decided in the service (it is, exactly when this instance's C06 flag was placed there).
+  app.get('/seller/import', SELLER, h((req, res) => res.render('seller/import', {})));
+  app.post('/seller/import-preview', SELLER, async (req, res, next) => {
+    try {
+      const out = await importPreview(req.body);
+      res.status(out.ok ? 200 : 503).json(out);
     } catch (e) {
       if (e instanceof ValidationError) return res.status(400).json({ error: e.message });
       next(e);

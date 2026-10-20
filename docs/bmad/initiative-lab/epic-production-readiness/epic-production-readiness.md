@@ -38,3 +38,12 @@ Stream L work. Where a part belongs to another stream (the invite and company fl
 - 2026-10-19: follow-up fix on the same pull request (delete_after only while withdrawn), same dev-log
 - 2026-10-19: instance limits, flag scan in CI and the time-metrics 500, docs/dev-log/2026-10-19-tannmayygupta-instance-limits-flag-scan-and-time-metrics.md (L-14, L-19, L-25 stay open)
 - 2026-10-19: the images workflow change declared in contracts/CHANGELOG.md (contract rules), same pull request
+- 2026-10-19: COMPAT.md follows Akshay's P-25 (IF-1 1.1.0, DB 2.1.0), erase repeat test (H-145), docs/dev-log/2026-10-19-tannmayygupta-compat-after-p25-and-erase-repeat.md
+- 2026-10-19: Tanmay's own COMPAT.md sign-off rows approved, docs/dev-log/2026-10-19-tannmayygupta-own-signoff-rows.md
+- 2026-10-19: FR-TIM-04 events written by the lab, docs/dev-log/2026-10-19-tannmayygupta-attempt-log-events.md (L-25 stays open)
+- 2026-10-19: Postgres loop test updated for the new first log lines (same pull request)
+- 2026-10-19: L-10, L-14, L-19, L-24 closed with live proof, docs/dev-log/2026-10-19-tannmayygupta-ops-proofs-backups-alerts.md
+- 2026-10-20: L-12 closed, hello stack deployed from CI images to both VMs and the laptop, docs/dev-log/2026-10-20-tannmayygupta-l12-hello-stack-deployed.md
+- 2026-10-20: L-25 closed, docs/dev-log/2026-10-20-tannmayygupta-l25-platform-events.md
+- 2026-10-20: L-29 closed, instances run in gVisor, docs/dev-log/2026-10-20-tannmayygupta-l29-gvisor-sandbox.md
+- 2026-10-20: every challenge verified live, C06 C07 C10 fixed, docs/dev-log/2026-10-20-tannmayygupta-live-exploits-c06-c07-c10.md

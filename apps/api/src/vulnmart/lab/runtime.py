@@ -61,6 +61,7 @@ MAX_HINT_LEVEL = 3
 # and no instance lives longer than four hours. It was 1440 and 1440, so a closed browser tab held one of the seven slots of vm-i for a whole day (found by the load check,
 # 2026-10-19). A candidate's instance is longer, see `LabRuntime._limits_for`.
 DEFAULT_TEMPLATE_LIMITS = Limits(memory_mb=256, cpu_limit=1.0, pids_limit=256, idle_minutes=60, max_minutes=240)
+SEEN_MARKER_GAP_S = 300  # a `request_seen` marker at most every five minutes per instance
 CANDIDATE_IDLE_MINUTES = 120  # a candidate may think for a while without touching the shop
 CANDIDATE_MARGIN_MINUTES = 30  # the instance outlives the template's time limit by this much (the attempt's own clock ends the assessment)
 
@@ -135,7 +136,7 @@ class LabRuntime:
         self.state_reports = StateReportStore()  # what the orchestrator reported per instance (H-347); empty without a receiver
         self.events = s.events
         self.engine = AttemptEngine(s.attempts, HostInstanceControl(host), self.clock, events=self._engine_event)
-        self.attempts = EngineAttemptPort(self.engine)
+        self.attempts = EngineAttemptPort(self.engine, self.attempt_log)
         self.evidence_store = s.evidence
         self.reports = EngineReportPort(attempts=self.attempts, facts=RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None))),
                                         integrity=self.integrity, clock=self.clock,
@@ -169,6 +170,7 @@ class LabRuntime:
                                         events=self.attempt_log.append)
         # the domain events of the live hub (H-142): attached by `_mount_lab` when the platform has a durable event port, silent otherwise
         self.live = LiveAnnouncer(clock=self.clock, record_of=self._record_or_none, score_of=self.score_rows)
+        self._seen_marker: dict[str, datetime] = {}  # instance id -> when `request_seen` was last written (FR-TIM-04: a marker, not a request log)
         self._bump_pending: set[str] = set()  # accounts whose access bump failed; `tick` tries again
         self._recover_windows()
     def _recover_windows(self) -> None:
@@ -291,6 +293,8 @@ class LabRuntime:
         if result.stored is False:
             return  # a replay: nothing else sees it
         for credit in result.credits:
+            if event.get("type") == "proxy.flag_seen" and (event.get("data") or {}).get("kind") == "real":
+                self._journal("flag_auto_detected", credit.attempt_id, challenge_key=credit.challenge_key, instance_id=event["instance_id"])  # FR-TIM-04
             self._journal("milestone_reached", credit.attempt_id, challenge_key=credit.challenge_key, level=credit.milestone.value,
                           instance_id=event["instance_id"])
             self.live.milestone(credit.attempt_id, credit.challenge_key, credit.milestone.value)
@@ -301,6 +305,21 @@ class LabRuntime:
         self.bots.observe(event, at)
         if event.get("session_kind") == "player":
             self._note_activity(event["instance_id"], at)
+            if event.get("type") == "proxy.request":
+                self._mark_request_seen(event["instance_id"], at)
+
+    def _mark_request_seen(self, instance_id: str, at: datetime) -> None:
+        """FR-TIM-04 `request_seen`: one line when the player's traffic starts and again after five quiet minutes, never one line per request and never a request."""
+        with self._lock:
+            last = self._seen_marker.get(instance_id)
+            if last is not None and (at - last).total_seconds() < SEEN_MARKER_GAP_S:
+                return
+            self._seen_marker[instance_id] = at
+            if len(self._seen_marker) > 2000:
+                self._seen_marker = {k: v for k, v in self._seen_marker.items() if (at - v).total_seconds() < SEEN_MARKER_GAP_S}
+        info = self.directory.get(instance_id)
+        if info is not None:
+            self._journal("request_seen", info.attempt_id, instance_id=instance_id)
 
     def _note_activity(self, instance_id: str, at: datetime | None = None) -> None:
         """Tell the orchestrator that a player is active (audit blocker B1: without it the idle limit ran from `ready` and cut players off mid-attempt).
@@ -325,6 +344,10 @@ class LabRuntime:
             log.warning("reporting activity of instance %s failed", instance_id[:10], exc_info=True)
 
     # ---- calls ----
+
+    def journal(self, event: str, attempt_id: str, **extra: Any) -> None:
+        """The same one-line journal for the callers outside the runtime (the routes): ids only, never raises."""
+        self._journal(event, attempt_id, **extra)
 
     def _journal(self, event: str, attempt_id: str, **extra: Any) -> None:
         """One line of the ids-only attempt log (FR-TIM-04). A failing log never undoes the step it describes."""
@@ -372,6 +395,7 @@ class LabRuntime:
                                     hostname=f"{instance_id.lower()}.{self._suffix}", limits=self._limits_for(rec),
                                     owner_hash=self.keys.owner_hash(user_id))
             self.host.create(request)
+            self._journal("instance_requested", rec.id, instance_id=instance_id)  # FR-TIM-04
             # registered at once: the owner can poll the instance while it starts, and an event of epoch 1 has a known epoch
             self.directory.add(InstanceInfo(instance_id, rec.id, template, 1, tuple(self.challenge_keys)))
             self.epochs.set(instance_id, 1)
@@ -390,6 +414,7 @@ class LabRuntime:
         try:
             self._wait_ready(instance_id)
             self.host.set_access(instance_id, Access.OPEN, 1)
+            self._journal("instance_ready", rec.id, instance_id=instance_id)  # FR-TIM-04 (before the clock starts: `session_started` follows)
             started = self.engine.instance_ready(rec.id, self.clock(), instance_id)
             if started.instance_id != instance_id:  # a running attempt whose old instance died now points at the new one
                 started = self.engine.set_instance(rec.id, instance_id)

@@ -53,5 +53,6 @@
 | 0053 | [Stream authorisation: the company's standing, passive session checks, and HTTP/2 through the front](0053-stream-authorisation-company-standing-passive-sessions-and-http2-through-the-front.md) | Proposed (the builder's design for the developer to confirm) |
 | 0054 | [Retention: a scheduler with leased runs, two privileged purge functions, and the candidate's clock](0054-retention-scheduler-leased-runs-privileged-purge-functions-and-the-candidate-clock.md) | Proposed (the builder's design for the developer to confirm) |
 | 0055 | [Deletion requests: the 7-day undo window, the company's part, and company-level view history](0055-deletion-requests-the-undo-window-the-company-s-part-and-company-level-view-history.md) | Proposed (the builder's design for the developer to confirm) |
+| 0057 | [Admin operations: admin-only routes, a real quota port, and setting ranges](0057-admin-operations-admin-only-routes-a-real-quota-port-and-setting-ranges.md) | Proposed (the builder's design for the developer to confirm) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

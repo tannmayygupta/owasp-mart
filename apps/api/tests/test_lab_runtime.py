@@ -12,7 +12,7 @@ from vulnmart_attempts import FakeClock
 from support import play
 from vulnmart.ingest.verify import sign_body
 from vulnmart.lab.runtime import LabRuntime, RuntimeFacts, build_lab_runtime, new_instance_id
-from vulnmart.ports.errors import AttemptStateInvalid
+from vulnmart.ports.errors import AttemptGone, AttemptStateInvalid
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
 from vulnmart.ports.instance_host import Access, InstanceState
 
@@ -264,7 +264,7 @@ def test_the_log_gets_flag_hint_and_milestone_lines_the_metrics_and_timeline_rea
     assert rt.submit_flag(s.attempt_id, "C02", "VM{ZZZZZZZZZZZZZZZZZZZZZZZZ}").result == "incorrect"
     assert rt.submit_flag(s.attempt_id, "C02", rt.keys.flag(s.instance_id, "C02", 1)).credit == "credited"
     names = [(e["event"], e.get("challenge_key"), e.get("result") or e.get("level")) for e in rt.attempt_log.read(s.attempt_id)]
-    assert names == [("session_started", None, None), ("hint_unlocked", "C01", 1), ("flag_submitted", "C02", "incorrect"),
+    assert names == [("instance_requested", None, None), ("instance_ready", None, None), ("session_started", None, None), ("hint_unlocked", "C01", 1), ("flag_submitted", "C02", "incorrect"),
                      ("flag_submitted", "C02", "correct"), ("milestone_reached", "C02", "M3")]
     assert rt.time_metrics(s.attempt_id).retries == {"C02": 2} or rt.time_metrics(s.attempt_id).retries
 
@@ -458,3 +458,68 @@ def test_the_instance_limits_are_an_hour_idle_and_four_hours_for_a_learner_and_c
     lim = rt._limits_for(rec)
     assert lim.idle_minutes == 120 and lim.max_minutes == max(240, rec.rules.time_limit_minutes + 30)
     assert rt._limits_for(rt.engine.get(learner.attempt_id)) == rt._limits
+
+
+def test_erase_is_safe_to_repeat_as_the_deletion_workflow_and_the_retention_job_both_call_it():
+    """Handoff H-145 (story P-25): a deletion request and the retention job call the same `LabRuntime.erase`, possibly twice for one attempt."""
+    rt, _, _ = make_runtime()
+    started = rt.start_attempt("u-1", org_id="o-1")
+    rt.withdraw(started.attempt_id)
+    rt.erase(started.attempt_id)
+    rt.erase(started.attempt_id)  # the second call finds the key gone and the attempt already purged
+    assert rt.engine.get(started.attempt_id).purged_at is not None
+    with pytest.raises(AttemptGone):
+        rt.attempts.get(started.attempt_id)  # the platform's port refuses a purged attempt
+
+
+def test_the_lab_writes_the_instance_and_auto_capture_events_of_the_attempt_log():
+    """FR-TIM-04 (L-25): instance_requested, instance_ready and flag_auto_detected were on the allow-list but never written."""
+    rt, clock, _ = make_runtime()
+    started = rt.start_attempt("u-1")
+    play(rt, started.instance_id)
+    flag = rt.keys.flag(started.instance_id, "C02", 1)
+    assert post(rt, flag_event(rt, started.instance_id, "C02", flag, 1, clock)).status == 202
+    names = [e["event"] for e in rt.attempt_log.read(started.attempt_id)]
+    assert names.index("instance_requested") < names.index("instance_ready"), names
+    assert "session_started" in names and "flag_auto_detected" in names, names
+    detected = [e for e in rt.attempt_log.read(started.attempt_id) if e["event"] == "flag_auto_detected"]
+    assert detected and detected[0]["challenge_key"] == "C02" and flag not in str(detected), "ids only, never the flag"
+
+
+def test_the_invite_history_the_platform_knows_goes_into_the_attempt_log_once_with_its_real_times():
+    """FR-TIM-04 (L-25): invite_created, invite_opened and consent_given are known to the platform, not to the lab; the port writes them when the attempt is made."""
+    from datetime import timedelta
+
+    rt, clock, _ = make_runtime()
+    made, opened, consented = clock() - timedelta(days=3), clock() - timedelta(days=2), clock() - timedelta(minutes=5)
+    args = dict(user_id="u-7", org_id="o-1", template_id="shop-v0", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-1")
+    a = rt.attempts.create_from_consent(**args, history={"invite_created": made, "invite_opened": opened, "consent_given": consented})
+    rows = {e["event"]: e["at"] for e in rt.attempt_log.read(a.attempt_id)}
+    assert rows == {"invite_created": made.isoformat(), "invite_opened": opened.isoformat(), "consent_given": consented.isoformat()}
+    again = rt.attempts.create_from_consent(**args, history={"invite_created": made, "invite_opened": opened, "consent_given": consented})
+    assert again.attempt_id == a.attempt_id
+    assert [e["event"] for e in rt.attempt_log.read(a.attempt_id)].count("invite_created") == 1, "written once, not again on a repeated call"
+    b = rt.attempts.create_from_consent(user_id="u-8", org_id="o-1", template_id="shop-v0", invite_id="i-BBBBBBBBBBBBBBBB", consent_id="c-2",
+                                        history={"invite_created": made, "invite_opened": None, "consent_given": consented})
+    assert [e["event"] for e in rt.attempt_log.read(b.attempt_id)] == ["invite_created", "consent_given"], "an instant the platform does not know is not invented"
+    c = rt.attempts.create_from_consent(user_id="u-9", org_id="o-1", template_id="shop-v0", invite_id="i-CCCCCCCCCCCCCCCC", consent_id="c-3")
+    assert rt.attempt_log.read(c.attempt_id) == (), "no history given: nothing written"
+
+
+def test_request_seen_is_a_marker_when_the_player_starts_and_after_a_quiet_gap_never_one_line_per_request():
+    """FR-TIM-04 (L-25): `request_seen` is a summary marker, never the request."""
+    from datetime import timedelta
+
+    rt, clock, _ = make_runtime()
+    s = rt.start_attempt("u-1")
+    def request(seq, at):
+        return {"schema_version": "0.1", "instance_id": s.instance_id, "epoch": 1, "seq": seq, "type": "proxy.request", "source": "sidecar", "session_kind": "player", "user_id": "u-1001",
+                "ts": at.strftime("%Y-%m-%dT%H:%M:%SZ"), "data": {"route_template": "/api/x", "method": "GET", "status": 200, "count": 3, "resp_len": 120, "client_class": "browser"}}
+    seen = lambda: [e for e in rt.attempt_log.read(s.attempt_id) if e["event"] == "request_seen"]  # noqa: E731
+    for n in range(5):
+        assert post(rt, request(n + 1, clock())).status == 202
+        clock.advance(seconds=20)  # five requests inside two minutes
+    assert len(seen()) == 1 and set(seen()[0]) == {"event", "attempt_id", "at", "instance_id"}, "one marker, ids only"
+    clock.advance(minutes=6)
+    assert post(rt, request(6, clock())).status == 202
+    assert len(seen()) == 2, "a new marker after a quiet gap"

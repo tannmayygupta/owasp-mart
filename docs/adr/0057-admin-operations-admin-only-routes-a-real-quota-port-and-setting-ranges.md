@@ -1,4 +1,4 @@
-# 0056. Admin operations: admin-only routes, a real quota port, and setting ranges
+# 0057. Admin operations: admin-only routes, a real quota port, and setting ranges
 
 - **Status:** Proposed (the builder's design for the developer to confirm; the quota and cap numbers are placeholders, OI-21)
 - **Date:** 2026-10-20

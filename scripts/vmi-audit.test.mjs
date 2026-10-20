@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import {
+import { auditRuntime,
   FILES, auditAll, auditDaemon, auditDockerInfo, auditImds, auditInspect, auditIptables, auditLabsChain, auditListeners, cidrContains, exitCodeOf,
   parseArgs, parseCidr, parseListeners, redactEvidence,
 } from './vmi-audit.mjs';
@@ -145,7 +145,7 @@ test('cidr helpers', () => {
 
 test('parseArgs and redaction', () => {
   assert.equal(parseArgs(['--local']).mode, 'local');
-  assert.deepEqual(parseArgs(['--from', 'd', '--instances', '10', '--out', 'o']), { mode: 'from', from: 'd', instances: 10, out: 'o' });
+  assert.deepEqual(parseArgs(['--from', 'd', '--instances', '10', '--out', 'o']), { mode: 'from', from: 'd', instances: 10, out: 'o', expectRuntime: null });
   assert.match(parseArgs([]).error, /Usage/);
   assert.match(parseArgs(['--from']).error, /needs a folder/);
   assert.match(parseArgs(['--local', '--instances', 'x']).error, /positive integer/);
@@ -200,4 +200,23 @@ test('inspect (finding D11): only the edge gate may sit on an instance network b
   const bad = run(c('vulnmart-orchestrator', ['labs-core', 'vm-i-aaaaaaaaaaaaaaaa-e1']));
   assert.equal(bad.status, 'FAIL');
   assert.match(bad.detail, /vulnmart-orchestrator: attached to an instance network/);
+});
+
+
+test('instance-runtime (S-8, L-29): with an expected runtime every instance container must have asked for it; infrastructure containers are not instances', () => {
+  const c = (name, runtime, labels = {}) => ({ Name: `/${name}`, Config: { Labels: labels }, HostConfig: { Runtime: runtime } });
+  const text = (list) => JSON.stringify(list);
+  const ok = auditRuntime(text([c('vm-i-aaaa-e1-shop', 'runsc'), c('vm-i-aaaa-e1-sidecar', 'runsc'), c('vulnmart-orchestrator', 'runc')]), 'runsc');
+  assert.deepEqual(ok.map((r) => [r.status, r.name]), [['PASS', 'instance-runtime']]);
+  assert.match(ok[0].detail, /2 instance container\(s\), every one under runsc/);
+  const bad = auditRuntime(text([c('vm-i-aaaa-e1-shop', 'runsc'), c('vm-i-aaaa-e1-import-service', ''), c('vm-i-bbbb-e1-shop', 'runc')]), 'runsc');
+  assert.equal(bad[0].status, 'FAIL');
+  assert.match(bad[0].detail, /vm-i-aaaa-e1-import-service \(runc\)/);
+  assert.match(bad[0].detail, /vm-i-bbbb-e1-shop \(runc\)/);
+  assert.doesNotMatch(bad[0].detail, /vm-i-aaaa-e1-shop \(/);
+  assert.match(auditRuntime(text([c('vulnmart-edge-gate', 'runc')]), 'runsc')[0].detail, /no instance container is running/);
+  assert.equal(auditRuntime('not json', 'runsc')[0].status, 'FAIL');
+  assert.equal(parseArgs(['--from', 'x', '--expect-runtime', 'runsc']).expectRuntime, 'runsc');
+  assert.match(parseArgs(['--from', 'x', '--expect-runtime', 'kata']).error, /runc or runsc/);
+  assert.equal(parseArgs(['--from', 'x']).expectRuntime, null);
 });

@@ -12,11 +12,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
-### 1.2.0 (2026-10-20, Akshay, story P-28, ADR 0056)
-
-- Additive, not breaking (the sign-offs of COMPAT.md stay on 1.0.0 until the owners confirm the minor label; the OpenAPI `info.version` is not changed here): thirteen admin-only operations under `/api/v1/admin/` (`listPendingCompanies`, `decideCompany`, `listUsers`, `actOnUser`, `forceStopInstance`, `listSettings`, `updateSetting`, `resetSetting`, `listQuotas`, `setQuota`, `removeQuota`, `getCapacity`, `listJobs`), the tag `admin`, the responses `AdminNotFound` (404 `REQ-ROUTE-UNKNOWN`, also the answer to a non-admin) and `AdminConflict` (409), and the schemas `PendingCompany`, `PendingCompanyList`, `CompanyDecisionRequest`, `AdminUser`, `AdminUserList`, `UserActionRequest`, `UserActionResult`, `ForceStopResult`, `AdminSetting`, `AdminSettingList`, `SettingUpdateRequest`, `Quota`, `QuotaList`, `QuotaRequest`, `Capacity`, `JobStatus`, `JobStatusList`; no new error code. The bundle (42 platform operations, 62 in all) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (four valid and four invalid request examples added; `scripts/platform-mock.test.mjs` 20 of 20).
-
-### 1.2.0 (2026-10-20, Akshay, story P-28, ADR 0056)
+### 1.2.0 (2026-10-20, Akshay, story P-28, ADR 0057)
 
 - Additive, not breaking (the sign-offs of COMPAT.md stay on 1.0.0 until the owners confirm the minor label; the OpenAPI `info.version` is not changed here): thirteen admin-only operations under `/api/v1/admin/` (`listPendingCompanies`, `decideCompany`, `listUsers`, `actOnUser`, `forceStopInstance`, `listSettings`, `updateSetting`, `resetSetting`, `listQuotas`, `setQuota`, `removeQuota`, `getCapacity`, `listJobs`), the tag `admin`, the schemas `PendingCompany`, `PendingCompanyList`, `CompanyDecisionRequest`, `AdminUser`, `AdminUserList`, `UserActionRequest`, `UserActionResult`, `ForceStopResult`, `AdminSetting`, `AdminSettingList`, `SettingUpdateRequest`, `Quota`, `QuotaList`, `QuotaRequest`, `Capacity`, `JobStatus`, `JobStatusList`, the responses `AdminNotFound` (404 `REQ-ROUTE-UNKNOWN`, also for a non-admin) and `AdminConflict` (409 `ATT-INVALID-STATE`); no new error code. The bundle (42 platform operations) and the generated models are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (two valid and four invalid request examples added; `scripts/platform-mock.test.mjs` 20 of 20).
 
@@ -308,6 +304,12 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Full content (briefs, write-ups, decoys, filled hints, official-site id re-check) is T-30; each challenge's real milestone signals and confirmed flag placement come with its own story.
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
+
+### 2026-10-19 (Tanmay, story L-09: own sign-offs)
+- registry change: the Approvals rows of `@tannmayygupta` in `contracts/COMPAT.md` are set to `approved` on 2026-10-19 at the versions listed there, on the developer's instruction in chat. No contract file, registry entry or rule changed.
+
+### 2026-10-19 (Tanmay, story L-09: COMPAT.md follows the changelog after P-25)
+- registry change: `contracts/COMPAT.md` lists IF-1 at 1.1.0 and DB at 2.1.0, the versions of the newest changelog entries of Akshay's story P-25 (the tag script checks that COMPAT.md equals the changelog); the approval rows of IF-1 and DB carry the same versions and are `pending`. No contract file, registry entry or rule changed.
 
 ### 2026-10-19 (Tanmay, story L-19: flag scan of every image in CI)
 - registry change: the `check` job of `.github/workflows/images.yml` now builds each image with `--load` and runs `node scripts/scan-flags.mjs --image` on it, and the path filter lists `scripts/scan-flags.mjs`. Workflow change only: no change to the registry, the checker, the diff scripts, the oasdiff pins, any contract or any rule.

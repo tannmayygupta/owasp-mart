@@ -24,7 +24,7 @@ context:
 
 ## Boundaries & Constraints
 
-**Decisions (developer):** "continue automatically", "go with the recommended flow"; OI-29 rate limits only. Claude's choices, in ADR 0056 (Proposed): attempts as the handle of force-stop, a participant's deletion through the deletion service (locked instead when it holds assessment data), a recruiter account marked deleted, no admin account changed through these routes, the setting ranges, the caps as settings, the existing error codes.
+**Decisions (developer):** "continue automatically", "go with the recommended flow"; OI-29 rate limits only. Claude's choices, in ADR 0057 (Proposed): attempts as the handle of force-stop, a participant's deletion through the deletion service (locked instead when it holds assessment data), a recruiter account marked deleted, no admin account changed through these routes, the setting ranges, the caps as settings, the existing error codes.
 
 **Always:** every method checks the admin against the database, not only the session; every change is audited without a reason's text, an address or anything a candidate wrote; an admin never sees or sets a password; a value outside its range is refused; a quota change is read by the next request.
 

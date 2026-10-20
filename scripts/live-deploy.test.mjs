@@ -50,3 +50,15 @@ test('the demo template only changes the memory of the six roles and keeps every
 });
 
 test('hooks is a command', () => { assert.equal(parseArgs(['hooks']).cmd, 'hooks'); });
+
+
+test('the lab deploy runs instances in gVisor by default, runc only when asked, and the environment says so (S-8, L-29)', async () => {
+  const { labEnv, DEFAULT_RUNTIME, parseArgs } = await import('./live-deploy.mjs');
+  const H = { i: { priv: '10.0.1.5' }, p: { priv: '10.0.0.5' } };
+  assert.equal(DEFAULT_RUNTIME, 'runsc');
+  assert.match(labEnv({ zone: 'z.example', H }), /(^| )VULNMART_ORCH_RUNTIME=runsc( |$)/);
+  assert.match(labEnv({ zone: 'z.example', H, runtime: 'runsc' }), /VULNMART_ORCH_RUNTIME=runsc/);
+  assert.doesNotMatch(labEnv({ zone: 'z.example', H, runtime: 'runc' }), /VULNMART_ORCH_RUNTIME/);
+  assert.equal(parseArgs(['lab', '--runtime', 'runc']).runtime, 'runc');
+  assert.match(parseArgs(['lab', '--runtime', 'kata']).error, /runsc \(gVisor\) or runc/);
+});

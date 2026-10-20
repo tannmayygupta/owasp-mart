@@ -1,0 +1,12 @@
+{
+  "what": "L-14: the orchestrator reaper destroys an instance that is idle too long or past its total limit, observed on the deployed lab (vm-i), 2026-10-19",
+  "method": "three throwaway attempts were started through the lab runtime of the API container with chosen limits; the state of each instance was read from the orchestrator about 4 and 5 minutes later (read only)",
+  "started_at": "2026-10-19T14:35:49+05:30",
+  "read_at": "2026-10-19T14:40:26+05:30",
+  "instances": [
+    { "name": "idle3", "limits": { "idle_minutes": 3, "max_minutes": 240 }, "state_after": "destroyed", "meaning": "no activity for 3 minutes: destroyed by the reaper" },
+    { "name": "max4", "limits": { "idle_minutes": 60, "max_minutes": 4 }, "state_after": "destroyed", "meaning": "total limit of 4 minutes reached: destroyed by the reaper" },
+    { "name": "control", "limits": { "idle_minutes": 60, "max_minutes": 240 }, "state_after": "ready", "meaning": "the production defaults: still alive after 5 minutes, as it must be" }
+  ],
+  "not_covered": "the control instance is expected to be destroyed about 60 minutes after 14:36 if nobody plays; the kill-the-orchestrator test is not part of this record"
+}

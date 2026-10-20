@@ -3,7 +3,7 @@
 Every route needs an admin session (`requires(Role.ADMIN)`); a caller who is not an admin is answered 404 REQ-ROUTE-UNKNOWN, the same as for a route that does not exist, so the answer
 does not even say the route is there. The routes that change state also need the CSRF header and the Origin check. Every change is audited by `AdminOps`; no route here reads
 anything a candidate wrote (FR-ADM-08). A company, user, attempt, setting or quota that does not exist is the same 404; a change that does not start from the state it is
-asked for (a company already decided, an account not active) is 409 ATT-INVALID-STATE (the registry has no admin codes, ADR 0056); a value outside its range is 422.
+asked for (a company already decided, an account not active) is 409 ATT-INVALID-STATE (the registry has no admin codes, ADR 0057); a value outside its range is 422.
 """
 from __future__ import annotations
 

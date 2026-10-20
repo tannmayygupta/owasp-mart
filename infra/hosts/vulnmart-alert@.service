@@ -1,0 +1,6 @@
+[Unit]
+Description=VulnMart alert for the failed unit %i (leaves a marker file and a critical journal line)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vulnmart-alert.sh fail %i

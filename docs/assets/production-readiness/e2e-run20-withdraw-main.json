@@ -1,0 +1,61 @@
+{
+  "at": "2026-10-19T07:50:05.008Z",
+  "base": "https://tanmay-platform-prod.duckdns.org",
+  "rows": [
+    {
+      "name": "two throwaway learners signed in",
+      "ok": true,
+      "detail": "ids not printed"
+    },
+    {
+      "name": "a candidate attempt with an instance was made by the lab runtime of the API container",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "the owner reads the candidate attempt (running)",
+      "ok": true,
+      "detail": "candidate/running"
+    },
+    {
+      "name": "a withdrawal without the confirmation is refused",
+      "ok": true,
+      "detail": "HTTP 422"
+    },
+    {
+      "name": "another account cannot withdraw it (404, like a missing attempt)",
+      "ok": true,
+      "detail": "HTTP 404"
+    },
+    {
+      "name": "the owner withdraws: state withdrawn and a deletion date is set",
+      "ok": true,
+      "detail": "HTTP 200 withdrawn"
+    },
+    {
+      "name": "the instance is destroyed",
+      "ok": true,
+      "detail": "HTTP 200 stopping"
+    },
+    {
+      "name": "nothing is accepted after the withdrawal",
+      "ok": true,
+      "detail": "HTTP 409 ATT-INVALID-STATE"
+    },
+    {
+      "name": "withdrawing again keeps the first deletion date",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "the undo cancels the deletion and the attempt stays withdrawn",
+      "ok": true,
+      "detail": "HTTP 200 withdrawn"
+    },
+    {
+      "name": "withdrawn again so the lab erases the throwaway attempt after the window",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
