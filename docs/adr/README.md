@@ -61,5 +61,6 @@
 | 0062 | [Break-glass sessions and the admin's audit log](0062-break-glass-sessions-and-the-admin-audit-log.md) | Proposed (the builder's design for the developer to confirm) |
 | 0063 | [Sequenced learner runs with a countdown per challenge](0063-sequenced-learner-runs-with-a-countdown-per-challenge.md) | Accepted (the developer answered the questions on 2026-10-20) |
 | 0064 | [The team is the leader and Claude only](0064-the-team-is-the-leader-and-claude-only.md) | Accepted (the leader instructed it on 2026-10-21) |
+| 0070 | [Browser tests run the production build of the dashboards against the real API app on a throw-away database](0070-browser-tests-run-the-real-api-app-on-a-throw-away-database.md) | Accepted (the leader asked for real browser tests on 2026-10-21; choices to review in the pull request) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.
