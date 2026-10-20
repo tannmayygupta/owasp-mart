@@ -340,6 +340,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
+### 2026-10-20 (Sahil, IF-6 1.0.1 consumer re-sign-off)
+- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0058) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
+
+
 ### 2026-10-20 (Sahil, IF-7 1.2.0 owner + DB 2.1.0 consumer sign-off)
 - registry change: in `contracts/COMPAT.md` the stream-T Approvals rows for IF-7 (owner) and DB (consumer) are set to `approved` at 1.2.0 and 2.1.0 (date 2026-10-20). Sahil's review: IF-7 1.2.0 is data-only (the player-facing `start_state` text of C01–C11 now names the seeded demo account and where to look; no schema change, no flag/placement/test-path in any text, the accounts match `apps/shop/seed/contributions/010-challenge-accounts.mjs`); DB 2.1.0 is additive table-owner rows (`data_views`, lab tables, `security_events`) that do not touch the shop (own SQLite) or the catalogue tables. No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
 
