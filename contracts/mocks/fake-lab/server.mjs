@@ -102,6 +102,7 @@ export function createFakeLab(options = {}) {
     b.progress.get('C01').best = 2;
     b.progress.get('C11').held = true;
     addTimeline(b, { at: b.startedAt, type: 'attempt.started', challenge_key: null, milestone: null, result: null });
+    addTimeline(b, { at: stamp(Date.now() - 35 * 60 * 1000), type: 'attempt.time_warning', challenge_key: null, milestone: null, result: null, minutes_left: 15 }); // a seeded warning (the mock's clock is not the engine's)
     addTimeline(b, { at: stamp(Date.now() - 30 * 60 * 1000), type: 'milestone.reached', challenge_key: 'C01', milestone: 'M1', result: null });
     addTimeline(b, { at: stamp(Date.now() - 20 * 60 * 1000), type: 'milestone.reached', challenge_key: 'C01', milestone: 'M2', result: null });
     b.evidence.push({ evidence_id: 'e-AAAAAAAAAAAAAAAA', challenge_key: 'C01', captured_at: stamp(Date.now() - 20 * 60 * 1000), method: 'GET',
@@ -204,7 +205,7 @@ export function createFakeLab(options = {}) {
     if (c.state === 'active' || (allowSolved && c.state === 'solved')) return null;
     return problem(res, 409, 'ATT-INVALID-STATE', `the challenge is ${c.state}`) ?? true;
   }
-  const timelineView = (e) => ({ at: e.at, type: e.type, challenge_key: e.challenge_key, milestone: e.milestone, result: e.result });
+  const timelineView = (e) => ({ at: e.at, type: e.type, challenge_key: e.challenge_key, milestone: e.milestone, result: e.result, ...(e.type === 'attempt.time_warning' ? { minutes_left: e.minutes_left } : {}) });
   const GONE_STATES = ['withdrawn', 'cancelled'];
   const flagView = (f) => ({ integrity_flag_id: f.id, type: f.type, challenge_key: f.challenge, explanation: f.explanation, status: f.status,
     held: f.held, created_at: f.createdAt, decided_at: f.decidedAt, decision_note: f.note });
@@ -634,13 +635,14 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     if (!isObj(body)) return invalid(res, '', 'the body must be a JSON object');
     const a = typeof body.attempt_id === 'string' ? attempts.get(body.attempt_id) : undefined;
     if (!a) return attemptNotFound(res);
-    const types = ['attempt.started', 'milestone.reached', 'flag.submitted', 'hint.unlocked', 'instance.reset', 'attempt.submitted', 'attempt.expired'];
+    const types = ['attempt.started', 'milestone.reached', 'flag.submitted', 'hint.unlocked', 'instance.reset', 'attempt.submitted', 'attempt.expired', 'attempt.time_warning'];
     const type = body.type ?? 'flag.submitted';
     if (!Number.isSafeInteger(body.epoch) || body.epoch < 1) return invalid(res, '/epoch', 'epoch is a whole number of at least 1');
     if (!Number.isSafeInteger(body.seq) || body.seq < 1) return invalid(res, '/seq', 'seq is a whole number of at least 1');
     if (!types.includes(type)) return invalid(res, '/type', 'unknown timeline type');
     if (a.timeline.some((e) => e.epoch === body.epoch && e.seq === body.seq)) return problem(res, 409, 'ATT-INVALID-STATE', 'an event with this key exists');
-    addTimeline(a, { at: stamp(), type, challenge_key: body.challenge_key ?? null, milestone: body.milestone ?? null, result: body.result ?? null }, { epoch: body.epoch, seq: body.seq });
+    if (type === 'attempt.time_warning' && (!Number.isSafeInteger(body.minutes_left) || body.minutes_left < 1 || body.minutes_left > 1440)) return invalid(res, '/minutes_left', 'minutes_left is a whole number of 1 to 1440');
+    addTimeline(a, { at: stamp(), type, challenge_key: body.challenge_key ?? null, milestone: body.milestone ?? null, result: body.result ?? null, ...(type === 'attempt.time_warning' ? { minutes_left: body.minutes_left } : {}) }, { epoch: body.epoch, seq: body.seq });
     res.writeHead(204, { 'cache-control': 'private, no-store' });
     res.end();
   }

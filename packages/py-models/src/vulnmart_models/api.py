@@ -1896,6 +1896,7 @@ class Type1(Enum):
     instance_reset = 'instance.reset'
     attempt_submitted = 'attempt.submitted'
     attempt_expired = 'attempt.expired'
+    attempt_time_warning = 'attempt.time_warning'
 
 
 class Milestone1(Enum):
@@ -1913,6 +1914,14 @@ class TimelineEntry(BaseModel):
     challenge_key: ChallengeKey | None
     milestone: Milestone1 | None
     result: FlagResult | None
+    minutes_left: Annotated[
+        int | None,
+        Field(
+            description='Optional (v2.0.0). Only on `attempt.time_warning`, how many minutes the attempt had left when the warning went out (the default rules warn at 15 and at 5).',
+            ge=1,
+            le=1440,
+        ),
+    ] = None
 
 
 class Timeline(BaseModel):

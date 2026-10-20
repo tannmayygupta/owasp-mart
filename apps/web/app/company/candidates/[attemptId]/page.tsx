@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
-  api, duration, say, when, type CatalogueItem, type CompanyInvite, type Evidence, type IntegrityFlag, type Report, type TimelineEntry,
+  api, duration, say, timelineText, when, type CatalogueItem, type CompanyInvite, type Evidence, type IntegrityFlag, type Report, type TimelineEntry,
 } from '../../../../lib/api';
 import { useRequireUser } from '../../../../lib/session';
 import { Stars } from '../../../attempt-board';
@@ -133,7 +133,7 @@ export default function CandidateReportPage() {
       <section className="card">
         <h2>Timeline</h2>
         {timeline.length === 0 ? <p className="muted">Nothing yet.</p> : (
-          <ol>{timeline.map((t, i) => <li key={i}>{when(t.at)} {t.type}{t.challenge_key ? ` ${t.challenge_key}` : ''}{t.milestone ? ` (${t.milestone})` : ''}{t.result ? `: ${t.result}` : ''}</li>)}</ol>
+          <ol>{timeline.map((t, i) => <li key={i} data-testid={t.type === 'attempt.time_warning' ? 'time-warning' : undefined}>{when(t.at)} {timelineText(t)}</li>)}</ol>
         )}
       </section>
     </>

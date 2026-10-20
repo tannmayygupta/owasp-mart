@@ -244,7 +244,23 @@ export type IntegrityFlag = {
   created_at: string;
   decision_note: string | null;
 };
-export type TimelineEntry = { at: string; type: string; challenge_key: string | null; milestone: string | null; result: string | null };
+export type TimelineEntry = { at: string; type: string; challenge_key: string | null; milestone: string | null; result: string | null; minutes_left?: number };
+
+/** One line of the timeline in words; a type this build does not know is shown as it is (IF-2 may add types). */
+export function timelineText(t: TimelineEntry): string {
+  const key = t.challenge_key ? ` ${t.challenge_key}` : '';
+  switch (t.type) {
+    case 'attempt.time_warning': return `Time warning: ${t.minutes_left ?? '?'} minutes left`;
+    case 'attempt.started': return 'The clock started';
+    case 'attempt.submitted': return 'Submitted';
+    case 'attempt.expired': return 'Time ran out';
+    case 'milestone.reached': return `Milestone${key}${t.milestone ? ` (${t.milestone})` : ''}`;
+    case 'flag.submitted': return `Flag pasted${key}${t.result ? `: ${t.result}` : ''}`;
+    case 'hint.unlocked': return `Hint unlocked${key}`;
+    case 'instance.reset': return 'Instance reset';
+    default: return `${t.type}${key}${t.milestone ? ` (${t.milestone})` : ''}${t.result ? `: ${t.result}` : ''}`;
+  }
+}
 
 // ---- the admin's shapes (IF-1, story P-28; the dashboard is story P-30) ----
 

@@ -1774,6 +1774,7 @@ export interface paths {
          *     Cursor-paged: pass `next_cursor` as `cursor` to get the entries after the last one already read. Entries are neither skipped
          *     nor repeated when a late event with a smaller key is stored between two page requests; such an event is shown only when the
          *     client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /query/cursor.
+         *     Since v2.0.0 the time warnings the attempt received are entries too (`attempt.time_warning` with `minutes_left`), so the recruiter's report shows when the candidate was told time was running out.
          */
         get: operations["getTimeline"];
         put?: never;
@@ -2661,10 +2662,12 @@ export interface components {
         TimelineEntry: {
             at: components["schemas"]["Timestamp"];
             /** @enum {unknown} */
-            type: "attempt.started" | "milestone.reached" | "flag.submitted" | "hint.unlocked" | "instance.reset" | "attempt.submitted" | "attempt.expired";
+            type: "attempt.started" | "milestone.reached" | "flag.submitted" | "hint.unlocked" | "instance.reset" | "attempt.submitted" | "attempt.expired" | "attempt.time_warning";
             challenge_key: components["schemas"]["ChallengeKey"] | null;
             milestone: ("M1" | "M2" | "M3") | null;
             result: components["schemas"]["FlagResult"] | null;
+            /** @description Optional (v2.0.0). Only on `attempt.time_warning`, how many minutes the attempt had left when the warning went out (the default rules warn at 15 and at 5). */
+            minutes_left?: number;
         };
         /**
          * @description One page of the timeline, sorted by the key (epoch, seq) of the event, oldest first. The key is not part of

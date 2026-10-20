@@ -1,8 +1,8 @@
 openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
-  title: Lab API (IF-2), browser-facing fragment, contract v1.3.0
-  version: 1.3.0
+  title: Lab API (IF-2), browser-facing fragment, contract v2.0.0
+  version: 2.0.0
   description: |
     The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
     flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
@@ -572,6 +572,7 @@ paths:
         Cursor-paged: pass `next_cursor` as `cursor` to get the entries after the last one already read. Entries are neither skipped
         nor repeated when a late event with a smaller key is stored between two page requests; such an event is shown only when the
         client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /query/cursor.
+        Since v2.0.0 the time warnings the attempt received are entries too (`attempt.time_warning` with `minutes_left`), so the recruiter's report shows when the candidate was told time was running out.
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -1235,7 +1236,7 @@ components:
       properties:
         at: { $ref: '#/components/schemas/Timestamp' }
         type:
-          enum: [attempt.started, milestone.reached, flag.submitted, hint.unlocked, instance.reset, attempt.submitted, attempt.expired]
+          enum: [attempt.started, milestone.reached, flag.submitted, hint.unlocked, instance.reset, attempt.submitted, attempt.expired, attempt.time_warning]
         challenge_key:
           anyOf:
             - { $ref: '#/components/schemas/ChallengeKey' }
@@ -1248,6 +1249,11 @@ components:
           anyOf:
             - { $ref: '#/components/schemas/FlagResult' }
             - { type: 'null' }
+        minutes_left:
+          description: Optional (v2.0.0). Only on `attempt.time_warning`, how many minutes the attempt had left when the warning went out (the default rules warn at 15 and at 5).
+          type: integer
+          minimum: 1
+          maximum: 1440
     Timeline:
       description: |
         One page of the timeline, sorted by the key (epoch, seq) of the event, oldest first. The key is not part of

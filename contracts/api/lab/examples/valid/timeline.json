@@ -20,6 +20,14 @@
       "challenge_key": "C01",
       "milestone": null,
       "result": "correct"
+    },
+    {
+      "at": "2026-10-09T13:45:00Z",
+      "type": "attempt.time_warning",
+      "challenge_key": null,
+      "milestone": null,
+      "result": null,
+      "minutes_left": 15
     }
   ],
   "has_more": true,

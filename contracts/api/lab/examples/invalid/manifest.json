@@ -513,5 +513,10 @@
     "schema": "AccountProgress",
     "path": "/total_points",
     "rule": "the total is at most 1000"
+  },
+  "timeline-bad-minutes.json": {
+    "schema": "Timeline",
+    "path": "/items/0/minutes_left",
+    "rule": "minutes_left is a whole number of 1 to 1440"
   }
 }

@@ -33,7 +33,7 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `listIntegrityFlags` | `GET /api/v1/attempts/{attempt_id}/integrity-flags` | 200 | Integrity signals |
 | `decideIntegrityFlag` | `POST .../integrity-flags/{integrity_flag_id}/decision` | 200 | Review decision |
 | `getReport` | `GET /api/v1/attempts/{attempt_id}/report` | 200 | Per-candidate report |
-| `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first |
+| `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first (with the time warnings, v2.0.0) |
 
 **A sequenced practice run (v1.3.0).** A learner works through the challenges one at a time, in catalogue order. The current challenge is `ready` until the learner calls `beginChallenge`; then its countdown runs (the tier sets the time) and flags, hints and milestones count for it. It ends when its flag is captured (`solved`; a capture held for review counts as solved) or the time is over (`expired`); the next challenge then becomes current. A challenge that ended gives no more credit and no more hints; what it earned stays. The challenges after the current one are not listed and answer 404 `ATT-CHALLENGE-NOT-FOUND` on every route; a challenge not begun, or one that ended, answers 409 `ATT-INVALID-STATE` on flags and hints. A run lasts the sum of the challenge times plus 30 minutes. When every challenge is solved or timed out the run is submitted by the lab's tick; after that the learner can start a new run (`requestInstance` again): the old run stays as history and the account points keep the best result per challenge. A company assessment is not sequenced. The deployed lab turns this on with `VULNMART_LAB_SEQUENCE=1`.
 

@@ -64,7 +64,7 @@ GONE_STATES = ("withdrawn", "cancelled")
 TIMELINE_TYPES = {
     "session_started": "attempt.started", "milestone_reached": "milestone.reached", "flag_submitted": "flag.submitted",
     "hint_unlocked": "hint.unlocked", "instance_reset": "instance.reset", "session_submitted": "attempt.submitted",
-    "session_expired": "attempt.expired",
+    "session_expired": "attempt.expired", "time_warning_sent": "attempt.time_warning",  # IF-2 1.4.0, handoff H-359
 }
 M = TypeVar("M", bound=Strict)
 
@@ -754,9 +754,15 @@ async def get_timeline(attempt_id: str, request: Request, auth: Authenticated = 
             if kind is None or (after is not None and (1, seq) <= after):
                 continue
             result = event.get("result") if kind == "flag.submitted" else None
-            entries.append((seq, {"at": stamp(event["at"]), "type": kind, "challenge_key": event.get("challenge_key"),
-                                  "milestone": event.get("level") if kind == "milestone.reached" and event.get("level") in ("M1", "M2", "M3") else None,
-                                  "result": result if result in ("correct", "incorrect") else None}))
+            entry = {"at": stamp(event["at"]), "type": kind, "challenge_key": event.get("challenge_key"),
+                     "milestone": event.get("level") if kind == "milestone.reached" and event.get("level") in ("M1", "M2", "M3") else None,
+                     "result": result if result in ("correct", "incorrect") else None}
+            if kind == "attempt.time_warning":  # how many minutes were left when the warning went out (the engine writes 15 and 5 by default)
+                minutes = event.get("minutes_left")
+                if type(minutes) is not int or not 1 <= minutes <= 1440:
+                    continue  # a warning without a sound number is not shown rather than shown wrong
+                entry["minutes_left"] = minutes
+            entries.append((seq, entry))
         page = entries[:limit]
         more = len(entries) > limit
         return {"items": [e for _, e in page], "has_more": more, "next_cursor": encode_cursor(1, page[-1][0]) if more else None}
