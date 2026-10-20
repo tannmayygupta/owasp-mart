@@ -481,6 +481,19 @@ async def get_attempt(attempt_id: str, request: Request, auth: Authenticated = D
     return json_ok(attempt_view(rt, readable(rt, auth, attempt_id)))
 
 
+@router.post("/api/v1/attempts/{attempt_id}/start", operation_id="startAttempt")
+async def start_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """H-356, D-80: the candidate's Start asks for the instance of the attempt a consent created; the clock starts when the instance is ready, not at the press.
+    A second press while the instance starts, or once the attempt runs, answers the same attempt. A learner starts through `requestInstance`."""
+    rt = lab(request)
+    rec = owned(rt, auth, attempt_id)
+    await no_body(request)
+    if rec.org_id is None or rec.state.value not in ("ready", "running"):
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    await run(rt.start_existing_async, rec.id)
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
 @router.post("/api/v1/attempts/{attempt_id}/submit", operation_id="submitAttempt")
 async def submit_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
     rt = lab(request)

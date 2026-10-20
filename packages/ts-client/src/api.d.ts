@@ -1407,11 +1407,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start the clock of a ready attempt (PENDING OI-22)
-         * @description PENDING OI-22: whether the candidate presses Start or the clock starts when the instance becomes
-         *     ready is open. Both outcomes are recorded in lab-api.md. This route exists for the first outcome;
-         *     if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 ATT-INVALID-STATE.
-         *     The body is empty.
+         * Ask for the instance of a ready attempt (the candidate's Start)
+         * @description D-80 (OI-22 resolved): Start only asks for the instance; the clock starts when the instance is ready, so the cold start
+         *     never counts against the candidate. Answers at once with the attempt (still ready while the instance starts); pressing
+         *     again, or after it runs, answers the same attempt. Only the owner of an assessment attempt in state ready or running;
+         *     a learner starts through requestInstance, and any other state answers 409 ATT-INVALID-STATE. The body is empty.
          */
         post: operations["startAttempt"];
         delete?: never;

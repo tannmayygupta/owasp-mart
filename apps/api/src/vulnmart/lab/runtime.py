@@ -447,6 +447,11 @@ class LabRuntime:
                                      attempt_id=new_attempt_id(), rules=self._rules_for(org_id))
             if previous is not None and previous.id != rec.id:
                 self._retire(previous)  # a new run began: the finished one keeps its results but no longer holds an instance
+            return self._prepare(rec, user_id, template)
+
+    def _prepare(self, rec: Any, user_id: str, template: str) -> tuple[Any, str, int, str] | StartedAttempt:
+        """The rest of the fast half, for an attempt that exists (a new learner run, or a candidate attempt a consent created): under the lock `_begin` holds."""
+        with self._lock:
             if rec.id in self._starting:
                 return StartedAttempt(rec.id, self._starting[rec.id], rec.state.value)
             if rec.state.value not in ("ready", "running"):
@@ -542,6 +547,31 @@ class LabRuntime:
                 self._finish(rec, instance_id, epoch, template)
             except Exception:
                 log.exception("the start of instance %s failed", instance_id)
+
+        threading.Thread(target=work, name=f"lab-start-{instance_id[:8]}", daemon=True).start()
+        return StartedAttempt(rec.id, instance_id, rec.state.value)
+
+    def start_existing_async(self, attempt_id: str) -> StartedAttempt:
+        """Ask for the instance of a candidate attempt that a consent created (state `ready`, no instance): IF-2 `startAttempt`, handoff H-356, OI-22.
+
+        D-80: the Start button only asks for the instance; the clock starts when the instance is ready (the `_finish` step moves the attempt to `running`), so cold start never
+        counts against the candidate. Answers at once like `start_attempt_async`; a second call while the start is under way, or once it runs, answers the same attempt.
+        AttemptStateInvalid for a learner attempt (a learner starts through `requestInstance`) and for a state that cannot start (submitted, withdrawn, cancelled...)."""
+        rec = self.engine.get(attempt_id)
+        if rec.org_id is None:
+            raise AttemptStateInvalid("a learner starts through requestInstance")
+        with self._lock:
+            # the orchestrator knows only its own template names; the attempt keeps the invite's versioned name
+            begun = self._prepare(rec, rec.user_id, self.template_id)
+        if isinstance(begun, StartedAttempt):
+            return begun
+        rec, instance_id, epoch, template = begun
+
+        def work() -> None:
+            try:
+                self._finish(rec, instance_id, epoch, template)
+            except Exception:
+                log.exception("the start of the instance %s of candidate attempt %s failed", instance_id, rec.id)
 
         threading.Thread(target=work, name=f"lab-start-{instance_id[:8]}", daemon=True).start()
         return StartedAttempt(rec.id, instance_id, rec.state.value)

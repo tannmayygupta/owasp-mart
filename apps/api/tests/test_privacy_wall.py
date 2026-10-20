@@ -200,7 +200,7 @@ def w(sessions, clock, companies, assessments, audit):
     granted = cam.post("/api/v1/consent", {"attempt_id": world.cam_attempt, "notice_version": notice["notice_version"],
                                            "notice_text_sha256": notice["notice_text_sha256"], "decision": "granted"})
     assert granted.status_code in (200, 201), granted.text
-    # the grant creates the attempt in the lab (state `ready`); the lab has no route to start it yet (startAttempt is pending OI-22, handoff H-356)
+    # the grant creates the attempt in the lab (state `ready`); the candidate starts it through startAttempt (H-356, D-80)
     assert world.lab.engine.get(world.cam_attempt).state.value == "ready"
     # Rob's company, approved, terms accepted, with a template of its own
     signup(companies, email=ROB, company="Globex", name="Rob Owner")
