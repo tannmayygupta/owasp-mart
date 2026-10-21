@@ -246,7 +246,8 @@ class ServiceProcess:
             # the keys go in the environment, never on the command line (M6); the fake backend needs its explicit test switch (H3)
             args = [sys.executable, "-m", "vulnmart_orchestrator", "--backend", "fake", "--allow-fake-backend", "--port", "0",
                     "--capacity-mb", str(capacity_mb), "--step-delay-ms", str(step_delay_ms),
-                    "--templates-dir", str(python_templates_dir()), "--template-schema", str(TEMPLATE_SCHEMA), "--rate-per-s", "0"]
+                    "--templates-dir", str(python_templates_dir()), "--template-schema", str(TEMPLATE_SCHEMA), "--rate-per-s", "0",
+                    "--no-desired-state"]  # these receivers do not implement the platform's list of wanted instances; without the flag the reconciler is in safe mode and refuses creates (ORCH-BUSY)
             env = {**os.environ, "PYTHONPATH": str(ORCH_SRC), "VM_ORCH_PLATFORM_KEY": PLATFORM_KEY.decode(),
                    "VM_ORCH_REPORT_KEY": ORCH_KEY.decode()}
         else:

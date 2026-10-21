@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
-import { PAGES, parseArgs, platformOperations, verify } from './verify-deployed.mjs';
+import { PAGES, mailProviderCheck, parseArgs, platformOperations, verify } from './verify-deployed.mjs';
 
 const BUNDLE = { paths: {
   '/api/v1/health': { get: { operationId: 'getHealth', tags: ['health'], security: [] } },
@@ -20,6 +20,11 @@ function stand_in({ missing = [], headers = true, console_page = false } = {}) {
     const json = (status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
     if (req.url === '/api/v1/health') return json(200, { status: 'ok' });
     if (req.url === '/api/v1/session' && req.headers.origin === 'https://evil.example') return json(403, { code: 'AUTH-ORIGIN-FORBIDDEN', request_id: 'req-1' });
+    if (req.url === '/') {
+      const csp = headers ? { 'content-security-policy': "default-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'" } : {};
+      res.writeHead(200, { 'content-type': 'text/html', ...csp });
+      return res.end('<html><title>VulnMart lab console</title><script src="/app.js"></script></html>');
+    }
     if (PAGES.includes(req.url)) {
       const h = { 'content-type': 'text/html' };
       if (headers) Object.assign(h, { 'content-security-policy': "script-src 'nonce-abc123=' 'strict-dynamic'; frame-ancestors 'none'", 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
@@ -69,4 +74,26 @@ test('bad arguments are refused', () => {
   assert.ok(parseArgs(['--base', 'https://example.org/path']).error);
   assert.ok(parseArgs(['--base', 'https://example.org', '--what']).error);
   assert.equal(parseArgs(['--base', 'https://example.org']).base, 'https://example.org');
+});
+
+test('the learner console at / must keep its strict CSP and must not be the dashboards app', async () => {
+  const stale = (await run(stand_in({ headers: false }))).filter((r) => !r.ok).map((r) => r.name);
+  assert.ok(stale.includes('the learner console at / keeps the strict CSP (style-src self, no nonce)'), stale.join(' | '));
+});
+
+test('the mail provider check: brevo passes, the catcher in any form fails', async () => {
+  assert.equal(mailProviderCheck('VULNMART_EMAIL_PROVIDER=brevo\nVULNMART_ALLOW_MAIL_CATCHER=false\n').ok, true);
+  assert.equal(mailProviderCheck('VULNMART_PLATFORM_HOST=h\n').ok, true, 'the compose default is brevo');
+  assert.equal(mailProviderCheck('VULNMART_EMAIL_PROVIDER=smtp\n').ok, false);
+  assert.equal(mailProviderCheck('VULNMART_EMAIL_PROVIDER=brevo\nVULNMART_ALLOW_MAIL_CATCHER=true\n').ok, false);
+  assert.equal(mailProviderCheck('COMPOSE_PROFILES=mail-catcher\r\n').ok, false);
+  const withEnv = async (platformEnv) => {
+    const server = stand_in();
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    try { return (await verify({ base: `http://127.0.0.1:${server.address().port}`, bundle: BUNDLE, timeout: 5000, platformEnv })).find((r) => r.name.startsWith('the mail provider')); } finally { server.close(); }
+  };
+  assert.equal((await withEnv('VULNMART_EMAIL_PROVIDER=brevo\n')).ok, true);
+  assert.equal((await withEnv('VULNMART_EMAIL_PROVIDER=smtp\n')).ok, false);
+  assert.equal(await (async () => { const server = stand_in(); await new Promise((r) => server.listen(0, '127.0.0.1', r)); try { return (await verify({ base: `http://127.0.0.1:${server.address().port}`, bundle: BUNDLE, timeout: 5000 })).some((r) => r.name.startsWith('the mail provider')); } finally { server.close(); } })(), false, 'without --platform-env the check is not run');
+  assert.equal(parseArgs(['--base', 'https://example.org', '--platform-env', 'x.env']).platformEnv, 'x.env');
 });

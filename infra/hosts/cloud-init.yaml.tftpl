@@ -1,17 +1,8 @@
 #cloud-config
-# Identical for VM-P and VM-I (one baseline). Rendered by Terraform (AWS or Oracle); files are base64 from infra/hosts/.
+# One baseline for VM-P and VM-I, rendered by Terraform.
 package_update: true
 package_upgrade: true
-packages:
-  - iptables-persistent
-  - netfilter-persistent
-  - unattended-upgrades
-  - ca-certificates
-  - curl
-  - gnupg
-  - python3
 
-# Keys of the developers (empty list where the cloud injects them itself, as Oracle does).
 ssh_authorized_keys: ${ssh_keys_json}
 
 write_files:
@@ -89,6 +80,23 @@ write_files:
       [Time]
       NTP=${ntp_server}
 
-# One script: stops at the first failure and writes /var/lib/vulnmart/baseline-ok or baseline-failed (names the step).
+# H-111: the baseline is a oneshot unit, retried at each boot and every 30 s until baseline-ok exists.
+  - path: /etc/systemd/system/vulnmart-baseline.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      After=network-online.target
+      Wants=network-online.target
+      ConditionPathExists=!/var/lib/vulnmart/baseline-ok
+      [Service]
+      Type=oneshot
+      Environment=DEBIAN_FRONTEND=noninteractive
+      ExecStartPre=/usr/bin/apt-get install -y iptables-persistent netfilter-persistent unattended-upgrades ca-certificates curl gnupg python3
+      ExecStart=/usr/local/sbin/vulnmart-baseline.sh "${private_cidr}" "${keepalive_enabled}"
+      Restart=on-failure
+      RestartSec=30
+      [Install]
+      WantedBy=multi-user.target
+
 runcmd:
-  - [/usr/local/sbin/vulnmart-baseline.sh, "${private_cidr}", "${keepalive_enabled}"]
+  - [systemctl, enable, --now, --no-block, vulnmart-baseline.service]

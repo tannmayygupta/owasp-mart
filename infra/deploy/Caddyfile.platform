@@ -22,20 +22,30 @@
 	}
 }
 
+# Port 80 only redirects (the security group and the host firewall already admit it). The target is the configured host name, never the Host header of the request.
+:80 {
+	redir https://{$VULNMART_PLATFORM_HOST}{uri} 308
+}
+
+# One origin, three kinds of answer (ADR 0059, docs/runbooks/live-deploy.md):
+#   /api/* and /healthz  -> the API (this server adds the origin secret itself); strict CSP of the console.
+#   the dashboards' paths -> the Next.js app (`web`): recruiter, candidate, admin, invite, consent, account pages. Next sets its OWN per-request nonce CSP, so no CSP is set here for them.
+#   everything else       -> the static lab console for learners (index.html, app.js, style.css) under the strict CSP below (style-src 'self', no inline).
+# Headers that are the same everywhere are set once; the CSP and the Referrer-Policy differ per kind and are set inside each handler.
 :443 {
 	tls /certs/fullchain.pem /certs/privkey.pem
 
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
-		Referrer-Policy "no-referrer"
 		X-Frame-Options "DENY"
-		Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 		-Server
 	}
 
-	# The API: this server adds the origin secret itself (the console is served from here, so the browser is on the same origin). Nothing else reaches the API.
+	# The API: this server adds the origin secret itself (the browser is on the same origin). Nothing else reaches the API.
 	handle /api/* {
+		header Referrer-Policy "no-referrer"
+		header Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 		reverse_proxy api:8000 {
 			flush_interval -1
 			header_up X-Origin-Secret {file./run/secrets/origin_secret}
@@ -47,14 +57,24 @@
 		reverse_proxy api:8000
 	}
 
+	# The dashboards. Keep this list in step with the page folders of apps/web/app (scripts/check-deployed-compose.mjs fails when a folder has no entry here) and with PAGES in scripts/verify-deployed.mjs.
+	@dashboards path /login /login/* /signup /signup/* /verify-email /verify-email/* /forgot-password /forgot-password/* /reset-password /reset-password/* /account /account/* /dashboard /dashboard/* /invite /invite/* /company /company/* /admin /admin/* /assessment /assessment/* /_next/*
+	handle @dashboards {
+		reverse_proxy web:3000 {
+			flush_interval -1
+		}
+	}
+
+	# The learner console: static files, one catch-all page. No path of the dashboards reaches here, so the two never shadow each other.
 	handle {
+		header Referrer-Policy "no-referrer"
+		header Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 		root * /srv/console
 		try_files {path} /index.html
 		file_server
 	}
 }
-
-# Only the two internal routes and only POST. This is server TLS (the callers check this certificate against the private CA), not mutual TLS: the callers do not present a
+# Only the three internal routes, each with its one method (the two receivers POST, the desired-state read GET). This is server TLS (the callers check this certificate against the private CA), not mutual TLS: the callers do not present a
 # certificate. What protects the listener is (1) the network: only the labs subnet reaches this port (security group and network ACL, tested in
 # infra/terraform/aws/tests) and (2) the signature of every request (event key per instance, report key for state reports). Mutual TLS is a recorded follow-up.
 :9444 {
@@ -62,6 +82,13 @@
 	@internal {
 		method POST
 		path /internal/v1/events /internal/v1/orch/state
+	}
+	@desired {
+		method GET
+		path /internal/v1/orch/desired
+	}
+	handle @desired {
+		reverse_proxy api:8000
 	}
 	handle @internal {
 		reverse_proxy api:8000 {

@@ -248,14 +248,19 @@ class AuditAnchors:
 
     def anchor(self) -> AnchorResult:
         """Verify the chain, then record today's head in `audit_anchor` and in the sink. One anchor a day: a second call the same day changes nothing.
-        Raises AuditChainBroken (and anchors nothing) when the chain does not verify, and OSError when the sink cannot be written."""
+        An empty log is started with one entry first. Raises AuditChainBroken (and anchors nothing) when the chain does not verify, and OSError when the sink cannot be written."""
         moment = self._now()
         day = moment.astimezone(UTC).date()
         result = self._audit.verify()
         if not result.ok:
             raise AuditChainBroken(f"entry {result.bad_seq}: {result.reason}")
         if result.head_seq is None or result.head_hash is None:
-            raise AuditChainBroken("the log is empty")
+            # A new deployment: nothing has been logged yet, so there is nothing to anchor. An empty log is not a broken chain: the first anchor starts the chain with one
+            # entry of its own and anchors that (before this, the first daily run failed once and the failure entry itself made the retry succeed).
+            self._audit.append(actor="job:audit_anchor", action="audit.chain_started", subject=None, details={})
+            result = self._audit.verify()
+            if not result.ok or result.head_seq is None or result.head_hash is None:
+                raise AuditChainBroken("the log is empty and could not be started")
         with self._sessions() as session:
             existing = session.get(AuditAnchor, day)
         if existing is not None:

@@ -47,7 +47,11 @@ jobs:
       - run: pnpm run domain-events:check
       - run: pnpm run api:check
       - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"
-      - run: uv run --locked --package vulnmart-api pytest -q
+      - run: node scripts/check-deployed-compose.mjs
+      - run: uv run --locked --package vulnmart-api python scripts/check_spec_routes.py
+      - run: uv run --locked --package vulnmart-api pytest -q --junitxml=api-junit.xml
+      # No database or Valkey here, so the service tests skip; the number that is normal today is the budget (241 when measured), so a jump is caught. The `api` job below has the services and allows none.
+      - run: node scripts/check-pytest-skips.mjs --junit api-junit.xml --max-env-skips 250 --label scripts
       - run: uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests
       # story 3.2: the same protocol, wire, http, report and mTLS suites against the Python orchestrator service (reset cases skipped until story 3.4)
       - run: VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py
@@ -297,7 +301,9 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends postgresql-client >/dev/null
           PGPASSWORD=ci-owner-throwaway VULNMART_APP_DB_PASSWORD=ci-app-throwaway psql -h localhost -U vulnmart -d vulnmart -v ON_ERROR_STOP=1 -f infra/compose/postgres/initdb/10-app-role.sql
-      - run: uv run --frozen --package vulnmart-api pytest apps/api
+      - run: uv run --frozen --package vulnmart-api pytest apps/api --junitxml=api-junit.xml
+      # A database or Valkey test must never be skipped here (the wiring audit of 2026-10-21 found the 15 *_postgres modules and every Valkey test skipped in CI).
+      - run: node scripts/check-pytest-skips.mjs --junit api-junit.xml --max-env-skips 0 --label api
 
   compose:
     name: compose and hello
@@ -319,6 +325,8 @@ jobs:
       - run: docker compose -f infra/compose/compose.yaml --profile platform --profile web config -q
       # The API image copies packages/py-models: build it so a broken Dockerfile or .dockerignore fails here.
       - run: docker compose -f infra/compose/compose.yaml --profile platform build api
+      # The production image of the dashboards (next build, standalone output, distroless runtime): a broken build or Dockerfile fails here (production hardening, ADR 0074).
+      - run: docker build -f apps/web/Dockerfile.prod -t vulnmart-web:prod apps/web
       - run: node scripts/dev.mjs hello
       - run: node scripts/dev.mjs harness
       - run: node --test scripts/e2e/harness.e2e.test.mjs

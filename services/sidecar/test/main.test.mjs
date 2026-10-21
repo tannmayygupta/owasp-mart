@@ -31,7 +31,7 @@ test('a good start document starts both ports; the word "sidecar" in front of th
   const eventsPort = await freePort(); const playerPort = await freePort();
   let sc;
   const { createSidecar } = await import('../src/sidecar.mjs');
-  const wrapped = { createSidecar: (o) => { sc = createSidecar({ ...o, relayUrl: 'http://127.0.0.1:1/x', statePath: null }); return sc; } };
+  const wrapped = { createSidecar: (o) => { sc = createSidecar({ ...o, relayUrl: 'http://127.0.0.1:1/x', statePath: null, outboxPath: null }); return sc; } };
   const { r, lines } = await capture(() => main(['sidecar', '--relay', 'http://127.0.0.1:1/x', '--upstream', 'http://127.0.0.1:1', '--events-port', String(eventsPort), '--player-port', String(playerPort)], {}, { stdin: Readable.from([JSON.stringify(startDoc(v))]), deps: wrapped }));
   try {
     assert.equal(r, null);

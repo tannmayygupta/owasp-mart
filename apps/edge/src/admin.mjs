@@ -1,6 +1,7 @@
 // Admin handlers of the gate (contracts/edge/gate-ticket.md section 5): the orchestrator pushes the access state here.
 //   PUT    /internal/v1/gate/instances/{id}   one record          DELETE /internal/v1/gate/instances/{id}   remove it
 //   PUT    /internal/v1/gate/sync             {"instances": [...]} the full list, all or nothing
+//   GET    /internal/v1/gate/status           counts only (instances, used tickets, decide errors, the saved state): no ids, no owners
 // Every call needs the header X-VM-Gate-Admin equal to the secret in a file (constant-time comparison). The secret is read from the file on each call
 // (so a rotated file takes effect) and is never logged or returned. No sockets here: handle() takes a parsed request and returns { status, headers, body }.
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ const problem = (status, detail, extra = {}) => ({
 });
 const noContent = () => ({ status: 204, headers: { 'cache-control': 'no-store' }, body: '' });
 
-export function createAdmin({ store, secretFile, readFile = (f) => fs.readFileSync(f, 'utf8') }) {
+export function createAdmin({ store, secretFile, readFile = (f) => fs.readFileSync(f, 'utf8'), status = null }) {
   if (!store || typeof secretFile !== 'string' || !secretFile) throw new Error('createAdmin needs a store and a secretFile');
 
   function secret() {
@@ -53,6 +54,10 @@ export function createAdmin({ store, secretFile, readFile = (f) => fs.readFileSy
         if (url.includes('?') || url.includes('#') || !url.startsWith(PREFIX)) return problem(404);
         const rest = url.slice(PREFIX.length);
         const method = req.method;
+        if (rest === 'status' && status) {
+          if (method !== 'GET') return problem(405, null, { allow: 'GET' });
+          return { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: JSON.stringify(status()) };
+        }
         if (rest === 'sync') {
           if (method !== 'PUT') return problem(405, null, { allow: 'PUT' });
           const b = parseBody(req, MAX_BODY_BYTES.sync);

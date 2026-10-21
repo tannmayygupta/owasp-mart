@@ -144,3 +144,61 @@ def test_every_table_of_the_metadata_is_in_the_table_owners_file():
                 "audit_anchor", "audit_checkpoint", "audit_log", "consent_records", "mfa_credentials", "recovery_codes", "subject_map",
                 "dpa_acceptances", "join_requests", "assessment_templates", "invites", "template_challenges", "deletion_requests", "data_views",
                 "break_glass_sessions"]))
+
+# ---- the mail guard of staging and production (fail closed) ----
+
+@pytest.mark.parametrize("env", ["staging", "production"])
+@pytest.mark.parametrize("host", [None, "", "mailpit", "MailPit", "localhost", "127.0.0.1", "mail.localhost"])
+def test_production_refuses_to_start_with_mail_going_to_a_catcher(env, host):
+    s = Settings(env=env, email_provider="smtp", smtp_host=host)
+    assert s.mail_goes_to_catcher()  # every one of these hosts is a catcher, or there is no host at all
+    with pytest.raises(RuntimeError, match="catcher|SMTP_HOST"):
+        s.check_mail_for_environment()
+
+
+def test_the_catcher_can_be_allowed_knowingly_and_it_is_logged(caplog):
+    s = Settings(env="production", email_provider="smtp", smtp_host="mailpit", allow_mail_catcher=True)
+    with caplog.at_level("WARNING", logger="vulnmart.settings"):
+        s.check_mail_for_environment()
+    assert "MAIL CATCHER ACTIVE" in caplog.text
+
+
+def test_a_real_smtp_relay_is_allowed_in_production():
+    Settings(env="production", email_provider="smtp", smtp_host="smtp-relay.example.org").check_mail_for_environment()
+
+
+def test_brevo_in_production_needs_a_key(tmp_path):
+    with pytest.raises(RuntimeError, match="brevo needs a key"):
+        Settings(env="production", email_provider="brevo").check_mail_for_environment()
+    empty = tmp_path / "brevo_api_key"
+    empty.write_text("\n")
+    with pytest.raises(RuntimeError, match="brevo needs a key"):
+        Settings(env="production", email_provider="brevo", brevo_api_key_file=str(empty)).check_mail_for_environment()
+    with pytest.raises(RuntimeError, match="cannot be read"):
+        Settings(env="production", email_provider="brevo", brevo_api_key_file=str(tmp_path / "missing")).check_mail_for_environment()
+    empty.write_text("xkeysib-test-not-a-real-key\n")
+    Settings(env="production", email_provider="brevo", brevo_api_key_file=str(empty)).check_mail_for_environment()
+
+
+@pytest.mark.parametrize("env", ["dev", "test"])
+def test_dev_and_test_keep_mailpit_as_the_default(env):
+    s = Settings(env=env)
+    assert s.email_provider == "smtp" and s.allow_mail_catcher is False
+    s.check_mail_for_environment()
+
+
+def test_get_settings_applies_the_guard(monkeypatch):
+    from vulnmart.kernel import settings as module
+
+    module.get_settings.cache_clear()
+    monkeypatch.setenv("VULNMART_ENV", "production")
+    monkeypatch.setenv("VULNMART_SMTP_HOST", "mailpit")
+    monkeypatch.setenv("VULNMART_POSTGRES_DSN", "postgresql://app@db.invalid/vulnmart")  # the store guard (check_stores_for_environment) runs too
+    monkeypatch.setenv("VULNMART_KEYSTORE_DSN", "postgresql://keys@db.invalid/vm_keystore")
+    try:
+        with pytest.raises(RuntimeError, match="catcher"):
+            module.get_settings()
+        monkeypatch.setenv("VULNMART_ALLOW_MAIL_CATCHER", "true")
+        assert module.get_settings().allow_mail_catcher is True
+    finally:
+        module.get_settings.cache_clear()

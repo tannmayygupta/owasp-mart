@@ -48,5 +48,5 @@ EXPOSE 8080 9000
 HEALTHCHECK --interval=2s --timeout=2s --retries=15 --start-period=1s \
   CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:9000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
-# Flags: --no-crs (no detection helper), --relay URL --upstream URL (defaults: the edge relay and the shop of an instance), --state FILE (default /tmp/vm-sidecar-seq.json).
+# Flags: --no-crs (no detection helper), --relay URL --upstream URL (defaults: the edge relay and the shop of an instance), --state FILE (default /tmp/vm-sidecar-seq.json), --outbox FILE (the durable journal of unsent events, default /tmp/vm-sidecar-outbox.jsonl; /tmp is a tmpfs in the instance template, so the journal survives a restart of the process but not of the container, see ADR 0075).
 CMD ["/app/src/main.mjs"]

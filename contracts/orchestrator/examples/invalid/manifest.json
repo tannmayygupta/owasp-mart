@@ -368,5 +368,10 @@
     "schema": "ActivityRequest",
     "path": "/note",
     "rule": "the body is closed: no unknown field"
+  },
+  "desired-bad-instance-id.json": {
+    "schema": "DesiredInstances",
+    "path": "/instance_ids/1",
+    "rule": "every id is i- plus 16 Base32"
   }
 }
