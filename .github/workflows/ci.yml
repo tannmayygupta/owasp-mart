@@ -43,6 +43,7 @@ jobs:
           version: 0.12.23
       - run: node --test "scripts/*.test.mjs"
       - run: pnpm run errors:check
+      - run: node scripts/check-asvs.mjs
       - run: pnpm run domain-events:check
       - run: pnpm run api:check
       - run: node --test "contracts/mocks/stub-instance/**/*.test.mjs"

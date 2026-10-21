@@ -46,6 +46,8 @@ Before the reconciliation: Done 87, Built 89, Partial 31, Not started 11, free-t
 
 ## ASVS 5.0 checklist (NFR-SEC-01, NFR-SEC-02; story P-32)
 
+**Update 2026-10-21 (work package G):** the requirement-by-requirement table now exists in [security/asvs-checklist.md](security/asvs-checklist.md) (345 requirements of ASVS 5.0.0, each with applies, status, evidence, owner and note; checked by `node scripts/check-asvs.mjs`, in CI). The chapter table below is kept as history.
+
 Level 2 for the platform, level 3 for the admin functions and the key service (D-21, D-35). Chapters as published by OWASP (`OWASP/ASVS`, `5.0/en`, read 2026-10-20). **This table is at chapter level**: each chapter's numbered requirements have not yet been checked one by one against the code; that per-requirement review is the open part of NFR-SEC-01 (the "requirement ID" column of its checklist). Deployed results come from `node scripts/verify-deployed.mjs` ([2026-10-20-akshaay29-p32-deployed-verification-and-asvs](dev-log/2026-10-20-akshaay29-p32-deployed-verification-and-asvs.md)).
 
 | Chapter | Applies | How met (platform) | Evidence | Local result | Deployed result |
@@ -67,6 +69,15 @@ Level 2 for the platform, level 3 for the admin functions and the key service (D
 | V15 Secure Coding and Architecture | yes | Written contracts with checks in CI; dependency review and pinned BMAD skills; table ownership; the separation of the platform and the hostile instances (two VMs) | `check-contract-rules.mjs`, `verify-skills.mjs` | pass (CI) | n/a |
 | V16 Security Logging and Error Handling | yes | Hash-chained audit log for security events (sign-in, MFA, admin actions and reads, break-glass, exports); generic errors with a request id and no stack trace | `test_audit*.py`, the stack tests | pass locally | an unknown route answers an IF-8 problem with a request id on the deployed site (PASS) |
 | V17 WebRTC | no | Not used | n/a | n/a | n/a |
+
+## Verification: scenario matrix, ASVS and live journeys (work package G, 2026-10-21)
+
+| ID | Requirement (short) | Status | Code | Tests | Result | Dev-log |
+|---|---|---|---|---|---|---|
+| L-30 | End-to-end suite: invite, assessment, report, release, admin, on a deployed site | Partial: scripts and local proof done; the deployed run is the leader's step after the deploy | `scripts/e2e-live-journeys.mjs`, `docs/runbooks/live-e2e-journeys.md` | `scripts/e2e-live-journeys.test.mjs` (8 tests, fake platform), `apps/api/tests/test_scenarios_*.py` (98 passed, 1 xfailed) | Local variant against `apps/api/tests/e2e_web_server.py`: 15 PASS, 0 FAIL, 4 SKIP (company routes not mounted there); deployed run not done | [2026-10-21-tannmayygupta-scenario-matrix-asvs-live-journeys](dev-log/2026-10-21-tannmayygupta-scenario-matrix-asvs-live-journeys.md) |
+| L-31 | Demo rehearsal and submission pack | Not rehearsed: checklist and record form written, no rehearsal claimed | `docs/runbooks/demo-rehearsal.md` | none (a rehearsal is a person doing it) | not run | same dev-log |
+| P-32, NFR-SEC-01 | ASVS 5.0 requirement by requirement | Partial: all 345 rows assessed (173 met, 54 partly, 13 not met, 105 n.a.); the deployed verification re-run waits for the redeploy | `docs/security/asvs-checklist.md`, `scripts/check-asvs.mjs`, CI step in the `scripts` job | `scripts/check-asvs.test.mjs` (5 tests) | `node scripts/check-asvs.mjs`: ok, 345 requirements | same dev-log |
+| Role scenarios (145) | Test-backed status of every scenario of the 2026-10-21 audit | Done: 74 VERIFIED, 36 PARTIAL, 23 MISSING-OWNED-BY a package, 7 MISSING-UNOWNED, 5 EXTERNAL | `docs/audit/2026-10-21-scenario-matrix.md` | `apps/api/tests/test_scenarios_learner.py`, `_candidate.py`, `_recruiter.py`, `_admin.py`, `_cross.py`, `test_scenario_matrix.py` | 98 passed, 1 xfailed (known gap, see the matrix) | same dev-log |
 
 ## Challenges (D-06)
 
