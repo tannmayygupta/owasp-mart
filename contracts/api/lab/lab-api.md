@@ -33,6 +33,7 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `listIntegrityFlags` | `GET /api/v1/attempts/{attempt_id}/integrity-flags` | 200 | Integrity signals |
 | `decideIntegrityFlag` | `POST .../integrity-flags/{integrity_flag_id}/decision` | 200 | Review decision |
 | `releaseResults` | `POST /api/v1/attempts/{attempt_id}/release` | 200 | The recruiter releases a finished candidate's results when the invite says `after_release` (v2.1.0) |
+| `extendAttempt` | `POST /api/v1/attempts/{attempt_id}/extend` | 200 | The recruiter gives a running candidate attempt extra time, 5 to 240 minutes in all, inside the instance's lifetime (R-25, v2.3.0) |
 | `cancelAttempt` | `POST /api/v1/attempts/{attempt_id}/cancel` | 200 | The recruiter cancels a candidate's ready or running attempt (FR-SES-07, v2.2.0) |
 | `getReport` | `GET /api/v1/attempts/{attempt_id}/report` | 200 | Per-candidate report |
 | `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first (with the time warnings, v2.0.0) |

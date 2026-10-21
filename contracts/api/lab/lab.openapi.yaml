@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: Lab API (IF-2), browser-facing fragment, contract v2.2.0
-  version: 2.2.0
+  version: 2.3.0
   description: |
     The routes the dashboards call for what the lab owns: instances, the running part of an attempt,
     flag submission, hints, score, evidence, integrity flags, the per-candidate report and the timeline.
@@ -274,6 +274,37 @@ paths:
         '403': { $ref: '#/components/responses/CsrfFailed' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/attempts/{attempt_id}/extend:
+    parameters:
+      - $ref: '#/components/parameters/AttemptIdPath'
+    post:
+      tags: [attempts]
+      operationId: extendAttempt
+      summary: Give a running candidate attempt extra time (the recruiter of the company)
+      description: |
+        Since v2.3.0 (R-25, C-30: an accommodation). The recruiter of the owning company moves the deadline of a company assessment attempt that is `running` and whose deadline has
+        not passed by `minutes` (5 to 240). All extra time of one attempt together is at most 240 minutes and never reaches past the fixed lifetime of the instance (the template's
+        time limit plus a margin, at most 240 minutes unless the template is longer); a request beyond that, or on an attempt in any other state, is 409 ATT-INVALID-STATE. The
+        answer is the attempt with its new `deadline_at`; a time warning that is due again is sent again. An ended attempt is never reopened. The candidate and anyone else get the
+        404 of every attempt route; a learner's practice attempt cannot be extended. 429 REQ-RATE-LIMITED when one recruiter acts too often.
+      security:
+        - sessionCookie: []
+          csrfHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExtendRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AttemptOk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/CsrfFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMedia' }
         '422': { $ref: '#/components/responses/Invalid' }
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/v1/attempts/{attempt_id}/withdraw:
@@ -924,6 +955,12 @@ components:
       required: [kind]
       properties:
         kind: { enum: [learner] }
+    ExtendRequest:
+      type: object
+      additionalProperties: false
+      required: [minutes]
+      properties:
+        minutes: { type: integer, minimum: 5, maximum: 240 }
     ConfirmRequest:
       type: object
       additionalProperties: false

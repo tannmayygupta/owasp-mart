@@ -34,6 +34,7 @@ EVENT_FIELDS: dict[str, frozenset[str]] = {
     "results_released": frozenset({"viewer_id"}),  # H-355: the recruiter released the candidate's results (a failed write must not pass silently, so the route appends directly)
     "attempt_withdrawn": frozenset({"state", "delete_after"}),
     "withdrawal_undone": frozenset({"state"}),
+    "time_extended": frozenset({"state", "minutes", "deadline_at", "viewer_id"}),  # R-25: the recruiter gave extra time (the id of the recruiter, never a name)
     "held_review_overdue": frozenset({"challenge_key"}),
 }
 

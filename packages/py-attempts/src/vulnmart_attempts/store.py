@@ -53,6 +53,7 @@ class AttemptRecord:
     deleted_at: datetime | None = None
     org_id: str | None = None  # the organisation of a candidate attempt; None for learner practice
     purged_at: datetime | None = None  # the platform's deletion workflow purged the data (the attempt is gone)
+    extended_minutes: int = 0  # the recruiter's extra time, summed over every extension (R-25); the deadline already includes it
     freeze_failed_at: datetime | None = None  # the first freeze that failed; the destroy waits for the freeze only for a while after it
 
     @property

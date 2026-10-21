@@ -1994,6 +1994,36 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/AdminNotFound' }
         '422': { $ref: '#/components/responses/Invalid' }
+  /api/v1/admin/attempts:
+    get:
+      tags: [admin]
+      operationId: listOpenAttempts
+      summary: The open attempts, with the ones that wait or fail to start marked
+      description: |
+        A-27 (work package G refresh): the attempts that are open (`ready` or `running`), newest first, with what an operator needs to see which ones wait or fail. `issue` is
+        `waiting` for a company assessment that was consented and not started, `failing` for an attempt whose instance the orchestrator reported as `failed`, else `none`;
+        `kind` (`all`, `waiting`, `failing`) filters. Ids, states and instants only: no name, no address and no result (a candidate's answers stay behind break-glass). The read is
+        audited with its count. Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN.
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema: { enum: [all, waiting, failing] }
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: The open attempts.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminOpenAttemptList' }
+              examples:
+                default:
+                  value: {"items": [{"attempt_id": "a-AAAAAAAAAAAAAAAA", "mode": "candidate", "state": "ready", "created_at": "2026-10-21T09:00:00Z", "deadline_at": null, "instance_id": null, "instance_state": null, "issue": "waiting"}]}
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/AdminNotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
   /api/v1/admin/companies/{org_id}/invite-cap:
     parameters:
       - name: org_id
@@ -3791,6 +3821,25 @@ components:
       required: [items]
       properties:
         items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/AdminCompany' } }
+    AdminOpenAttempt:
+      type: object
+      additionalProperties: false
+      required: [attempt_id, mode, state, created_at, deadline_at, instance_id, instance_state, issue]
+      properties:
+        attempt_id: { type: string, pattern: '^a-[A-Z2-7]{16}$' }
+        mode: { enum: [learner, candidate] }
+        state: { enum: [ready, running] }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        deadline_at: { anyOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }] }
+        instance_id: { anyOf: [{ type: string, pattern: '^i-[A-Z2-7]{16}$' }, { type: 'null' }] }
+        instance_state: { anyOf: [{ type: string, maxLength: 32 }, { type: 'null' }], description: 'What the orchestrator last reported for the instance, or null when nothing was reported.' }
+        issue: { enum: [none, waiting, failing] }
+    AdminOpenAttemptList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/AdminOpenAttempt' } }
     InviteCapRequest:
       type: object
       additionalProperties: false

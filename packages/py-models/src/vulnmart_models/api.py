@@ -1065,6 +1065,58 @@ class AdminCompanyList(BaseModel):
     items: Annotated[list[AdminCompany], Field(max_length=100)]
 
 
+class Mode(Enum):
+    learner = 'learner'
+    candidate = 'candidate'
+
+
+class State5(Enum):
+    ready = 'ready'
+    running = 'running'
+
+
+class InstanceState(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description='What the orchestrator last reported for the instance, or null when nothing was reported.',
+            max_length=32,
+        ),
+    ]
+
+
+class Issue(Enum):
+    none = 'none'
+    waiting = 'waiting'
+    failing = 'failing'
+
+
+class AdminOpenAttempt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: Annotated[str, Field(pattern='^a-[A-Z2-7]{16}$')]
+    mode: Mode
+    state: State5
+    created_at: Timestamp
+    deadline_at: Timestamp | None
+    instance_id: InstanceId | None
+    instance_state: Annotated[
+        InstanceState | None,
+        Field(
+            description='What the orchestrator last reported for the instance, or null when nothing was reported.'
+        ),
+    ]
+    issue: Issue
+
+
+class AdminOpenAttemptList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[AdminOpenAttempt], Field(max_length=100)]
+
+
 class InviteCap(RootModel[int]):
     root: Annotated[int, Field(ge=0, le=100000)]
 
@@ -1335,12 +1387,7 @@ class CatalogueList(BaseModel):
     has_more: bool
 
 
-class Mode(Enum):
-    learner = 'learner'
-    candidate = 'candidate'
-
-
-class State5(Enum):
+class State6(Enum):
     invited = 'invited'
     consent = 'consent'
     ready = 'ready'
@@ -1360,7 +1407,7 @@ class AttemptSummary(BaseModel):
     attempt_id: AttemptId
     mode: Mode
     state: Annotated[
-        State5,
+        State6,
         Field(
             description='The ten attempt states of the architecture (04 section 10.1); the same as IF-2 and IF-3.'
         ),
@@ -1378,7 +1425,7 @@ class AttemptSummaryList(BaseModel):
     has_more: bool
 
 
-class State6(Enum):
+class State7(Enum):
     requested = 'requested'
     provisioning = 'provisioning'
     starting = 'starting'
@@ -1421,7 +1468,7 @@ class InstanceSummary(BaseModel):
     instance_id: InstanceId
     attempt_id: AttemptId
     state: Annotated[
-        State6,
+        State7,
         Field(
             description='The ten instance states of IF-5 (identical in IF-2 and IF-3).'
         ),
@@ -1582,6 +1629,13 @@ class RequestInstanceRequest(BaseModel):
     kind: Kind2
 
 
+class ExtendRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    minutes: Annotated[int, Field(ge=5, le=240)]
+
+
 class ConfirmRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -1595,7 +1649,7 @@ class Instance(BaseModel):
     )
     instance_id: InstanceId
     attempt_id: AttemptId
-    state: State6
+    state: State7
     access: Access
     health: Health
     epoch: Annotated[int, Field(ge=1)]
@@ -1726,7 +1780,7 @@ class WriteUp(BaseModel):
     fix: Annotated[str, Field(max_length=1200)]
 
 
-class State8(Enum):
+class State9(Enum):
     ready = 'ready'
     active = 'active'
     solved = 'solved'
@@ -1777,7 +1831,7 @@ class ChallengeProgress(BaseModel):
         ),
     ] = None
     state: Annotated[
-        State8 | None,
+        State9 | None,
         Field(
             description='Optional (a sequenced practice run only, v1.3.0). `ready`: the current challenge, not begun. `active`: begun, the countdown runs.\n`solved`: captured (or held for review). `expired`: the time ran out; nothing counts for it any more.\n'
         ),

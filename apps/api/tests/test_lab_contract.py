@@ -184,7 +184,7 @@ def test_the_contract_check_passes_on_the_repository():
     assert errors == []
     valid = json.loads((LAB_DIR / "examples" / "valid" / "manifest.json").read_text(encoding="utf-8"))
     invalid = json.loads((LAB_DIR / "examples" / "invalid" / "manifest.json").read_text(encoding="utf-8"))
-    assert counts["operations"] == 24
+    assert counts["operations"] == 25
     assert counts["valid"] == len(valid) and counts["invalid"] == len(invalid)
     # every file in the folders is in its manifest, and every manifest entry is a file (the counts cannot drift apart)
     for folder, manifest in (("valid", valid), ("invalid", invalid)):
@@ -214,7 +214,7 @@ def test_states_access_and_health_are_identical_to_if5():
 
 def test_every_route_is_under_api_v1_and_every_operation_has_an_id():
     ids = [op["operationId"] for item in SPEC["paths"].values() for m, op in item.items() if m in contract.METHODS]
-    assert len(ids) == len(set(ids)) == 24
+    assert len(ids) == len(set(ids)) == 25
     assert all(p.startswith("/api/v1/") for p in SPEC["paths"])
 
 
@@ -406,6 +406,12 @@ def test_every_operation_answers_and_every_answer_conforms(fresh):
     assert r[1]["results_released"] is True
     ok(m.call("POST", f"/api/v1/attempts/{A_DONE}/release", "rex"), 200)  # repeating changes nothing
     ok(m.call("GET", f"/api/v1/attempts/{A_DONE}/score", "cam"), 200)
+    before = m.call("GET", f"/api/v1/attempts/{A_CAND}", "cam")[1]["deadline_at"]
+    assert m.call("POST", f"/api/v1/attempts/{A_CAND}/extend", "cam", {"minutes": 30})[0] == 404  # the candidate cannot give themselves time
+    assert m.call("POST", f"/api/v1/attempts/{A_CAND}/extend", "rex", {"minutes": 4})[0] == 422 and m.call("POST", f"/api/v1/attempts/{A_CAND}/extend", "rex", {"minutes": 30, "x": 1})[0] == 422
+    r = m.call("POST", f"/api/v1/attempts/{A_CAND}/extend", "rex", {"minutes": 30}); ok(r, 200)  # the recruiter gives a running candidate attempt extra time (IF-2 2.3.0)
+    assert r[1]["deadline_at"] > before and m.call("POST", f"/api/v1/attempts/{A_CAND}/extend", "rex", {"minutes": 240})[0] == 409  # the total is capped at 240
+    assert m.call("POST", f"/api/v1/attempts/{A_LEARNER}/extend", "ada", {"minutes": 30})[0] == 404
     ok(m.call("POST", f"/api/v1/attempts/{A_CAND}/cancel", "rex"), 200)  # the recruiter cancels a running candidate attempt (IF-2 2.2.0)
     assert m.call("POST", f"/api/v1/attempts/{A_CAND}/cancel", "rex")[0] == 409 and m.call("POST", f"/api/v1/attempts/{A_LEARNER}/cancel", "ada")[0] == 404
     assert m.operations == {op["operationId"] for item in SPEC["paths"].values() for k, op in item.items() if k in contract.METHODS}

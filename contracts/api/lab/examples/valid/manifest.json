@@ -11,6 +11,8 @@
   "attempt.start.json": "Attempt",
   "attempt.released.json": "Attempt",
   "attempt.cancelled.json": "Attempt",
+  "attempt.extend.request.json": "ExtendRequest",
+  "attempt.extended.json": "Attempt",
   "attempt.submit.request.json": "ConfirmRequest",
   "attempt.submitted.json": "Attempt",
   "attempt.withdraw.request.json": "ConfirmRequest",

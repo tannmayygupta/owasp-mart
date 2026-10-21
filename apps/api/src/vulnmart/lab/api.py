@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import Field
-from vulnmart_attempts import AttemptRecord, InvalidTransition, WindowClosed
+from vulnmart_attempts import AttemptRecord, ExtensionRefused, InvalidTransition, WindowClosed
 from vulnmart_attempts.review import NotHeld, ReviewFinal, ReviewForbidden
 from vulnmart_models.error_codes import ErrorCode
 
@@ -75,6 +75,10 @@ M = TypeVar("M", bound=Strict)
 
 class RequestInstanceBody(Strict):
     kind: Literal["learner"]
+
+
+class ExtendBody(Strict):
+    minutes: int = Field(ge=5, le=240)  # IF-2 2.3.0: extra time in whole minutes
 
 
 class ConfirmBody(Strict):
@@ -284,6 +288,19 @@ def note_company_view(request: Request, rt: LabRuntime, auth: Authenticated, rec
             history.record(candidate_user_id=rec.user_id, org_id=rec.org_id, org_name=name, action="viewed")
     except Exception:
         log.warning("noting a company's view of an attempt failed", exc_info=True)
+
+
+def technique_label(rt: LabRuntime, key: str, best_milestone: str) -> str | None:
+    """D-07, FR-DET-07, R-20: the technique of a challenge the candidate got into, from the fixed tag layer of the catalogue (its title and primary weakness, for example
+    `Broken Access Control (CWE-639)`). An estimate that never changes points; null for a challenge with no milestone yet or one the catalogue does not describe. The automatic
+    detection layer (spike S-6) is not built, so nothing finer than the tags is claimed."""
+    if best_milestone == "none":
+        return None
+    entry = rt.catalog.get(key)
+    if entry is None or not entry.title:
+        return None
+    label = f"{entry.title} ({entry.cwe[0]})" if entry.cwe else entry.title
+    return label[:100]
 
 
 def json_ok(body: Any, status: int = 200) -> JSONResponse:
@@ -602,6 +619,27 @@ async def cancel_attempt(attempt_id: str, request: Request, auth: Authenticated 
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
 
 
+@router.post("/api/v1/attempts/{attempt_id}/extend", operation_id="extendAttempt")
+async def extend_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """R-25, C-30, IF-2 2.3.0: the recruiter of the owning company gives a running candidate attempt extra time (an accommodation). The deadline moves by `minutes` (5 to 240,
+    all extensions of one attempt together at most 240, and never past the instance's fixed lifetime); the candidate sees the new `deadline_at`, a time warning that is due
+    again fires again. A state other than `running`, a deadline that has passed, or a cap that is reached is 409 ATT-INVALID-STATE. The candidate, a recruiter of another company
+    and anyone else get the 404 of every route; a learner's practice cannot be extended. An ended attempt is never reopened (its instance is gone)."""
+    rt = lab(request)
+    rec = load_attempt(rt, attempt_id)
+    if not is_reviewer(auth, rec) or Role.RECRUITER not in auth.session.roles or rec.org_id is None:
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND)
+    body = await read_json(request, ExtendBody)
+    throttle(request, auth, "review", "rate_review_action_per_user_per_hour")
+    if rec.state.value != "running":
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    try:
+        await run(rt.extend_attempt, rec.id, body.minutes, by=auth.session.user.id)
+    except ExtensionRefused:
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
 def record_withdrawal(request: Request, auth: Authenticated, rec: AttemptRecord) -> None:
     """FR-SES-10: the minimal consent record of the withdrawal (`withdrawn`), kept as proof. Written after the withdrawal stands and never blocks it: a failure is logged and the
     next repeat of the same call writes it (the service writes one only when none exists yet). The recruiter's mail is the notification story's."""
@@ -857,7 +895,7 @@ async def get_report(attempt_id: str, request: Request, auth: Authenticated = De
         flags = visible_flags(auth, rec, rt.integrity.of(rec.id))
         per = [{"challenge_key": r["challenge_key"], "best_milestone": r["best_milestone"], "points": r["points"], "held": r["held"],
                 "hints_used": r["hints_used"], "time_to_capture_seconds": metrics.headline.get(r["challenge_key"]),
-                "technique_label": None} for r in rows]
+                "technique_label": technique_label(rt, r["challenge_key"], r["best_milestone"])} for r in rows]
         return {"attempt_id": rec.id, "mode": mode_of(rec), "state": rec.state.value, "generated_at": stamp(rt.clock()), "score": total,
                 "elapsed_seconds": elapsed, "active_seconds": metrics.active_seconds if rec.started_at else None,
                 "hints_used_total": sum(r["hints_used"] for r in rows), "integrity_open": sum(1 for f in flags if f.status == "open"),

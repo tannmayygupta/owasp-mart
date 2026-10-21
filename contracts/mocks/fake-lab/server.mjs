@@ -429,6 +429,20 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     if (r && r.state !== 'destroyed') { r.state = 'destroyed'; r.access = 'closed'; r.updatedAt = stamp(); }
     send(res, 200, attemptView(a));
   };
+  H.extendAttempt = ({ res, user, params, take }) => { // IF-2 2.3.0, R-25: the recruiter of the owning company gives a running candidate attempt extra time (5 to 240 minutes in all)
+    const a = reviewable(res, user, params.attempt_id);
+    if (!a) return;
+    const body = take();
+    if (body === false) return;
+    if (user.role !== 'recruiter' || a.orgId === null) return attemptNotFound(res);
+    if (!checkKeys(res, body, ['minutes'])) return;
+    if (!Number.isInteger(body.minutes) || body.minutes < 5 || body.minutes > 240) return invalid(res, '/minutes', 'minutes is a whole number from 5 to 240');
+    if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `extend is not allowed in state ${a.state}`);
+    if ((a.extended ?? 0) + body.minutes > 240) return problem(res, 409, 'ATT-INVALID-STATE', 'the extra time of this attempt would pass 240 minutes');
+    a.extended = (a.extended ?? 0) + body.minutes;
+    a.deadlineAt = stamp(Date.parse(a.deadlineAt) + body.minutes * 60 * 1000);
+    send(res, 200, attemptView(a));
+  };
   H.withdrawAttempt = ({ res, user, params, take }) => {
     const a = owned(res, user, params.attempt_id);
     if (!a) return;
@@ -681,6 +695,7 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/start$`), ['attempt_id'], 'startAttempt', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/release$`), ['attempt_id'], 'releaseResults', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/cancel$`), ['attempt_id'], 'cancelAttempt', 'none'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/extend$`), ['attempt_id'], 'extendAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/submit$`), ['attempt_id'], 'submitAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw$`), ['attempt_id'], 'withdrawAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw/undo$`), ['attempt_id'], 'undoWithdrawal', 'none'],

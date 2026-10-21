@@ -33,6 +33,7 @@ from vulnmart.accounts.roles import NotAnAdmin, RoleService, UnknownUser
 from vulnmart.accounts.service import AccountService, InvalidInput
 from vulnmart.accounts.status import AccountStatusService, InvalidAccountState, clean_reason
 from vulnmart.kernel.quota import MAX_QUOTA, SCOPES, DbQuotaPort, QuotaRow
+from vulnmart.lab.models import Attempt, Instance
 from vulnmart.live.models import DomainEvent
 from vulnmart.notifications.models import EmailOutbox
 from vulnmart.notifications.service import DbOutboxPort
@@ -104,6 +105,18 @@ class UserRow:
 
 
 @dataclass(frozen=True, slots=True)
+class OpenAttempt:
+    attempt_id: str
+    mode: str  # learner | candidate
+    state: str  # ready | running
+    created_at: datetime
+    deadline_at: str | None
+    instance_id: str | None
+    instance_state: str | None  # what the orchestrator last reported; None when nothing was reported
+    issue: str  # none | waiting | failing
+
+
+@dataclass(frozen=True, slots=True)
 class SettingRow:
     name: str
     value: int | bool | str
@@ -172,6 +185,31 @@ class AdminOps:
         rows = self._companies.list_companies(actor, status=status, limit=limit)
         self._audit.append(actor=admin_id, action="admin.companies_read", subject=None, details={"count": len(rows), "status": status})
         return rows
+
+    def open_attempts(self, actor: Scope, *, kind: str = "all", limit: int = 50) -> list[OpenAttempt]:
+        """A-27: the attempts that are open (`ready` or `running`), newest first, with what an operator needs to see which ones wait or fail (`issue`): `waiting` is a company assessment
+        that was consented and not started, `failing` is an attempt whose instance the orchestrator reported as `failed`. Ids, states and instants only: no name, no address, no result
+        (that stays behind break-glass). `kind` is `all`, `waiting` or `failing`; the read is audited with its count."""
+        admin_id = self._admin(actor)
+        if kind not in ("all", "waiting", "failing"):
+            raise InvalidInput("/kind")
+        states = dict(self._instance_states()) if self._instance_states else {}
+        out: list[OpenAttempt] = []
+        with self._sessions() as session:
+            rows = list(session.scalars(select(Attempt).where(Attempt.state.in_(("ready", "running"))).order_by(Attempt.created_at.desc()).limit(1000)))
+            directory = {a: i for a, i in session.execute(select(Instance.attempt_id, Instance.id).where(Instance.attempt_id.in_([r.id for r in rows])))} if rows else {}  # a failed start has an instance row and no instance in the record
+            for row in rows:
+                record = row.record or {}
+                instance_id = directory.get(row.id) or record.get("instance_id")
+                instance_state = states.get(instance_id) if instance_id else None
+                issue = "failing" if instance_state == "failed" else ("waiting" if row.state == "ready" and row.org_id else "none")
+                if kind != "all" and issue != kind:
+                    continue
+                out.append(OpenAttempt(row.id, "candidate" if row.org_id else "learner", row.state, row.created_at, record.get("deadline_at"), instance_id, instance_state, issue))
+                if len(out) >= limit:
+                    break
+        self._audit.append(actor=admin_id, action="admin.attempts_read", subject=None, details={"count": len(out), "kind": kind})
+        return out
 
     def set_company_invite_cap(self, actor: Scope, org_id: str, cap: int | None) -> CompanyRow:
         """Set (or, with None, remove) one company's daily invite cap (FR-ORG-08); the company service audits it. Raises NotFound, InvalidInput (`/invite_cap`)."""
