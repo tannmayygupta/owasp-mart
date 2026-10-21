@@ -69,6 +69,7 @@
 | 0070 | [Browser tests run the production build of the dashboards against the real API app on a throw-away database](0070-browser-tests-run-the-real-api-app-on-a-throw-away-database.md) | Accepted (the leader asked for real browser tests on 2026-10-21; choices to review in the pull request) |
 | 0071 | [Template settings, quotas and the attempt lifecycle in the lab](0071-template-settings-quotas-and-the-attempt-lifecycle.md) | Accepted (confirmed by the leader on 2026-10-21) |
 | 0072 | [Milestone mapping and decoy placement live in the catalogue](0072-milestone-mapping-and-decoy-placement-in-the-catalogue.md) | Accepted (the leader instructed work package D on 2026-10-21) |
+| 0073 | [Company administration, privacy workflows and real mail](0073-company-administration-privacy-workflows-and-real-mail.md) | Accepted (leader, 2026-10-21) |
 | 0074 | [Production hardening of the deployed stack: dashboards, scheduler, real mail, fail-closed starts](0074-production-hardening-of-the-deployed-stack.md) | Accepted |
 | 0075 | [Durable gate and sidecar state, and the platform's list of wanted instances](0075-durable-gate-and-sidecar-state-and-the-platform-s-wanted-instances.md) | Accepted |
 | 0090 | [Edge, gate, ticket and strict hostname model](0090-edge-gate-ticket-and-hostname-model.md) | Proposed (decided on the developer's delegation; to be confirmed). D-61, D-65, D-66 are planned only: their stories are not built. |

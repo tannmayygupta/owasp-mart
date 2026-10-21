@@ -1,8 +1,8 @@
 {
   "schema": "CompanyDecisionRequest",
   "body": {
-    "decision": "delete"
+    "decision": "archive"
   },
   "path": "/decision",
-  "rule": "approve, reject, suspend or reinstate only"
+  "rule": "approve, reject, suspend, reinstate or delete only"
 }

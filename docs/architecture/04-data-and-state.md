@@ -26,6 +26,7 @@ Two databases in one PostgreSQL 18 cluster: `vulnmart` (everything below) and `v
 | `recovery_codes` | `user_id`, `code_hash`, `used_at` | Hashes only |
 | `sessions` | `id_hash`, `user_id`, `created_at`, `last_seen_at`, `absolute_expires_at`, `ip_trunc`, `ua_class`, `revoked_at`, `mfa_at` | Server-side sessions (D-21). Opaque ID stored hashed. `mfa_at` is when a second factor was proved in the session: an admin session without it carries no admin role (story P-15, ADR 0045). Valkey caching of active sessions is not built |
 | `email_tokens` | `token_hash`, `user_id`, `purpose` (`verify`, `reset`, `mfa`), `expires_at`, `used_at`, `attempts` | Single-use, stored as a hash (FR-ACC-02, FR-ACC-08). `mfa` is the 5-minute ticket between the password and the second factor, with at most five tries counted in `attempts` (FR-ACC-07, story P-15). `recovery_codes.code_hash` is a keyed hash (HMAC under the field key) |
+| `email_changes` | `user_id`, `new_email`, `new_email_ci`, `token_hash`, `expires_at` | WP-B (FR-ACC-09, migration 0018): a pending change of an account's address, one row per account; the link is mailed to the NEW address and stored only as a hash; the account's address changes when the link is used (the row is then deleted; sessions end, unused reset and verification links die, the old address is told); the housekeeping job deletes rows whose link ended |
 ### 2.2 Organizations (stream P)
 
 | Table | Key columns | Notes |

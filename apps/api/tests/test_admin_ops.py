@@ -146,7 +146,7 @@ def test_reject_suspend_and_reinstate_need_a_reason_and_an_unknown_company_is_no
             rig.ops.decide_company(ADMIN_SCOPE, pending.org_id, decision)
         assert raised.value.pointer == "/reason"
     with pytest.raises(InvalidInput):
-        rig.ops.decide_company(ADMIN_SCOPE, pending.org_id, "delete", "x")
+        rig.ops.decide_company(ADMIN_SCOPE, pending.org_id, "bogus", "x")
     with pytest.raises(NotFound):
         rig.ops.decide_company(ADMIN_SCOPE, "00000000-0000-0000-0000-0000000000ff", "approve")
     rig.ops.decide_company(ADMIN_SCOPE, pending.org_id, "reject", "not a real company")

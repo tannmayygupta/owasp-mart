@@ -23,7 +23,7 @@ METHODS = ("get", "put", "post", "delete", "patch")
 ROUTER_MODULES = (
     "vulnmart.accounts.api", "vulnmart.accounts.me_api", "vulnmart.accounts.mfa_api", "vulnmart.accounts.password_api", "vulnmart.accounts.session_api",
     "vulnmart.admin.api", "vulnmart.assessments.invite_api", "vulnmart.lab.api", "vulnmart.live.api", "vulnmart.orgs.company_api",
-    "vulnmart.privacy.api", "vulnmart.privacy.deletion_api", "vulnmart.privacy.export_api",
+    "vulnmart.orgs.colleague_api", "vulnmart.orgs.company_privacy_api", "vulnmart.privacy.api", "vulnmart.privacy.deletion_api", "vulnmart.privacy.export_api",
 )
 # operation id -> does the contract have to mark it `x-pending` for the exemption to hold
 PENDING = {"createLiveTicket": True}  # contract-pending, deliberately not served (spike S-14); startAttempt is served since H-356 (OI-22 resolved by D-80)

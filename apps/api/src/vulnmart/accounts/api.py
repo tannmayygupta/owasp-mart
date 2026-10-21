@@ -99,3 +99,21 @@ async def resend_verification(request: Request) -> JSONResponse:
     except InvalidInput as exc:
         raise invalid(exc) from None
     return accepted()
+
+
+@router.post("/api/v1/accounts/confirm-email-change", operation_id="confirmEmailChange")
+async def confirm_email_change(request: Request) -> JSONResponse:
+    """Use the link mailed to a new address (WP-B): the account's address changes, its sessions end, the old address is told. No session is needed (the link may be opened on
+    another device); a link that was used, replaced, expired or never existed is 400 AUTH-TOKEN-INVALID."""
+    check_origin(request)
+    _, limiter = services(request)
+    service = getattr(request.app.state, "self_service", None)
+    if service is None:
+        raise ProblemError(ErrorCode.REQ_INTERNAL)
+    limit(request, limiter, "verify:ip", ip_of(request), "rate_verify_per_ip_per_hour")
+    body = await read_json(request, TokenBody)
+    try:
+        await asyncio.to_thread(service.confirm_email_change, body.token)
+    except TokenInvalid:
+        raise ProblemError(ErrorCode.AUTH_TOKEN_INVALID) from None
+    return JSONResponse({"status": "changed"}, headers=NO_STORE)

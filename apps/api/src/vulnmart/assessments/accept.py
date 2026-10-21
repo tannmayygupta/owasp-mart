@@ -33,6 +33,10 @@ class NotEligible(Exception):
     """The account cannot take an assessment: not an active, verified participant."""
 
 
+class NotVerified(NotEligible):
+    """The account is an active participant whose email address is not verified yet: the person can verify it (or ask for the link again) and come back."""
+
+
 class AddressMismatch(Exception):
     """The verified address of the account is not the one the invite was made for."""
 
@@ -76,6 +80,8 @@ class InviteAcceptance:
         if view.state not in ("opened", "consented"):
             raise InviteClosed(view.state)
         brief = self._directory.brief(user_id)
+        if brief is not None and brief.status == "active" and brief.account_type == "participant" and (not brief.email_verified or brief.email_ci is None):
+            raise NotVerified
         if brief is None or brief.status != "active" or brief.account_type != "participant" or not brief.email_verified or brief.email_ci is None:
             raise NotEligible
         if brief.email_ci != view.email:

@@ -1,4 +1,4 @@
-"""The admin routes of IF-1 (story P-28, FR-ADM-01, 02, 04, 05, 06, FR-PRV-18): the approval queue, user management, force-stop, settings, quotas, capacity and the scheduler's last runs.
+"""The admin routes of IF-1 (story P-28, FR-ADM-01, 02, 04, 05, 06, FR-PRV-18): the approval queue, the company list, user management, force-stop, settings, quotas, capacity and the scheduler's last runs.
 
 Every route needs an admin session (`requires(Role.ADMIN)`); a caller who is not an admin is answered 404 REQ-ROUTE-UNKNOWN, the same as for a route that does not exist, so the answer
 does not even say the route is there. The routes that change state also need the CSRF header and the Origin check. Every change is audited by `AdminOps`; no route here reads
@@ -40,8 +40,12 @@ SETTING_NAME = r"^[a-z][a-z0-9_]{0,63}$"
 
 
 class CompanyDecisionBody(Strict):
-    decision: Literal["approve", "reject", "suspend", "reinstate"]
+    decision: Literal["approve", "reject", "suspend", "reinstate", "delete"]
     reason: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class InviteCapBody(Strict):
+    invite_cap: int | None = Field(ge=0, le=100_000)  # null: back to the global setting
 
 
 class UserActionBody(Strict):
@@ -80,6 +84,11 @@ async def run(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         raise ProblemError(ErrorCode.REQ_INTERNAL) from None
 
 
+def company_body(r: Any) -> dict[str, Any]:
+    return {"org_id": r.org_id, "name": r.name, "status": r.status, "owner_name": r.owner_name, "owner_email_domain": r.owner_email_domain, "created_at": timestamp(r.created_at),
+            "members": r.members, "invite_cap": r.invite_cap, "invite_cap_override": r.invite_cap_override}
+
+
 def setting_body(row: SettingRow) -> dict[str, Any]:
     return {"name": row.name, "value": row.value, "default": row.default, "overridden": row.overridden, "minimum": row.minimum, "maximum": row.maximum}
 
@@ -102,6 +111,20 @@ async def decide_company(request: Request, org_id: Annotated[str, Path(pattern=O
     body = await read_json(request, CompanyDecisionBody)
     await run(ops_of(request).decide_company, auth.session.scope, org_id.lower(), body.decision, body.reason)
     return Response(status_code=204, headers=NO_STORE)
+
+
+@router.get("/api/v1/admin/companies", operation_id="listCompanies")
+async def list_companies(request: Request, auth: Authenticated = Depends(admin_read), status: Annotated[Literal["pending", "active", "rejected", "suspended", "deleted"] | None, Query()] = None,
+                         limit: Annotated[int, Query(ge=1, le=100)] = 50) -> JSONResponse:
+    rows = await run(ops_of(request).companies, auth.session.scope, status=status, limit=limit)
+    return JSONResponse({"items": [company_body(r) for r in rows]}, headers=NO_STORE)
+
+
+@router.put("/api/v1/admin/companies/{org_id}/invite-cap", operation_id="setCompanyInviteCap")
+async def set_company_invite_cap(request: Request, org_id: Annotated[str, Path(pattern=ORG_ID)], auth: Authenticated = Depends(admin_write)) -> JSONResponse:
+    body = await read_json(request, InviteCapBody)
+    row = await run(ops_of(request).set_company_invite_cap, auth.session.scope, org_id.lower(), body.invite_cap)
+    return JSONResponse(company_body(row), headers=NO_STORE)
 
 
 # ---- users ----
@@ -197,7 +220,7 @@ SESSION_ID = r"^g-[A-Z2-7]{16}$"
 
 class BreakGlassBody(Strict):
     attempt_id: str = Field(pattern=ATTEMPT_ID)
-    reason: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=20, max_length=500)  # the same bounds as the service and the contract (BreakGlassRequest)
 
 
 class ReviewBody(Strict):

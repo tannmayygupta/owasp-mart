@@ -1,0 +1,6 @@
+{
+  "schema": "DeletionDecisionRequest",
+  "body": {
+    "decision": "approve"
+  }
+}

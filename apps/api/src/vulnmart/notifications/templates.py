@@ -193,6 +193,21 @@ def _deletion_for_company(p: dict[str, str]) -> Rendered:
     ], link=("Open the request", p["link"]) if "link" in p else None, sender_note=f"This message was sent by VulnMart to {org}.")
 
 
+def _deletion_overdue(p: dict[str, str]) -> Rendered:
+    org = p["org_name"]
+    return _compose("A deletion request is overdue", [
+        f"A candidate's request to delete their data from the assessment \"{p['assessment_name']}\" was due for a decision by {p['decide_by']} and has had none.",
+        "It has now been passed to a VulnMart admin. Please decide it now: approve to start the 7-day hold, or decline with the reasons the candidate is owed.",
+    ], link=("Open the request", p["link"]) if "link" in p else None, sender_note=f"This message was sent by VulnMart to {org}.")
+
+
+def _deletion_escalated_admin(p: dict[str, str]) -> Rendered:
+    return _compose("A candidate deletion request was not decided", [
+        f"The company {p['org_name']} did not decide a candidate's deletion request ({p['request_id']}) by the due date.",
+        "The company was reminded. The request stays open; contact the company, or have it decide, so the candidate gets an answer.",
+    ])
+
+
 def _deletion_confirmed(p: dict[str, str]) -> Rendered:
     return _compose("Your data has been deleted", [
         "The deletion you asked for is complete." if "completed_on" not in p else f"The deletion you asked for was completed on {p['completed_on']}.",
@@ -241,6 +256,62 @@ def _system_test(p: dict[str, str]) -> Rendered:
     return _compose("VulnMart test message", ["This is a test message from VulnMart."])
 
 
+def _deletion_declined(p: dict[str, str]) -> Rendered:
+    org = p["org_name"]
+    return _compose("Your deletion request was declined", [
+        f"{org} declined your request to delete your data from the assessment.",
+        "The company may have a reason to keep the record for a while. Your data is still deleted on the date in your consent notice.",
+        "If you disagree, you can ask the VulnMart administrators to look at the decision.",
+    ], sender_note=f"This message was sent by VulnMart on behalf of {org}.")
+
+
+def _time_warning(p: dict[str, str]) -> Rendered:
+    minutes = p["minutes_left"]
+    return _compose(f"{minutes} minutes left in your assessment", [
+        f"Your assessment \"{p['assessment_name']}\" ends in about {minutes} minutes.",
+        "Capture and submit what you have: nothing can be sent after the time is over.",
+    ], link=("Back to your assessment", p["link"]) if "link" in p else None)
+
+
+def _submission_candidate(p: dict[str, str]) -> Rendered:
+    org = p["org_name"]
+    return _compose("Your assessment was submitted", [
+        f"We received your submission for the assessment \"{p['assessment_name']}\" of {org}.",
+        "You cannot change it any more. You will see your results when the company has released them, or right away if it set the assessment that way.",
+    ], link=("Open your assessment", p["link"]) if "link" in p else None, sender_note=f"This message was sent by VulnMart for {org}.")
+
+
+def _submission_recruiter(p: dict[str, str]) -> Rendered:
+    org = p["org_name"]
+    return _compose("A candidate submitted an assessment", [
+        f"A candidate submitted the assessment \"{p['assessment_name']}\" of {org}.",
+        "Their result is ready to review in your candidates list.",
+    ], link=("Open the candidates", p["link"]) if "link" in p else None, sender_note=f"This message was sent by VulnMart to {org}.")
+
+
+def _results_released(p: dict[str, str]) -> Rendered:
+    org = p["org_name"]
+    return _compose("Your assessment results are ready", [
+        f"{org} released the results of your assessment \"{p['assessment_name']}\". You can look at them now.",
+    ], link=("See my results", p["link"]) if "link" in p else None, sender_note=f"This message was sent by VulnMart for {org}.")
+
+
+def _email_change(p: dict[str, str]) -> Rendered:
+    hours = p.get("expires_in_hours")
+    return _compose("Confirm your new VulnMart email address", [
+        "Someone asked to use this email address for a VulnMart account. If it was you, use the link to confirm it.",
+        f"The link works once and expires in {hours} hours." if hours else "The link works once and expires.",
+        "If you did not ask for this, ignore this message: nothing changes until the link is used.",
+    ], link=("Confirm my new email address", p["link"]))
+
+
+def _email_changed_notice(p: dict[str, str]) -> Rendered:
+    return _compose("The email address of your VulnMart account was changed", [
+        "The email address of your VulnMart account was changed. From now on you sign in with the new address.",
+        "If you did not do this, reset your password at once and tell the VulnMart administrators.",
+    ])
+
+
 def _spec(name: str, required: set[str], build, *, optional: set[str] = frozenset(), links: set[str] = frozenset(),
           secret: set[str] = frozenset()) -> TemplateSpec:
     return TemplateSpec(name, frozenset(required), build, frozenset(optional), frozenset(secret), frozenset(links))
@@ -258,8 +329,17 @@ TEMPLATES: dict[str, TemplateSpec] = {s.name: s for s in (
           links={"undo_link"}, secret={"undo_link"}),
     _spec("privacy.deletion_request_for_company", {"org_name", "assessment_name", "decide_by"}, _deletion_for_company,
           optional={"link"}, links={"link"}),
+    _spec("privacy.deletion_overdue", {"org_name", "assessment_name", "decide_by"}, _deletion_overdue, optional={"link"}, links={"link"}),
+    _spec("admin.deletion_escalated", {"org_name", "request_id"}, _deletion_escalated_admin),
     _spec("privacy.deletion_confirmed", set(), _deletion_confirmed, optional={"completed_on"}),
-    _spec("learner.retention_warning", {"delete_on", "login_url"}, _retention, links={"login_url"}),
+    _spec("privacy.deletion_declined", {"org_name"}, _deletion_declined),
+    _spec("candidate.time_warning", {"assessment_name", "minutes_left"}, _time_warning, optional={"link"}, links={"link"}),
+    _spec("candidate.submission_received", {"org_name", "assessment_name"}, _submission_candidate, optional={"link"}, links={"link"}),
+    _spec("recruiter.submission_received", {"org_name", "assessment_name"}, _submission_recruiter, optional={"link"}, links={"link"}),
+    _spec("candidate.results_released", {"org_name", "assessment_name"}, _results_released, optional={"link"}, links={"link"}),
+    _spec("account.email_change", {"link"}, _email_change, optional={"expires_in_hours"}, links={"link"}, secret={"link"}),
+    _spec("account.email_changed", set(), _email_changed_notice),
+    _spec("learner.retention_warning",{"delete_on", "login_url"}, _retention, links={"login_url"}),
     _spec("instance.force_stopped", set(), _force_stopped),
     _spec("admin.break_glass_opened", {"grant_id", "minutes"}, _break_glass_admins),
     _spec("company.break_glass_opened", {"minutes"}, _break_glass_company),

@@ -1,0 +1,8 @@
+{
+  "schema": "JoinDecisionRequest",
+  "body": {
+    "decision": "decline"
+  },
+  "path": "/decision",
+  "rule": "approve or reject only"
+}

@@ -604,6 +604,12 @@ class TemplateRequest(BaseModel):
     writeup_required: bool | None = None
     results_visibility: ResultsVisibility | None = None
     flag_submissions_per_minute: Annotated[int | None, Field(ge=1, le=60)] = None
+    cohort_board: Annotated[
+        bool | None,
+        Field(
+            description='Turns the private cohort view on for this assessment (D-93). Off when left out.'
+        ),
+    ] = None
 
 
 class Template(BaseModel):
@@ -622,6 +628,10 @@ class Template(BaseModel):
     writeup_required: bool
     results_visibility: ResultsVisibility
     flag_submissions_per_minute: Annotated[int, Field(ge=1, le=60)]
+    cohort_board: Annotated[
+        bool,
+        Field(description='The private cohort view is on for this assessment (D-93).'),
+    ]
     version: Annotated[int, Field(ge=1)]
     updated_at: Timestamp
 
@@ -845,6 +855,7 @@ class Decision2(Enum):
     reject = 'reject'
     suspend = 'suspend'
     reinstate = 'reinstate'
+    delete = 'delete'
 
 
 class CompanyDecisionRequest(BaseModel):
@@ -855,12 +866,222 @@ class CompanyDecisionRequest(BaseModel):
     reason: Annotated[str | None, Field(max_length=500, min_length=1)] = None
 
 
-class Status2(Enum):
+class ChangeEmailRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    new_email: Email
+    current_password: Annotated[str, Field(max_length=128, min_length=1)]
+
+
+class ChangedStatus(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    status: Literal['changed']
+
+
+class CompanyDeletionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(pattern='^d-[A-Z2-7]{16}$')]
+    attempt_id: AttemptId
+    candidate_email: Annotated[
+        Email | None,
+        Field(
+            description="The address the candidate was invited with (the company's own invite data); null when the invite is gone."
+        ),
+    ]
+    status: Status1
+    requested_at: Timestamp
+    decide_by: Timestamp | None
+    execute_after: Timestamp | None
+    escalated: Annotated[
+        bool,
+        Field(
+            description='The company did not decide by `decide_by` and the request was passed to the admins.'
+        ),
+    ]
+
+
+class CompanyDeletionRequestList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[CompanyDeletionRequest], Field(max_length=100)]
+
+
+class Decision3(Enum):
+    approve = 'approve'
+    decline = 'decline'
+
+
+class DeletionDecisionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    decision: Decision3
+
+
+class DeletedRecord(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: AttemptId
+    attempts_erased: Annotated[int, Field(ge=0)]
+
+
+class CompanyJoinRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: UUID
+    display_name: Annotated[str, Field(max_length=60)]
+    requested_at: Timestamp
+
+
+class CompanyJoinRequestList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[CompanyJoinRequest], Field(max_length=500)]
+
+
+class Decision4(Enum):
+    approve = 'approve'
+    reject = 'reject'
+
+
+class JoinDecisionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    decision: Decision4
+
+
+class Role1(Enum):
+    owner = 'owner'
+    member = 'member'
+
+
+class CompanyMember(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    user_id: UserId
+    display_name: Annotated[str, Field(max_length=60)]
+    role: Role1
+
+
+class CompanyMemberList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[CompanyMember], Field(max_length=500)]
+
+
+class ActiveSeconds(RootModel[int]):
+    root: Annotated[int, Field(ge=0)]
+
+
+class CohortRow(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    position: Annotated[int, Field(ge=1)]
+    attempt_id: AttemptId
+    score: Annotated[int, Field(ge=0)]
+    full_captures: Annotated[int, Field(ge=0)]
+    hint_cost_units: Annotated[int, Field(ge=0)]
+    active_seconds: ActiveSeconds | None
+    last_capture_at: Timestamp | None
+    reason: Annotated[str, Field(max_length=200)]
+
+
+class Cohort(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    template_id: UUID
+    label: Annotated[str, Field(max_length=100)]
+    items: Annotated[list[CohortRow], Field(max_length=5000)]
+
+
+class Status3(Enum):
+    pending = 'pending'
+    active = 'active'
+    rejected = 'rejected'
+    suspended = 'suspended'
+    deleted = 'deleted'
+
+
+class InviteCapOverride(RootModel[int]):
+    root: Annotated[
+        int,
+        Field(
+            description="The admin's own number for this company; null when the global setting applies.",
+            ge=0,
+            le=100000,
+        ),
+    ]
+
+
+class AdminCompany(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    org_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        ),
+    ]
+    name: Annotated[str, Field(max_length=120)]
+    status: Status3
+    owner_name: Annotated[str, Field(max_length=60)]
+    owner_email_domain: Annotated[str, Field(max_length=253)]
+    created_at: Timestamp
+    members: Annotated[int, Field(ge=0)]
+    invite_cap: Annotated[
+        int,
+        Field(
+            description="The daily invite cap in force (the admin's own number for the company, else the global setting).",
+            ge=0,
+        ),
+    ]
+    invite_cap_override: Annotated[
+        InviteCapOverride | None,
+        Field(
+            description="The admin's own number for this company; null when the global setting applies."
+        ),
+    ]
+
+
+class AdminCompanyList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[AdminCompany], Field(max_length=100)]
+
+
+class InviteCap(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=100000)]
+
+
+class InviteCapRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invite_cap: InviteCap | None
+
+
+class Status4(Enum):
     active = 'active'
     disabled = 'disabled'
 
 
-class Role1(Enum):
+class Role2(Enum):
     learner = 'learner'
     candidate = 'candidate'
 
@@ -873,8 +1094,8 @@ class AdminUser(BaseModel):
     display_name: Annotated[str, Field(max_length=60)]
     email: Annotated[str, Field(max_length=254)]
     account_type: AccountType
-    status: Status2
-    roles: list[Role1]
+    status: Status4
+    roles: list[Role2]
     email_verified: bool
     created_at: Timestamp
     last_login_at: Timestamp | None
@@ -1777,7 +1998,7 @@ class Type(Enum):
     similarity = 'similarity'
 
 
-class Status3(Enum):
+class Status5(Enum):
     open = 'open'
     accepted = 'accepted'
     rejected = 'rejected'
@@ -1795,7 +2016,7 @@ class IntegrityFlag(BaseModel):
     type: Type
     challenge_key: ChallengeKey | None
     explanation: Annotated[str, Field(max_length=500, min_length=1)]
-    status: Status3
+    status: Status5
     held: Annotated[
         bool,
         Field(
@@ -1820,7 +2041,7 @@ class IntegrityFlagList(BaseModel):
     ]
 
 
-class Decision3(Enum):
+class Decision5(Enum):
     accept = 'accept'
     reject = 'reject'
 
@@ -1829,7 +2050,7 @@ class IntegrityDecisionRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    decision: Decision3
+    decision: Decision5
     note: Annotated[str, Field(max_length=1000, min_length=1)]
 
 
@@ -1869,7 +2090,7 @@ class ElapsedSeconds(RootModel[int]):
     root: Annotated[int, Field(ge=0)]
 
 
-class ActiveSeconds(RootModel[int]):
+class ActiveSeconds1(RootModel[int]):
     root: Annotated[
         int, Field(description='Estimate (FR-TIM-02); null when not computed.', ge=0)
     ]
@@ -1886,7 +2107,7 @@ class Report(BaseModel):
     score: Annotated[int, Field(ge=0, le=1000)]
     elapsed_seconds: ElapsedSeconds | None
     active_seconds: Annotated[
-        ActiveSeconds | None,
+        ActiveSeconds1 | None,
         Field(description='Estimate (FR-TIM-02); null when not computed.'),
     ]
     hints_used_total: Annotated[int, Field(ge=0, le=33)]

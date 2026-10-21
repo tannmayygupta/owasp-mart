@@ -1,0 +1,6 @@
+{
+  "schema": "InviteCapRequest",
+  "body": {
+    "invite_cap": 20
+  }
+}

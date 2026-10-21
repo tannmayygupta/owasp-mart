@@ -76,6 +76,13 @@ CLASSES: dict[str, tuple[str, str]] = {
     **{op: ("admin", W + "test_admin_routes_answer_everyone_else_like_unknown_routes") for op in (
         "listPendingCompanies", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
         "setQuota", "removeQuota", "getCapacity", "listJobs")},
+    # work package B: the company side of deletion requests, colleagues, the cohort view, the admin company routes and the change of address
+    **{op: ("company", "test_wp_b_routes.py::test_another_company_cannot_use_my_deletion_requests_members_or_cohort") for op in (
+        "listCompanyDeletionRequests", "decideDeletionRequest", "deleteCandidateRecord", "getCohort", "listCompanyMembers", "removeCompanyMember")},
+    **{op: ("company", "test_wp_b_routes.py::test_only_the_owner_reaches_the_colleague_routes_and_another_companys_request_is_not_found") for op in ("listJoinRequests", "decideJoinRequest")},
+    **{op: ("admin", "test_wp_b_routes.py::test_the_admin_company_routes_answer_everyone_else_like_unknown_routes") for op in ("listCompanies", "setCompanyInviteCap")},
+    "requestEmailChange": ("self", "test_wp_b_routes.py::test_a_recruiter_cannot_move_to_a_disposable_address_and_the_route_needs_a_session"),
+    "confirmEmailChange": ("public", "test_wp_b_routes.py::test_the_change_of_address_refuses_the_same_address_a_taken_one_an_admin_and_a_replaced_or_late_link"),
     "listAuditLog": ("admin", "test_breakglass.py::test_reading_the_audit_log_is_itself_audited_and_only_for_admins"),
     **{op: ("admin", "test_breakglass.py::test_a_session_alerts_the_other_admin_and_the_company_records_reads_and_is_reviewed_by_the_other_admin") for op in (
         "listBreakGlassSessions", "openBreakGlass", "readBreakGlassAttempt", "closeBreakGlass", "reviewBreakGlass")},

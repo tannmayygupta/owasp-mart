@@ -121,6 +121,21 @@ class PendingCompany:
 
 
 @dataclass(frozen=True, slots=True)
+class CompanyRow:
+    """One company in the admin's list: its standing, its size and its daily invite cap (the admin's number for it, or None when the global setting applies)."""
+
+    org_id: str
+    name: str
+    status: str
+    owner_name: str
+    owner_email_domain: str
+    created_at: datetime
+    members: int
+    invite_cap: int  # the cap in force today
+    invite_cap_override: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class Standing:
     """Where a recruiter stands. `state` is one of unverified_email, pending_approval, active, rejected, suspended, deleted, or `none` (no company)."""
 
@@ -386,6 +401,31 @@ class CompanyService:
         owners = self._directory.briefs(r.owner_user_id for r in rows)
         return [PendingCompany(str(r.id), r.name, owners[r.owner_user_id].display_name if r.owner_user_id in owners else "", r.email_domain,
                                _aware(r.created_at)) for r in rows]
+
+    def list_companies(self, actor: Scope, *, status: str | None = None, limit: int = 100, org_id: str | None = None) -> list[CompanyRow]:
+        """Every company (newest first), optionally of one status, with its size and invite cap (FR-ADM-01, FR-ORG-08). Raises InvalidInput (`/status`) for an unknown status."""
+        admin_id = self._roles.require_admin(actor)
+        if status is not None and status not in ("pending", "active", "rejected", "suspended", "deleted"):
+            raise InvalidInput("/status")
+        with self._scope.acting_as(Scope(user_id=admin_id, roles=actor.roles)):  # an admin with no company reads the company directory
+            with self._sessions() as session:
+                query = select(Organization)
+                if status is not None:
+                    query = query.where(Organization.status == status)
+                if org_id is not None:
+                    query = query.where(Organization.id == _uuid(org_id))
+                rows = session.scalars(query.order_by(Organization.created_at.desc(), Organization.id).limit(max(1, min(limit, 500)))).all()
+        owners = self._directory.briefs(r.owner_user_id for r in rows)
+        default_cap = int(self._settings.get("invite_cap_per_company_per_day"))
+        out: list[CompanyRow] = []
+        for r in rows:
+            with self._as(admin_id, str(r.id), actor.roles):  # the members are company data: read them for the one company at a time
+                with self._sessions() as session:
+                    count = len(session.scalars(select(OrgMember.user_id).where(OrgMember.org_id == r.id, OrgMember.status == "active")).all())
+            owner = owners.get(r.owner_user_id)
+            out.append(CompanyRow(str(r.id), r.name, r.status, owner.display_name if owner else "", r.email_domain, _aware(r.created_at), count,
+                                  r.invite_cap if r.invite_cap is not None else default_cap, r.invite_cap))
+        return out
 
     def approve(self, actor: Scope, org_id: str) -> None:
         """pending -> active: one admin approval activates the company and its owner. Queues the approval mail."""

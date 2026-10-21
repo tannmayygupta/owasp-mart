@@ -72,7 +72,7 @@ STAMPS = {"sent": "sent_at", "opened": "opened_at", "consented": "consented_at",
 # What a template can never switch off (FR-ASM-01): asking to is refused by name.
 FIXED_ON = frozenset({"flags", "flags_enabled", "per_instance_flags", "evidence", "evidence_capture", "audit", "audit_log", "consent", "consent_screen"})
 TEMPLATE_FIELDS = frozenset({"title", "challenge_keys", "time_limit_min", "hints_mode", "hint_cost_pct", "reset_limit", "invite_expiry_days", "retention_days",
-                             "writeup_required", "results_visibility", "flag_submissions_per_minute"})
+                             "writeup_required", "results_visibility", "flag_submissions_per_minute", "cohort_board"})
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f  ]")
 _SPACE = re.compile(r"\s+")
 
@@ -141,6 +141,7 @@ class TemplateView:
     flag_submissions_per_minute: int
     version: int
     updated_at: datetime
+    cohort_board: bool = False  # the private cohort view is on for this assessment (D-93); not part of the attempt's rules
 
     def rules(self) -> dict[str, Any]:
         """The rules an invite copies and an attempt runs under."""
@@ -244,11 +245,14 @@ def validate_template(values: Mapping[str, Any], *, default_retention: int = 180
         raise InvalidInput("/writeup_required")
     if visibility not in RESULTS_VISIBILITY:
         raise InvalidInput("/results_visibility")
+    cohort_board = values.get("cohort_board", False)
+    if type(cohort_board) is not bool:
+        raise InvalidInput("/cohort_board")
     return {
         "title": _clean_title(values.get("title")), "challenge_keys": sorted(keys), "hints_mode": hints_mode, "hint_cost_pct": cost,
         "time_limit_min": _int(values, "time_limit_min", 120, 30, 480), "reset_limit": _int(values, "reset_limit", 3, 0, 10),
         "invite_expiry_days": _int(values, "invite_expiry_days", 7, 1, 30), "retention_days": _int(values, "retention_days", default_retention, 30, 365),
-        "flag_submissions_per_minute": _int(values, "flag_submissions_per_minute", 10, 1, 60), "writeup_required": writeup, "results_visibility": visibility,
+        "flag_submissions_per_minute": _int(values, "flag_submissions_per_minute", 10, 1, 60), "writeup_required": writeup, "results_visibility": visibility, "cohort_board": cohort_board,
     }
 
 
@@ -290,13 +294,13 @@ class AssessmentService:
         s = dict(row.settings or {})
         return TemplateView(str(row.id), row.title, tuple(sorted(keys)), row.time_limit_min, row.hints_mode, row.hint_cost_pct, row.reset_limit, row.invite_expiry_days,
                             row.retention_days, bool(s.get("writeup_required", False)), s.get("results_visibility", "after_submit"),
-                            int(s.get("flag_submissions_per_minute", 10)), row.version, _aware(row.updated_at))
+                            int(s.get("flag_submissions_per_minute", 10)), row.version, _aware(row.updated_at), bool(s.get("cohort_board", False)))
 
     def _write_template(self, session: Session, row: AssessmentTemplate, fields: dict[str, Any]) -> None:
         row.title, row.time_limit_min, row.hints_mode, row.hint_cost_pct = fields["title"], fields["time_limit_min"], fields["hints_mode"], fields["hint_cost_pct"]
         row.reset_limit, row.invite_expiry_days, row.retention_days = fields["reset_limit"], fields["invite_expiry_days"], fields["retention_days"]
         row.settings = {"writeup_required": fields["writeup_required"], "results_visibility": fields["results_visibility"],
-                        "flag_submissions_per_minute": fields["flag_submissions_per_minute"]}
+                        "flag_submissions_per_minute": fields["flag_submissions_per_minute"], "cohort_board": fields["cohort_board"]}
 
     def create_template(self, actor: Scope, values: Mapping[str, Any]) -> TemplateView:
         org = self._recruiter_org(actor)
