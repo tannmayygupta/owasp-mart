@@ -407,3 +407,4 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ### 2026-10-11 (Tanmay, story 1.15)
 - registry change: IF-7 (challenge catalogue, owner T) is registered and `contracts/catalog` is no longer reserved; the checker, its registry, the oasdiff pins and the workflow now run from the base commit (trusted checker, ADR 0026); deleting a whole contract is a breaking change; the marker is the exact line `BREAKING:`.
+- registry change: `.github/workflows/ci.yml` gets a step `node scripts/check-asvs.mjs` in the `scripts` job on 2026-10-21 (work package G, task P-32): the ASVS 5.0.0 checklist `docs/security/asvs-checklist.md` must hold one row per requirement with a status, an owner and evidence whose files exist. No contract file changes, no rule of the contract checker changes.
