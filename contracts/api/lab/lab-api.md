@@ -20,18 +20,24 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `resetInstance` | `POST /api/v1/instances/{instance_id}/reset` | 202 | New epoch, new flags |
 | `stopInstance` | `POST /api/v1/instances/{instance_id}/stop` | 202 or 200 | Stop and destroy |
 | `getAttempt` | `GET /api/v1/attempts/{attempt_id}` | 200 | State and clock |
-| `startAttempt` | `POST /api/v1/attempts/{attempt_id}/start` | 200 | Start the clock (**pending OI-22**) |
+| `startAttempt` | `POST /api/v1/attempts/{attempt_id}/start` | 200 | Ask for the instance; the clock starts when it is ready (D-80) |
 | `submitAttempt` | `POST /api/v1/attempts/{attempt_id}/submit` | 200 | Manual submit after confirmation |
 | `submitFlag` | `POST /api/v1/attempts/{attempt_id}/flags` | 200 | Paste a flag |
 | `getScore` | `GET /api/v1/attempts/{attempt_id}/score` | 200 | Score snapshot |
-| `listChallenges` | `GET /api/v1/attempts/{attempt_id}/challenges` | 200 | Progress per challenge |
+| `listChallenges` | `GET /api/v1/attempts/{attempt_id}/challenges` | 200 | Progress per challenge (a sequenced run lists only the challenges reached, v1.3.0) |
+| `beginChallenge` | `POST .../challenges/{challenge_key}/begin` | 200 | Start the countdown of the current challenge: Easy 20, Medium 40, Hard 60 minutes (v1.3.0) |
+| `getMyProgress` | `GET /api/v1/me/progress` | 200 | The points on the learner's account: best result per challenge over all runs (v1.3.0) |
 | `listHints` | `GET .../challenges/{challenge_key}/hints` | 200 | Three hint levels |
 | `unlockHint` | `POST .../challenges/{challenge_key}/hints/{level}/unlock` | 200 | Unlock one level |
 | `listEvidence` | `GET /api/v1/attempts/{attempt_id}/evidence` | 200 | Captured requests (redacted) |
 | `listIntegrityFlags` | `GET /api/v1/attempts/{attempt_id}/integrity-flags` | 200 | Integrity signals |
 | `decideIntegrityFlag` | `POST .../integrity-flags/{integrity_flag_id}/decision` | 200 | Review decision |
+| `releaseResults` | `POST /api/v1/attempts/{attempt_id}/release` | 200 | The recruiter releases a finished candidate's results when the invite says `after_release` (v2.1.0) |
+| `cancelAttempt` | `POST /api/v1/attempts/{attempt_id}/cancel` | 200 | The recruiter cancels a candidate's ready or running attempt (FR-SES-07, v2.2.0) |
 | `getReport` | `GET /api/v1/attempts/{attempt_id}/report` | 200 | Per-candidate report |
-| `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first |
+| `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first (with the time warnings, v2.0.0) |
+
+**A sequenced practice run (v1.3.0).** A learner works through the challenges one at a time, in catalogue order. The current challenge is `ready` until the learner calls `beginChallenge`; then its countdown runs (the tier sets the time) and flags, hints and milestones count for it. It ends when its flag is captured (`solved`; a capture held for review counts as solved) or the time is over (`expired`); the next challenge then becomes current. A challenge that ended gives no more credit and no more hints; what it earned stays. The challenges after the current one are not listed and answer 404 `ATT-CHALLENGE-NOT-FOUND` on every route; a challenge not begun, or one that ended, answers 409 `ATT-INVALID-STATE` on flags and hints. A run lasts the sum of the challenge times plus 30 minutes. When every challenge is solved or timed out the run is submitted by the lab's tick; after that the learner can start a new run (`requestInstance` again): the old run stays as history and the account points keep the best result per challenge. A company assessment is not sequenced. The deployed lab turns this on with `VULNMART_LAB_SEQUENCE=1`.
 
 Who may call what (the mock enforces every row marked "mock"; a failure for a reader who may not know the resource is always the same 404). The roles are the account types of the architecture (`participant`, `recruiter`, `admin`; 04 section 2.1); a participant acts as a learner on a practice attempt and as a candidate on an assessment attempt.
 
@@ -39,7 +45,8 @@ Who may call what (the mock enforces every row marked "mock"; a failure for a re
 |---|---|---|---|---|
 | Instances (all five calls): request, get, open, reset, stop | yes (request: a learner; a candidate instance is created by the platform) | no: 404 (mock) | 404 (mock) | not here (proposal, to confirm) |
 | `getAttempt`, `getScore`, `listChallenges`, `getTimeline` | yes | yes | 404 | not here (proposal, to confirm; admin reads are break-glass sessions of FR-ADM-03, a platform route) |
-| `startAttempt`, `submitAttempt`, `submitFlag`, `listHints`, `unlockHint` | yes | no: 404 (mock) | 404 | no (proposal, to confirm) |
+| `startAttempt`, `submitAttempt`, `submitFlag`, `listHints`, `unlockHint`, `beginChallenge` | yes | no: 404 (mock) | 404 | no (proposal, to confirm) |
+| `getMyProgress` | yes (the learner's own account only) | not applicable | not applicable | no |
 | `listEvidence`, `listIntegrityFlags`, `getReport` | learner attempt: yes; candidate attempt: **OI-15** (the mock says no) | yes | 404 | not here (proposal, to confirm) |
 | `decideIntegrityFlag` | no: answered 404 like anyone else (the contract declares no 403 for it; the owner may read but not decide) | yes (**OI-38**) | 404 | not here (**OI-38** outcome B adds it) |
 
@@ -78,7 +85,7 @@ The browser sees exactly the values of the orchestrator contract (handoff H-78);
 - **Open.** In state `ready`, `active` or `idle` with access `open`: 200 with `{url, expires_at}`; the URL is `https://<instance host>/_vm/enter?t=<ticket>` (the ticket is `payload.signature`, gate-ticket.md section 2), single use, about 60 seconds (architecture 03 section 3). Otherwise 409 `INST-NOT-READY`.
 - **Reset.** Body `{"confirm": true}`. From `ready`, `active` or `idle`: 202, epoch plus one, state `resetting`. Any other state, an instance whose access is frozen, or an attempt that is not running (for example after submit): 409 `INST-INVALID-STATE`. Milestones already earned stay (FR-SES-09). The reset limit per template is OI-25.
 - **Stop.** 202 for a new stop, 200 when already `stopping` or `destroyed`; 409 `INST-INVALID-STATE` when the instance is frozen or its attempt is not running. The freeze after submit is never undone by a timer step.
-- **Start (pending OI-22).** From `ready` to `running`; the server sets `started_at` and `deadline_at`. Other states: 409 `ATT-INVALID-STATE`.
+- **Start (D-80, OI-22 resolved).** Asks for the instance of an assessment attempt in `ready`; the server moves it to `running` and sets `started_at` and `deadline_at` when the instance is ready. Repeat presses answer the same attempt. A learner attempt or another state: 409 `ATT-INVALID-STATE`.
 - **Submit.** Body `{"confirm": true}`. From `running` to `submitted`; the instance is frozen for 15 minutes, then destroyed (FR-SES-05). Other states: 409 `ATT-INVALID-STATE`.
 - **Flag submit.** Body `{"challenge_key", "flag"}` (flag is any text of 1 to 200 characters; the flag format is a placeholder, FR-FLG-02). 200 with `result` and `credit`. **No oracle:** the answer says only `correct` or `incorrect`. A wrong value, a decoy, a value of another instance and a value of an earlier epoch all answer `incorrect` with credit `none`, so a probe learns nothing from the answer; the detailed reason (wrong, decoy, other instance, stale epoch) never leaves the server (the mock writes it to its own log; the real service keeps it for the integrity review). Only while `running`, else 409. **Every** incorrect submission, whatever the reason, counts for the rate limit: after 5 incorrect submissions for one challenge within 10 minutes the next one is 429 `ATT-FLAG-RATE-LIMITED` with `Retry-After` (seconds), even for a correct value (FR-ACH-01; the hard cap of 30 per challenge per assessment is not modelled, OI-25). A decoy or a value of another instance also creates an integrity flag for a human; neither changes points (FR-SCR-05). That flag, and the flag of type `decoy` or `sharing`, is shown to a recruiter only: the owner of a learner attempt does not see it in `listIntegrityFlags` or in `integrity_open` of the report, because it would name the reason (proposal, to confirm). A correct value for a challenge that is already credited, or already held with an open flag, gives the same answer again (200, same `credit`) and records nothing new (no second milestone, integrity flag or timeline row).
 - **Hints.** With hints off (candidate default, FR-HNT-02) both hint routes answer 404 `ATT-HINTS-DISABLED`; an unknown challenge or level is 404 `ATT-CHALLENGE-NOT-FOUND`. The text of a level is null until unlocked; repeating an unlock is 200 and costs nothing more. Levels unlock in order: level 2 needs level 1, level 3 needs levels 1 and 2; an early level is 409 `ATT-INVALID-STATE` (no `field`: only a 422 carries one), and nothing is unlocked. For a withdrawn or cancelled attempt `listHints` is 410 (see States), checked after ownership and before the hints-off 404. The order check comes after the hints-off 404, the unknown challenge or level 404 and the not-running 409, and only for a level that is not yet unlocked (repeating an unlocked level is still 200). `cost_pct` is 0 for a learner and a placeholder 10, 20, 30 for a candidate. A hint never reveals a flag.
@@ -106,7 +113,8 @@ The `code` is a code of the registry `contracts/errors/error-codes.yaml` (IF-8):
 | 413 | `REQ-TOO-LARGE` | body over 64 KiB |
 | 415 | `REQ-UNSUPPORTED-MEDIA-TYPE` | not JSON |
 | 422 | `REQ-VALIDATION` | with `field` |
-| 429 | `ATT-FLAG-RATE-LIMITED` | with `Retry-After` |
+| 429 | `ATT-FLAG-RATE-LIMITED`, `REQ-RATE-LIMITED` | with `Retry-After`; the second is a per-account hourly limit on a costly route (v2.2.0) |
+| 503 | `INST-NO-CAPACITY` | no place for another instance (platform limit or orchestrator busy); with `Retry-After` (v2.2.0; it was a 429 before) |
 | (in `error_code` of a failed instance) | `INST-*`, for example `INST-HEALTH-TIMEOUT` | H-02 |
 
 `ORCH-*` codes never reach the browser. The names are final in IF-8; adding a code is a minor change, renaming one is breaking.
@@ -133,7 +141,7 @@ Each row is a proposal made while writing the contract. None is decided; Akshay 
 | 10 | Error codes `AUTH-*`, `ATT-*`, `INST-*`, `REQ-*` as in section 5, with the statuses of the registry | Registry (IF-8) 0.4.0 |
 | 11 | `requestInstance` takes `{"kind": "learner"}` and binds or creates the learner's practice attempt; the lab never creates a candidate attempt (that is create-attempt-from-consent, platform-owned) | Architecture 05 shows `kind learner` only; where the practice attempt is created is not written |
 | 12 | One instance per learner (409 `INST-QUOTA-REACHED`); per-user, per-company and global numbers are OI-21 | OI-21 is OPEN: both a queue and a refusal are possible (FR-INS-06) |
-| 13 | `startAttempt` exists and starts the clock (outcome A of OI-22). If the clock starts when the instance becomes ready (outcome B), the route is removed and `started_at` is set by the server | OI-22 is OPEN; this route is pending it |
+| 13 | `startAttempt` asks for the instance and the clock starts when it is ready (D-80, 2026-10-17) | Resolved: the route stays |
 | 14 | Whether a short write-up per solved challenge is required (OI-14): no route here; outcome A (optional write-up) adds one POST, outcome B (none) adds nothing | OI-14 is OPEN |
 | 15 | Whether a candidate sees their own score, evidence and report, and when (OI-15): the mock lets a candidate owner read attempt, score, challenges and timeline, and refuses evidence, integrity flags and report; outcome B (after submit, or after the recruiter closes) opens more reads | OI-15 is OPEN |
 | 16 | Idle candidate instance stopped and restored inside the window (OI-23): no route and no new state; outcome A needs a resume route and an `idle` meaning, outcome B changes nothing | OI-23 is OPEN |
@@ -149,7 +157,7 @@ Each row is a proposal made while writing the contract. None is decided; Akshay 
 | 26 | The live stream updates the same state these routes return (instance state, milestones); the stream and its ticket are IF-1 or IF-3, not here | Stream routes are platform-owned |
 | 27 | Evidence entries carry method, path and a redacted body only (no headers or cookies); the platform redacts before storage (FR-DET-03) | The shape of "the capturing request" is not written |
 | 28 | The evidence `path` may carry tokens or other secrets in a query string; the redaction rule for the path (strip the query, redact known parameter names, or keep it) is undecided. Today only the body is redacted (FR-DET-03) | The architecture redacts `Authorization`, cookies and password fields, not the path |
-| 29 | Rate limits exist only for wrong flag submissions. No limit or 429 is declared for instance request, hint unlock, integrity decision or reset (the reset limit per template is OI-25), and a double click on instance request is only stopped by the quota rule (409) | FR-ACH-01 limits flags only; a general per-user limit is not written |
+| 29 | Since v2.2.0 the costly routes (instance request, start, ticket, stop, reset, release, cancel, integrity decision) have a per-account hourly limit (admin settings, 429 `REQ-RATE-LIMITED`), and a template can set the flags per minute; no limit is declared for hint unlock (the reset limit per template is OI-25), and a double click on instance request is only stopped by the quota rule (409) | FR-ACH-01 limits flags only; a general per-user limit is not written |
 | 30 | Every incorrect submission counts toward the limit, whatever the hidden reason (wrong, decoy, other instance, stale epoch); the answer is `incorrect` for all of them. Version 0.1.0 did the opposite (only `wrong` counted); that let a probe learn which values were decoys | FR-ACH-01 says "wrong submissions" without saying which results |
 | 31 | When one of several open held flags on a challenge is accepted: are solved and held both true? The mock credits the challenge (solved) and keeps held while another held flag is open. Proposal: accepting any flag credits the challenge and resolves the held state; rejecting keeps it held until no held flag is open | Belongs to OI-38 (who decides, and what a decision does); the text says only 'held until no held flag is open' |
 | 32 | Evidence and integrity flag lists have a cap of 100 and `has_more`, but no cursor: entries beyond the cap cannot be read. A cursor like the timeline's (the evidence has no `seq`; it would key on `captured_at` and id) is the alternative | Realistic sizes are far below 100 for an assessment; not decided whether a cursor is worth it |

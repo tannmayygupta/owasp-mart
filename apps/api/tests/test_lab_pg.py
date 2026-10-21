@@ -278,6 +278,7 @@ def test_the_whole_loop_on_postgres_and_a_restart_loses_nothing(engine, keystore
     keys = make_keys(keystore_engine)
     user = f"u-loop-{uuid.uuid4().hex[:8]}"
     rt = make_runtime(engine, clock, host, keys)
+    rt.engine.create(user, rt.template_id, "c-1", org_id="o-loop", rules=Rules(hints_mode="on", hint_cost_pct=10))  # the template turned hints on (hints are off by default for a candidate)
     started = rt.start_attempt(user, org_id="o-loop")
     aid, iid = started.attempt_id, started.instance_id
 
@@ -336,7 +337,9 @@ def test_purge_removes_the_attempt_data_and_keeps_the_attempt_row_and_the_audit(
     clock, host = FakeClock(T0), FakeInstanceHost()
     keys = FakeKeyPort(event_master=os.urandom(32), flag_key=os.urandom(32), owner_key=os.urandom(32))
     rt = make_runtime(engine, clock, host, keys)
-    s = rt.start_attempt(f"u-purge-{uuid.uuid4().hex[:8]}", org_id="o-p")
+    purge_user = f"u-purge-{uuid.uuid4().hex[:8]}"
+    rt.engine.create(purge_user, rt.template_id, "c-1", org_id="o-p", rules=Rules(hints_mode="on", hint_cost_pct=10))
+    s = rt.start_attempt(purge_user, org_id="o-p")
     rt.submit_flag(s.attempt_id, "C01", keys.flag(s.instance_id, "C01", 1))
     rt.unlock_hint(s.attempt_id, "C01", 1)
     rt.withdraw(s.attempt_id)
@@ -497,3 +500,40 @@ def test_create_from_consent_with_an_attempt_id_the_invite_rules_and_a_reinvite_
     assert reread.get(second_id).template_id == "shop-v0~2"
     assert rt.attempts.create_from_consent(user_id=user, org_id="o-pg", template_id="shop-v0", invite_id="i-AAAAAAAAAAAAAAAA", consent_id="c-again",
                                            attempt_id=first_id, rules=rules).attempt_id == first_id, "idempotent on the same user and template"
+
+
+def test_a_finished_practice_run_lets_the_learner_start_a_new_one_but_a_company_attempt_never_restarts(engine):
+    from dataclasses import replace
+
+    store = pg.PgAttemptStore(engine)
+    user = f"u-runs-{uuid.uuid4().hex[:6]}"
+    first = store.add(new_record(user=user))
+    with pytest.raises(Conflict):
+        store.add(new_record(user=user))  # an unfinished run holds the pair
+    store.put_if_version(replace(first, state=AttemptState.RUNNING, started_at=T0, deadline_at=T0 + timedelta(hours=1)), 0)
+    with pytest.raises(Conflict):
+        store.add(new_record(user=user))  # a running run too
+    done = store.get(first.id)
+    store.put_if_version(replace(done, state=AttemptState.SUBMITTED, submitted_at=T0), done.version)
+    second = store.add(new_record(user=user))  # a finished run no longer holds it
+    assert store.find(user, "shop-v0").id == second.id  # find answers the newest attempt
+    assert [r.id for r in store.for_user(user)][0] == second.id  # newest first
+    assert {r.id for r in store.for_user(user)} == {first.id, second.id}
+    company = f"u-co-{uuid.uuid4().hex[:6]}"
+    c = store.add(new_record(user=company, org_id="o-1"))
+    cur = store.get(c.id)
+    store.put_if_version(replace(cur, state=AttemptState.SUBMITTED, submitted_at=T0), cur.version)
+    with pytest.raises(Conflict):
+        store.add(new_record(user=company, org_id="o-1"))  # one attempt per invite, even after it ended
+
+
+def test_the_challenge_clock_is_written_once_survives_and_goes_with_the_attempts_data(engine):
+    store = pg.PgAttemptStore(engine)
+    rec = store.add(new_record(user=f"u-clock-{uuid.uuid4().hex[:6]}"))
+    clock = pg.PgChallengeClockLedger(engine)
+    assert clock.opened_at(rec.id, "C01") is None
+    assert clock.open(rec.id, "C01", T0) is True
+    assert clock.open(rec.id, "C01", T0 + timedelta(minutes=5)) is False  # the first instant stays
+    assert clock.opened_at(rec.id, "C01") == T0 and clock.opened_at(rec.id, "C02") is None
+    removed = pg.purge_attempt_data(engine, rec.id)
+    assert removed["challenge_opens"] == 1 and clock.opened_at(rec.id, "C01") is None

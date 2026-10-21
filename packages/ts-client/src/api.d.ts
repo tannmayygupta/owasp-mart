@@ -1275,7 +1275,9 @@ export interface paths {
          * @description Asks for an instance of the learner's practice attempt. Answers 202 with state `requested`; the
          *     state then advances on its own (poll the instance, or listen to the live stream). Candidate
          *     instances are created by the platform when the attempt starts, not through this route.
-         *     409 INST-QUOTA-REACHED when the user already holds an instance (the numbers are OI-21).
+         *     409 INST-QUOTA-REACHED when the user already holds an instance or the admin's limit of the user or the company is reached (the numbers are OI-21; practice and
+         *     assessment are counted apart). 503 INST-NO-CAPACITY (with Retry-After) when the platform or the orchestrator has no place for another instance; since v2.2.0 this is no
+         *     longer a 429. 429 REQ-RATE-LIMITED when one account asks too often (an admin setting, per hour).
          */
         post: operations["requestInstance"];
         delete?: never;
@@ -1407,11 +1409,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start the clock of a ready attempt (PENDING OI-22)
-         * @description PENDING OI-22: whether the candidate presses Start or the clock starts when the instance becomes
-         *     ready is open. Both outcomes are recorded in lab-api.md. This route exists for the first outcome;
-         *     if the second is chosen it is removed. Allowed only in state `ready`; otherwise 409 ATT-INVALID-STATE.
-         *     The body is empty.
+         * Ask for the instance of a ready attempt (the candidate's Start)
+         * @description D-80 (OI-22 resolved): Start only asks for the instance; the clock starts when the instance is ready, so the cold start
+         *     never counts against the candidate. Answers at once with the attempt (still ready while the instance starts); pressing
+         *     again, or after it runs, answers the same attempt. Only the owner of an assessment attempt in state ready or running;
+         *     a learner starts through requestInstance, and any other state answers 409 ATT-INVALID-STATE. Since v2.2.0 the invite behind the attempt must still allow it: Start moves a
+         *     consented invite to `started`; a revoked, expired, declined or cancelled invite answers 409 ATT-INVALID-STATE and cancels a ready attempt. 503 INST-NO-CAPACITY
+         *     and 429 REQ-RATE-LIMITED as for requestInstance. The body is empty.
          */
         post: operations["startAttempt"];
         delete?: never;
@@ -1437,6 +1441,56 @@ export interface paths {
          *     The attempt becomes `submitted`; the instance is frozen for the freeze period and then destroyed.
          */
         post: operations["submitAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release a candidate's results (the recruiter of the company)
+         * @description Since v2.1.0 (handoff H-355, OI-15). When the invite says `results_visibility: after_release`, the candidate sees no score and no earned progress
+         *     (`getScore` answers 404, `listChallenges` shows nothing earned) until the recruiter of the owning company calls this once the attempt has ended
+         *     (`submitted`, `reported` or `expired`; otherwise 409 ATT-INVALID-STATE). Repeating it changes nothing. The candidate and anyone else get the 404 of every
+         *     attempt route. The answer is the attempt with `results_released: true`. The body is empty.
+         */
+        post: operations["releaseResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a candidate's attempt (the recruiter of the company)
+         * @description Since v2.2.0 (FR-SES-07). The recruiter of the owning company cancels a company assessment attempt that has not ended (`ready` or `running`): the instance is
+         *     destroyed at once, nothing scores any more, and the attempt becomes `cancelled`, which the candidate sees in `getAttempt`. Any other state (also a repeat) is 409
+         *     ATT-INVALID-STATE. The candidate and anyone else get the 404 of every attempt route; a learner's practice attempt cannot be cancelled this way. 429 REQ-RATE-LIMITED
+         *     when one recruiter acts too often. The body is empty.
+         */
+        post: operations["cancelAttempt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1551,9 +1605,62 @@ export interface paths {
         };
         /**
          * Progress per challenge (milestone, solved, hints used)
-         * @description Progress only. Titles, tags and difficulty are catalogue data (IF-7) served by the platform.
+         * @description Progress per challenge. Titles, tags and difficulty are catalogue data (IF-7) served by the platform.
+         *
+         *     A learner's practice run is sequenced (v1.3.0): the learner works on one challenge at a time, so the list holds only the challenges
+         *     that have been reached (the ones solved or timed out and the current one) and each entry carries `state`, `title`, `tier` and the
+         *     countdown fields. Challenges after the current one are not listed. `total` says how many challenges the run has and `current_key`
+         *     names the one to work on. A company assessment is not sequenced: every challenge is listed and the optional fields are absent.
          */
         get: operations["listChallenges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+                challenge_key: components["parameters"]["ChallengeKeyPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Begin the current challenge and start its countdown
+         * @description Only for a sequenced practice run (v1.3.0). Starts the countdown of the current challenge: Easy 20, Medium 40, Hard 60 minutes
+         *     (the tier of the catalogue). Repeating the call changes nothing and answers the same entry. Until the challenge is begun no flag, hint
+         *     or milestone counts for it. A challenge that is not the current one, and a run that is not sequenced, answer 404
+         *     ATT-CHALLENGE-NOT-FOUND; an attempt that is not running, or a challenge that already ended (solved or out of time), answers 409
+         *     ATT-INVALID-STATE. The body is empty.
+         */
+        post: operations["beginChallenge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The points on the learner's account
+         * @description The best result per challenge over every practice run of the signed-in learner, so a challenge repeated in a new run never counts
+         *     twice. `total_points` is shown out of 1000 on the same scale as the score of one run. A learner with no run gets zero everywhere.
+         */
+        get: operations["getMyProgress"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1721,6 +1828,7 @@ export interface paths {
          *     Cursor-paged: pass `next_cursor` as `cursor` to get the entries after the last one already read. Entries are neither skipped
          *     nor repeated when a late event with a smaller key is stored between two page requests; such an event is shown only when the
          *     client reads again from the start (cursor left out). A cursor that is not one we made is 422 with field /query/cursor.
+         *     Since v2.0.0 the time warnings the attempt received are entries too (`attempt.time_warning` with `minutes_left`), so the recruiter's report shows when the candidate was told time was running out.
          */
         get: operations["getTimeline"];
         put?: never;
@@ -2426,6 +2534,8 @@ export interface components {
             frozen_until: components["schemas"]["Timestamp"] | null;
             /** @description Optional. Present only while the attempt is `withdrawn` (the end of the undo window when the deletion is scheduled, null once the withdrawal was undone). Absent in every other state. */
             delete_after?: components["schemas"]["Timestamp"] | null;
+            /** @description Optional (v2.1.0). Only on a company assessment whose invite says `after_release`; true once the recruiter released the results. Absent otherwise. */
+            results_released?: boolean;
             /** @description The server clock; the browser timer is cosmetic (FR-SES-02). */
             server_time: components["schemas"]["Timestamp"];
         };
@@ -2470,11 +2580,32 @@ export interface components {
             brief?: string;
             /** @description Optional. How to begin, for example the demo account to sign in with and where to look. The accounts are documented demo accounts of the lab shop, not real credentials. */
             start?: string;
-            /** @description Optional. Present only for the owner of a practice attempt once the challenge is captured (M3); never in an assessment. The weakness and the fix. */
+            /** @description Optional. Present only for the owner of a practice attempt once the challenge is captured (M3) or timed out; never in an assessment. The weakness and the fix. */
             write_up?: {
                 vulnerable: string;
                 fix: string;
             };
+            /**
+             * @description Optional (a sequenced practice run only, v1.3.0). `ready`: the current challenge, not begun. `active`: begun, the countdown runs.
+             *     `solved`: captured (or held for review). `expired`: the time ran out; nothing counts for it any more.
+             * @enum {unknown}
+             */
+            state?: "ready" | "active" | "solved" | "expired";
+            /** @description Optional (sequenced run). The catalogue title of the challenge. */
+            title?: string;
+            /**
+             * @description Optional (sequenced run). The tier of the catalogue; it sets the time (Easy 20, Medium 40, Hard 60 minutes).
+             * @enum {unknown}
+             */
+            tier?: "Easy" | "Medium" | "Hard";
+            /** @description Optional (sequenced run). The time the challenge has once begun. */
+            time_limit_seconds?: number;
+            /** @description Optional (sequenced run). When the challenge was begun; null before. */
+            opened_at?: components["schemas"]["Timestamp"] | null;
+            /** @description Optional (sequenced run). When the countdown ends; null before the challenge is begun. */
+            expires_at?: components["schemas"]["Timestamp"] | null;
+            /** @description Optional (sequenced run). Seconds left when the answer was made; null unless the challenge is `active`. The browser counts down from it. */
+            seconds_left?: number | null;
         };
         ChallengeProgressList: {
             items: components["schemas"]["ChallengeProgress"][];
@@ -2483,6 +2614,24 @@ export interface components {
              * @constant
              */
             has_more: false;
+            /** @description Optional (sequenced run). How many challenges the run has in all, so the browser can show "3 of 11" without listing the ones ahead. */
+            total?: number;
+            /** @description Optional (sequenced run). The challenge to work on now; null when every challenge is solved or timed out. */
+            current_key?: components["schemas"]["ChallengeKey"] | null;
+            /** @description Optional (sequenced run). The server clock when the answer was made. */
+            server_time?: components["schemas"]["Timestamp"];
+        };
+        AccountChallengePoints: {
+            challenge_key: components["schemas"]["ChallengeKey"];
+            /** @description The best net points of this challenge over all runs (the points of one challenge */
+            best_points: number;
+        };
+        AccountProgress: {
+            /** @description The best points of every challenge added up and shown out of 1000 */
+            total_points: number;
+            /** @description How many practice runs the learner has started. */
+            runs: number;
+            per_challenge: components["schemas"]["AccountChallengePoints"][];
         };
         Hint: {
             level: number;
@@ -2569,10 +2718,12 @@ export interface components {
         TimelineEntry: {
             at: components["schemas"]["Timestamp"];
             /** @enum {unknown} */
-            type: "attempt.started" | "milestone.reached" | "flag.submitted" | "hint.unlocked" | "instance.reset" | "attempt.submitted" | "attempt.expired";
+            type: "attempt.started" | "milestone.reached" | "flag.submitted" | "hint.unlocked" | "instance.reset" | "attempt.submitted" | "attempt.expired" | "attempt.time_warning";
             challenge_key: components["schemas"]["ChallengeKey"] | null;
             milestone: ("M1" | "M2" | "M3") | null;
             result: components["schemas"]["FlagResult"] | null;
+            /** @description Optional (v2.0.0). Only on `attempt.time_warning`, how many minutes the attempt had left when the warning went out (the default rules warn at 15 and at 5). */
+            minutes_left?: number;
         };
         /**
          * @description One page of the timeline, sorted by the key (epoch, seq) of the event, oldest first. The key is not part of
@@ -2857,6 +3008,17 @@ export interface components {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
                 Allow: components["headers"]["Allow"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description No instance can be started right now (the platform is at its limit or the orchestrator has no capacity). INST-NO-CAPACITY with Retry-After; try again later. Since v2.2.0. */
+        Unavailable: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
@@ -4866,6 +5028,8 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["Unavailable"];
         };
     };
     getInstance: {
@@ -4911,6 +5075,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     resetInstance: {
@@ -4936,6 +5101,7 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     stopInstance: {
@@ -4956,6 +5122,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getAttempt: {
@@ -4992,6 +5159,8 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["Unavailable"];
         };
     };
     submitAttempt: {
@@ -5017,6 +5186,46 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+        };
+    };
+    releaseResults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    cancelAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     withdrawAttempt: {
@@ -5137,7 +5346,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description One entry per challenge of the attempt. */
+            /** @description One entry per challenge the learner has reached (all of them for an attempt that is not sequenced). */
             200: {
                 headers: {
                     "Cache-Control": components["headers"]["CacheControl"];
@@ -5150,6 +5359,59 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
             410: components["responses"]["Gone"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    beginChallenge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+                challenge_key: components["parameters"]["ChallengeKeyPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The challenge with its countdown running. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeProgress"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    getMyProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account points. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountProgress"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
             422: components["responses"]["Invalid"];
         };
     };
@@ -5304,6 +5566,7 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getReport: {

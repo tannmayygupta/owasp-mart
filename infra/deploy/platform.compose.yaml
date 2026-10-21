@@ -122,6 +122,8 @@ services:
       VULNMART_SERVICE: api
       VULNMART_LAB_RUNTIME: "1"
       VULNMART_LAB_STORE: postgres
+      # A learner's run goes one challenge at a time, each with a countdown by tier (Easy 20, Medium 40, Hard 60 minutes); a finished run can be followed by a new one
+      VULNMART_LAB_SEQUENCE: "1"
       # the key service of story P-17: wrapped per-attempt keys in vm_keystore (own role); the KEK and the three masters are files
       VULNMART_KEYSTORE_DSN: postgresql://vulnmart_keys:${VULNMART_KEYSTORE_PASSWORD}@postgres:5432/vm_keystore
       VULNMART_KEK_FILE: /run/secrets/kek

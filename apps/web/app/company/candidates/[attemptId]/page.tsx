@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
-  api, duration, say, when, type CatalogueItem, type CompanyInvite, type Evidence, type IntegrityFlag, type Report, type TimelineEntry,
+  api, duration, say, timelineText, when, type CatalogueItem, type CompanyInvite, type Evidence, type IntegrityFlag, type Report, type TimelineEntry,
 } from '../../../../lib/api';
 import { useRequireUser } from '../../../../lib/session';
 import { Stars } from '../../../attempt-board';
@@ -61,17 +61,35 @@ export default function CandidateReportPage() {
     }
   }
 
+  async function release() {
+    setBanner(null);
+    try {
+      await api('POST', `/api/v1/attempts/${attemptId}/release`);
+      setBanner({ text: 'Results released. The candidate can see them now.', kind: 'ok' });
+      await load();
+    } catch (e) {
+      setBanner({ text: say(e), kind: 'bad' });
+    }
+  }
+
   if (!user) return <p className="muted">Loading...</p>;
   if (user.account_type !== 'recruiter') return <p className="card">This page is for recruiters.</p>;
   if (!report) return <>{banner && <p className="banner bad" role="alert">{banner.text}</p>}<p className="muted">Loading the report...</p></>;
   const info = Object.fromEntries(catalog.map((c) => [c.challenge_key, c]));
   const hintsOn = invite?.hints_mode === 'on';
+  const canRelease = invite?.results_visibility === 'after_release' && ['submitted', 'reported', 'expired'].includes(report.state);
 
   return (
     <>
       <p><Link href="/company/candidates">Back to candidates</Link></p>
       <h1>{invite?.email ?? 'Candidate'}</h1>
       {banner && <p className={`banner ${banner.kind}`} role={banner.kind === 'bad' ? 'alert' : 'status'}>{banner.text}</p>}
+      {invite?.results_visibility === 'after_release' && (
+        <section className="card" data-testid="release">
+          <p>The invite says the candidate sees the results when you release them.</p>
+          {canRelease ? <button type="button" onClick={() => void release()}>Release the results to the candidate</button> : <p className="muted">You can release them once the attempt has ended.</p>}
+        </section>
+      )}
       <section className="card" data-testid="report">
         <dl className="facts">
           <dt>Score</dt><dd><strong data-testid="report-score">{report.score}</strong> of 1000</dd>
@@ -133,7 +151,7 @@ export default function CandidateReportPage() {
       <section className="card">
         <h2>Timeline</h2>
         {timeline.length === 0 ? <p className="muted">Nothing yet.</p> : (
-          <ol>{timeline.map((t, i) => <li key={i}>{when(t.at)} {t.type}{t.challenge_key ? ` ${t.challenge_key}` : ''}{t.milestone ? ` (${t.milestone})` : ''}{t.result ? `: ${t.result}` : ''}</li>)}</ol>
+          <ol>{timeline.map((t, i) => <li key={i} data-testid={t.type === 'attempt.time_warning' ? 'time-warning' : undefined}>{when(t.at)} {timelineText(t)}</li>)}</ol>
         )}
       </section>
     </>

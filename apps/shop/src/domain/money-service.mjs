@@ -7,6 +7,7 @@
 import { can } from './permissions.mjs';
 import { assertTransition } from './state-machines.mjs';
 import { ForbiddenError, NotFoundError, ValidationError } from './shop-service.mjs';
+import { pageArgs } from './limits.mjs';
 
 // A seller may self-approve refunds only up to this per-refund amount (RS-G
 // 'own_store_under_limit'); above it, support or admin must approve.
@@ -74,12 +75,13 @@ export function orderRefundableRemaining(db, orderId) {
 }
 
 // Refund rows a staff member (all) or a seller (own store only) may act on.
-export function listRefunds(db, actor) {
+export function listRefunds(db, actor, opts = {}) {
+  const page = pageArgs(opts, 200);
   if (['support_agent', 'finance', 'admin'].includes(actor?.role)) {
-    return db.prepare('SELECT r.*, oi.store_id FROM refunds r JOIN order_items oi ON oi.id = r.order_item_id ORDER BY r.id DESC LIMIT 200').all();
+    return db.prepare('SELECT r.*, oi.store_id FROM refunds r JOIN order_items oi ON oi.id = r.order_item_id ORDER BY r.id DESC LIMIT ? OFFSET ?').all(page.limit, page.offset);
   }
   if ((actor?.role === 'seller_owner' || actor?.role === 'seller_staff') && actor.store_id) {
-    return db.prepare('SELECT r.*, oi.store_id FROM refunds r JOIN order_items oi ON oi.id = r.order_item_id WHERE oi.store_id = ? ORDER BY r.id DESC LIMIT 200').all(actor.store_id);
+    return db.prepare('SELECT r.*, oi.store_id FROM refunds r JOIN order_items oi ON oi.id = r.order_item_id WHERE oi.store_id = ? ORDER BY r.id DESC LIMIT ? OFFSET ?').all(actor.store_id, page.limit, page.offset);
   }
   throw new ForbiddenError();
 }

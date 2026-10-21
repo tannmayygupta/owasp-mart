@@ -1,0 +1,17 @@
+{
+  "total_points": 63,
+  "runs": 2,
+  "per_challenge": [
+    { "challenge_key": "C01", "best_points": 60 },
+    { "challenge_key": "C02", "best_points": 0 },
+    { "challenge_key": "C03", "best_points": 0 },
+    { "challenge_key": "C04", "best_points": 0 },
+    { "challenge_key": "C05", "best_points": 0 },
+    { "challenge_key": "C06", "best_points": 0 },
+    { "challenge_key": "C07", "best_points": 0 },
+    { "challenge_key": "C08", "best_points": 0 },
+    { "challenge_key": "C09", "best_points": 0 },
+    { "challenge_key": "C10", "best_points": 0 },
+    { "challenge_key": "C11", "best_points": 0 }
+  ]
+}

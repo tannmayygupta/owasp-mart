@@ -27,7 +27,8 @@ from vulnmart_attempts import AttemptRecord, InvalidTransition, WindowClosed
 from vulnmart_attempts.review import NotHeld, ReviewFinal, ReviewForbidden
 from vulnmart_models.error_codes import ErrorCode
 
-from vulnmart.accounts.http import Authenticated, Strict, authenticated, authenticated_with_csrf, read_json
+from vulnmart.assessments.service import InviteClosed
+from vulnmart.accounts.http import Authenticated, Strict, authenticated, authenticated_with_csrf, limit, read_json
 from vulnmart.ingest.stores import FlagAlreadyDecided, InstanceInfo
 from vulnmart.kernel.service import NO_STORE
 from vulnmart.lab.catalog import HINT_KINDS
@@ -39,6 +40,7 @@ from vulnmart.ports.errors import (
     ChallengeNotFound,
     FlagRateLimited,
     InstanceMissing,
+    InstanceNoCapacity,
     InstanceNotReady,
     InstanceQuotaReached,
     InstanceStateInvalid,
@@ -64,7 +66,7 @@ GONE_STATES = ("withdrawn", "cancelled")
 TIMELINE_TYPES = {
     "session_started": "attempt.started", "milestone_reached": "milestone.reached", "flag_submitted": "flag.submitted",
     "hint_unlocked": "hint.unlocked", "instance_reset": "instance.reset", "session_submitted": "attempt.submitted",
-    "session_expired": "attempt.expired",
+    "session_expired": "attempt.expired", "time_warning_sent": "attempt.time_warning",  # IF-2 1.4.0, handoff H-359
 }
 M = TypeVar("M", bound=Strict)
 
@@ -90,6 +92,13 @@ class DecisionBody(Strict):
 
 
 # ---- small helpers ----
+
+def throttle(request: Request, auth: Authenticated, name: str, setting: str) -> None:
+    """A per-account hourly limit (an admin setting) on a costly authenticated route; 429 REQ-RATE-LIMITED with Retry-After. A missing limiter (no platform) is no limit."""
+    limiter = getattr(request.app.state, "rate_limiter", None)
+    if limiter is not None:
+        limit(request, limiter, f"lab-{name}:user", auth.session.user.id, setting)
+
 
 def lab(request: Request) -> LabRuntime:
     runtime = getattr(request.app.state, "lab", None)
@@ -132,6 +141,8 @@ def call(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         return fn(*args, **kwargs)
     except FlagRateLimited as exc:
         raise ProblemError(ErrorCode.ATT_FLAG_RATE_LIMITED, headers={"Retry-After": str(exc.retry_after)}) from None
+    except InstanceNoCapacity:
+        raise ProblemError(ErrorCode.INST_NO_CAPACITY, headers={"Retry-After": "15"}) from None  # the platform is full: 503, try again
     except (AttemptNotFound, AttemptGone, AttemptStateInvalid, ChallengeNotFound, InstanceMissing, InstanceNotReady,
             InstanceQuotaReached, InstanceStateInvalid) as exc:
         raise ProblemError(exc.code) from None
@@ -148,8 +159,8 @@ def call(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     except InstanceNotFound:
         raise ProblemError(ErrorCode.INST_NOT_FOUND) from None
     except Busy:
-        # the host has no capacity or the orchestrator is busy: tell the browser to try again (429), not that the platform broke
-        raise ProblemError(ErrorCode.REQ_RATE_LIMITED, headers={"Retry-After": "15"}) from None
+        # the orchestrator has no capacity: 503 INST-NO-CAPACITY with Retry-After (it was a 429 "too many requests", which blamed the user)
+        raise ProblemError(ErrorCode.INST_NO_CAPACITY, headers={"Retry-After": "15"}) from None
     except OrchestratorError:
         log.exception("the orchestrator refused or did not answer")
         raise ProblemError(ErrorCode.REQ_INTERNAL) from None  # INST-START-FAILED is the code of a failed instance, not an HTTP answer
@@ -190,7 +201,7 @@ def mode_of(rec: AttemptRecord) -> str:
 
 
 def hints_enabled(rec: AttemptRecord) -> bool:
-    return rec.org_id is None  # practice has hints; an assessment's template decides (placeholder: off until stream P sets it)
+    return rec.org_id is None or rec.rules.hints_mode == "on"  # practice has free hints; an assessment has them only when its template turned them on (F-07)
 
 
 def is_owner(auth: Authenticated, rec: AttemptRecord) -> bool:
@@ -244,6 +255,18 @@ def reviewable(rt: LabRuntime, auth: Authenticated, attempt_id: str) -> AttemptR
     return not_gone(rec)
 
 
+def results_released(rt: LabRuntime, rec: AttemptRecord) -> bool:
+    """H-355: the recruiter released this candidate's results (the attempt log holds the line `results_released`)."""
+    return any(e.get("event") == "results_released" for e in rt.attempt_log.read(rec.id))
+
+
+def results_hidden(rt: LabRuntime, auth: Authenticated, rec: AttemptRecord) -> bool:
+    """H-355, OI-15: the candidate of an assessment whose invite says `after_release` sees no score and no per-challenge result until the recruiter releases them.
+    The recruiter of the company and a learner on their own practice always see them."""
+    return (rec.org_id is not None and is_owner(auth, rec) and not is_reviewer(auth, rec)
+            and rec.rules.results_visibility == "after_release" and not results_released(rt, rec))
+
+
 def note_company_view(request: Request, rt: LabRuntime, auth: Authenticated, rec: AttemptRecord, *, report: bool) -> None:
     """A recruiter of the owning company looks at a candidate's data (the report, the evidence): the attempt log gets a line with the viewer's id only (FR-TIM-04,
     `recruiter_viewed_report`) and the candidate's view history an entry with the company's name (FR-PRV-11, handoff H-145). The candidate looking at their own data is
@@ -275,6 +298,8 @@ def attempt_view(rt: LabRuntime, rec: AttemptRecord) -> dict[str, Any]:
             "instance_id": rec.instance_id or (info.instance_id if info else None), "started_at": stamp(rec.started_at),
             "deadline_at": stamp(rec.deadline_at), "submitted_at": stamp(rec.submitted_at), "frozen_until": stamp(rec.frozen_until),
             "server_time": stamp(rt.clock())}
+    if rec.org_id is not None and rec.rules.results_visibility == "after_release":  # optional in IF-2 2.1.0: only where the recruiter releases the results
+        view["results_released"] = results_released(rt, rec)
     if rec.state.value == "withdrawn":  # optional in IF-2 1.1.0: only a withdrawn attempt carries it (null once the withdrawal is undone)
         view["delete_after"] = stamp(rec.delete_after)
     return view
@@ -319,7 +344,7 @@ def score_rows(rt: LabRuntime, rec: AttemptRecord) -> tuple[int, list[dict[str, 
 def hint_view(rt: LabRuntime, rec: AttemptRecord, key: str, level: int) -> dict[str, Any]:
     unlocked = level in rt.hints.levels(rec.id, key)
     catalog = rt.catalog
-    return {"level": level, "kind": HINT_KINDS[level - 1], "unlocked": unlocked, "cost_pct": level * 10 if rec.org_id else 0,
+    return {"level": level, "kind": HINT_KINDS[level - 1], "unlocked": unlocked, "cost_pct": rt.hint_cost_pct(rec.id, level),
             "text": catalog.hint_text(key, level) if unlocked else None}
 
 
@@ -394,11 +419,12 @@ async def get_catalogue_challenge(challenge_key: str, request: Request, auth: Au
 async def list_my_attempts(request: Request, auth: Authenticated = Depends(authenticated)) -> JSONResponse:
     rt = lab(request)
     params = query(request, ("limit",))
-    limit = parse_limit(params, 50, 100)
+    max_items = parse_limit(params, 50, 100)
+    # practice and assessment attempts share this list on purpose (IF-1); every item carries `mode`, and a screen filters on it (the lab console does)
     rows = [r for r in await run(rt.engine.for_user, auth.session.user.id) if r.purged_at is None and r.state.value != "deleted"]
     items = [{"attempt_id": r.id, "mode": mode_of(r), "state": r.state.value, "instance_id": r.instance_id,
-              "created_at": stamp(r.created_at), "deadline_at": stamp(r.deadline_at)} for r in rows[:limit]]
-    return json_ok({"items": items, "has_more": len(rows) > limit})
+              "created_at": stamp(r.created_at), "deadline_at": stamp(r.deadline_at)} for r in rows[:max_items]]
+    return json_ok({"items": items, "has_more": len(rows) > max_items})
 
 
 # ---- instances ----
@@ -407,6 +433,7 @@ async def list_my_attempts(request: Request, auth: Authenticated = Depends(authe
 async def request_instance(request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
     rt = lab(request)
     await read_json(request, RequestInstanceBody)
+    throttle(request, auth, "instance-start", "rate_instance_start_per_user_per_hour")
     user_id = auth.session.user.id
     existing = rt.engine.find(user_id, rt.template_id)  # the one attempt of this user for this template
     if existing is not None and rt.instance_alive(existing.instance_id) and existing.state.value == "running":
@@ -429,6 +456,7 @@ async def open_instance(instance_id: str, request: Request, auth: Authenticated 
     rt = lab(request)
     info, rec = own_instance(rt, auth, instance_id)
     await no_body(request)
+    throttle(request, auth, "instance-open", "rate_instance_open_per_user_per_hour")
     st = await run(rt.host.get, info.instance_id)
     if st.state not in _OPENABLE or st.access is not Access.OPEN:
         raise ProblemError(ErrorCode.INST_NOT_READY)
@@ -445,6 +473,7 @@ async def reset_instance(instance_id: str, request: Request, auth: Authenticated
     rt = lab(request)
     info, rec = own_instance(rt, auth, instance_id)
     await read_json(request, ConfirmBody)
+    throttle(request, auth, "instance-stop", "rate_instance_stop_per_user_per_hour")
     st = await run(rt.host.get, info.instance_id)
     if st.state not in _OPENABLE or not can_change(rt, rec):
         raise ProblemError(ErrorCode.INST_INVALID_STATE)
@@ -458,6 +487,7 @@ async def stop_instance(instance_id: str, request: Request, auth: Authenticated 
     rt = lab(request)
     info, rec = own_instance(rt, auth, instance_id)
     await no_body(request)
+    throttle(request, auth, "instance-stop", "rate_instance_stop_per_user_per_hour")
     st = await run(rt.host.get, info.instance_id)
     if st.state in (InstanceState.STOPPING, InstanceState.DESTROYED):
         return json_ok(await run(instance_view, rt, info, rec), 200)
@@ -481,6 +511,52 @@ async def get_attempt(attempt_id: str, request: Request, auth: Authenticated = D
     return json_ok(attempt_view(rt, readable(rt, auth, attempt_id)))
 
 
+def invite_gate(request: Request, rt: LabRuntime, rec: AttemptRecord) -> None:
+    """The invite behind a candidate attempt decides whether it may start (wiring audit F-05, F-06). `consented` becomes `started` (a started invite no longer expires while
+    its attempt runs or has ended); `started` stays; any other state (revoked, expired, declined, cancelled, still being consented) refuses with 409 and cancels a `ready` attempt, so
+    nothing stays startable behind a closed invite. No platform service (a lab without invites) or no invite for the attempt means no gate."""
+    assessments = getattr(request.app.state, "assessments", None)
+    if assessments is None:
+        return
+    gate = assessments.start_gate(rec.id)
+    if gate is None:
+        return
+    state, org_id, invite_id = gate
+    if state == "consented":
+        try:
+            assessments.advance(org_id, invite_id, "started")
+        except InviteClosed as late:
+            if late.state != "started":  # another press moved it first: fine; anything else closed it
+                state = late.state
+            else:
+                return
+        else:
+            return
+    if state == "started":
+        return
+    if rec.state.value == "ready":
+        try:
+            rt.cancel_attempt(rec.id, by="system:invites", reason=f"invite_{state}")
+        except Exception:
+            log.warning("cancelling attempt %s behind a closed invite failed", rec.id, exc_info=True)
+    raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+
+
+@router.post("/api/v1/attempts/{attempt_id}/start", operation_id="startAttempt")
+async def start_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """H-356, D-80: the candidate's Start asks for the instance of the attempt a consent created; the clock starts when the instance is ready, not at the press.
+    A second press while the instance starts, or once the attempt runs, answers the same attempt. A learner starts through `requestInstance`."""
+    rt = lab(request)
+    rec = owned(rt, auth, attempt_id)
+    await no_body(request)
+    if rec.org_id is None or rec.state.value not in ("ready", "running"):
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    throttle(request, auth, "instance-start", "rate_instance_start_per_user_per_hour")
+    await run(invite_gate, request, rt, rec)  # the invite must still allow it (F-05, F-06); a candidate's Start moves it to `started`
+    await run(rt.start_existing_async, rec.id)
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
 @router.post("/api/v1/attempts/{attempt_id}/submit", operation_id="submitAttempt")
 async def submit_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
     rt = lab(request)
@@ -492,6 +568,53 @@ async def submit_attempt(attempt_id: str, request: Request, auth: Authenticated 
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
 
 
+@router.post("/api/v1/attempts/{attempt_id}/release", operation_id="releaseResults")
+async def release_results(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """H-355, OI-15: the recruiter of the owning company releases a finished candidate's results (the invite said `after_release`). Repeating it changes nothing.
+    The candidate and anyone else get the 404 of every route; an attempt that has not ended is 409."""
+    rt = lab(request)
+    rec = reviewable(rt, auth, attempt_id)
+    if Role.RECRUITER not in auth.session.roles or rec.org_id is None:
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND)
+    await no_body(request)
+    throttle(request, auth, "review", "rate_review_action_per_user_per_hour")
+    if rec.state.value not in ("submitted", "reported", "expired"):
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    if not await run(results_released, rt, rec):
+        await run(rt.attempt_log.append, {"event": "results_released", "attempt_id": rec.id, "at": rt.clock().isoformat(), "viewer_id": auth.session.user.id})
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
+@router.post("/api/v1/attempts/{attempt_id}/cancel", operation_id="cancelAttempt")
+async def cancel_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """FR-SES-07, IF-2 2.2.0: the recruiter of the owning company cancels a candidate attempt that has not ended (`ready` or `running`). The instance is destroyed, nothing scores
+    any more, the attempt becomes `cancelled` and the candidate sees that state. The candidate, a recruiter of another company and anyone else get the 404 of every route; a learner's
+    practice cannot be cancelled this way. A repeat or an ended attempt is 409. The mail to the candidate is the notification story's: it reads the attempt-state domain event."""
+    rt = lab(request)
+    rec = load_attempt(rt, attempt_id)
+    if not is_reviewer(auth, rec) or Role.RECRUITER not in auth.session.roles or rec.org_id is None:
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND)
+    await no_body(request)
+    throttle(request, auth, "review", "rate_review_action_per_user_per_hour")
+    if rec.state.value not in ("ready", "running"):
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    await run(rt.cancel_attempt, rec.id, by=auth.session.user.id, reason="recruiter")
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
+def record_withdrawal(request: Request, auth: Authenticated, rec: AttemptRecord) -> None:
+    """FR-SES-10: the minimal consent record of the withdrawal (`withdrawn`), kept as proof. Written after the withdrawal stands and never blocks it: a failure is logged and the
+    next repeat of the same call writes it (the service writes one only when none exists yet). The recruiter's mail is the notification story's."""
+    consent = getattr(request.app.state, "consent_service", None)
+    if consent is None:
+        return
+    try:
+        consent.record_withdrawal(user_id=auth.session.user.id, attempt_id=rec.id)
+        log.info("candidate withdrew from attempt %s (consent record written)", rec.id)
+    except Exception:
+        log.error("the withdrawal of attempt %s stands but its consent record could not be written", rec.id, exc_info=True)
+
+
 @router.post("/api/v1/attempts/{attempt_id}/withdraw", operation_id="withdrawAttempt")
 async def withdraw_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
     """FR-SES-10: the candidate leaves the assessment. The instance is destroyed, deletion is scheduled after the undo window, nothing scores any more."""
@@ -501,6 +624,7 @@ async def withdraw_attempt(attempt_id: str, request: Request, auth: Authenticate
     if rec.org_id is None:  # a learner has no assessment to withdraw from (their practice data is erased through the privacy routes)
         raise ProblemError(ErrorCode.ATT_INVALID_STATE)
     await run(rt.withdraw, rec.id)
+    await run(record_withdrawal, request, auth, rec)
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
 
 
@@ -532,6 +656,8 @@ async def get_score(attempt_id: str, request: Request, auth: Authenticated = Dep
     rt = lab(request)
     query(request, ())
     rec = not_gone(readable(rt, auth, attempt_id))
+    if await run(results_hidden, rt, auth, rec):
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND)  # not released yet: the same 404 as for a stranger
     total, rows = await run(score_rows, rt, rec)
     return json_ok({"attempt_id": rec.id, "score": total, "computed_at": stamp(rt.clock()), "per_challenge": rows})
 
@@ -542,31 +668,86 @@ async def list_challenges(attempt_id: str, request: Request, auth: Authenticated
     query(request, ())
     rec = not_gone(readable(rt, auth, attempt_id))
 
-    def build() -> list[dict[str, Any]]:
+    sequenced = rt.is_sequenced(rec.id)
+    hidden = await run(results_hidden, rt, auth, rec)
+
+    def build() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         out = []
         practice = rec.org_id is None and is_owner(auth, rec)  # a write-up is for a learner of their own practice, never in an assessment
-        for key in rt.challenge_keys:
+        now = rt.clock()
+        clocks = {c.challenge_key: c for c in rt.challenge_clocks(rec.id)}
+        keys = rt.keys_for(rec.id)  # the template's subset for an assessment
+        for key in keys:
+            clock = clocks[key]
+            if sequenced and not clock.visible:
+                continue  # a sandbox run shows one challenge at a time: the ones after the current one do not exist for the learner yet
             best = rt.milestones.best(rec.id, key)
             entry = rt.catalog.get(key)
             solved = best.value == "M3"
             item = {"challenge_key": key, "best_milestone": best.value, "solved": solved,
                     "held": rt.milestones.is_held(rec.id, key), "hints_used": len(rt.hints.levels(rec.id, key)),
-                    "hints_available": hints_enabled(rec)}
-            if entry is not None and (entry.brief or entry.start):
-                item["brief"], item["start"] = entry.brief, entry.start
-            if entry is not None and entry.write_up and solved and practice:
+                    "hints_available": hints_enabled(rec) and (not sequenced or clock.state == "active")}
+            if hidden:  # H-355: the progress of a candidate whose results are not released shows nothing earned
+                item.update({"best_milestone": "none", "solved": False, "held": False})
+            if sequenced:
+                item.update({"state": clock.state, "title": (entry.title[:120] if entry else key), "tier": (entry.tier if entry else None) or "Medium",
+                             "time_limit_seconds": clock.limit_seconds, "opened_at": stamp(clock.opened_at), "expires_at": stamp(clock.expires_at),
+                             "seconds_left": clock.seconds_left(now)})
+            # a challenge that has not begun shows what it is about; how to begin (the demo account, where to look) comes with the countdown
+            if entry is not None and entry.brief and (not sequenced or clock.state != "future"):
+                item["brief"] = entry.brief
+            if entry is not None and entry.start and (not sequenced or clock.state != "ready"):
+                item["start"] = entry.start
+            if entry is not None and entry.write_up and (solved or (sequenced and clock.state == "expired")) and practice:
                 item["write_up"] = {"vulnerable": entry.write_up[0], "fix": entry.write_up[1]}
             out.append(item)
-        return out
+        meta: dict[str, Any] = {}
+        if sequenced:
+            current = next((c for c in clocks.values() if c.state in ("ready", "active")), None)
+            meta = {"total": len(keys), "current_key": current.challenge_key if current else None, "server_time": stamp(now)}
+        return out, meta
 
-    return json_ok({"items": await run(build), "has_more": False})
+    items, meta = await run(build)
+    return json_ok({"items": items, "has_more": False, **meta})
+
+
+@router.post("/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin", operation_id="beginChallenge")
+async def begin_challenge(attempt_id: str, challenge_key: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """Start the countdown of the current challenge of a sequenced run (Easy 20, Medium 40, Hard 60 minutes). Repeating the call changes nothing.
+    404 for a challenge that is not the current one, 409 when the attempt is not running or the challenge already ended."""
+    rt = lab(request)
+    rec = not_gone(owned(rt, auth, attempt_id))
+    await no_body(request)
+    if not _CHALLENGE.fullmatch(challenge_key):
+        raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)
+    clock = await run(rt.begin_challenge, rec.id, challenge_key)
+
+    def view() -> dict[str, Any]:
+        entry = rt.catalog.get(challenge_key)
+        best = rt.milestones.best(rec.id, challenge_key)
+        return {"challenge_key": challenge_key, "best_milestone": best.value, "solved": best.value == "M3", "held": rt.milestones.is_held(rec.id, challenge_key),
+                "hints_used": len(rt.hints.levels(rec.id, challenge_key)), "hints_available": hints_enabled(rec) and clock.state == "active",
+                "state": clock.state, "title": (entry.title[:120] if entry else challenge_key), "tier": (entry.tier if entry else None) or "Medium",
+                "time_limit_seconds": clock.limit_seconds, "opened_at": stamp(clock.opened_at), "expires_at": stamp(clock.expires_at),
+                "seconds_left": clock.seconds_left(rt.clock()),
+                **({"brief": entry.brief} if entry and entry.brief else {}), **({"start": entry.start} if entry and entry.start else {})}
+
+    return json_ok(await run(view))
+
+
+@router.get("/api/v1/me/progress", operation_id="getMyProgress")
+async def get_my_progress(request: Request, auth: Authenticated = Depends(authenticated)) -> JSONResponse:
+    """The points on the learner's account: the best result per challenge over every run, so a repeated challenge never counts twice."""
+    rt = lab(request)
+    query(request, ())
+    return json_ok(await run(rt.account_progress, auth.session.user.id))
 
 
 def hint_context(rt: LabRuntime, auth: Authenticated, attempt_id: str, challenge_key: str) -> AttemptRecord:
     rec = not_gone(owned(rt, auth, attempt_id))  # ownership 404, then 410, then the hints-off 404
     if not hints_enabled(rec):
         raise ProblemError(ErrorCode.ATT_HINTS_DISABLED)
-    if not _CHALLENGE.fullmatch(challenge_key):
+    if not _CHALLENGE.fullmatch(challenge_key) or challenge_key not in rt.keys_for(rec.id):
         raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)
     return rec
 
@@ -576,6 +757,9 @@ async def list_hints(attempt_id: str, challenge_key: str, request: Request, auth
     rt = lab(request)
     query(request, ())
     rec = hint_context(rt, auth, attempt_id, challenge_key)
+    clock = rt.sequence.clock_of(rec.id, challenge_key) if rt.is_sequenced(rec.id) else None
+    if clock is not None and clock.state == "future":
+        raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)  # a challenge the sandbox run has not reached does not exist for the learner
     items = await run(lambda: [hint_view(rt, rec, challenge_key, level) for level in (1, 2, 3)])
     return json_ok({"challenge_key": challenge_key, "items": items, "has_more": False})
 
@@ -636,6 +820,7 @@ async def decide_integrity_flag(attempt_id: str, integrity_flag_id: str, request
     rec = reviewable(rt, auth, attempt_id)
     if Role.RECRUITER not in auth.session.roles:
         raise ProblemError(ErrorCode.ATT_NOT_FOUND)  # the owner may read but not decide (OI-38): the same 404 as for anyone else
+    throttle(request, auth, "review", "rate_review_action_per_user_per_hour")
     number = flag_number(integrity_flag_id)
     rows = {r.flag_id: r for r in await run(rt.integrity.of, rec.id)}
     if number is None or number not in rows:
@@ -700,9 +885,15 @@ async def get_timeline(attempt_id: str, request: Request, auth: Authenticated = 
             if kind is None or (after is not None and (1, seq) <= after):
                 continue
             result = event.get("result") if kind == "flag.submitted" else None
-            entries.append((seq, {"at": stamp(event["at"]), "type": kind, "challenge_key": event.get("challenge_key"),
-                                  "milestone": event.get("level") if kind == "milestone.reached" and event.get("level") in ("M1", "M2", "M3") else None,
-                                  "result": result if result in ("correct", "incorrect") else None}))
+            entry = {"at": stamp(event["at"]), "type": kind, "challenge_key": event.get("challenge_key"),
+                     "milestone": event.get("level") if kind == "milestone.reached" and event.get("level") in ("M1", "M2", "M3") else None,
+                     "result": result if result in ("correct", "incorrect") else None}
+            if kind == "attempt.time_warning":  # how many minutes were left when the warning went out (the engine writes 15 and 5 by default)
+                minutes = event.get("minutes_left")
+                if type(minutes) is not int or not 1 <= minutes <= 1440:
+                    continue  # a warning without a sound number is not shown rather than shown wrong
+                entry["minutes_left"] = minutes
+            entries.append((seq, entry))
         page = entries[:limit]
         more = len(entries) > limit
         return {"items": [e for _, e in page], "has_more": more, "next_cursor": encode_cursor(1, page[-1][0]) if more else None}

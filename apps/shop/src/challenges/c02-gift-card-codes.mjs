@@ -68,7 +68,8 @@ export function buyCard(db, user, { amount_cents = 2000 } = {}, { challenges = {
 export function redeem(db, user, rawCode, { challenges = {}, emit = () => {} } = {}) {
   const code = String(rawCode ?? '').trim();
   const wellformed = WELLFORMED.test(code);
-  const attempt = (result, extra = {}) => emit('shop.giftcard_attempt', { result, user_id: user?.id != null ? String(user.id) : null, ...extra });
+  // The event of IF-4 (data_shop_giftcard_attempt, no other member): result is malformed, unknown_wellformed or redeemed; card_class says whose card was redeemed.
+  const attempt = (result, cardClass = 'none') => emit('shop.giftcard_attempt', { user_id: String(user?.id ?? 'unknown'), result, card_class: cardClass });
 
   let card = null;
   if (isVulnerable('C02', challenges)) {
@@ -88,17 +89,17 @@ export function redeem(db, user, rawCode, { challenges = {}, emit = () => {} } =
   }
 
   if (!card) {
-    attempt(wellformed ? 'unknown_wellformed' : 'invalid');
+    attempt(wellformed ? 'unknown_wellformed' : 'malformed');
     throw new NotFoundError('no such gift card');
   }
-  if (card.status === 'redeemed') { attempt('already_redeemed', { serial: String(card.serial) }); throw new ValidationError('card already redeemed'); }
+  if (card.status === 'redeemed') throw new ValidationError('card already redeemed'); // no event: the contract has no result for a second redemption
 
   const ownedByPlayer = card.owner_user_id === user.id;
   const cardClass = card.serial === 1 ? 'flag_card' : (!ownedByPlayer ? 'unsold_test' : 'own');
   db.prepare("UPDATE gift_cards SET status = 'redeemed' WHERE id = ?").run(card.id);
   // Credit goes to the non-spendable promo ledger, never a checkout-usable wallet.
   db.prepare("INSERT INTO promo_credit (user_id, amount_cents, source) VALUES (?, ?, 'giftcard')").run(user.id, card.amount_cents);
-  attempt('redeemed', { card_class: cardClass, serial: String(card.serial) });
+  attempt('redeemed', cardClass);
   // The message (where a seeded card's flag lives) is returned only here.
   return { serial: card.serial, amount_cents: card.amount_cents, message: card.message, card_class: cardClass };
 }

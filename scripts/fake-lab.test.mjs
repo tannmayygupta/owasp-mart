@@ -155,3 +155,30 @@ test('withdraw and undo: a candidate withdraws (deletion scheduled), repeats it,
     assert.deepEqual([undone.status, undone.json.state, undone.json.delete_after], [200, 'withdrawn', null]);
   });
 });
+test('a sequenced run shows one challenge at a time, begin starts its countdown, a correct flag brings the next, and the account keeps the best points', async () => {
+  await withLab(async ({ lab, call }) => {
+    const H = 'a-HHHHHHHHHHHHHHHH';
+    const list = async () => (await call('GET', `/api/v1/attempts/${H}/challenges`, 'ADA')).json;
+    let body = await list();
+    assert.deepEqual(body.items.map((i) => [i.challenge_key, i.state]), [['C01', 'ready']]);
+    assert.equal(body.total, 11); assert.equal(body.current_key, 'C01');
+    assert.equal((await call('POST', `/api/v1/attempts/${H}/challenges/C02/begin`, 'ADA')).status, 404, 'C02 is not reached');
+    assert.equal((await call('POST', `/api/v1/attempts/${H}/flags`, 'ADA', { challenge_key: 'C01', flag: 'VM{' + 'A'.repeat(24) + '}' })).status, 409, 'not begun');
+    const begun = await call('POST', `/api/v1/attempts/${H}/challenges/C01/begin`, 'ADA');
+    assert.equal(begun.status, 200); assert.equal(begun.json.state, 'active'); assert.equal(begun.json.time_limit_seconds, 1200);
+    assert.ok(begun.json.seconds_left > 1190 && begun.json.seconds_left <= 1200);
+    assert.equal((await call('POST', `/api/v1/attempts/${H}/challenges/C01/begin`, 'ADA')).json.opened_at, begun.json.opened_at, 'a repeat changes nothing');
+    const right = await call('POST', `/api/v1/attempts/${H}/flags`, 'ADA', { challenge_key: 'C01', flag: 'VM{' + 'A'.repeat(24) + '}' });
+    assert.deepEqual(right.json, { challenge_key: 'C01', result: 'correct', credit: 'credited' });
+    body = await list();
+    assert.deepEqual(body.items.map((i) => [i.challenge_key, i.state]), [['C01', 'solved'], ['C02', 'ready']]);
+    assert.equal(body.items[1].tier, 'Medium'); assert.equal(body.items[1].time_limit_seconds, 2400);
+    lab.attempts.get(H).opened.set('C02', Date.now() - 41 * 60 * 1000); // the 40 minutes of C02 are over
+    body = await list();
+    assert.deepEqual(body.items.map((i) => [i.challenge_key, i.state]), [['C01', 'solved'], ['C02', 'expired'], ['C03', 'ready']]);
+    assert.equal((await call('POST', `/api/v1/attempts/${H}/challenges/C02/hints/1/unlock`, 'ADA')).status, 409, 'no hint after the time');
+    const acc = await call('GET', '/api/v1/me/progress', 'ADA');
+    assert.equal(acc.status, 200); assert.ok(acc.json.total_points > 0 && acc.json.runs >= 2);
+    assert.equal(acc.json.per_challenge.find((r) => r.challenge_key === 'C01').best_points, 90); // the mock weighs every challenge 90
+  });
+});

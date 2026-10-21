@@ -9,6 +9,8 @@ import * as money from '../domain/money-service.mjs';
 import { getSellerOrderByNo } from '../challenges/c01-cross-store-order.mjs';
 import { importImageFromUrl } from '../challenges/c10-ssrf-import.mjs';
 import { importPreview } from '../domain/import-client.mjs';
+import { randomBytes } from 'node:crypto';
+import { safeClass } from '../challenges/event-fields.mjs';
 import { registerStoreWithKyc, sellerPayoutsView } from '../challenges/c11-kyc-failopen.mjs';
 
 function handleError(err, res) {
@@ -74,7 +76,10 @@ export function registerSellerRoutes(app, db, { emit = () => {}, challenges = {}
   app.get('/seller/import', SELLER, h((req, res) => res.render('seller/import', {})));
   app.post('/seller/import-preview', SELLER, async (req, res, next) => {
     try {
-      const out = await importPreview(req.body);
+      const { flagged, ...out } = await importPreview(req.body);
+      // The import service is isolated and has no network, so the shop reports the job for it (IF-4: source import). The audit token never leaves in an event, only whether it was issued.
+      emit('import.job', { job_id: `job-${randomBytes(6).toString('hex')}`, store_id: String(req.user.store_id ?? 'none'), flagged_keys: flagged.map(safeClass), polluted: Boolean(out.auditToken),
+        audit_token_issued: Boolean(out.auditToken) }, { source: 'import', user_id: String(req.user.id) });
       res.status(out.ok ? 200 : 503).json(out);
     } catch (e) {
       if (e instanceof ValidationError) return res.status(400).json({ error: e.message });

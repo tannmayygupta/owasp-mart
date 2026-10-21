@@ -52,7 +52,7 @@ export function registerStoreWithKyc(db, user, { name, tax_id } = {}, { challeng
 
   try {
     kyc(tax_id); // valid -> verified; stays pending for admin review
-    emit('kyc.result', { outcome: 'verified_pending', store_id: String(storeId) });
+    emit('kyc.result', { outcome: 'valid', store_id: String(storeId) }); // IF-4 outcomes: valid, invalid_verbose, provider_error_fallback
     return { store_id: storeId, outcome: 'pending' };
   } catch (err) {
     if (err instanceof KycInvalidError) {
@@ -64,12 +64,12 @@ export function registerStoreWithKyc(db, user, { name, tax_id } = {}, { challeng
     if (isVulnerable('C11', challenges)) {
       // FAIL OPEN: approve the store on a provider error.
       db.prepare("UPDATE stores SET status = 'approved', approved_by = 'system:kyc-fallback', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(storeId);
-      emit('kyc.result', { outcome: 'provider_error', store_id: String(storeId) });
-      emit('store.approved', { store_id: String(storeId), approved_by: 'system:kyc-fallback' });
+      emit('kyc.result', { outcome: 'provider_error_fallback', store_id: String(storeId) });
+      emit('store.approved', { store_id: String(storeId), approved_by: 'system_kyc_fallback' }); // IF-4 ids cannot hold a colon: the stored value is system:kyc-fallback
       return { store_id: storeId, outcome: 'fallback_approved' };
     }
-    // FAIL CLOSED: stays pending.
-    emit('kyc.result', { outcome: 'provider_error', store_id: String(storeId) });
+    // FAIL CLOSED: stays pending (the contract has no outcome for a provider error that was refused: it is reported as the fallback outcome with no approval event).
+    emit('kyc.result', { outcome: 'provider_error_fallback', store_id: String(storeId) });
     return { store_id: storeId, outcome: 'pending' };
   }
 }

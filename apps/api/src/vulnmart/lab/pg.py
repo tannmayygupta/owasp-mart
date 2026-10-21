@@ -93,8 +93,10 @@ class PgAttemptStore(_Base):
 
     def find(self, user_id: str, template_id: str) -> AttemptRecord | None:
         with self._engine.connect() as c:
+            # the newest attempt: a learner may have finished earlier runs for the same template (migration 0017)
             row = c.execute(select(m.Attempt.record, m.Attempt.version).where(
-                m.Attempt.user_id == user_id, m.Attempt.template_id == template_id)).one_or_none()
+                m.Attempt.user_id == user_id, m.Attempt.template_id == template_id)
+                .order_by(m.Attempt.created_at.desc(), m.Attempt.id.desc()).limit(1)).first()
         return record_from_json(row.record, row.version) if row else None
 
     def add(self, record: AttemptRecord) -> AttemptRecord:
@@ -176,6 +178,21 @@ class PgHintLedger(_Base):
         with self._engine.begin() as c:
             row = c.execute(pg_insert(m.HintUnlock).values(attempt_id=attempt_id, challenge_key=challenge_key, level=level, at=at)
                             .on_conflict_do_nothing().returning(m.HintUnlock.level)).one_or_none()
+        return row is not None
+
+
+class PgChallengeClockLedger(_Base):
+    """When a learner began each challenge of a sequenced run (migration 0017). Written once; the first instant stays."""
+
+    def opened_at(self, attempt_id: str, challenge_key: str) -> datetime | None:
+        with self._engine.connect() as c:
+            return c.execute(select(m.ChallengeOpen.opened_at).where(
+                m.ChallengeOpen.attempt_id == attempt_id, m.ChallengeOpen.challenge_key == challenge_key)).scalar_one_or_none()
+
+    def open(self, attempt_id: str, challenge_key: str, at: datetime) -> bool:
+        with self._engine.begin() as c:
+            row = c.execute(pg_insert(m.ChallengeOpen).values(attempt_id=attempt_id, challenge_key=challenge_key, opened_at=at)
+                            .on_conflict_do_nothing().returning(m.ChallengeOpen.challenge_key)).one_or_none()
         return row is not None
 
 
@@ -562,7 +579,7 @@ def purge_attempt_data(engine: Engine, attempt_id: str) -> dict[str, int]:
     removed: dict[str, int] = {}
     with engine.begin() as c:
         instances = list(c.execute(select(m.Instance.id).where(m.Instance.attempt_id == attempt_id)).scalars())
-        keyed = (m.HintUnlock, m.Milestone, m.HeldCapture, m.FlagSubmission, m.IntegrityFlag, m.Evidence, m.AttemptEvent)
+        keyed = (m.HintUnlock, m.ChallengeOpen, m.Milestone, m.HeldCapture, m.FlagSubmission, m.IntegrityFlag, m.Evidence, m.AttemptEvent)
         for model in keyed:
             removed[model.__tablename__] = c.execute(delete(model).where(model.attempt_id == attempt_id)).rowcount
         if instances:
@@ -581,4 +598,5 @@ def build_pg_stores(engine: Engine) -> LabStores:
         evidence=PgEvidenceStore(engine), activity=PgActivityStore(engine), bots=PgBotVisitStore(engine),
         flag_log=PgFlagSubmissionLog(engine), held=PgHeldStore(engine), audit=PgAudit(engine),
         purge=lambda attempt_id: purge_attempt_data(engine, attempt_id),
+        challenge_clock=PgChallengeClockLedger(engine),
     )

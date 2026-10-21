@@ -57,6 +57,18 @@ export class Client {
   }
 }
 
+// What the lab shows for a hint whose catalogue text is missing (apps/api/src/vulnmart/lab/catalog.py PLACEHOLDER). It is longer than 20 characters,
+// so a length check alone lets a deployment without its catalogue pass; the sweep must refuse it.
+export const HINT_PLACEHOLDER = 'This hint has not been written yet.';
+/** Why a revealed hint text is not acceptable, or null. */
+export function hintTextProblem(text) {
+  const t = String(text ?? '').trim();
+  if (t === HINT_PLACEHOLDER) return 'placeholder text (catalogue missing or hint not written)';
+  if (t.length < 20) return 'too short';
+  if (/VM\{[A-Z2-7]{24}\}/.test(t)) return 'holds a flag';
+  return null;
+}
+
 export function mailpitToken(messageText) {
   const m = /\/verify-email\?token=([A-Za-z0-9_-]{32,128})/.exec(messageText);
   return m ? m[1] : null;
@@ -202,7 +214,7 @@ export async function journey(o) {
       const again = await c.request('POST', `/api/v1/attempts/${aid}/challenges/${key}/hints/${level}/unlock`);
       const item = ((await c.request('GET', `/api/v1/attempts/${aid}/challenges/${key}/hints`)).data?.items ?? []).find((x) => x.level === level);
       const text = String(item?.text ?? '');
-      if (u.status !== 200 || again.status !== 200 || !item?.unlocked || text.length < 20 || /VM\{[A-Z2-7]{24}\}/.test(text)) hintProblems.push(`${key} level ${level}: ${u.status}/${again.status} unlocked=${item?.unlocked} text ${text.length} chars`);
+      if (u.status !== 200 || again.status !== 200 || !item?.unlocked || hintTextProblem(text)) hintProblems.push(`${key} level ${level}: ${u.status}/${again.status} unlocked=${item?.unlocked} text ${text.length} chars ${hintTextProblem(text) ?? ''}`.trim());
     }
   }
   check('every challenge gives its three hints in order, with text, a repeat is free, and no hint holds a flag', hintProblems.length === 0, hintProblems.length ? hintProblems.slice(0, 3).join('; ') : '11 x 3 hints');

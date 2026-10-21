@@ -71,6 +71,7 @@ RANGES: dict[str, tuple[int, int]] = {
     "instance_max_minutes": (1, 1440),
     "instance_company_cap": (0, MAX_QUOTA),
     "instance_total_cap": (0, MAX_QUOTA),
+    "instance_assessment_reserve": (0, MAX_QUOTA),
     "invite_cap_per_company_per_day": (0, 100_000),
     "evidence_max_bytes": (256, 1_048_576),
 }

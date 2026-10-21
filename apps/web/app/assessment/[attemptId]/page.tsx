@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, say, type Attempt, type CatalogueItem, type ConsentNotice, type MyInvite } from '../../../lib/api';
+import { candidateResultsAllowed, closedInviteMessage } from '../../../lib/attempt-logic';
 import { useRequireUser } from '../../../lib/session';
 import { AttemptBoard } from '../../attempt-board';
 
@@ -39,7 +40,7 @@ export default function AssessmentPage() {
   }, [user, load]);
 
   const resultsAllowed = useCallback(
-    (a: Attempt) => !!invite && invite.results_visibility === 'after_submit' && ['submitted', 'reported'].includes(a.state),
+    (a: Attempt) => !!invite && candidateResultsAllowed(a, invite.results_visibility), // IF-2 2.1.0: after the attempt ended, and only when the invite says after_submit or the company released them
     [invite],
   );
 
@@ -99,11 +100,11 @@ export default function AssessmentPage() {
         </section>
       ) : ['consented', 'started'].includes(invite.state) ? (
         <section className="card">
-          <AttemptBoard attemptId={attemptId} catalog={catalog} resultsAllowed={resultsAllowed} onChanged={load} />
+          <AttemptBoard attemptId={attemptId} catalog={catalog} expectedMode="candidate" resultsAllowed={resultsAllowed} onChanged={load} />
           <p><button type="button" className="ghost" onClick={askDeletion}>Ask the company to delete this record</button></p>
         </section>
       ) : (
-        <p className="card">This invitation is {invite.state}.</p>
+        <p className="card banner bad" role="alert" data-testid="invite-closed">{closedInviteMessage(invite.state) ?? `This invitation is ${invite.state}.`}</p>
       )}
     </>
   );

@@ -7,11 +7,11 @@
     },
     {
       "name": "lab",
-      "version": "1.2.0",
-      "operations": 20
+      "version": "2.2.0",
+      "operations": 24
     }
   ],
-  "operations": 89,
+  "operations": 93,
   "shared_components": [
     {
       "section": "headers",

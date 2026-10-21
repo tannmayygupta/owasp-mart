@@ -3,7 +3,7 @@ title: 'Shop identity, six roles, permissions and strong hashing'
 type: 'feature'
 ticket: '2'
 created: '2026-10-09'
-status: built
+status: done
 baseline_revision: '82532f1'
 route: 'full'
 route_source: 'pinned'

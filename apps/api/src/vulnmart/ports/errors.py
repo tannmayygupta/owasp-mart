@@ -100,6 +100,11 @@ class InstanceQuotaReached(PortError):
     code = ErrorCode.INST_QUOTA_REACHED
 
 
+class InstanceNoCapacity(PortError):
+    """The platform (or the orchestrator) has no place for another instance right now: 503, try again (not a limit of the user)."""
+    code = ErrorCode.INST_NO_CAPACITY
+
+
 class KeyShredded(AttemptGone):
     """The attempt's key was shredded: deleting the key is how an attempt's evidence is erased (ATT-GONE, like a purge)."""
 
@@ -108,5 +113,5 @@ class KeyShredded(AttemptGone):
 ERRORS_BY_CODE: dict[ErrorCode, type[PortError]] = {
     cls.code: cls
     for cls in (PortMisuse, EventInvalid, AttemptNotFound, AttemptStateInvalid, AttemptGone, ChallengeNotFound, FlagRateLimited,
-                InstanceMissing, InstanceStateInvalid, InstanceNotReady, InstanceQuotaReached)
+                InstanceMissing, InstanceStateInvalid, InstanceNotReady, InstanceQuotaReached, InstanceNoCapacity)
 }

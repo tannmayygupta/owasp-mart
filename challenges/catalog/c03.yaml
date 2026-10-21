@@ -29,7 +29,7 @@ milestones:
     signal: "part A: the search response holds the ops-note marker or the flag; part B: collector.hit with bot_tagged = true"
   m3:
     summary: flag captured
-    signal: "part A: proxy.flag_seen (C03A) on the search route; part B: collector.hit with a valid token for C03B"
+    signal: "proxy.flag_seen for the one C03 flag, read through either part (the search route for part A; the collector hit of the bot for part B). C03 has a single flag key: both parts carry the same per-instance flag"
 hints:
   - level: 1
     text: >-
@@ -52,4 +52,5 @@ brief: >-
 write_up:
   vulnerable: String-concatenated SQL; an unescaped render of stored user markup.
   fix: Parameterised queries (+ allow-listed sort, least-privilege account, generic errors); HTML-escape all user content.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

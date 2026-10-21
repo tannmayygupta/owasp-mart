@@ -1,0 +1,17 @@
+{
+  "name": "@vulnmart/web-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests of apps/web (Playwright): the production build of the dashboards against the real API app on an in-memory database, the fake instance host and the real clock.",
+  "scripts": {
+    "test": "playwright test",
+    "install:browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

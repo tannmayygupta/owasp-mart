@@ -28,7 +28,7 @@ milestones:
     signal: kyc.result with outcome = invalid_verbose for a player-created store
   m2:
     summary: the store was approved by the fail-open fallback
-    signal: store.approved with approved_by = system:kyc-fallback
+    signal: store.approved with approved_by = system_kyc_fallback (the stored value system:kyc-fallback, written without the colon in the event)
   m3:
     summary: flag captured
     signal: proxy.flag_seen on /seller/payouts
@@ -47,4 +47,5 @@ write_up:
   fix: >-
     Fail closed (reject or queue for manual review), strict input validation before the call, narrow exception types,
     one global handler, generic user errors, alert on provider errors.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

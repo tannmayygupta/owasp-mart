@@ -122,6 +122,22 @@ class ConsentService:
             raise
         return view
 
+    def record_withdrawal(self, *, user_id: str, attempt_id: str) -> ConsentView | None:
+        """FR-SES-10, FR-PRV-02: the candidate withdrew from a running assessment; add the `withdrawn` record that keeps the proof (the grant stays, the table is append-only).
+        Only the person whose attempt it is, and only after they granted consent. Idempotent: when a `withdrawn` record already exists nothing is added and
+        None is returned (an undo keeps the attempt withdrawn, D-91, so the consent stays withdrawn too)."""
+        target = self._own_target(user_id, attempt_id)
+        notice = self._notice_for(target)
+        with self._sessions.begin() as session:
+            if session.get_bind().dialect.name == "postgresql":
+                session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": f"consent:{attempt_id}"})
+            actions = set(session.scalars(select(ConsentRecord.action).where(ConsentRecord.attempt_id == attempt_id, ConsentRecord.user_id == user_id)))
+            if "granted" not in actions:
+                raise ConsentState
+            if "withdrawn" in actions:
+                return None
+            return _view(self._insert(session, user_id, target, notice, "withdrawn", None, None))
+
     def _insert(self, session: Session, user_id: str, target: ConsentTarget, notice: Notice, decision: str, ip_hash: str | None,
                 ua_hash: str | None) -> ConsentRecord:
         consent_id = new_consent_id()

@@ -7,6 +7,7 @@
 import { can } from './permissions.mjs';
 import { assertTransition } from './state-machines.mjs';
 import { ForbiddenError, NotFoundError, ValidationError } from './shop-service.mjs';
+import { pageArgs } from './limits.mjs';
 
 function parseId(v) {
   const n = Number(v);
@@ -95,9 +96,10 @@ export function updateStoreProfile(db, actor, { name, kyc_text } = {}) {
 
 // ---- Products ---------------------------------------------------------------
 
-export function listMyProducts(db, actor) {
+export function listMyProducts(db, actor, opts = {}) {
   const store = ownStore(db, actor);
-  return db.prepare('SELECT * FROM products WHERE store_id = ? ORDER BY id DESC').all(store.id);
+  const page = pageArgs(opts);
+  return db.prepare('SELECT * FROM products WHERE store_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(store.id, page.limit, page.offset);
 }
 
 export function createProduct(db, actor, { title, description, price_cents, stock, category_id } = {}) {
@@ -156,8 +158,9 @@ export function unlistProduct(db, actor, productId) {
 
 // ---- Fulfilment (per order item; one order can span several stores) ---------
 
-export function listStoreOrderItems(db, actor) {
+export function listStoreOrderItems(db, actor, opts = {}) {
   const store = ownStore(db, actor);
+  const page = pageArgs(opts);
   return db
     .prepare(
       `SELECT oi.id, oi.order_id, oi.qty, oi.unit_price_cents, oi.status, p.title,
@@ -166,9 +169,9 @@ export function listStoreOrderItems(db, actor) {
          JOIN products p ON p.id = oi.product_id
          JOIN orders o ON o.id = oi.order_id
         WHERE oi.store_id = ?
-        ORDER BY oi.id DESC`,
+        ORDER BY oi.id DESC LIMIT ? OFFSET ?`,
     )
-    .all(store.id);
+    .all(store.id, page.limit, page.offset);
 }
 
 // Move one of the store's order items forward (paid→processing→shipped→delivered)

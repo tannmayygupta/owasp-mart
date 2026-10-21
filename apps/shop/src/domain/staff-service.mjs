@@ -4,14 +4,20 @@
 import { can, requiresRedaction } from './permissions.mjs';
 import { assertTransition } from './state-machines.mjs';
 import { ForbiddenError, NotFoundError, ValidationError } from './shop-service.mjs';
+import { LIMITS, capText, pageArgs } from './limits.mjs';
 
 function parseId(v) {
   const n = Number(v);
   if (!Number.isInteger(n) || n < 1) throw new NotFoundError('not found');
   return n;
 }
+// The context a decision is made in: WHO is acting (and for which store, when they have one), plus whatever is known about the resource. Passing it always means a matrix
+// cell that is ever made scoped (own, own_store) is evaluated for real instead of silently denied or, worse, allowed against an empty context.
+export function actorContext(actor, ctx = {}) {
+  return { actor_id: actor.id, actor_store_id: actor.store_id ?? null, ...ctx };
+}
 function requireCan(actor, action, ctx = {}) {
-  if (!can(actor.role, action, ctx)) throw new ForbiddenError();
+  if (!can(actor.role, action, actorContext(actor, ctx))) throw new ForbiddenError();
 }
 // Record a staff action in the (deliberately thin) audit log.
 function audit(db, actorId, action, target) {
@@ -49,9 +55,10 @@ export function viewOrder(db, actor, orderId) {
 
 // ---- Tickets (support, admin) ----------------------------------------------
 
-export function listTickets(db, actor) {
+export function listTickets(db, actor, opts = {}) {
   requireCan(actor, 'manage_tickets');
-  return db.prepare('SELECT * FROM tickets ORDER BY id DESC').all();
+  const page = pageArgs(opts);
+  return db.prepare('SELECT * FROM tickets ORDER BY id DESC LIMIT ? OFFSET ?').all(page.limit, page.offset);
 }
 // A ticket with its messages, for the support console detail view (C03 part B).
 export function getTicketWithMessages(db, actor, ticketId) {
@@ -65,8 +72,8 @@ export function replyTicket(db, actor, ticketId, body) {
   requireCan(actor, 'manage_tickets');
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(parseId(ticketId));
   if (!ticket) throw new NotFoundError('ticket not found');
-  if (!body || !String(body).trim()) throw new ValidationError('a reply is required');
-  db.prepare('INSERT INTO ticket_messages (ticket_id, author_id, body) VALUES (?, ?, ?)').run(ticket.id, actor.id, String(body));
+  const reply = capText('reply', body, LIMITS.reply_body, { required: true });
+  db.prepare('INSERT INTO ticket_messages (ticket_id, author_id, body) VALUES (?, ?, ?)').run(ticket.id, actor.id, reply);
   audit(db, actor.id, 'ticket.reply', `ticket:${ticket.id}`);
 }
 export function assignTicket(db, actor, ticketId, assigneeId) {
@@ -103,9 +110,10 @@ export function resolveTicket(db, actor, ticketId) {
 
 // ---- Disputes (support, admin) ---------------------------------------------
 
-export function listDisputes(db, actor) {
+export function listDisputes(db, actor, opts = {}) {
   requireCan(actor, 'resolve_dispute');
-  return db.prepare('SELECT * FROM disputes ORDER BY id DESC').all();
+  const page = pageArgs(opts);
+  return db.prepare('SELECT * FROM disputes ORDER BY id DESC LIMIT ? OFFSET ?').all(page.limit, page.offset);
 }
 export function moveDispute(db, actor, disputeId, to) {
   requireCan(actor, 'resolve_dispute');
@@ -131,13 +139,15 @@ export function moderateReview(db, actor, reviewId, action) {
 
 // ---- Payouts (finance view/approve, admin hold) ----------------------------
 
-export function listPayouts(db, actor) {
+export function listPayouts(db, actor, opts = {}) {
   requireCan(actor, 'view_payouts');
-  return db.prepare('SELECT * FROM payouts ORDER BY id DESC').all();
+  const page = pageArgs(opts);
+  return db.prepare('SELECT * FROM payouts ORDER BY id DESC LIMIT ? OFFSET ?').all(page.limit, page.offset);
 }
-export function listCommissions(db, actor) {
+export function listCommissions(db, actor, opts = {}) {
   requireCan(actor, 'view_payouts');
-  return db.prepare('SELECT * FROM commissions ORDER BY id DESC').all();
+  const page = pageArgs(opts);
+  return db.prepare('SELECT * FROM commissions ORDER BY id DESC LIMIT ? OFFSET ?').all(page.limit, page.offset);
 }
 export function approvePayout(db, actor, payoutId) {
   requireCan(actor, 'approve_payout');
@@ -178,9 +188,10 @@ export function approveProduct(db, actor, productId, decision) {
   db.prepare('UPDATE products SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(to, p.id);
   audit(db, actor.id, `product.${to}`, `product:${p.id}`);
 }
-export function listUsers(db, actor) {
+export function listUsers(db, actor, opts = {}) {
   requireCan(actor, 'manage_users');
-  return db.prepare('SELECT id, email, role, store_id, status FROM users ORDER BY id').all();
+  const page = pageArgs(opts);
+  return db.prepare('SELECT id, email, role, store_id, status FROM users ORDER BY id LIMIT ? OFFSET ?').all(page.limit, page.offset);
 }
 export function setUserStatus(db, actor, userId, status) {
   requireCan(actor, 'manage_users');

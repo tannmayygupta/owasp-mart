@@ -1,0 +1,13 @@
+Fonts served by the VulnMart lab console (self-hosted: the page's content security policy allows no outside source).
+
+1. Atkinson Hyperlegible Next (variable, weights 400 to 800, Latin subset)
+   Copyright the Braille Institute of America, Inc. Designed for maximum legibility.
+   License: SIL Open Font License 1.1 (https://openfontlicense.org).
+   Source: Google Fonts, https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next (file taken 2026-10-20).
+
+2. Martian Mono (variable, weights 400 to 700, Latin subset)
+   Copyright Evil Martians. A monospace with tabular digits, used for the countdown, the points, challenge keys and flags.
+   License: SIL Open Font License 1.1 (https://openfontlicense.org).
+   Source: Google Fonts, https://fonts.google.com/specimen/Martian+Mono (file taken 2026-10-20).
+
+The Open Font License allows use, embedding and redistribution with the fonts unmodified, as here. The files were checked to be WOFF2 (magic bytes `wOF2`).

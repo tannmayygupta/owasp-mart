@@ -417,6 +417,12 @@ class AssessmentService:
                                        details={"org": str(org), "invite": old.id, "replaced_by": invite_id})
                 if session.scalar(select(Invite.id).where(Invite.template_id == tid, Invite.email_ci == email_ci, Invite.state.in_(LIVE_STATES))) is not None:
                     raise InviteExists
+                if supersedes is None:
+                    # a repeat invite after an earlier one closed (expired, declined, revoked, withdrawn attempt): the lab keeps one attempt per account and template, so the
+                    # new invite takes the next generation and with it an attempt key of its own (wiring audit, dangling attempt id)
+                    earlier = session.scalar(select(func.max(Invite.generation)).where(Invite.template_id == tid, Invite.email_ci == email_ci))
+                    if earlier is not None:
+                        generation = max(generation, earlier + 1)
                 if supersedes is None and session.scalar(select(Invite.id).where(Invite.template_id == tid, Invite.email_ci == email_ci, Invite.state == "started")) is not None:
                     raise AlreadyStarted
                 invite = Invite(id=invite_id, org_id=org, template_id=tid, template_version=template.version, rules=view.rules(), email_ci=email_ci,
@@ -599,7 +605,9 @@ class AssessmentService:
 
     def revoke(self, actor: Scope, invite_id: str) -> InviteView:
         """sent, opened or consented -> revoked: the link stops working."""
-        return self._recruiter_close(actor, invite_id, from_states=("sent", "opened", "consented"), to_state="revoked")
+        view = self._recruiter_close(actor, invite_id, from_states=("sent", "opened", "consented"), to_state="revoked")
+        self._cancel_attempt(view.attempt_id, by=actor.user_id, why="revoked")  # a ready attempt must not stay startable behind a revoked invite (wiring audit F-06)
+        return view
 
     def _recruiter_close(self, actor: Scope, invite_id: str, *, from_states: tuple[str, ...], to_state: str) -> InviteView:
         org = self._recruiter_org(actor)
@@ -723,6 +731,19 @@ class AssessmentService:
                 company = session.get(Organization, org)
                 return None if company is None else (view, str(org), company.name)
 
+    def start_gate(self, attempt_id: str) -> tuple[str, str, str] | None:
+        """What the lab asks before it starts a candidate attempt: (invite state, company id, invite id) of the invite that names the attempt, or None when there is none
+        (a practice run, or a lab with no platform). The state is what it is NOW: a live invite past its expiry reads as `expired` even before the scheduler closed it.
+        Read as the signed-in candidate, so only their own invite is visible (policy `own_invite`)."""
+        found = self.for_attempt(attempt_id)
+        if found is None:
+            return None
+        view, org_id, _ = found
+        state = view.state
+        if state in ("created", "sent", "opened", "consented") and view.expires_at <= self._now():
+            state = "expired"
+        return state, org_id, view.invite_id
+
     def describe(self, org_id: str, invite: InviteView) -> CandidateInvite:
         """The company's name and the template's title for an invite, read in the company's own scope (the candidate has none). A template deleted since the invite
         was sent leaves the title empty; the invite keeps its own copy of the rules."""
@@ -800,15 +821,34 @@ class AssessmentService:
             with self._sessions.begin() as session:
                 return session.execute(delete(Invite).where(Invite.org_id == oid, Invite.attempt_id == attempt_id)).rowcount
 
+    def _cancel_attempt(self, attempt_id: str | None, *, by: str, why: str) -> None:
+        """Cancel the lab attempt behind a closed invite when it can still be cancelled (ready, or in consent). Best effort and logged: the invite is already closed, and
+        the start route refuses a closed invite as well, so a failure here leaves nothing startable."""
+        if attempt_id is None or self._attempts is None:
+            return
+        try:
+            self._attempts.cancel(attempt_id, by=by)
+        except (AttemptNotFound, AttemptGone, AttemptStateInvalid) as reason:
+            logger.info("invite %s: attempt %s was not cancelled (%s)", why, attempt_id, type(reason).__name__)
+
     def expire_due(self, org_id: str) -> int:
-        """Close the live invites of one company that are past their expiry. Returns how many."""
+        """Close the live invites of one company that are past their expiry and cancel the attempts they leave `ready`. Returns how many invites it closed."""
         oid = self._uuid(org_id, InviteNotFound)
         now = self._now()
+        attempts: list[str] = []
         with self._scope.acting_as(self._system(oid)):
             with self._sessions.begin() as session:
                 rows = session.scalars(select(Invite).where(Invite.org_id == oid, Invite.state.in_(("created", "sent", "opened", "consented")),
                                                             Invite.expires_at <= now)).all()
-                return sum(1 for invite in rows if self._close(session, invite, "expired", now))
+                closed = 0
+                for invite in rows:
+                    if self._close(session, invite, "expired", now):
+                        closed += 1
+                        if invite.attempt_id is not None:
+                            attempts.append(invite.attempt_id)
+        for attempt_id in attempts:
+            self._cancel_attempt(attempt_id, by="system:invites", why="expired")
+        return closed
 
     def expire_all(self) -> int:
         """`expire_due` for every company (the scheduler of story P-24 calls it). The companies are read through the admin-visible company directory."""

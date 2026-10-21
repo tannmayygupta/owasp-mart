@@ -48,7 +48,7 @@ class DbQuotaPort:
 
     def limits(self, user_id: str, org_id: str | None = None) -> QuotaLimits:
         company = None if org_id is None else int(self._settings.get("instance_company_cap"))
-        return QuotaLimits(self.max_instances(user_id, org_id), company, int(self._settings.get("instance_total_cap")))
+        return QuotaLimits(self.max_instances(user_id, org_id), company, int(self._settings.get("instance_total_cap")), int(self._settings.get("instance_assessment_reserve")))
 
     # ---- the admin's side ----
 

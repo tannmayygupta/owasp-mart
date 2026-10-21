@@ -134,7 +134,7 @@ export type Session = { status: 'authenticated'; user: User; csrf_token: string 
 export type MfaRequired = { status: 'mfa_required'; mfa_ticket: string };
 export type CatalogueItem = { challenge_key: string; title: string; owasp_2021: string | null; owasp_2025: string; difficulty: number; tier: string };
 export type AttemptSummary = { attempt_id: string; mode: 'learner' | 'candidate'; state: string; instance_id: string | null; created_at: string; deadline_at: string | null };
-export type Attempt = AttemptSummary & { hints_enabled: boolean; started_at: string | null; submitted_at: string | null; delete_after?: string | null };
+export type Attempt = AttemptSummary & { hints_enabled: boolean; started_at: string | null; submitted_at: string | null; delete_after?: string | null; results_released?: boolean; server_time?: string };
 export type Instance = { instance_id: string; state: string; access: string; epoch: number };
 export type Progress = {
   challenge_key: string;
@@ -212,6 +212,7 @@ export type CompanyInvite = {
   time_limit_min: number | null;
   hints_mode: 'on' | 'off';
   hint_cost_pct: number;
+  results_visibility?: 'after_submit' | 'after_release';
 };
 export type InvitesResult = { created: CompanyInvite[]; skipped: { email: string; reason: string }[]; remaining: string[]; cap: number | null };
 export type ReportChallenge = {
@@ -244,7 +245,23 @@ export type IntegrityFlag = {
   created_at: string;
   decision_note: string | null;
 };
-export type TimelineEntry = { at: string; type: string; challenge_key: string | null; milestone: string | null; result: string | null };
+export type TimelineEntry = { at: string; type: string; challenge_key: string | null; milestone: string | null; result: string | null; minutes_left?: number };
+
+/** One line of the timeline in words; a type this build does not know is shown as it is (IF-2 may add types). */
+export function timelineText(t: TimelineEntry): string {
+  const key = t.challenge_key ? ` ${t.challenge_key}` : '';
+  switch (t.type) {
+    case 'attempt.time_warning': return `Time warning: ${t.minutes_left ?? '?'} minutes left`;
+    case 'attempt.started': return 'The clock started';
+    case 'attempt.submitted': return 'Submitted';
+    case 'attempt.expired': return 'Time ran out';
+    case 'milestone.reached': return `Milestone${key}${t.milestone ? ` (${t.milestone})` : ''}`;
+    case 'flag.submitted': return `Flag pasted${key}${t.result ? `: ${t.result}` : ''}`;
+    case 'hint.unlocked': return `Hint unlocked${key}`;
+    case 'instance.reset': return 'Instance reset';
+    default: return `${t.type}${key}${t.milestone ? ` (${t.milestone})` : ''}${t.result ? `: ${t.result}` : ''}`;
+  }
+}
 
 // ---- the admin's shapes (IF-1, story P-28; the dashboard is story P-30) ----
 
@@ -308,3 +325,18 @@ export function when(stamp: string | null | undefined): string {
   const d = new Date(stamp);
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString();
 }
+
+// ===== learner and candidate screens (work package E, 2026-10-21): the sequenced practice run, IF-2 1.3.0 =====
+// A learner's run is sequenced when the lab runs with VULNMART_LAB_SEQUENCE=1: the list holds only the challenges reached, and each entry has a state and a countdown.
+export type ChallengeProgress = Progress & {
+  state?: 'ready' | 'active' | 'solved' | 'expired';
+  title?: string;
+  tier?: 'Easy' | 'Medium' | 'Hard';
+  time_limit_seconds?: number;
+  opened_at?: string | null;
+  expires_at?: string | null;
+  seconds_left?: number | null;
+};
+export type ProgressList = { items: ChallengeProgress[]; has_more?: false; total?: number; current_key?: string | null; server_time?: string };
+export type AccountProgress = { total_points: number; runs: number; per_challenge: { challenge_key: string; best_points: number }[] };
+// ===== end of the learner and candidate block =====

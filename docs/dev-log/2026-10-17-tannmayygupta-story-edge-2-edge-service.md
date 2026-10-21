@@ -9,7 +9,7 @@
 | Report tag | edge service, event relay, Caddy, FR-INS-10, NFR-ISO-04, S-15 local part, D-62, D-64 |
 
 ## Requirements covered
-FR-INS-10, NFR-ISO-04 (local part), spike S-15 (local part); decisions D-62, D-64, D-67 (Proposed, in ADR 0040); handoffs H-75 (relay part answered), H-337 (new, shared with story 1). Tasks L-17 and L-18 (parts; both stay unticked).
+FR-INS-10, NFR-ISO-04 (local part), spike S-15 (local part); decisions D-62, D-64, D-67 (Proposed, in ADR 0090); handoffs H-75 (relay part answered), H-337 (new, shared with story 1). Tasks L-17 and L-18 (parts; both stay unticked).
 
 ## Summary (plain language, 3-5 lines)
 The gate of story 1 is now a running edge: stock Caddy terminates TLS and accepts only the strict instance hostname, an own small gate service decides, and a relay forwards signed sidecar events to the ingest without holding any key. On Docker Desktop one gate was attached to 20 internal instance networks, each hostname reached only its own instance, and no instance container published a port. Nothing here ran on the real VM.
@@ -31,7 +31,7 @@ Caddy checks the hostname and proxies to `edge-gate:8080`. The gate proxies allo
 - `infra/caddy/Caddyfile.l`, `infra/compose/compose.yaml` - new service definitions
 - `scripts/check-lab-compose-rules.mjs`, `scripts/check-lab-compose-rules.test.mjs` - port rule and tests
 - `scripts/e2e/edge.e2e.test.mjs` - new
-- `docs/adr/0040-edge-gate-ticket-and-hostname-model.md`, `initial.md`, HANDOFFS, CHANGELOG, traceability, dev1 file
+- `docs/adr/0090-edge-gate-ticket-and-hostname-model.md`, `initial.md`, HANDOFFS, CHANGELOG, traceability, dev1 file
 - `docs/assets/story-edge-2-edge-service/test-output.txt`
 
 ## Decisions made
