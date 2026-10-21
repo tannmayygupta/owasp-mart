@@ -12,8 +12,8 @@ Every version listed here must be an entry of the contract's own section in `con
 |---|---|---|---|
 | IF-1 | 1.7.0 | P | `contracts/api/platform/` |
 | IF-3 | 1.0.0 | P | `contracts/domain-events/` |
-| IF-8 | 1.0.0 | P | `contracts/errors/` |
-| IF-2 | 2.1.0 | L | `contracts/api/lab/` |
+| IF-8 | 2.0.0 | P | `contracts/errors/` |
+| IF-2 | 2.2.0 | L | `contracts/api/lab/` |
 | IF-4 | 1.0.0 | L | `contracts/events/` |
 | IF-5 | 1.1.0 | L | `contracts/orchestrator/` |
 | IF-6 | 1.0.1 | L | `contracts/instance/` |
@@ -35,9 +35,9 @@ Contract | Stream | Handle | Role | Version | Date | Status
 ---|---|---|---|---|---|---
 IF-1 | P | @akshaay29 | owner | 1.7.0 | 2026-10-20 | approved
 IF-3 | P | @akshaay29 | owner | 1.0.0 | 2026-10-20 | approved
-IF-8 | P | @akshaay29 | owner | 1.0.0 | 2026-10-20 | approved
-IF-2 | L | @tannmayygupta | owner | 2.1.0 | 2026-10-20 | approved
-IF-2 | P | @tannmayygupta | consumer | 2.1.0 | 2026-10-21 | approved
+IF-8 | P | @tannmayygupta | owner | 2.0.0 | 2026-10-21 | approved
+IF-2 | L | @tannmayygupta | owner | 2.2.0 | 2026-10-21 | approved
+IF-2 | P | @tannmayygupta | consumer | 2.2.0 | 2026-10-21 | approved
 IF-4 | L | @tannmayygupta | owner | 1.0.0 | 2026-10-19 | approved
 IF-4 | T | @sahillroy | consumer | 1.0.0 | 2026-10-15 | approved
 IF-4 | P | @akshaay29 | consumer | 1.0.0 | 2026-10-20 | approved

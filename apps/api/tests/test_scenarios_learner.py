@@ -3,6 +3,7 @@ Each test name starts with the scenario id; docs/audit/2026-10-21-scenario-matri
 from __future__ import annotations
 
 import io
+from datetime import timedelta
 import re
 import zipfile
 from urllib.parse import parse_qs, urlsplit
@@ -164,20 +165,17 @@ def test_l09_an_expired_countdown_moves_on_and_keeps_earned_points(seq, clock):
     assert eve.get(f"/api/v1/attempts/{attempt}/score").json()["score"] == 0
 
 
-def test_l10_a_pasted_flag_is_credited_a_flag_without_play_is_held_and_nothing_echoes_the_flag(sw):
+def test_l10_a_learner_flag_is_credited_even_without_shop_traffic_and_nothing_echoes_the_flag(sw):
+    # ADR 0071: learner practice never holds a capture (nobody could release it); the activity hold is for company assessments only
     eve = sw.browser(EVE_EMAIL)
     instance, attempt = start_practice(sw, eve)
     flag = sw.lab.keys.flag(instance, "C01", 1)
-    # no shop traffic was seen: a pasted flag is held for review (FR-ACH-02), not credited and not refused
-    held = eve.post(f"/api/v1/attempts/{attempt}/flags", {"challenge_key": "C01", "flag": flag})
-    assert held.status_code == 200 and held.json() == {"challenge_key": "C01", "result": "correct", "credit": "held"}
-    assert flag not in held.text
+    credited = eve.post(f"/api/v1/attempts/{attempt}/flags", {"challenge_key": "C01", "flag": flag})
+    assert credited.status_code == 200 and credited.json() == {"challenge_key": "C01", "result": "correct", "credit": "credited"}
+    assert flag not in credited.text
     c01 = next(i for i in eve.get(f"/api/v1/attempts/{attempt}/challenges").json()["items"] if i["challenge_key"] == "C01")
-    assert c01["held"] is True
-    play(sw.lab, instance)
-    credited = eve.post(f"/api/v1/attempts/{attempt}/flags", {"challenge_key": "C02", "flag": sw.lab.keys.flag(instance, "C02", 1)})
-    assert credited.json()["result"] == "correct" and credited.json()["credit"] == "credited" and eve.get(f"/api/v1/attempts/{attempt}/score").json()["score"] > 0
-
+    assert c01["held"] is False and c01["solved"] is True
+    assert eve.get(f"/api/v1/attempts/{attempt}/score").json()["score"] > 0
 
 def test_l11_five_wrong_flags_in_ten_minutes_end_in_429_without_a_score_penalty(sw, clock):
     eve = sw.browser(EVE_EMAIL)
@@ -228,6 +226,7 @@ def test_l14_solving_every_challenge_of_a_sequenced_run_submits_it_frees_the_ins
         assert eve.post(f"/api/v1/attempts/{attempt}/challenges/{key}/begin").status_code == 200, key
         r = eve.post(f"/api/v1/attempts/{attempt}/flags", {"challenge_key": key, "flag": seq.lab.keys.flag(instance, key, 1)})
         assert r.json()["result"] == "correct", (key, r.text)
+        seq.clock.now = seq.clock.now + timedelta(seconds=10)  # the per-minute flag limit of the template (10) is enforced: a learner does not solve eleven challenges in one minute
     seq.lab.tick()
     assert eve.get(f"/api/v1/attempts/{attempt}").json()["state"] in ("submitted", "reported")
     items = eve.get(f"/api/v1/attempts/{attempt}/challenges").json()["items"]
@@ -287,12 +286,12 @@ def test_l20_a_failed_start_is_a_clean_error_without_internals_and_the_learner_c
     wait_running(sw.lab, again.json()["attempt_id"])
 
 
-def test_l21_a_full_platform_answers_429_with_retry_after_not_a_crash(sw):
+def test_l21_a_full_platform_answers_503_no_capacity_not_a_crash(sw):
     host = sw.lab.host
     host.capacity_memory_mb = 1  # nothing fits
     eve = sw.browser(EVE_EMAIL)
     r = eve.post("/api/v1/instances", {"kind": "learner"})
-    assert r.status_code == 429 and r.headers["retry-after"] == "15" and r.json()["code"] == "REQ-RATE-LIMITED", r.text
+    assert r.status_code == 503 and r.json()["code"] == "INST-NO-CAPACITY", r.text  # IF-2 2.2.0: a full lab is 503, not a misleading 429
     assert "traceback" not in r.text.lower()
 
 

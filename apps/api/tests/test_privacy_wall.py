@@ -72,7 +72,7 @@ CLASSES: dict[str, tuple[str, str]] = {
         "getConsentNotice", "recordConsent", "createDeletionRequest", "cancelDeletionRequest", "acceptInvite", "withdrawAttempt", "undoWithdrawal")},
     **{op: ("company", W + "test_another_company_sees_none_of_a_company_s_data") for op in (
         "getMyCompany", "reapplyCompany", "getCompanyTerms", "acceptCompanyTerms", "listTemplates", "createTemplate", "getTemplate", "updateTemplate", "deleteTemplate",
-        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag", "releaseResults")},
+        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag", "releaseResults", "cancelAttempt")},
     **{op: ("admin", W + "test_admin_routes_answer_everyone_else_like_unknown_routes") for op in (
         "listPendingCompanies", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
         "setQuota", "removeQuota", "getCapacity", "listJobs")},

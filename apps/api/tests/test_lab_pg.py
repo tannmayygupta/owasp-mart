@@ -278,6 +278,7 @@ def test_the_whole_loop_on_postgres_and_a_restart_loses_nothing(engine, keystore
     keys = make_keys(keystore_engine)
     user = f"u-loop-{uuid.uuid4().hex[:8]}"
     rt = make_runtime(engine, clock, host, keys)
+    rt.engine.create(user, rt.template_id, "c-1", org_id="o-loop", rules=Rules(hints_mode="on", hint_cost_pct=10))  # the template turned hints on (hints are off by default for a candidate)
     started = rt.start_attempt(user, org_id="o-loop")
     aid, iid = started.attempt_id, started.instance_id
 
@@ -336,7 +337,9 @@ def test_purge_removes_the_attempt_data_and_keeps_the_attempt_row_and_the_audit(
     clock, host = FakeClock(T0), FakeInstanceHost()
     keys = FakeKeyPort(event_master=os.urandom(32), flag_key=os.urandom(32), owner_key=os.urandom(32))
     rt = make_runtime(engine, clock, host, keys)
-    s = rt.start_attempt(f"u-purge-{uuid.uuid4().hex[:8]}", org_id="o-p")
+    purge_user = f"u-purge-{uuid.uuid4().hex[:8]}"
+    rt.engine.create(purge_user, rt.template_id, "c-1", org_id="o-p", rules=Rules(hints_mode="on", hint_cost_pct=10))
+    s = rt.start_attempt(purge_user, org_id="o-p")
     rt.submit_flag(s.attempt_id, "C01", keys.flag(s.instance_id, "C01", 1))
     rt.unlock_hint(s.attempt_id, "C01", 1)
     rt.withdraw(s.attempt_id)

@@ -10,6 +10,7 @@
   "attempt.json": "Attempt",
   "attempt.start.json": "Attempt",
   "attempt.released.json": "Attempt",
+  "attempt.cancelled.json": "Attempt",
   "attempt.submit.request.json": "ConfirmRequest",
   "attempt.submitted.json": "Attempt",
   "attempt.withdraw.request.json": "ConfirmRequest",

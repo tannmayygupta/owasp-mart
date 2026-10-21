@@ -20,10 +20,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from vulnmart_attempts import AttemptEngine, Fact, InvalidTransition
+from vulnmart_attempts import AttemptEngine, Fact, InvalidTransition, ScoringRules
 from vulnmart_attempts import AttemptState as AttemptState_, Milestone as ScoreMilestone, ResetLimitReached, Rules
 from vulnmart_attempts.catalogue import Catalogue as Catalogue_
 from vulnmart_attempts.metrics import time_metrics
+from vulnmart_attempts.store import allows_new_run
 from vulnmart_attempts.review import HeldCaptureReview, HeldItem, default_may_review
 
 from vulnmart.flags.checker import FlagChecker
@@ -46,7 +47,8 @@ from vulnmart.ports.attempts import AttemptState
 from vulnmart.ports.engine_attempts import EngineAttemptPort
 from vulnmart.ports.engine_cohort import EngineCohortPort
 from vulnmart.ports.engine_reports import EngineReportPort
-from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, InstanceNotReady
+from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, InstanceNoCapacity, InstanceNotReady, InstanceQuotaReached
+from vulnmart.ports.quota import QuotaPort
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
 from vulnmart.ports.fakes import FakeKeyPort
 from vulnmart.ports.http_instance_host import HttpInstanceHost
@@ -92,13 +94,15 @@ class StartedAttempt:
 class RuntimeFacts:
     """Scoring facts from the milestone store and the hint ledger. A held capture counts at its fallback (D-86)."""
 
-    def __init__(self, milestones: MilestoneStore, hints: HintLedger, charged: Callable[[str], bool] = lambda attempt_id: True) -> None:
+    def __init__(self, milestones: MilestoneStore, hints: HintLedger, charged: Callable[[str], bool] = lambda attempt_id: True,
+                 keys_of: Callable[[str], tuple[str, ...]] = lambda attempt_id: CHALLENGE_KEYS) -> None:
         # `charged(attempt_id)`: hints cost points only in an assessment (FR-SCR-03); a learner's hints are free (PRD section 4, journey step 5; audit finding)
-        self._milestones, self._hints, self._charged = milestones, hints, charged
+        # `keys_of(attempt_id)`: the challenges of the attempt (the template's subset for an assessment)
+        self._milestones, self._hints, self._charged, self._keys_of = milestones, hints, charged, keys_of
 
     def facts(self, attempt_id: str) -> Mapping[str, Fact]:
         out: dict[str, Fact] = {}
-        for ck in CHALLENGE_KEYS:
+        for ck in self._keys_of(attempt_id):
             best = ScoreMilestone[self._milestones.best(attempt_id, ck).name]
             levels = self._hints.levels(attempt_id, ck)
             paid = levels if self._charged(attempt_id) else ()
@@ -116,7 +120,9 @@ class LabRuntime:
                  hostname_suffix: str = "instances.example.invalid", ready_timeout_s: float = READY_TIMEOUT_S,
                  ready_poll_s: float = READY_POLL_S, sleep: Callable[[float], None] = time.sleep, gate: ActivityGate | None = None,
                  limits: Limits = DEFAULT_TEMPLATE_LIMITS, stores: LabStores | None = None, catalog: Catalog | None = None,
-                 sequenced: bool = False) -> None:
+                 sequenced: bool = False, quota: QuotaPort | None = None) -> None:
+        # quota: the admin's per-user, per-company and platform limits (wiring audit F-08); None (unit tests, the laptop demo) means no limit but the orchestrator's own.
+        self.quota = quota
         # sequenced: a learner's run goes one challenge at a time with a countdown each (the deployed mode, `VULNMART_LAB_SEQUENCE=1`);
         # off for the plain runtime of the older tests and demos, where every challenge is open at once.
         self.sequenced = sequenced
@@ -148,10 +154,12 @@ class LabRuntime:
         self.engine = AttemptEngine(s.attempts, HostInstanceControl(host), self.clock, events=self._engine_event)
         self.attempts = EngineAttemptPort(self.engine, self.attempt_log)
         self.evidence_store = s.evidence
-        self.reports = EngineReportPort(attempts=self.attempts, facts=RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None))),
-                                        integrity=self.integrity, clock=self.clock,
+        def facts() -> RuntimeFacts:
+            return RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None)), self.keys_for)
+
+        self.reports = EngineReportPort(attempts=self.attempts, facts=facts(), integrity=self.integrity, clock=self.clock, profile=self.scoring_profile,
                                         evidence=EvidenceReader(store=self.evidence_store, keys=self.keys))
-        self.cohort = EngineCohortPort(engine=self.engine, facts=RuntimeFacts(self.milestones, self.hints, lambda aid: bool(getattr(self._record_or_none(aid), "org_id", None))),
+        self.cohort = EngineCohortPort(engine=self.engine, facts=facts(), profile=self.scoring_profile,
                                        milestones=self.milestones, active_seconds_of=self._active_seconds)  # the private cohort view (L-28); the route is stream P's
         self.checker = FlagChecker(self.keys)
         gate_kw = {"gate": gate} if gate is not None else {}
@@ -167,7 +175,7 @@ class LabRuntime:
                                                                         integrity=self.integrity)
         self.submit_service = FlagSubmitService(attempts=self.attempts, directory=self.directory, checker=self.checker,
                                                 milestones=self.milestones, integrity=self.integrity, log=self.flag_log,
-                                                clock=self.clock, gate=paste_gate)
+                                                clock=self.clock, gate=paste_gate, per_minute_of=self._flags_per_minute)
         self.handler = IngestHandler(keys=self.keys, epochs=self.epochs, store=s.event_store, security=s.security,
                                      sink=self._on_event, now=self.clock)
         self._starting: dict[str, str] = {}  # attempt id -> the instance whose start is under way (one start per attempt)
@@ -206,7 +214,7 @@ class LabRuntime:
         score = self.score(attempt_id)
         by_key = {r.challenge_key: r for r in score.per_challenge}
         rows = []
-        for key in self.challenge_keys:
+        for key in self.keys_for(attempt_id):
             r = by_key.get(key)
             rows.append({"challenge_key": key, "best_milestone": (r.milestone.value if r else self.milestones.best(attempt_id, key).value),
                          "held": self.milestones.is_held(attempt_id, key), "hints_used": len(self.hints.levels(attempt_id, key)),
@@ -230,6 +238,76 @@ class LabRuntime:
             return self.engine.get(attempt_id)
         except Exception:  # an unknown attempt has no rules: the gate uses the defaults
             return None
+
+    # ---- what the template says (wiring audit F-07): subset, hints, hint cost, flag limit ----
+
+    def keys_for(self, attempt_id: str) -> tuple[str, ...]:
+        """The challenges of this attempt: the template's subset for a company assessment (in the runtime's order), every challenge otherwise."""
+        rec = self._record_or_none(attempt_id)
+        chosen = tuple(getattr(getattr(rec, "rules", None), "challenge_keys", ()) or ())
+        if rec is None or rec.org_id is None or not chosen:
+            return tuple(self.challenge_keys)
+        return tuple(k for k in self.challenge_keys if k in chosen)
+
+    def hints_on(self, attempt_id: str) -> bool:
+        """Practice has free hints; an assessment has them only when its template turned them on."""
+        rec = self._record_or_none(attempt_id)
+        return rec is None or rec.org_id is None or rec.rules.hints_mode == "on"
+
+    def hint_cost_pct(self, attempt_id: str, level: int) -> int:
+        """Percent of the challenge's points that unlocking hint `level` costs: the template's percentage times the level (10 gives 10, 20, 30), at most 100; 0 in practice."""
+        rec = self._record_or_none(attempt_id)
+        if rec is None or rec.org_id is None:
+            return 0
+        return min(100, rec.rules.hint_cost_pct * level)
+
+    def scoring_profile(self, attempt_id: str) -> tuple[Catalogue_, ScoringRules]:
+        """The weights (the attempt's challenges only, so the score is out of 1000 over them) and the hint costs this attempt is scored with."""
+        keys = self.keys_for(attempt_id)
+        full = Catalogue_()
+        catalogue = Catalogue_({k: full.weights[k] for k in keys if k in full.weights}) if keys else full
+        return catalogue, ScoringRules(hint_cost_pct=tuple(self.hint_cost_pct(attempt_id, level) for level in (1, 2, 3)))
+
+    def _flags_per_minute(self, attempt_id: str) -> int | None:
+        rec = self._record_or_none(attempt_id)
+        return None if rec is None else rec.rules.flag_submissions_per_minute
+
+    # ---- quotas (wiring audit F-08) ----
+
+    def live_instances(self) -> list[Any]:
+        """The attempts that hold an instance right now (starting, ready, active; a candidate's frozen one too). A learner's finished run is not counted: the next run retires it."""
+        held = []
+        for rec in self.engine.in_states(AttemptState_.READY, AttemptState_.RUNNING, AttemptState_.EXPIRED, AttemptState_.SUBMITTED, AttemptState_.REPORTED):
+            if rec.purged_at is not None or rec.destroyed:
+                continue
+            if rec.org_id is None and rec.state not in (AttemptState_.READY, AttemptState_.RUNNING):
+                continue
+            info = self.directory.for_attempt(rec.id)
+            if self.instance_alive(rec.instance_id or (info.instance_id if info else None)):
+                held.append(rec)
+        return held
+
+    def check_quota(self, user_id: str, org_id: str | None, *, exclude_attempt: str | None = None) -> None:
+        """Refuse a new instance that would pass the admin's limits: the user's (counted per mode, so a practice run and an assessment can run together), the company's, and the
+        platform's, of which `assessment_reserve` places are only for assessments. InstanceQuotaReached (409) for a user or company limit, InstanceNoCapacity (503) for the platform."""
+        if self.quota is None:
+            return
+        limits = self.quota.limits(user_id, org_id)
+        live = [r for r in self.live_instances() if r.id != exclude_attempt]
+        if sum(1 for r in live if r.user_id == user_id and (r.org_id is None) == (org_id is None)) >= limits.user:
+            raise InstanceQuotaReached("the account is at its instance limit")
+        if org_id is not None and limits.company is not None and sum(1 for r in live if r.org_id == org_id) >= limits.company:
+            raise InstanceQuotaReached("the company is at its instance limit")
+        ceiling = limits.total if org_id is not None else max(0, limits.total - limits.assessment_reserve)
+        if len(live) >= ceiling:
+            raise InstanceNoCapacity("the platform has no free place for this instance")
+
+    def cancel_attempt(self, attempt_id: str, *, by: str, reason: str = "recruiter") -> str:
+        """FR-SES-07: the recruiter cancels a candidate attempt that has not ended. The engine destroys the instance and records who and why; the attempt-state domain event
+        (to `cancelled`) is what the notification story reads to mail the candidate. InvalidTransition when the attempt cannot be cancelled in its state."""
+        rec = self.engine.cancel(attempt_id, by, reason)
+        log.info("attempt %s cancelled by %s (%s)", attempt_id, by, reason)
+        return rec.state.value
 
     # ---- one challenge at a time, each with a countdown (vulnmart.lab.sequence) ----
 
@@ -443,6 +521,8 @@ class LabRuntime:
         or a start is already under way for it)."""
         with self._lock:
             previous = self.engine.find(user_id, template) if org_id is None else None
+            if org_id is None and (previous is None or allows_new_run(previous)):
+                self.check_quota(user_id, None)  # before a new run exists: a refused start leaves no empty attempt behind
             rec = self.engine.create(user_id, template, consent_id=f"demo-consent-{secrets.token_hex(4)}", org_id=org_id,
                                      attempt_id=new_attempt_id(), rules=self._rules_for(org_id))
             if previous is not None and previous.id != rec.id:
@@ -459,6 +539,7 @@ class LabRuntime:
                 raise AttemptStateInvalid("the attempt cannot be started in its state")
             if self.instance_alive(rec.instance_id):
                 return StartedAttempt(rec.id, rec.instance_id, rec.state.value)
+            self.check_quota(user_id, getattr(rec, "org_id", None), exclude_attempt=rec.id)  # the admin's limits (F-08)
             self.keys.create_attempt_key(rec.id)  # the data key that seals this attempt's evidence (without it every capture is dropped)
             stale = self.directory.for_attempt(rec.id)
             if stale is not None:
@@ -483,9 +564,12 @@ class LabRuntime:
 
     def _rules_for(self, org_id: str | None) -> Rules | None:
         """A sequenced learner run lasts as long as all its challenge times plus a margin (Easy 20, Medium 40, Hard 60 minutes each); everything else uses the defaults."""
-        if org_id is None and self.sequenced:
-            return Rules(time_limit_minutes=self.sequence.run_limit_minutes())
-        return None
+        if org_id is not None:
+            return None
+        # practice has no reviewer, so a capture the activity does not explain is only flagged, never held: nobody could release it (wiring audit section 4)
+        if self.sequenced:
+            return Rules(time_limit_minutes=self.sequence.run_limit_minutes(), activity_check_mode="flag")
+        return Rules(activity_check_mode="flag")
 
     def _retire(self, finished: Any) -> None:
         """Destroy what a finished learner run still holds (an instance frozen for its 15 minutes). Best effort: the reconciler of the orchestrator cleans up."""
@@ -595,6 +679,8 @@ class LabRuntime:
         rec = self._record_or_none(attempt_id)
         if rec is not None and rec.state is AttemptState_.RUNNING and rec.deadline_at is not None and self.clock() > rec.deadline_at:
             raise AttemptStateInvalid("the attempt is over: its deadline has passed")  # the tick that submits it runs up to a minute later
+        if challenge_key not in self.keys_for(attempt_id):
+            raise ChallengeNotFound("not a challenge of this assessment")  # the template's subset (F-07)
         self.require_playable(attempt_id, challenge_key, allow_solved=True)  # a sequenced run: only the challenge that is active now (or one already captured) takes a flag
         result = self.submit_service.submit_flag(attempt_id, challenge_key, text)
         info = self.directory.for_attempt(attempt_id)
@@ -613,8 +699,10 @@ class LabRuntime:
         attempt = self.attempts.get(attempt_id)
         if attempt.state is not AttemptState.RUNNING:
             raise AttemptStateInvalid("the attempt is not running")
-        if challenge_key not in self.challenge_keys:
+        if challenge_key not in self.keys_for(attempt_id):
             raise ChallengeNotFound("not a challenge of this template")
+        if not self.hints_on(attempt_id):
+            raise AttemptStateInvalid("hints are off for this assessment")
         self.require_playable(attempt_id, challenge_key)  # a sequenced run: hints only for the challenge that is active now
         with self._lock:
             have = self.hints.levels(attempt_id, challenge_key)
@@ -625,7 +713,7 @@ class LabRuntime:
             if level != len(have) + 1:
                 raise AttemptStateInvalid("hint levels unlock in order")
             self.hints.add(attempt_id, challenge_key, level, self.clock())
-            self._journal("hint_unlocked", attempt_id, challenge_key=challenge_key, level=level, cost=0)
+            self._journal("hint_unlocked", attempt_id, challenge_key=challenge_key, level=level, cost=self.hint_cost_pct(attempt_id, level))
             self.live.hint(attempt_id, challenge_key, level)
             self.live.score(attempt_id)
             return len(have) + 1
@@ -826,6 +914,28 @@ def _host_from_environ(environ: Mapping[str, str]) -> InstanceHost:
         context = ssl.create_default_context(cafile=ca)
         context.load_cert_chain(cert, cert_key)
     return HttpInstanceHost(url, key, ssl_context=context)
+
+
+DEPLOYED_ENVS = ("staging", "production")
+ALLOW_FAKES_FLAG = "VULNMART_ALLOW_FAKE_LAB"  # an explicit dev flag: a deployed API otherwise refuses fakes and memory stores
+
+
+def check_deployable(runtime: LabRuntime, env_name: str, environ: Mapping[str, str] | None = None) -> None:
+    """Fail closed (wiring audit section 3): a staging or production API must not run on the fake instance host, on in-memory attempt state, or without the admin's quotas.
+    A mistyped environment variable would otherwise leave a deployed lab silently serving fakes with random per-process keys. `VULNMART_ALLOW_FAKE_LAB=1` is the explicit
+    dev escape. Raises RuntimeError naming what is wrong (never a value)."""
+    env = os.environ if environ is None else environ
+    if env_name not in DEPLOYED_ENVS or env.get(ALLOW_FAKES_FLAG) == "1":
+        return
+    problems = []
+    if isinstance(runtime.host, FakeInstanceHost):
+        problems.append("the instance host is the fake (set VULNMART_ORCH_URL and VULNMART_ORCH_KEY_FILE)")
+    if not runtime.stores.persistent:
+        problems.append("the attempt state is in memory (set VULNMART_LAB_STORE=postgres)")
+    if runtime.quota is None:
+        problems.append("the admin's quotas are not wired")
+    if problems:
+        raise RuntimeError(f"VULNMART_ENV={env_name} refuses to start the lab: " + "; ".join(problems) + f". {ALLOW_FAKES_FLAG}=1 allows it for a dev run only.")
 
 
 def build_lab_runtime(environ: Mapping[str, str] | None = None, *, host: InstanceHost | None = None,

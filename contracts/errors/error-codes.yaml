@@ -1,4 +1,4 @@
-# IF-8: the VulnMart error registry (contract version 1.0.0, story P-02, owner stream P).
+# IF-8: the VulnMart error registry (contract version 2.0.0, story P-02, owner stream P).
 # The ONE place an error code is defined. Application code names a code only through the constants
 # generated from this file (packages/py-models, packages/ts-client); run `node scripts/generate-error-codes.mjs`.
 #
@@ -10,7 +10,7 @@
 #  - `status` is the HTTP status when the code is sent as an HTTP answer, or null when it only appears inside an
 #    event or in `error_code` of a failed instance (never as an HTTP answer).
 #  - Entries are sorted by code so a diff shows exactly what changed.
-registry_version: "1.0.0"
+registry_version: "2.0.0"
 
 families:
   AUTH: { owner: P, description: "Sign-in, session and request-origin checks on the browser API." }
@@ -49,6 +49,7 @@ codes:
   - { code: INST-INJECT-SNAPSHOT-PATCH, status: null, title: "The snapshot patch failed.", retryable: false, exit_code: 11 }
   - { code: INST-INVALID-STATE, status: 409, title: "This action is not allowed in the instance's current state.", retryable: false }
   - { code: INST-LOST, status: null, title: "The instance was lost.", retryable: false }
+  - { code: INST-NO-CAPACITY, status: 503, title: "No instance can be started right now. Try again in a moment.", retryable: true }
   - { code: INST-NOT-FOUND, status: 404, title: "Instance not found.", retryable: false }
   - { code: INST-NOT-READY, status: 409, title: "The instance is not ready yet.", retryable: true }
   - { code: INST-QUOTA-REACHED, status: 409, title: "The instance limit has been reached.", retryable: false }

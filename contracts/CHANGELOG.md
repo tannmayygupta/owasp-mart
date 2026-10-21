@@ -75,6 +75,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Error codes and error format (IF-8), `contracts/errors/`
 
+### 2.0.0 (2026-10-21, Tanmay with Claude, backlog story 12, ADR 0071)
+- Additive: one code, `INST-NO-CAPACITY` (503, retryable): no instance can be started right now (the platform is at its limit or the orchestrator has no capacity); the lab API answers it instead of a 429. Constants regenerated (61 codes).
+- BREAKING: none in substance. The rules engine cannot compare `error-codes.yaml` and treats any change as breaking, so the major number is raised (the same reading as IF-2 2.0.0). Checked by hand: 1 added, 0 removed, 0 changed.
+- registry change: `contracts/COMPAT.md` IF-8 row names 2.0.0 (the approval rows are the leader's to close). No mock change: no mock sends this code.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, label change plus one code (below); no mock change. Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -171,6 +175,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 2.2.0 (2026-10-21, Tanmay with Claude, backlog story 12, ADR 0071: the attempt lifecycle, template settings, quotas and rate limits)
+- Additive: one operation, `cancelAttempt` (`POST /api/v1/attempts/{attempt_id}/cancel`), for the recruiter of the owning company (FR-SES-07): a `ready` or `running` company attempt becomes `cancelled`, the instance is destroyed, the candidate sees the state in `getAttempt`. Documented responses added: `429 REQ-RATE-LIMITED` (per-account hourly limit) on `requestInstance`, `startAttempt`, `openInstance`, `resetInstance`, `stopInstance`, `releaseResults`, `decideIntegrityFlag`; `503 INST-NO-CAPACITY` (component `Unavailable`, with `Retry-After`) on `requestInstance` and `startAttempt`.
+- Behaviour: a full orchestrator or platform answered 429 `REQ-RATE-LIMITED` before; it now answers 503 `INST-NO-CAPACITY` (new IF-8 code, registry 2.0.0). `startAttempt` checks the invite (a revoked, expired, declined or cancelled invite is 409 and cancels a ready attempt; a consented invite becomes `started`). The template's challenge subset, hints mode, hint cost and flags per minute now apply to `listChallenges`, hints, flags, score and report. No existing member, value or route changed.
+- BREAKING: none in substance (no value of a response enum or member was added, removed or changed). The one visible change is the status of a full platform on `requestInstance` (429 to 503); no consumer relies on it (apps/web and lab-console show the problem text), so there is no contract step to follow.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (`cancelAttempt`); example `examples/valid/attempt.cancelled.json`. Generated code and bundle regenerated.
 ### 2.1.0 (2026-10-20, Tanmay, backlog story 10, handoff H-355: the recruiter releases a candidate's results)
 - Additive: one operation, `releaseResults` (`POST /api/v1/attempts/{attempt_id}/release`), for the recruiter of the owning company; the optional member `results_released` (boolean) of `Attempt`, present only on a company assessment whose invite says `after_release`. No existing value, member or route changed.
 - Behaviour: when the invite says `after_release` the candidate's own `getScore` answers 404 and `listChallenges` shows nothing earned until the recruiter releases the finished attempt (OI-15, the developer's answer of 2026-10-18). `after_submit` (the default) and a learner's practice are as before.

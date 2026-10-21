@@ -1,6 +1,6 @@
 """Check the lab API contract (IF-2) in contracts/api/lab/.
 
-Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 23 operations exist and no other; every operation
+Checks: the OpenAPI 3.1 file is valid; every route is under /api/v1/; the 24 operations exist and no other; every operation
 declares its security; the state, access and health values equal those of IF-5; no GET answer schema or valid answer example
 can hold a secret-looking name; every valid example matches its schema; every invalid example fails at the path its manifest
 names; no real-looking flag is in the contract; the flag result names no oracle reason; every problem example is an IF-8 body (the closed schema, a registered code, its status and title). Run through `pnpm run contracts:check` (last part) or on its own:
@@ -44,6 +44,8 @@ OPERATIONS = {
     ("post", "/api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin"), ("get", "/api/v1/me/progress"),
     # v2.1.0: the recruiter releases a candidate's results (H-355)
     ("post", "/api/v1/attempts/{attempt_id}/release"),
+    # v2.2.0: the recruiter cancels a candidate attempt (FR-SES-07)
+    ("post", "/api/v1/attempts/{attempt_id}/cancel"),
 }
 # The names of IF-5 plus what a browser must never learn about the lab host.
 SECRET_NAMES = base.SECRET_NAMES | {"host_id", "hostname", "orchestrator_url", "stack", "stack_trace", "traceback", "digest"}

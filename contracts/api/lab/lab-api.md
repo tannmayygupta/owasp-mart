@@ -33,6 +33,7 @@ A route is **lab-owned** when it reads or changes the tables the lab owns (attem
 | `listIntegrityFlags` | `GET /api/v1/attempts/{attempt_id}/integrity-flags` | 200 | Integrity signals |
 | `decideIntegrityFlag` | `POST .../integrity-flags/{integrity_flag_id}/decision` | 200 | Review decision |
 | `releaseResults` | `POST /api/v1/attempts/{attempt_id}/release` | 200 | The recruiter releases a finished candidate's results when the invite says `after_release` (v2.1.0) |
+| `cancelAttempt` | `POST /api/v1/attempts/{attempt_id}/cancel` | 200 | The recruiter cancels a candidate's ready or running attempt (FR-SES-07, v2.2.0) |
 | `getReport` | `GET /api/v1/attempts/{attempt_id}/report` | 200 | Per-candidate report |
 | `getTimeline` | `GET /api/v1/attempts/{attempt_id}/timeline` | 200 | What happened, oldest first (with the time warnings, v2.0.0) |
 
@@ -112,7 +113,8 @@ The `code` is a code of the registry `contracts/errors/error-codes.yaml` (IF-8):
 | 413 | `REQ-TOO-LARGE` | body over 64 KiB |
 | 415 | `REQ-UNSUPPORTED-MEDIA-TYPE` | not JSON |
 | 422 | `REQ-VALIDATION` | with `field` |
-| 429 | `ATT-FLAG-RATE-LIMITED` | with `Retry-After` |
+| 429 | `ATT-FLAG-RATE-LIMITED`, `REQ-RATE-LIMITED` | with `Retry-After`; the second is a per-account hourly limit on a costly route (v2.2.0) |
+| 503 | `INST-NO-CAPACITY` | no place for another instance (platform limit or orchestrator busy); with `Retry-After` (v2.2.0; it was a 429 before) |
 | (in `error_code` of a failed instance) | `INST-*`, for example `INST-HEALTH-TIMEOUT` | H-02 |
 
 `ORCH-*` codes never reach the browser. The names are final in IF-8; adding a code is a minor change, renaming one is breaking.
@@ -155,7 +157,7 @@ Each row is a proposal made while writing the contract. None is decided; Akshay 
 | 26 | The live stream updates the same state these routes return (instance state, milestones); the stream and its ticket are IF-1 or IF-3, not here | Stream routes are platform-owned |
 | 27 | Evidence entries carry method, path and a redacted body only (no headers or cookies); the platform redacts before storage (FR-DET-03) | The shape of "the capturing request" is not written |
 | 28 | The evidence `path` may carry tokens or other secrets in a query string; the redaction rule for the path (strip the query, redact known parameter names, or keep it) is undecided. Today only the body is redacted (FR-DET-03) | The architecture redacts `Authorization`, cookies and password fields, not the path |
-| 29 | Rate limits exist only for wrong flag submissions. No limit or 429 is declared for instance request, hint unlock, integrity decision or reset (the reset limit per template is OI-25), and a double click on instance request is only stopped by the quota rule (409) | FR-ACH-01 limits flags only; a general per-user limit is not written |
+| 29 | Since v2.2.0 the costly routes (instance request, start, ticket, stop, reset, release, cancel, integrity decision) have a per-account hourly limit (admin settings, 429 `REQ-RATE-LIMITED`), and a template can set the flags per minute; no limit is declared for hint unlock (the reset limit per template is OI-25), and a double click on instance request is only stopped by the quota rule (409) | FR-ACH-01 limits flags only; a general per-user limit is not written |
 | 30 | Every incorrect submission counts toward the limit, whatever the hidden reason (wrong, decoy, other instance, stale epoch); the answer is `incorrect` for all of them. Version 0.1.0 did the opposite (only `wrong` counted); that let a probe learn which values were decoys | FR-ACH-01 says "wrong submissions" without saying which results |
 | 31 | When one of several open held flags on a challenge is accepted: are solved and held both true? The mock credits the challenge (solved) and keeps held while another held flag is open. Proposal: accepting any flag credits the challenge and resolves the held state; rejecting keeps it held until no held flag is open | Belongs to OI-38 (who decides, and what a decision does); the text says only 'held until no held flag is open' |
 | 32 | Evidence and integrity flag lists have a cap of 100 and `has_more`, but no cursor: entries beyond the cap cannot be read. A cursor like the timeline's (the evidence has no `seq`; it would key on `captured_at` and id) is the alternative | Realistic sizes are far below 100 for an assessment; not decided whether a cursor is worth it |
