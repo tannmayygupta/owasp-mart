@@ -51,6 +51,15 @@ test('the demo template only changes the memory of the six roles and keeps every
 
 test('hooks is a command', () => { assert.equal(parseArgs(['hooks']).cmd, 'hooks'); });
 
+test('backup-now and data-counts are commands, and the counts query reads counts and the migration head, never a value', async () => {
+  assert.equal(parseArgs(['backup-now']).cmd, 'backup-now');
+  assert.equal(parseArgs(['data-counts']).cmd, 'data-counts');
+  const { COUNTS_SQL } = await import('./live-deploy.mjs');
+  assert.match(COUNTS_SQL, /alembic_version/);
+  assert.match(COUNTS_SQL, /count\(\*\)/);
+  assert.doesNotMatch(COUNTS_SQL, /;|\bdelete\b|\bupdate\b|\binsert\b|\bdrop\b/i, 'one read-only statement');
+});
+
 
 test('the lab deploy runs instances in gVisor by default, runc only when asked, and the environment says so (S-8, L-29)', async () => {
   const { labEnv, DEFAULT_RUNTIME, parseArgs } = await import('./live-deploy.mjs');

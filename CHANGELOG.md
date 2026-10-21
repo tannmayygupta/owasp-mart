@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Live data safety: `live-deploy.mjs backup-now` and `data-counts`, and `scripts/verify-live-data.mjs` (real HTTPS sign-ups checked against the live row counts); the live database was backed up, the dump restored and compared (43 of 43 tables equal), the new sign-in pages deployed, 70 deployed checks and 14 data checks passed.
 - Sign-up and sign-in pages of the dashboards app now use the lab console's design (tokens, fonts, split layout, segmented account-type choice instead of the stretched radio buttons); the console and the practice shop's login say where credentials come from and where a company signs up.
 - Live deploy of packages A to G2 from main (lab and platform redeployed, deployed verification 70 PASS, 0 FAIL); `live-deploy.mjs platform` now restarts Caddy so a changed Caddyfile (page routes) takes effect.
 - Live deploy of the merged audit work (H-358): lab and platform stacks redeployed with the dashboards container, the retention scheduler and Brevo mail; `live-deploy.mjs --mail-sender` sets the verified sender; the runtime mail check follows the provider, not a leftover SMTP host; deployed verification 68 PASS, 0 FAIL (was 49 and 14). Real delivery waits for Brevo's authorised-IP setting.
