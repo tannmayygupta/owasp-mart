@@ -9,6 +9,7 @@
 // section 6: /version carries no secrets).
 
 import { botScope, createBotQueue } from './challenges/c03b-bot.mjs';
+import { buildId, catalogueVersion } from './build-id.mjs';
 import express from 'express';
 import { configureViews } from './web/views.mjs';
 import { loadUser, checkCsrf } from './web/middleware.mjs';
@@ -21,10 +22,9 @@ import { registerAuthResetRoutes } from './challenges/c07-password-reset.mjs';
 import { registerWebhookRoutes } from './challenges/c08-payment-webhook.mjs';
 import { registerLegacyLoginRoute } from './challenges/c09-logging-failures.mjs';
 
-// Build id and catalogue version are supplied by the environment at run time.
-// They default to "dev" so the skeleton answers even outside an instance.
-const BUILD_ID = process.env.VM_BUILD_ID ?? 'dev';
-const CATALOGUE_VERSION = process.env.VM_CATALOG_VERSION ?? 'dev';
+// Build id and catalogue version: stamped into files by the image build (build-id.mjs), "dev" when nothing was stamped (tests, a local run).
+const BUILD_ID = buildId();
+const CATALOGUE_VERSION = catalogueVersion();
 
 // Readiness gate. Outside an instance (tests, local runs) the shop is ready as
 // soon as the process is up, so the default is always-ready. Inside an instance
@@ -39,7 +39,7 @@ const ALWAYS_READY = () => true;
 // without it the shop is always-ready (tests / local runs). Pass { emit } to post
 // app events to the sidecar on built flows (T-09, IF-4); without it emission is a
 // no-op (local runs and tests that do not assert on events).
-export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {}, flagOf = () => undefined, bot = null, mockUrl = process.env.VM_MOCK_URL ?? 'http://mock-services' } = {}) {
+export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challenges = {}, flagOf = () => undefined, bot = null, mockUrl = process.env.VM_MOCK_URL ?? 'http://mock-services', loginThrottle } = {}) {
   const app = express();
 
   // Do not advertise the framework.
@@ -100,7 +100,7 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
     // so even a successful injection cannot reach anything but merchandising data.
     // Built lazily on first search (after readiness) so instance mode, where the
     // snapshot db opens only after the marker, does not touch it at construction.
-    registerRoutes(app, db, emit, { challenges, bot: botQueue, mockUrl, instanceId: process.env.VM_INSTANCE_ID, getCatalogDb: () => buildCatalogStore(db, { flag: flagOf('C03') }) });
+    registerRoutes(app, db, emit, { challenges, bot: botQueue, mockUrl, instanceId: process.env.VM_INSTANCE_ID, loginThrottle, getCatalogDb: () => buildCatalogStore(db, { flag: flagOf('C03') }) });
     registerStaffRoutes(app, db, { emit, challenges, flagOf });
     registerSellerRoutes(app, db, { emit, challenges });
   }

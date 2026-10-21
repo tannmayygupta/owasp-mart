@@ -107,9 +107,11 @@ export function createMetadata({ placementDir = PLACEMENT_DIR, eventsUrl = proce
   // The injector writes exactly one "file in mock-services" placement file (C10);
   // its NAME comes from the challenge catalogue (IF-7), only the directory is
   // fixed by IF-6. So serve whichever single file is there, not a hardcoded name.
+  // A decoy file (C10.decoy<n>, H-42) may sit in the same volume: it is never served. The placement file is C10.placement, or else the one file that is not a decoy.
   const readPlacement = () => {
     try {
-      const file = fs.readdirSync(placementDir).find((f) => fs.statSync(path.join(placementDir, f)).isFile());
+      const files = fs.readdirSync(placementDir).filter((f) => !/\.decoy\d+$/.test(f) && fs.statSync(path.join(placementDir, f)).isFile());
+      const file = files.includes('C10.placement') ? 'C10.placement' : files[0];
       return file ? fs.readFileSync(path.join(placementDir, file), 'utf8').trim() : null;
     } catch { return null; }
   };

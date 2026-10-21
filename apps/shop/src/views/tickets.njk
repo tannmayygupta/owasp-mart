@@ -13,4 +13,5 @@
 <table><tr><th>#</th><th>Subject</th><th>Status</th></tr>
 {% for t in tickets %}<tr><td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td><td>{{ t.subject }}</td><td><span class="badge b-{{ t.status }}">{{ t.status }}</span></td></tr>
 {% else %}<tr><td colspan="3" class="muted">No tickets yet.</td></tr>{% endfor %}</table>
+{% include "partials/pager.njk" %}
 {% endblock %}

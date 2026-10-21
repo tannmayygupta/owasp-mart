@@ -9,7 +9,13 @@
 //   catalogue-store   C03: built at request time from the flags file (see server.mjs), nothing to plant here
 //   file placements   C06 for the import service and C10 for the mock services: a read-only file in a volume only that service mounts
 //
+//   decoys            (H-42, H-331) a decoy is a flag-shaped value placed where a legitimate solver never goes: AT REST, outside the path of the weakness. `decoy_placement`
+//                     is `shop-db` (the default: a `sentinel` row `decoy_<key>_<index>`, key in lower case, that no route reads) or `service-file` (C06 and C10 only: `<KEY>.decoy<index>` next to the
+//                     placement file, in a volume only that service mounts). It is NOT put beside the real flag: a solver who read the whole table could not tell which is real.
+//                     The sidecar still watches responses for the decoy digests, so a value that comes out over an escalation beyond the intended weakness is flagged for a human.
+//
 // A challenge is planted only when the document carries its flag. Every flag is the exact value the platform derived; nothing here invents or logs one.
+import { createHmac } from 'node:crypto';
 import { issueCard } from '../challenges/c02-gift-card-codes.mjs';
 import { hash } from '../identity/password.mjs';
 
@@ -22,9 +28,43 @@ export const FILE_PLACEMENTS = [
 
 const sentinel = (db, key, value) => db.prepare('INSERT OR REPLACE INTO sentinel (key, value) VALUES (?, ?)').run(key.toLowerCase(), value);
 
+// D-02, per-instance seeded passwords. The baked snapshot gives every instance the same demo passwords. That is wrong for an account the brief does not hand to the player:
+// owner.northwind and customer.demo share the demo password of owner.harbor (named in the C06 and C10 briefs), so a player could sign in to the competitor store without C01;
+// finance.ops is the C07 target and admin.root, bot.support, s.iyer and the filler customers have documented passwords that sit in the repository. The injector therefore
+// gives each of them a password derived from this instance's seed (HMAC-SHA256 over the email), which nobody is told, and leaves only the logins the briefs name.
+export const BRIEF_ACCOUNTS = ['staff.harbor@vulnmart.test', 'player.customer@vulnmart.test', 'owner.harbor@vulnmart.test'];
+
+/** The password the injector sets for a reseeded account of the instance with this seed (24 characters of base64url). Only a test asks for it. */
+export function reseededPassword(seed, email) {
+  return createHmac('sha256', String(seed)).update(`vm-seed-password-v1:${email}`).digest('base64url').slice(0, 24);
+}
+
+/** Give every seeded account the brief does not name a password of its own for this instance. Returns the emails changed (never a password). */
+export function reseedAccounts(db, seed) {
+  const users = db.prepare('SELECT id, email FROM users ORDER BY id').all().filter((u) => !BRIEF_ACCOUNTS.includes(u.email));
+  const set = db.prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+  for (const u of users) set.run(hash(reseededPassword(seed, u.email)), u.id);
+  return users.map((u) => u.email);
+}
+
 /** The challenge keys whose flag is in the document, mapped to the flag. */
 export function flagMap(doc) {
   return Object.fromEntries(doc.flags.map((f) => [f.challenge_key, f.flag]));
+}
+
+export const DECOY_PLACEMENTS = ['shop-db', 'service-file'];
+export const FILE_DECOY_KEYS = FILE_PLACEMENTS.map((p) => p.challenge_key);
+
+/** The decoys of the document as { challenge_key, index, value, placement }; the placement defaults to shop-db. */
+export function decoyList(doc) {
+  return (doc.decoys ?? []).map((x) => ({ challenge_key: x.challenge_key, index: x.index, value: x.value, placement: x.decoy_placement ?? 'shop-db' }));
+}
+
+/** Plant the shop-db decoys (sentinel rows no route reads). Returns how many. */
+export function plantDecoysDatabase(db, decoys) {
+  const rows = decoys.filter((x) => x.placement === 'shop-db');
+  for (const x of rows) sentinel(db, `decoy_${x.challenge_key}_${x.index}`, x.value);
+  return rows.length;
 }
 
 /** Plant every database placement. Returns the keys planted, in order (for the exit report; never a value). */

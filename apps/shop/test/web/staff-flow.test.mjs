@@ -154,3 +154,37 @@ test('a suspended account cannot sign in', async () => {
   assert.equal(r.status, 401, 'a suspended account is refused a session');
   db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(fixtures.custId);
 });
+
+test('the staff screens carry the Assign and Hold controls (WP-D), reachable by the roles that may use them', async () => {
+  const s = await session().login('support@vm.test');
+  const tickets = await (await s.get('/staff/tickets')).text();
+  assert.match(tickets, new RegExp(`/staff/tickets/${fixtures.ticketId}/assign`), 'the Assign form is on the ticket row');
+  assert.match(tickets, /name="assignee_id"/);
+  assert.match(tickets, /support@vm\.test/, 'the agents to assign to are listed');
+  assert.doesNotMatch(tickets, /cust@vm\.test/, 'a customer is not offered as an assignee');
+  // using the control: assign to the support agent through the page's own form fields
+  const a = await s.post(`/staff/tickets/${fixtures.ticketId}/assign`, { assignee_id: String(fixtures.supportId) });
+  assert.equal(a.status, 302);
+  assert.equal(db.prepare('SELECT assignee_id FROM tickets WHERE id = ?').get(fixtures.ticketId).assignee_id, fixtures.supportId);
+  const admin = await session().login('admin@vm.test');
+  const adminPayouts = await (await admin.get('/staff/payouts')).text();
+  assert.match(adminPayouts, new RegExp(`/staff/payouts/${fixtures.payoutId}/hold`), 'admin sees the Hold control');
+  const fin = await session().login('finance@vm.test');
+  const finPayouts = await (await fin.get('/staff/payouts')).text();
+  assert.doesNotMatch(finPayouts, /\/hold/, 'finance may not hold a payout and is not shown the button');
+  assert.equal((await admin.post(`/staff/payouts/${fixtures.payoutId}/hold`, {})).status, 302);
+  assert.equal(db.prepare('SELECT status FROM payouts WHERE id = ?').get(fixtures.payoutId).status, 'held');
+  assert.equal((await fin.post(`/staff/payouts/${fixtures.payoutId}/hold`, {})).status, 403, 'finance cannot hold even by a direct POST');
+});
+
+test('the staff lists page: ?page=2 shows the next rows and a Previous link', async () => {
+  const admin = await session().login('admin@vm.test');
+  for (let i = 0; i < 52; i++) db.prepare("INSERT INTO users (email, password_hash, role) VALUES (?, 'x', 'customer')").run(`pager${i}@vm.test`);
+  const one = await (await admin.get('/staff/users')).text();
+  assert.match(one, /href="\/staff\/users\?page=2"/, 'page 1 links to page 2');
+  assert.doesNotMatch(one, /Previous/);
+  const two = await (await admin.get('/staff/users?page=2')).text();
+  assert.match(two, /href="\/staff\/users\?page=1"/, 'page 2 links back');
+  assert.notEqual(one, two);
+  assert.equal((await admin.get('/staff/users?page=abc')).status, 200, 'a bad page number is page 1, not an error');
+});

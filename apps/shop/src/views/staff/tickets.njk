@@ -4,6 +4,8 @@
 {% for t in tickets %}<tr><td>{{ t.id }}</td><td>{{ t.subject }}</td><td><span class="badge b-{{ t.status }}">{{ t.status }}</span></td>
 <td>
   <form class="inline" method="post" action="/staff/tickets/{{ t.id }}/reply"><input type="hidden" name="csrf" value="{{ csrf }}"><input name="body" placeholder="Reply"><button>Reply</button></form>
+  <form class="inline" method="post" action="/staff/tickets/{{ t.id }}/assign"><input type="hidden" name="csrf" value="{{ csrf }}"><select name="assignee_id" aria-label="Assign to">{% for a in agents %}<option value="{{ a.id }}"{% if t.assignee_id == a.id %} selected{% endif %}>{{ a.email }}</option>{% endfor %}</select><button>Assign</button></form>
   <form class="inline" method="post" action="/staff/tickets/{{ t.id }}/resolve"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Resolve</button></form>
 </td></tr>{% else %}<tr><td colspan="4" class="muted">No tickets.</td></tr>{% endfor %}</table>
+{% include "partials/pager.njk" %}
 {% endblock %}
