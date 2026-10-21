@@ -7,7 +7,13 @@ export function Nav() {
   const { user, loading, signOut } = useSession();
   return (
     <header className="nav">
-      <Link href="/" className="brand">VulnMart</Link>
+      <div className="row">
+        <Link href="/" className="brand">
+          <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" className="logo-bg" /><path d="M9 10l7 13 7-13" className="logo-v" /><circle cx="16" cy="23" r="2.2" className="logo-dot" /></svg>
+          <span>VulnMart</span>
+        </Link>
+        <span className="sandbox-tag" title="Everything you attack here is a private copy built to be broken">Sandbox</span>
+      </div>
       <nav>
         {!loading && user && (
           <>

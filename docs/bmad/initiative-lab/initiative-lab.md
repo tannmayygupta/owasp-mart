@@ -58,3 +58,5 @@ Follows the stream boundary of ADR 0013: everything driven by instance events an
 - Draft written 2026-10-08 by Claude Code for the user to approve; not yet confirmed.
 
 - 2026-10-21 live deploy of packages A to G2 done (70 PASS, 0 FAIL); live learner and exploit suites need a mail path in production, see docs/dev-log/2026-10-21-tannmayygupta-live-deploy-audit-packages.md
+
+- 2026-10-22 web auth pages restyled to match the console; sign-in guidance added (dev-log 2026-10-22-tannmayygupta-web-auth-ui-match-console)

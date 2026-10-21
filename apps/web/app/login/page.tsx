@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, say, type MfaRequired, type Session } from '../../lib/api';
 import { safeNext, useSession } from '../../lib/session';
+import { AuthShell } from '../auth-shell';
 
 // Sign-in (FR-ACC-03), then the second factor when the account has one (FR-ACC-07, H-135): the answer is `mfa_required` with a ticket, and the code
 // (or a recovery code) completes it. After success the visitor goes back to where they came from (`next`, same-origin only).
@@ -53,8 +54,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="card narrow">
-      <h1>Sign in</h1>
+    <AuthShell>
+      <h2>Sign in</h2>
       {error && <p className="banner bad" role="alert">{error}</p>}
       {!ticket ? (
         <form onSubmit={onPassword}>
@@ -62,17 +63,17 @@ export default function LoginPage() {
           <input id="email" name="email" type="email" autoComplete="username" required />
           <label htmlFor="password">Password</label>
           <input id="password" name="password" type="password" autoComplete="current-password" required />
-          <p><button type="submit" disabled={busy}>Sign in</button></p>
-          <p className="muted"><Link href="/forgot-password">Forgot your password?</Link> · <Link href="/signup">Create an account</Link></p>
+          <p><button type="submit" className="btn-block" disabled={busy}>Sign in</button></p>
+          <p className="muted switch"><Link href="/forgot-password">Forgot your password?</Link> · <Link href="/signup">Create an account</Link></p>
         </form>
       ) : (
         <form onSubmit={onCode}>
           <p>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
           <label htmlFor="code">Code</label>
           <input id="code" name="code" type="text" inputMode="text" autoComplete="one-time-code" maxLength={32} required />
-          <p><button type="submit" disabled={busy}>Continue</button></p>
+          <p><button type="submit" className="btn-block" disabled={busy}>Continue</button></p>
         </form>
       )}
-    </div>
+    </AuthShell>
   );
 }
