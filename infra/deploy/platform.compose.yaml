@@ -26,7 +26,7 @@ x-api-env: &api-env
   VULNMART_BREVO_API_KEY_FILE: /run/secrets/brevo_api_key
   VULNMART_SMTP_HOST: ${VULNMART_SMTP_HOST:-mailpit}  # read only when the provider is smtp
   VULNMART_SMTP_PORT: "1025"
-  VULNMART_EMAIL_SENDER_ADDRESS: no-reply@${VULNMART_PLATFORM_HOST}
+  VULNMART_EMAIL_SENDER_ADDRESS: ${VULNMART_EMAIL_SENDER_ADDRESS}
 services:
   postgres:
     <<: *hardening
