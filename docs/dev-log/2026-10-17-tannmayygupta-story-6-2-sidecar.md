@@ -9,7 +9,7 @@
 | Report tag | sidecar, flag matcher, evidence capture, spike S-9, FR-FLG-04, FR-FLG-06, FR-DET-04, D-70, D-73, D-76 |
 
 ## Requirements covered
-FR-FLG-04, FR-FLG-06, FR-DET-04; spike S-9 (run locally); D-01; decisions D-70, D-73, D-76 (Proposed, in ADR 0042); handoffs H-76 and H-94 (answered as built), H-332 (new). Task L-20 (part; stays unticked: Coraza and classifier accuracy S-6 are not built).
+FR-FLG-04, FR-FLG-06, FR-DET-04; spike S-9 (run locally); D-01; decisions D-70, D-73, D-76 (Proposed, in ADR 0092); handoffs H-76 and H-94 (answered as built), H-332 (new). Task L-20 (part; stays unticked: Coraza and classifier accuracy S-6 are not built).
 
 ## Summary (plain language, 3-5 lines)
 `services/sidecar/` held only a `.gitkeep`. It now holds a real sidecar that passes player traffic through unchanged while scanning a bounded copy of each response for flags after decoding gzip, deflate, brotli, JSON escapes, HTML entities and percent encoding. It sends signed `proxy.flag_seen`, `evidence.capture` and aggregated `proxy.request` events and never sends a flag value. It builds into a small distroless image and starts under the runtime profile.
@@ -29,10 +29,10 @@ Bytes go to the player unchanged first; a bounded copy (1 MiB) is decoded and ev
 - `services/sidecar/**` - new (see above)
 - `infra/images.json`, `infra/compose/harness.sidecar.yaml`, `pnpm-lock.yaml` - changed / new
 - `docs/assets/story-6-2-sidecar/{test-output.txt,s9-matcher-channels.md}`
-- Docs: this entry, ADR 0042, `initial.md` (D-70, D-73, D-76), HANDOFFS, CHANGELOG, traceability, dev1 file
+- Docs: this entry, ADR 0092, `initial.md` (D-70, D-73, D-76), HANDOFFS, CHANGELOG, traceability, dev1 file
 
 ## Decisions made
-D-70 (Node sidecar plus a later small Go helper for Coraza only; Caddy plugin rejected for maintenance risk R-6 and because flag matching, signing and `seq` would still need a Go module; full Go rewrite rejected for about two days of work and no Go toolchain on the dev PC), D-73 (matching rules), D-76 (who the player is). Built-in choices to confirm: the three schemas are vendored with a test that fails on a one-byte difference from `contracts/`; a full buffer drops the oldest `proxy.request` first and a flag, evidence or shop event is never dropped before a summary; `proxy.request` aggregate keyed by (method, status, route template) with at most 200 keys per window; evidence is replaced whole by `[FLAG-REDACTED]` if any decoded form still holds a flag shape (fail closed); route segments longer than 40 characters or containing a digit become `{id}`; the dedupe window is fixed from the first send. See ADR 0042.
+D-70 (Node sidecar plus a later small Go helper for Coraza only; Caddy plugin rejected for maintenance risk R-6 and because flag matching, signing and `seq` would still need a Go module; full Go rewrite rejected for about two days of work and no Go toolchain on the dev PC), D-73 (matching rules), D-76 (who the player is). Built-in choices to confirm: the three schemas are vendored with a test that fails on a one-byte difference from `contracts/`; a full buffer drops the oldest `proxy.request` first and a flag, evidence or shop event is never dropped before a summary; `proxy.request` aggregate keyed by (method, status, route template) with at most 200 keys per window; evidence is replaced whole by `[FLAG-REDACTED]` if any decoded form still holds a flag shape (fail closed); route segments longer than 40 characters or containing a digit become `{id}`; the dedupe window is fixed from the first send. See ADR 0092.
 
 ## Tests
 Raw output in `docs/assets/story-6-2-sidecar/test-output.txt`.

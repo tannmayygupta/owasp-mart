@@ -3,7 +3,7 @@ title: 'Shop data model and seven state machines'
 type: 'feature'
 ticket: '1'
 created: '2026-10-09'
-status: built
+status: done
 baseline_revision: '218e8bd'
 route: 'full'
 route_source: 'pinned'

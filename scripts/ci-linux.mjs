@@ -36,6 +36,7 @@ export const STEPS = [
   ['pytest-orchestrator', 'uv run --locked --package vulnmart-orchestrator pytest -q apps/orchestrator/tests'],
   ['pytest-orchestrator-service', 'VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py'],
   ['contracts-check', 'pnpm run contracts:check'],
+  ['records-check', 'pnpm run records:check'],
   ['uv-lock-check', 'uv lock --check'],
   // local form: no reviews file, so the rule `approvals` prints NOT-APPLICABLE (in CI a separate step fetches the reviews and passes --reviews --require-reviews)
   ['contract-rules', 'node scripts/check-contract-rules.mjs'],
