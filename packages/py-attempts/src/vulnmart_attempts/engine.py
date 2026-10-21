@@ -28,6 +28,7 @@ Events = Callable[[dict[str, Any]], None]
 MAX_RETRIES = 10
 DESTROY_CLAIM_LEASE_SECONDS = 300  # a claim whose owner crashed is taken over after this long (a destroy can take a while: finding B11)
 READY_AT_TOLERANCE_SECONDS = 300
+MAX_EXTENSION_MINUTES = 240  # all extra time of one attempt together (an accommodation, not a second attempt)
 FREEZE_PATIENCE = timedelta(minutes=5)  # how long after its first failure a freeze may hold up the destroy
 
 
@@ -38,6 +39,15 @@ class ResetLimitReached(Exception):
         super().__init__(f"attempt {attempt_id} has used all {limit} resets")
         self.attempt_id = attempt_id
         self.limit = limit
+
+
+class ExtensionRefused(Exception):
+    """Extra time cannot be given: the total would pass the limit (`MAX_EXTENSION_MINUTES`)."""
+
+    def __init__(self, attempt_id: str, total: int) -> None:
+        super().__init__(f"attempt {attempt_id} would have {total} extra minutes")
+        self.attempt_id = attempt_id
+        self.total = total
 
 
 class WindowClosed(Exception):
@@ -216,6 +226,30 @@ class AttemptEngine:
             self._advance(new.id)
             return self._load(attempt_id)
         raise Conflict("cancel: too many conflicts")
+
+    def extend(self, attempt_id: str, minutes: int, by: str) -> AttemptRecord:
+        """R-25, C-30: give a running attempt extra time (an accommodation, FR-SES-07 family). Only a `running` attempt whose deadline has not passed; the deadline moves
+        by `minutes` and a time warning that is due again fires again. InvalidTransition in any other state or after the deadline, ExtensionRefused when the total extra
+        time of the attempt would pass `MAX_EXTENSION_MINUTES`. Nothing reopens an ended attempt: its instance is gone."""
+        if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes <= 0:
+            raise ValueError("minutes is a positive whole number")
+        for _ in range(MAX_RETRIES):
+            rec = self._load(attempt_id)
+            now = self._clock()
+            if rec.state is not AttemptState.RUNNING or rec.deadline_at is None or now >= rec.deadline_at:
+                raise InvalidTransition(rec.state, AttemptState.RUNNING)
+            total = rec.extended_minutes + minutes
+            if total > MAX_EXTENSION_MINUTES:
+                raise ExtensionRefused(attempt_id, total)
+            deadline = rec.deadline_at + timedelta(minutes=minutes)
+            left = (deadline - now).total_seconds() / 60
+            try:
+                new = self._save(rec, deadline_at=deadline, extended_minutes=total, warnings_sent=tuple(m for m in rec.warnings_sent if m >= left))
+            except Conflict:
+                continue
+            self._emit("time_extended", new, minutes=minutes, deadline_at=_iso(deadline), viewer_id=by)
+            return new
+        raise Conflict("extend: too many conflicts")
 
     # ---- reset (FR-SES-09, D-91)
 

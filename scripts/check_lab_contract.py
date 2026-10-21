@@ -46,6 +46,8 @@ OPERATIONS = {
     ("post", "/api/v1/attempts/{attempt_id}/release"),
     # v2.2.0: the recruiter cancels a candidate attempt (FR-SES-07)
     ("post", "/api/v1/attempts/{attempt_id}/cancel"),
+    # v2.3.0: the recruiter gives a running candidate attempt extra time (R-25)
+    ("post", "/api/v1/attempts/{attempt_id}/extend"),
 }
 # The names of IF-5 plus what a browser must never learn about the lab host.
 SECRET_NAMES = base.SECRET_NAMES | {"host_id", "hostname", "orchestrator_url", "stack", "stack_trace", "traceback", "digest"}

@@ -69,7 +69,8 @@ def make_admin(world, uid: str, email: str, *, proved: bool = True) -> Browser:
 
 
 def new_learner(world, n: int) -> tuple[str, str]:
-    uid, email = f"u-SCEN{n:02d}SCEN{n:02d}SCEN"[:18], f"scen{n}@learners.example"
+    tag = chr(65 + n // 26) + chr(65 + n % 26)  # letters only: a user id is Base32, which has no 0, 1, 8 or 9
+    uid, email = f"u-SCEN{tag}SCEN{tag}SCEN"[:18], f"scen{n}@learners.example"
     world.learner(uid, email)
     return uid, email
 

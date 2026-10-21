@@ -341,5 +341,5 @@ export function main(argv = process.argv.slice(2), { log = console.log, err = co
 }
 
 if (import.meta.main) {
-  process.exit(main());
+  process.exitCode = main(); // not process.exit(): it can cut the output of a piped run short (an intermittent CI failure of the CLI test)
 }

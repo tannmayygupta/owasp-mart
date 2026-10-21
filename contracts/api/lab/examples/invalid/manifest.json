@@ -144,6 +144,16 @@
     "path": "/mode",
     "rule": "learner or candidate"
   },
+  "extend-too-short.json": {
+    "schema": "ExtendRequest",
+    "path": "/minutes",
+    "rule": "minutes is at least 5"
+  },
+  "extend-extra-field.json": {
+    "schema": "ExtendRequest",
+    "path": "/reason",
+    "rule": "the request is closed: no member but minutes"
+  },
   "attempt-bad-id.json": {
     "schema": "Attempt",
     "path": "/attempt_id",

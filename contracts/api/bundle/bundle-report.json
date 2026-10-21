@@ -3,15 +3,15 @@
     {
       "name": "platform",
       "version": "1.0.0",
-      "operations": 81
+      "operations": 82
     },
     {
       "name": "lab",
-      "version": "2.2.0",
-      "operations": 24
+      "version": "2.3.0",
+      "operations": 25
     }
   ],
-  "operations": 105,
+  "operations": 107,
   "shared_components": [
     {
       "section": "headers",

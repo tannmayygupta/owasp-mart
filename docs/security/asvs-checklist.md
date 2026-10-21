@@ -17,8 +17,8 @@ This is a review of the code and tests on `origin/main` (db3721b) plus the scena
 
 | Status | Requirements |
 |---|---|
-| met | 173 |
-| partly | 54 |
+| met | 176 |
+| partly | 51 |
 | not met | 13 |
 | n.a. | 105 |
 | Total | 345 |
@@ -64,7 +64,7 @@ This is a review of the code and tests on `origin/main` (db3721b) plus the scena
 | V2.2.2 | 1 | yes | met | `apps/api/src/vulnmart/accounts/http.py` | - | Validation runs in the API; the dashboards only help the user. |
 | V2.2.3 | 2 | yes | met | `apps/api/src/vulnmart/assessments/service.py` `apps/api/tests/test_assessments.py` | - | Template rules are checked together (range and combinations). |
 | V2.3.1 | 1 | yes | met | `packages/py-attempts/src/vulnmart_attempts` `apps/api/tests/test_scenarios_candidate.py` | - | The attempt state machine refuses skipped steps (submit before start, flags after submit). |
-| V2.3.2 | 2 | yes | partly | `apps/api/src/vulnmart/kernel/quota.py` | A | Quotas are stored but not enforced until package A. |
+| V2.3.2 | 2 | yes | met | `apps/api/src/vulnmart/kernel/quota.py` `apps/api/tests/test_scenarios_refresh.py` | - | User, company and platform quotas and the assessment reserve are enforced at the start (test_a09, test_a12). |
 | V2.3.3 | 2 | yes | met | `apps/api/src/vulnmart/kernel/db.py` | - | Operations run in one transaction (sessions.begin()). |
 | V2.3.4 | 2 | yes | met | `apps/api/tests/test_assessments_postgres.py` `apps/api/tests/test_invite_acceptance_postgres.py` | - | Row locks and unique keys; the races are proved on Postgres (they skip without a database). |
 | V2.3.5 | 3 | L3 scope | met | `apps/api/src/vulnmart/admin/breakglass.py` `apps/api/tests/test_breakglass.py` | - | Break-glass needs a second admin's review. |
@@ -151,7 +151,7 @@ This is a review of the code and tests on `origin/main` (db3721b) plus the scena
 | V6.3.4 | 2 | yes | met | `apps/api/src/vulnmart/accounts/session_api.py` | - | No undocumented sign-in path. |
 | V6.3.5 | 3 | L3 scope | not met | `apps/api/src/vulnmart/accounts/session_api.py` | B | No mail on a sign-in from a new device. |
 | V6.3.6 | 3 | L3 scope | met | `apps/api/src/vulnmart/accounts/session_api.py` | - | Mail is not a sign-in factor (only a reset and verification link). |
-| V6.3.7 | 3 | L3 scope | partly | `apps/api/src/vulnmart/notifications/templates.py` `apps/api/src/vulnmart/accounts/password_api.py` | B | Reset sends a mail; a plain password change and an address change send none yet. |
+| V6.3.7 | 3 | L3 scope | partly | `apps/api/src/vulnmart/notifications/templates.py` `apps/api/src/vulnmart/accounts/self_service.py` | H | A reset and an address change mail the person (the old address is told, test_c06); a plain password change sends no mail. |
 | V6.3.8 | 3 | L3 scope | met | `apps/api/src/vulnmart/accounts/service.py` `apps/api/tests/test_accounts_api.py` `apps/api/tests/test_scenarios_learner.py` | - | Same 202 for known and unknown address; one generic sign-in error with a dummy hash. |
 | V6.4.1 | 1 | yes | met | `apps/api/src/vulnmart/accounts/admins.py` | - | Admin activation by a random single-use link. |
 | V6.4.2 | 1 | yes | met | `apps/api/src/vulnmart/accounts/service.py` | - | No secret questions. |
@@ -303,7 +303,7 @@ This is a review of the code and tests on `origin/main` (db3721b) plus the scena
 | V13.3.3 | 3 | L3 scope | partly | `apps/api/src/vulnmart/kernel/keys.py` | G | Keys are in the key service in a separate store; no HSM. |
 | V13.3.4 | 3 | L3 scope | not met | `docs/runbooks/keystore-and-audit-anchor.md` | C | No rotation schedule. |
 | V13.4.1 | 1 | yes | met | `apps/web/Dockerfile` `infra/deploy/Caddyfile.platform` | - | Images contain built output; .git is not served. |
-| V13.4.2 | 2 | yes | partly | `apps/api/src/vulnmart/kernel/settings.py` | A | Staging and production refuse to start without secrets; refusing a fake instance host or in-memory lab store is part of package A (acceptance criterion 6). |
+| V13.4.2 | 2 | yes | met | `apps/api/src/vulnmart/kernel/settings.py` `apps/api/tests/test_lab_production_guard.py` | - | Staging and production refuse to start without secrets, with a fake instance host or with an in-memory lab store (package A, merged). |
 | V13.4.3 | 2 | yes | met | `infra/deploy/Caddyfile.platform` | - | Caddy serves fixed routes and files; no directory browsing. |
 | V13.4.4 | 2 | yes | partly | `infra/deploy/Caddyfile.platform` | C | TRACE was not tested on the deployed site. |
 | V13.4.5 | 2 | yes | partly | `apps/api/src/vulnmart/kernel/service.py` `scripts/verify-deployed.mjs` | C | /docs and /openapi.json exposure on the deployed site is not part of verify-deployed. |
@@ -317,7 +317,7 @@ This is a review of the code and tests on `origin/main` (db3721b) plus the scena
 | V14.2.4 | 2 | yes | met | `apps/api/src/vulnmart/kernel/observability.py` `apps/api/src/vulnmart/privacy/retention/candidates.py` | - | Logging, retention and access follow classes. |
 | V14.2.5 | 3 | L3 scope | met | `apps/api/src/vulnmart/kernel/service.py` | - | Private no-store on sensitive routes. |
 | V14.2.6 | 3 | L3 scope | met | `apps/api/tests/test_data_minimum.py` | - | A dedicated test of the data minimum. |
-| V14.2.7 | 3 | L3 scope | partly | `apps/api/src/vulnmart/privacy/retention/candidates.py` | C | Retention jobs exist; the scheduler is off in the deployed configuration. |
+| V14.2.7 | 3 | L3 scope | met | `apps/api/src/vulnmart/privacy/retention/candidates.py` `apps/api/tests/test_scenarios_refresh.py` `scripts/check-deployed-compose.mjs` | - | Retention jobs erase candidate records, idle learners and old rows (proved in test_l24); the deployed configuration has the scheduler on. |
 | V14.2.8 | 3 | no | n.a. | `contracts/api/bundle/openapi.json` | - | No uploads. |
 | V14.3.1 | 1 | yes | not met | `infra/deploy/Caddyfile.platform` | E | No Clear-Site-Data on logout. |
 | V14.3.2 | 2 | yes | met | `apps/api/src/vulnmart/kernel/service.py` | - | no-store. |

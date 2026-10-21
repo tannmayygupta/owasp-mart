@@ -72,9 +72,9 @@ CLASSES: dict[str, tuple[str, str]] = {
         "getConsentNotice", "recordConsent", "createDeletionRequest", "cancelDeletionRequest", "acceptInvite", "withdrawAttempt", "undoWithdrawal")},
     **{op: ("company", W + "test_another_company_sees_none_of_a_company_s_data") for op in (
         "getMyCompany", "reapplyCompany", "getCompanyTerms", "acceptCompanyTerms", "listTemplates", "createTemplate", "getTemplate", "updateTemplate", "deleteTemplate",
-        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag", "releaseResults", "cancelAttempt")},
+        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag", "releaseResults", "cancelAttempt", "extendAttempt")},
     **{op: ("admin", W + "test_admin_routes_answer_everyone_else_like_unknown_routes") for op in (
-        "listPendingCompanies", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
+        "listPendingCompanies", "listOpenAttempts", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
         "setQuota", "removeQuota", "getCapacity", "listJobs")},
     # work package B: the company side of deletion requests, colleagues, the cohort view, the admin company routes and the change of address
     **{op: ("company", "test_wp_b_routes.py::test_another_company_cannot_use_my_deletion_requests_members_or_cohort") for op in (
@@ -324,6 +324,7 @@ def test_another_company_sees_none_of_a_company_s_data(w):
         assert rob.get(url).status_code == 404, url
     assert rob.post(f"/api/v1/attempts/{c}/integrity-flags/f-AAAAAAAAAAAAAAAA/decision", {"decision": "accept", "note": "x"}).status_code == 404
     assert rob.post(f"/api/v1/attempts/{c}/release").status_code == 404  # another company cannot release the results either (H-355)
+    assert rob.post(f"/api/v1/attempts/{c}/extend", {"minutes": 30}).status_code == 404  # nor give a candidate of another company extra time (R-25)
     assert w.browser(RITA).get(f"/api/v1/attempts/{c}/report").status_code == 200
     # Rob's look left no trace in Cam's view history; Rita's did
     views = w.browser(CAM_EMAIL).get("/api/v1/me/data-views").json()["items"]
@@ -337,7 +338,7 @@ def test_another_company_sees_none_of_a_company_s_data(w):
 
 
 def test_admin_routes_answer_everyone_else_like_unknown_routes(w):
-    calls = [("get", "/api/v1/admin/companies/pending", None), ("post", "/api/v1/admin/companies/00000000-0000-4000-8000-000000000000/decision", {"decision": "approve"}),
+    calls = [("get", "/api/v1/admin/companies/pending", None), ("get", "/api/v1/admin/attempts", None), ("post", "/api/v1/admin/companies/00000000-0000-4000-8000-000000000000/decision", {"decision": "approve"}),
              ("get", "/api/v1/admin/users", None), ("post", f"/api/v1/admin/users/{ADA}/actions", {"action": "lock", "reason": "x"}),
              ("post", f"/api/v1/admin/attempts/{w.ada_attempt}/force-stop", None), ("get", "/api/v1/admin/settings", None),
              ("put", "/api/v1/admin/settings/candidate_retention_days", {"value": 90}), ("delete", "/api/v1/admin/settings/candidate_retention_days", None),

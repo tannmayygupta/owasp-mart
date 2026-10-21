@@ -32,7 +32,7 @@ Related: `docs/runbooks/demo-19-oct.md` (the earlier demo plan), `docs/runbooks/
 | 7 | admin | Queue, users, capacity, audit log; break-glass shown by its refusal without a reason | Admin access is audited and cannot read candidate answers silently | 3 min | the scenario matrix A-15 to A-17 |
 | 8 | all | The scenario matrix and the ASVS checklist | What is proved, what is open and who owns it | 2 min | print them |
 
-Total about 29 minutes plus questions. Do not show anything the matrix marks as missing (company deletion, colleagues, cancel attempt, hints for candidates) as if it worked.
+Total about 29 minutes plus questions. Do not show anything the matrix marks as missing or partial (write-ups and their similarity review, the admin dashboard of package F, the recruiter buttons of package F) as if it worked.
 
 ## Record of one rehearsal (copy this block for each run, fill it in by hand)
 

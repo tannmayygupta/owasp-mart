@@ -120,6 +120,15 @@ async def list_companies(request: Request, auth: Authenticated = Depends(admin_r
     return JSONResponse({"items": [company_body(r) for r in rows]}, headers=NO_STORE)
 
 
+@router.get("/api/v1/admin/attempts", operation_id="listOpenAttempts")
+async def list_open_attempts(request: Request, auth: Authenticated = Depends(admin_read), kind: Annotated[Literal["all", "waiting", "failing"], Query()] = "all",
+                             limit: Annotated[int, Query(ge=1, le=100)] = 50) -> JSONResponse:
+    """A-27: the open attempts with the ones that wait or fail to start marked (ids, states and instants only; no name and no result)."""
+    rows = await run(ops_of(request).open_attempts, auth.session.scope, kind=kind, limit=limit)
+    return JSONResponse({"items": [{"attempt_id": r.attempt_id, "mode": r.mode, "state": r.state, "created_at": timestamp(r.created_at), "deadline_at": r.deadline_at,
+                                    "instance_id": r.instance_id, "instance_state": r.instance_state, "issue": r.issue} for r in rows]}, headers=NO_STORE)
+
+
 @router.put("/api/v1/admin/companies/{org_id}/invite-cap", operation_id="setCompanyInviteCap")
 async def set_company_invite_cap(request: Request, org_id: Annotated[str, Path(pattern=ORG_ID)], auth: Authenticated = Depends(admin_write)) -> JSONResponse:
     body = await read_json(request, InviteCapBody)

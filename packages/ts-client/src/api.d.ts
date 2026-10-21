@@ -1147,6 +1147,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The open attempts, with the ones that wait or fail to start marked
+         * @description A-27 (work package G refresh): the attempts that are open (`ready` or `running`), newest first, with what an operator needs to see which ones wait or fail. `issue` is
+         *     `waiting` for a company assessment that was consented and not started, `failing` for an attempt whose instance the orchestrator reported as `failed`, else `none`;
+         *     `kind` (`all`, `waiting`, `failing`) filters. Ids, states and instants only: no name, no address and no result (a candidate's answers stay behind break-glass). The read is
+         *     audited with its count. Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN.
+         */
+        get: operations["listOpenAttempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/{org_id}/invite-cap": {
         parameters: {
             query?: never;
@@ -1766,6 +1789,32 @@ export interface paths {
          *     when one recruiter acts too often. The body is empty.
          */
         post: operations["cancelAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give a running candidate attempt extra time (the recruiter of the company)
+         * @description Since v2.3.0 (R-25, C-30: an accommodation). The recruiter of the owning company moves the deadline of a company assessment attempt that is `running` and whose deadline has
+         *     not passed by `minutes` (5 to 240). All extra time of one attempt together is at most 240 minutes and never reaches past the fixed lifetime of the instance (the template's
+         *     time limit plus a margin, at most 240 minutes unless the template is longer); a request beyond that, or on an attempt in any other state, is 409 ATT-INVALID-STATE. The
+         *     answer is the attempt with its new `deadline_at`; a time warning that is due again is sent again. An ended attempt is never reopened. The candidate and anyone else get the
+         *     404 of every attempt route; a learner's practice attempt cannot be extended. 429 REQ-RATE-LIMITED when one recruiter acts too often.
+         */
+        post: operations["extendAttempt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2628,6 +2677,23 @@ export interface components {
         AdminCompanyList: {
             items: components["schemas"]["AdminCompany"][];
         };
+        AdminOpenAttempt: {
+            attempt_id: string;
+            /** @enum {unknown} */
+            mode: "learner" | "candidate";
+            /** @enum {unknown} */
+            state: "ready" | "running";
+            created_at: components["schemas"]["Timestamp"];
+            deadline_at: components["schemas"]["Timestamp"] | null;
+            instance_id: string | null;
+            /** @description What the orchestrator last reported for the instance, or null when nothing was reported. */
+            instance_state: string | null;
+            /** @enum {unknown} */
+            issue: "none" | "waiting" | "failing";
+        };
+        AdminOpenAttemptList: {
+            items: components["schemas"]["AdminOpenAttempt"][];
+        };
         InviteCapRequest: {
             invite_cap: number | null;
         };
@@ -2866,6 +2932,9 @@ export interface components {
         RequestInstanceRequest: {
             /** @enum {unknown} */
             kind: "learner";
+        };
+        ExtendRequest: {
+            minutes: number;
         };
         ConfirmRequest: {
             /** @constant */
@@ -5199,6 +5268,34 @@ export interface operations {
             422: components["responses"]["Invalid"];
         };
     };
+    listOpenAttempts: {
+        parameters: {
+            query?: {
+                kind?: "all" | "waiting" | "failing";
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The open attempts. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOpenAttemptList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
     setCompanyInviteCap: {
         parameters: {
             query?: never;
@@ -5960,6 +6057,32 @@ export interface operations {
             403: components["responses"]["CsrfFailed"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    extendAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
             429: components["responses"]["RateLimited"];
         };

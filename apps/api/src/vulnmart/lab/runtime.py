@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from vulnmart_attempts import AttemptEngine, Fact, InvalidTransition, ScoringRules
-from vulnmart_attempts import AttemptState as AttemptState_, Milestone as ScoreMilestone, ResetLimitReached, Rules
+from vulnmart_attempts import AttemptState as AttemptState_, ExtensionRefused, Milestone as ScoreMilestone, ResetLimitReached, Rules
 from vulnmart_attempts.catalogue import Catalogue as Catalogue_
 from vulnmart_attempts.metrics import time_metrics
 from vulnmart_attempts.store import allows_new_run
@@ -68,6 +68,7 @@ MAX_HINT_LEVEL = 3
 DEFAULT_TEMPLATE_LIMITS = Limits(memory_mb=256, cpu_limit=1.0, pids_limit=256, idle_minutes=60, max_minutes=240)
 SEEN_MARKER_GAP_S = 300  # a `request_seen` marker at most every five minutes per instance
 CANDIDATE_IDLE_MINUTES = 120  # a candidate may think for a while without touching the shop
+EXTENSION_MARGIN_MINUTES = 5  # an extended deadline stays this far inside the instance's fixed lifetime
 CANDIDATE_MARGIN_MINUTES = 30  # the instance outlives the template's time limit by this much (the attempt's own clock ends the assessment)
 
 
@@ -310,6 +311,18 @@ class LabRuntime:
         rec = self.engine.cancel(attempt_id, by, reason)
         log.info("attempt %s cancelled by %s (%s)", attempt_id, by, reason)
         return rec.state.value
+
+    def extend_attempt(self, attempt_id: str, minutes: int, *, by: str) -> Any:
+        """R-25, C-30: the recruiter gives a running candidate attempt extra time (an accommodation). The deadline moves; the instance must still be alive at the new deadline,
+        and the orchestrator fixes an instance's lifetime when it is made, so the extra time is capped by what is left of that lifetime (`EXTENSION_MARGIN_MINUTES` short of it).
+        InvalidTransition when the attempt is not running or its deadline passed, ExtensionRefused when the cap or the total limit is reached. Returns the new record."""
+        rec = self.engine.get(attempt_id)
+        if rec.state is AttemptState_.RUNNING and rec.started_at is not None and rec.deadline_at is not None:
+            span = (rec.deadline_at - rec.started_at).total_seconds() / 60
+            room = self._limits_for(rec).max_minutes - EXTENSION_MARGIN_MINUTES - span
+            if minutes > room:
+                raise ExtensionRefused(attempt_id, int(rec.extended_minutes + minutes))
+        return self.engine.extend(attempt_id, minutes, by)
 
     # ---- one challenge at a time, each with a countdown (vulnmart.lab.sequence) ----
 

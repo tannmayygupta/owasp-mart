@@ -51,7 +51,7 @@ def test_the_real_fragment_passes_every_check():
 
 def test_the_fragment_has_the_planned_slice():
     ops = contract.operations(PLATFORM)
-    assert len(ops) == 81  # work package B twelve (company deletion, colleagues, cohort, admin companies, change of address), story P-25 added four (deletion requests and the view history), story P-28 thirteen (the admin area), story P-26 three (the candidate's invites), story P-27 thirteen (the recruiter's company), story P-29 two (the exports), story P-31 six (the audit log and break-glass), story 3.6 three (the caller's own sessions)
+    assert len(ops) == 82  # package H one (extendAttempt), work package B twelve (company deletion, colleagues, cohort, admin companies, change of address), story P-25 added four (deletion requests and the view history), story P-28 thirteen (the admin area), story P-26 three (the candidate's invites), story P-27 thirteen (the recruiter's company), story P-29 two (the exports), story P-31 six (the audit log and break-glass), story 3.6 three (the caller's own sessions)
     assert all(p.startswith("/api/v1/") for p, _, _ in ops)
     # the one route that waits on a decision is marked, not hidden
     assert op(PLATFORM, "createLiveTicket")[2].get("x-pending")
@@ -63,7 +63,7 @@ def test_the_real_bundle_passes():
 
 def test_the_main_command_is_ok_on_the_real_files(capsys):
     assert contract.main([]) == 0
-    assert "OK: platform fragment 81 operations" in capsys.readouterr().out
+    assert "OK: platform fragment 82 operations" in capsys.readouterr().out
 
 
 # ---- the fragment rules fail when broken ----
