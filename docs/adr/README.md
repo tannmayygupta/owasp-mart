@@ -73,3 +73,4 @@
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.
 | 0094 | [Claude approves under the leader's standing authority](0094-claude-approves-under-the-leaders-standing-authority.md) | Accepted (the leader instructed it on 2026-10-21) |
+| 0095 | [A sole maintainer passes the contract approvals rule](0095-sole-maintainer-passes-the-contract-approvals-rule.md) | Accepted (the leader instructed it on 2026-10-21; Claude approved under D-104) |

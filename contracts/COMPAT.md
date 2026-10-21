@@ -23,6 +23,8 @@ Every version listed here must be an entry of the contract's own section in `con
 
 ## Approvals
 
+**Sole maintainer:** @tannmayygupta (decisions D-102, D-104, D-105): nobody else is on the project, so a pull request authored by the sole maintainer passes the rule `approvals` on the strength of the other contract rules. The rule reads this line from the base copy of this file.
+
 One row per contract, person and role. The **owner** writes and merges the contract. A **consumer** builds against it. The `version` is the contract version that the person signs off before the tag; `status` is `pending` until that sign-off exists and `approved` after it (the tag script refuses while any row is `pending`). The rule `approvals` in CI looks only at the contract, the handle and the role; `status` does not change who may approve a later pull request.
 
 The table below is written without the outer pipes on purpose: the checker of the base commit (before the tag) reads every line that starts with a pipe as a row of the table of versions, so lines with outer pipes would fail it. It is still a normal table on GitHub.
