@@ -1621,6 +1621,7 @@ Summary of the data inventory in RS-H Q3 with the values of D-25. Clock A is the
 |---|---|---|---|---|
 | Account: name, display name, role | Login, identity | Account life; learner 12 months after last login | Self; Admin (support); recruiter sees the invited candidate's name only | Row delete; audit rows keep an opaque ID |
 | Email | Login, invites, verification | Same as account | Self; Admin; inviting recruiter (for own invite) | Row delete |
+| New email waiting for confirmation (address and link hash) | Changing the address of an account | Until the link is used or ends (24 hours by default) | Nobody | Row delete on use or expiry, or with the account |
 | Password hash (Argon2id) | Login | Account life | Nobody | Row delete |
 | Invite token (hash) | Single-use invite | Until used or expired (default 7 days), then purge | Nobody | Purge job |
 | Assessment answers and write-ups | Scoring, review | A | Candidate; the company's users on that assessment | Hard delete, key shredded |

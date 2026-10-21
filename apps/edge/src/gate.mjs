@@ -1,5 +1,5 @@
 // The gate: one decision per request (contracts/edge/gate-ticket.md section 6). No sockets here; the caller proxies on "forward".
-// createGate({ keys, zone, now, store }) returns { decide(req), store }.
+// createGate({ keys, zone, now, store, log, onUsedChange }) returns { decide(req), store, usedSnapshot, restoreUsed, errors, status }.
 //   req = { method, url (path and query), headers (lower-case names, as Node gives them) }
 //   decide returns { type: 'respond', status, headers, body } or { type: 'forward', upstream, cookie } (cookie: the Cookie header to send on, or undefined).
 // Order: host rule, state lookup, /_vm/ paths, cookie check, allow. Anything unexpected is refused (fail closed).
@@ -70,11 +70,12 @@ export function stripGateCookie(header) {
 
 export const upstreamName = (rec) => `vm-${rec.instance_id.toLowerCase()}-e${rec.epoch}-sidecar:8080`;
 
-export function createGate({ keys, zone, now = () => Date.now(), store } = {}) {
+export function createGate({ keys, zone, now = () => Date.now(), store, log = () => {}, onUsedChange = () => {} } = {}) {
   checkKeys(keys);
   checkZone(zone);
   const state = store ?? createStore({ zone });
-  const used = new Map(); // jti -> exp (seconds); kept until exp
+  const used = new Map(); // jti -> exp (seconds); kept until exp (saved by persist.mjs through onUsedChange, so a restart does not forget a used ticket)
+  let decideErrors = 0; // exceptions inside decide: each one is refused (fail closed) but counted and logged, never hidden as an ordinary refusal
   const nowS = () => Math.floor(now() / 1000);
 
   function purge(t) {
@@ -102,6 +103,7 @@ export function createGate({ keys, zone, now = () => Date.now(), store } = {}) {
     if (used.has(v.claims.jti)) return respond('denied');
     if (used.size >= MAX_USED_TICKETS) return respond('denied'); // full: refuse rather than forget an id (fail closed)
     used.set(v.claims.jti, v.claims.exp);
+    try { onUsedChange(); } catch { /* the saver counts its own failures */ }
     return {
       type: 'respond',
       status: 302,
@@ -148,10 +150,22 @@ export function createGate({ keys, zone, now = () => Date.now(), store } = {}) {
   return {
     store: state,
     usedTickets: () => used.size,
+    usedSnapshot: () => [...used],
+    /** At start, from the saved state (already validated): the ticket ids that were used and have not expired. Never lowers an existing entry. */
+    restoreUsed(entries) {
+      const t = nowS();
+      for (const [jti, exp] of entries) if (exp > t && !used.has(jti) && used.size < MAX_USED_TICKETS) used.set(jti, exp);
+    },
+    /** How many times decide hit an exception. A refusal for a normal reason is not counted. */
+    errors: () => decideErrors,
+    status: () => ({ instances: state.size, used_tickets: used.size, decide_errors: decideErrors }),
     decide(req) {
       try {
         return decideUnsafe(req);
-      } catch {
+      } catch (e) {
+        // Fail closed, but do not hide it: a bug or a malformed request that throws must show in the counter and the log (the name of the error only: its text could hold a ticket).
+        decideErrors += 1;
+        log(`edge-gate: decide failed (${e?.name ?? 'error'}); ${decideErrors} so far`);
         return respond('denied');
       }
     },

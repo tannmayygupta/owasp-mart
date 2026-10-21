@@ -33,6 +33,13 @@ COPY migrations ./migrations
 COPY seed ./seed
 RUN node seed/build-snapshot.mjs /snapshot/base.db
 
+# The build id and the catalogue version that GET /version reports. Written to plain files (the instance contract's environment allowlist does not carry them):
+#   docker build --build-arg VM_BUILD_ID=<git sha or release label> --build-arg VM_CATALOG_VERSION=<catalogue version> ...
+# Without the arguments both read "dev". The values are checked at run time (letters, digits, dot, underscore, hyphen only).
+ARG VM_BUILD_ID=dev
+ARG VM_CATALOG_VERSION=dev
+RUN printf '%s' "$VM_BUILD_ID" > /app/BUILD_ID && printf '%s' "$VM_CATALOG_VERSION" > /app/CATALOG_VERSION
+
 # ---- runtime: distroless non-root Node 24 ----
 # Distroless runs as uid:gid 65532:65532 (nonroot) and has no shell, which fits a
 # read-only root filesystem and cap_drop ALL. Its ENTRYPOINT is /nodejs/bin/node
@@ -45,6 +52,7 @@ ENV NODE_ENV=production \
 COPY --from=builder /app/node_modules ./node_modules
 COPY src ./src
 COPY package.json ./
+COPY --from=builder /app/BUILD_ID /app/CATALOG_VERSION ./
 COPY --from=builder /snapshot/base.db ./snapshot/base.db
 
 EXPOSE 3000

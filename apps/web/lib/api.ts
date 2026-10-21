@@ -192,6 +192,7 @@ export type Template = {
   writeup_required: boolean;
   results_visibility: 'after_submit' | 'after_release';
   flag_submissions_per_minute: number;
+  cohort_board?: boolean; // IF-1 1.8.0 (work package F)
   version: number;
   updated_at: string;
 };
@@ -340,3 +341,22 @@ export type ChallengeProgress = Progress & {
 export type ProgressList = { items: ChallengeProgress[]; has_more?: false; total?: number; current_key?: string | null; server_time?: string };
 export type AccountProgress = { total_points: number; runs: number; per_challenge: { challenge_key: string; best_points: number }[] };
 // ===== end of the learner and candidate block =====
+
+// ===== recruiter dashboard additions (work package F, 2026-10-21): invite actions, template edit, the cohort board (IF-1 1.8.0) =====
+export type InviteAction = 'resend' | 'cancel' | 'revoke' | 'reinvite';
+/** What each action may be done to, as the API's rules say (assessments/service.py): the button is drawn only where the API would accept the call. */
+export function inviteActions(i: Pick<CompanyInvite, 'state' | 'attempt_id' | 'superseded_by'>): InviteAction[] {
+  const out: InviteAction[] = [];
+  if (['created', 'sent', 'opened'].includes(i.state)) out.push('resend');
+  if (i.state === 'created') out.push('cancel');
+  if (['sent', 'opened', 'consented'].includes(i.state)) out.push('revoke');
+  if (['started', 'consented'].includes(i.state) && i.attempt_id && !i.superseded_by) out.push('reinvite');
+  return out;
+}
+export type CohortRow = { position: number; attempt_id: string; score: number; full_captures: number; hint_cost_units: number; active_seconds: number | null; last_capture_at: string | null; reason: string };
+export type TemplateCohort = { template_id: string; label: string; items: CohortRow[] };
+export type CompanyDeletionRequest = { request_id: string; attempt_id: string; candidate_email: string | null; status: 'pending' | 'approved' | 'declined' | 'cancelled' | 'done'; requested_at: string; decide_by: string | null; execute_after: string | null; escalated: boolean };
+export type JoinRequest = { request_id: string; display_name: string; requested_at: string };
+export type CompanyMember = { user_id: string; display_name: string; role: 'owner' | 'member' };
+export type AdminCompany = { org_id: string; name: string; status: 'pending' | 'active' | 'rejected' | 'suspended' | 'deleted'; owner_name: string; owner_email_domain: string; created_at: string; members: number; invite_cap: number; invite_cap_override: number | null };
+// ===== end of the recruiter additions =====

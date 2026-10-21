@@ -1,0 +1,33 @@
+# VulnMart dashboards, PRODUCTION image (production hardening: the dashboards served on the platform host next to the lab console).
+# Build (context is apps/web, which has its own lockfile, installed in isolation like the dev image):
+#   docker build -f apps/web/Dockerfile.prod -t vulnmart-web:prod apps/web
+# Two stages: the builder runs `next build` (output: 'standalone', next.config.mjs); the runtime is the distroless Node image with only the traced server tree.
+# Read-only root filesystem friendly: Next writes its cache under /tmp (set NEXT_CACHE via the tmpfs in the compose file), nothing else.
+# Base images are pinned by digest (the same Node as .node-version 24.21.0, apps/shop and the dev image). Update them deliberately, never float the tag.
+
+FROM node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS builder
+RUN npm install -g pnpm@12.10.1
+ENV HOME=/tmp \
+    NEXT_TELEMETRY_DISABLED=1 \
+    TZ=UTC
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-workspace
+COPY . .
+RUN pnpm build \
+ && mkdir -p public
+
+FROM gcr.io/distroless/nodejs24-debian12:nonroot@sha256:14d42e2511532589a7c7e01a753667a74fcc96266e137e8125006b87b0c32d0a
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000 \
+    TZ=UTC
+WORKDIR /app
+COPY --from=builder --chown=65532:65532 /app/.next/standalone ./
+COPY --from=builder --chown=65532:65532 /app/.next/static ./.next/static
+COPY --from=builder --chown=65532:65532 /app/public ./public
+USER 65532:65532
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:3000/login').then((r)=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
+CMD ["server.js"]

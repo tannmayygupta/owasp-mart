@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 // Every challenge, attacked the way a player attacks it, against a REAL shop started the way an instance starts it, on this machine (no Docker, no platform).
-//   node scripts/e2e-local-flags.mjs [--only C01,C05] [--json file]
+//   node scripts/e2e-local-flags.mjs [--only C01,C05] [--json file] [--build vulnerable|fixed] [--deployed-script yes]
 // What it does: builds the seeded snapshot, runs the real injector with a fresh flag per challenge (made here, never a real one), starts the shop in instance mode,
 // the import service (C06) and the mock services (C10, C08, C11), then runs the exploit module of challenges/tests/<challenge>/ against the shop.
-// For each challenge it checks: the exploit holds; the flag planted for THAT challenge came back in the responses; no flag of another challenge came back.
+// For each challenge it checks: the exploit holds; the flag planted for THAT challenge came back in the responses; no flag of another challenge came back; no decoy came back
+// (a decoy is planted per instance at rest, beside nothing a player reads). `--build fixed` runs the SAME instance with VM_BUILD=fixed (every challenge on its fixed code) and checks the
+// other way round: the exploit FAILS, no planted flag comes back, and the milestone 2 rule is NOT satisfied by the events the attempt produced (for C09: the fixed build posts
+// shop.security_event_written, so the negative observation cannot hold).
+// --deployed-script yes skips that loop and instead runs scripts/verify-deployed-exploits.mjs (the T-32 script for a deployed shop) against this same instance, in the chosen build,
+// so the script that will run on the instance VM is itself proven here on both builds.
 // It also stands in for the sidecar: every event the shop and the mock services post is checked against the posted-event schema of the contract
 // (contracts/events/instance-events.posted.schema.json), and each exploit must produce the events the milestone rules of the platform read for milestones 1 and 2
 // (apps/api/src/vulnmart/ingest/milestone_rules.json). A challenge whose events do not fit the contract, or never appear, cannot reach its milestones on the live lab.
@@ -45,17 +50,52 @@ const matchValue = (v, cond) => {
   }
   return v === cond;
 };
-const eventFits = (e, r) => e.type === r.type && Object.entries(r.where ?? {}).every(([k, c]) => matchValue(e.data?.[k], c));
-/** Did the events of an exploit satisfy a milestone rule? 'yes' for a plain event rule, 'partial' when only the first condition of a counting rule is met, else 'no'. */
+/**
+ * Did the events of an exploit satisfy a milestone rule? The rule kinds of the platform engine (apps/api/src/vulnmart/ingest/rules.py and engine.py) evaluated over the posted events in order:
+ * event, any, count (group_by, sum_field, then), count_distinct and negative_window. Time is not modelled: a proof run lasts seconds, far inside the 600 s window and the 30 s grace of C09.
+ * Returns 'yes' or 'no' ('flag' rules are the platform's flag check, not events: 'no').
+ */
 export function ruleSeen(events, rule) {
-  if (!rule) return 'no';
-  if (rule.kind === 'event') return events.some((e) => eventFits(e, rule)) ? 'yes' : 'no';
-  if (rule.kind === 'any') { const r = rule.of.map((x) => ruleSeen(events, x)); return r.includes('yes') ? 'yes' : r.includes('partial') ? 'partial' : 'no'; }
-  if (rule.kind === 'count' || rule.kind === 'count_distinct') return events.some((e) => eventFits(e, rule)) ? 'partial' : 'no';
-  if (rule.kind === 'negative_window') return events.some((e) => eventFits(e, { type: rule.failures.type, where: rule.failures.where })) ? 'partial' : 'no';
-  return 'no';
+  return ruleHolds(events, rule) ? 'yes' : 'no';
 }
-
+function ruleHolds(events, rule) {
+  if (!rule) return false;
+  const fits = (e, r) => e.type === r.type && Object.entries(r.where ?? {}).every(([k, c]) => matchValue(e.data?.[k], c));
+  switch (rule.kind) {
+    case 'event': return events.some((e) => fits(e, rule));
+    case 'any': return rule.of.some((x) => ruleHolds(events, x));
+    case 'count_distinct': return new Set(events.filter((e) => fits(e, rule)).map((e) => e.data?.[rule.field]).filter((v) => v != null)).size >= rule.at_least;
+    case 'count': {
+      let pool = events;
+      if (rule.then) {
+        const at = events.findIndex((e) => fits(e, rule.then));
+        if (at < 0) return false;
+        pool = events.slice(0, at);
+      }
+      const hits = pool.filter((e) => fits(e, rule));
+      if (rule.sum_field) return hits.reduce((s, e) => s + (Number.isInteger(e.data?.[rule.sum_field]) ? e.data[rule.sum_field] : 0), 0) >= rule.at_least;
+      if (rule.group_by) {
+        const g = new Map();
+        for (const e of hits) g.set(e.data?.[rule.group_by], (g.get(e.data?.[rule.group_by]) ?? 0) + 1);
+        return Math.max(0, ...g.values()) >= rule.at_least;
+      }
+      return hits.length >= rule.at_least;
+    }
+    case 'negative_window': {
+      // an account with at_least failures, then a success, and no `absent` event for that account anywhere in the run
+      const ok = (e, part) => fits(e, { type: part.type, where: part.where });
+      for (let i = 0; i < events.length; i += 1) {
+        if (!ok(events[i], rule.success)) continue;
+        const account = events[i].data?.[rule.group_by];
+        const failed = events.slice(0, i).filter((e) => ok(e, rule.failures) && e.data?.[rule.group_by] === account).length;
+        const absentSeen = events.some((e) => e.type === rule.absent.type && e.data?.[rule.group_by] === account);
+        if (failed >= rule.failures.at_least && !absentSeen) return true;
+      }
+      return false;
+    }
+    default: return false;
+  }
+}
 const rows = [];
 const check =(name, ok, detail = '') => { rows.push({ name, ok: !!ok, detail: String(detail) }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  ${detail}` : ''}`); return !!ok; };
 
@@ -91,6 +131,9 @@ export async function main(argv = process.argv.slice(2)) {
   const o = {};
   for (let i = 0; i < argv.length; i += 2) o[argv[i].replace(/^--/, '')] = argv[i + 1];
   const only = o.only ? o.only.split(',') : Object.keys(CHALLENGES);
+  const build = o.build ?? 'vulnerable';
+  if (!['vulnerable', 'fixed'].includes(build)) throw new Error('--build must be vulnerable or fixed');
+  const fixedBuild = build === 'fixed';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-local-flags-'));
   const children = [];
   const stop = () => { for (const c of children) { try { c.kill(); } catch { /* gone */ } } };
@@ -101,7 +144,10 @@ export async function main(argv = process.argv.slice(2)) {
     if (built.status !== 0) throw new Error(`the snapshot did not build: ${built.stderr.slice(0, 200)}`);
     const flags = Object.fromEntries(Object.keys(CHALLENGES).map((k) => [k, newFlag()]));
     const doc = { schema_version: '0.1', instance_id: 'i-LOCALFLAGSAAAAAA', epoch: 1, issued_at: new Date().toISOString(), seed: crypto.randomBytes(24).toString('base64url'),
-      flags: Object.entries(flags).map(([challenge_key, flag]) => ({ challenge_key, flag })), decoys: [] };
+      flags: Object.entries(flags).map(([challenge_key, flag]) => ({ challenge_key, flag })),
+      // one decoy per challenge in the shop database; C06 and C10 also get a file beside their placement (H-42, H-331)
+      decoys: Object.keys(CHALLENGES).flatMap((challenge_key, i) => [{ challenge_key, index: 0, value: newFlag() }, ...(['C06', 'C10'].includes(challenge_key) ? [{ challenge_key, index: 1, value: newFlag(), decoy_placement: 'service-file' }] : [])]) };
+    const decoyValues = doc.decoys.map((x) => x.value);
     const run = path.join(dir, 'run'); const imp = path.join(dir, 'imp'); const mock = path.join(dir, 'mock');
     for (const d of [run, imp, mock]) fs.mkdirSync(d, { recursive: true });
     const { runInject } = await import(pathToFileURL(path.join(ROOT, 'apps', 'shop', 'src', 'instance', 'inject.mjs')).href);
@@ -132,40 +178,65 @@ export async function main(argv = process.argv.slice(2)) {
     children.push(spawn(process.execPath, [path.join(ROOT, 'services', 'mock-services', 'src', 'main.mjs')], { ...quiet, env: { ...process.env, VM_PLACEMENT_MOCK_DIR: mock, VM_SIDECAR_EVENTS_URL: eventsUrl, VM_INSTANCE_ID: doc.instance_id } }));
     const port = await freePort();
     children.push(spawn(process.execPath, [path.join(ROOT, 'apps', 'shop', 'src', 'server.mjs')], { ...quiet, cwd: path.join(ROOT, 'apps', 'shop'), env: { ...process.env, PORT: String(port), VM_SNAPSHOT_PATH: path.join(run, 'snapshot.db'),
-      VM_FLAGS_PATH: path.join(run, 'flags.json'), VM_DB_PATH: path.join(dir, 'data.db'), VM_MOCK_URL: 'http://127.0.0.1', VM_IMPORT_SOCKET: sock, VM_INSECURE_COOKIES: '1', VM_INSTANCE_ID: doc.instance_id, VM_SIDECAR_EVENTS_URL: eventsUrl } }));
+      VM_FLAGS_PATH: path.join(run, 'flags.json'), VM_DB_PATH: path.join(dir, 'data.db'), VM_MOCK_URL: 'http://127.0.0.1', VM_IMPORT_SOCKET: sock, VM_INSECURE_COOKIES: '1', VM_INSTANCE_ID: doc.instance_id, VM_SIDECAR_EVENTS_URL: eventsUrl, ...(fixedBuild ? { VM_BUILD: 'fixed' } : {}) } }));
     const baseUrl = `http://127.0.0.1:${port}`;
     await waitFor(async () => (await fetch(`${baseUrl}/readyz`)).status === 200, 'the shop to be ready');
     await waitFor(() => portOpen(9103), 'the mock services (port 9103 free on this machine?)');
-    check('the shop is ready only after the injector (instance mode) and the companions are up', true);
+    check(`the shop is ready only after the injector (instance mode) and the companions are up (build: ${build})`, true);
+
+    if (o['deployed-script']) {
+      const { main: verify } = await import(pathToFileURL(path.join(ROOT, 'scripts', 'verify-deployed-exploits.mjs')).href);
+      const skipC06 = process.platform === 'win32'; // the import service needs a unix socket (see below)
+      const keys = only.filter((k) => !(skipC06 && k === 'C06'));
+      const code = await verify(['--base', baseUrl, '--build', build, '--only', keys.join(',')], { log: (l) => console.log(l) });
+      check(`scripts/verify-deployed-exploits.mjs agrees with the ${build} build on ${keys.length} challenges`, code === 0, `exit ${code}`);
+      const failedOnly = rows.filter((r) => !r.ok);
+      console.log(`\n${rows.length - failedOnly.length} PASS, ${failedOnly.length} FAIL`);
+      return failedOnly.length ? 1 : 0;
+    }
 
     // 3. each exploit, as a player runs it
     const results = {};
     for (const key of only) {
       // the import service listens on a unix socket and its protocol needs half-close, which Windows cannot give (the repo's own tests skip for the same reason); use --docker
       if (key === 'C06' && process.platform === 'win32') { console.log('SKIP  C06: needs a unix socket; run `node scripts/e2e-local-flags.mjs --docker`'); continue; }
+      if (key === 'C06' && fixedBuild) { console.log('SKIP  C06: the fixed build of the import service is a different service image; challenges/tests/c06-prototype-pollution/c06.test.mjs proves it (release gate)'); continue; }
       const ex = await loadExploit(key);
       if (!ex) { check(`${key}: an exploit for this challenge exists`, false, 'no exploit module'); continue; }
       const found = new Set(); let held = false; let detail = '';
       const first = events.length;
       try { await ex.fn({ baseUrl, fetch: recordingFetch(found), signal: AbortSignal.timeout(120000) }); held = true; } catch (e) { detail = `${e.name}: ${String(e.message).slice(0, 160)}`; }
-      check(`${key}: the exploit works (${ex.file})`, held, held ? '' : detail);
+      if (fixedBuild) check(`${key}: the exploit FAILS on the fixed build (${ex.file})`, !held, held ? 'the exploit still works on the fixed build' : '');
+      else check(`${key}: the exploit works (${ex.file})`, held, held ? '' : detail);
       await sleep(700); // the shop posts its events without waiting
       const posted = events.slice(first);
       const bad = posted.filter((e) => e._problems.length);
       check(`${key}: every event posted fits the event contract (${posted.length} posted)`, bad.length === 0, bad.length ? `${bad[0].type}: ${bad[0]._problems.join('; ')}` : '');
+      const postedText = JSON.stringify(posted.map(({ _problems, ...e }) => e));
+      const inEvents = [...Object.values(flags), ...decoyValues].filter((v) => postedText.includes(v));
+      check(`${key}: no event holds a flag or a decoy value`, inEvents.length === 0, inEvents.length ? `${inEvents.length} value(s) in the events` : '');
       for (const m of ['m1', 'm2']) {
         if (EVENTS_ELSEWHERE[key]) { console.log(`SKIP  ${key}: milestone ${m.slice(1)} events come from ${EVENTS_ELSEWHERE[key]}, not from the shop`); continue; }
         if (key === 'C11' && m === 'm1') { console.log('SKIP  C11: milestone 1 (the verbose error) and milestone 2 (the fail-open) need two different registrations, and one account can register one store'); continue; }
         const seen = ruleSeen(posted, rules[key]?.[m]);
-        const ok = seen !== 'no';
-        check(`${key}: the exploit produces the event that milestone ${m.slice(1)} reads${seen === 'partial' ? ' (first condition only; the counting is the platform\'s)' : ''}`, ok,
+        if (fixedBuild) {
+          // milestone 1 may fire on the fixed build (an attempt, by the spec); milestone 2 is working-exploit evidence and must not
+          if (m === 'm2') check(`${key}: milestone 2 is NOT reached on the fixed build`, seen === 'no', seen === 'no' ? '' : `the rule ${JSON.stringify(rules[key]?.[m]).slice(0, 110)} is satisfied by the fixed build's events`);
+          continue;
+        }
+        const ok = seen === 'yes';
+        check(`${key}: the exploit produces the events that milestone ${m.slice(1)} reads`, ok,
           ok ? '' : `the rule needs ${JSON.stringify(rules[key]?.[m]).slice(0, 110)}; posted types: ${[...new Set(posted.map((e) => e.type))].join(', ') || 'none'}`);
       }
       const mine = found.has(flags[key]);
       const foreign = [...found].filter((f) => f !== flags[key] && Object.values(flags).includes(f));
-      check(`${key}: the flag planted for this challenge comes back in the responses`, mine, mine ? '' : `${found.size} flag-shaped value(s), none is this challenge's`);
-      check(`${key}: no flag of another challenge comes back`, foreign.length === 0, foreign.length ? `${foreign.length} foreign flag(s)` : '');
-      results[key] = { held, ownFlag: mine, foreign: foreign.length };
+      const decoysSeen = [...found].filter((f) => decoyValues.includes(f));
+      if (fixedBuild) check(`${key}: no planted flag comes back on the fixed build`, ![...found].some((f) => Object.values(flags).includes(f)), '');
+      else {
+        check(`${key}: the flag planted for this challenge comes back in the responses`, mine, mine ? '' : `${found.size} flag-shaped value(s), none is this challenge's`);
+        check(`${key}: no flag of another challenge comes back`, foreign.length === 0, foreign.length ? `${foreign.length} foreign flag(s)` : '');
+      }
+      check(`${key}: no decoy comes back in any response`, decoysSeen.length === 0, decoysSeen.length ? `${decoysSeen.length} decoy value(s) came back` : '');      results[key] = { held, ownFlag: mine, foreign: foreign.length, decoys: decoysSeen.length };
     }
     const failed = rows.filter((r) => !r.ok);
     console.log(`\n${rows.length - failed.length} PASS, ${failed.length} FAIL`);

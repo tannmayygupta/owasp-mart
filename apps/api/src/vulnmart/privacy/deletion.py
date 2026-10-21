@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from vulnmart.accounts.models import User, UserRole
 from vulnmart.assessments.service import AssessmentService
+from vulnmart.notifications.triggers import MailTriggers
 from vulnmart.ports.audit import AuditPort
 from vulnmart.ports.settings import SettingsPort
 
@@ -86,6 +87,7 @@ class CompanyRequest:
     requested_at: datetime
     decide_by: datetime | None
     execute_after: datetime | None
+    escalated: bool = False  # the company did not decide in time and the admins were told (FR-PRV-09)
 
 
 def new_request_id() -> str:
@@ -100,9 +102,11 @@ def _aware(moment: datetime | None) -> datetime | None:
 
 class DeletionService:
     def __init__(self, sessions: sessionmaker[Session], assessments: AssessmentService | None, records: SqlAttemptRecords, settings: SettingsPort, audit: AuditPort,
-                 subjects: SubjectService | None, eraser: Callable[[str], None] | None, *, now: Callable[[], datetime] = lambda: datetime.now(UTC)):
+                 subjects: SubjectService | None, eraser: Callable[[str], None] | None, *, now: Callable[[], datetime] = lambda: datetime.now(UTC),
+                 mail: MailTriggers | None = None):
         self._sessions, self._assessments, self._records, self._settings, self._audit = sessions, assessments, records, settings, audit
         self._subjects, self._eraser, self._now = subjects, eraser, now
+        self._mail = mail  # the notice mails (story WP-B); None in a process that sends none
 
     # ---- the person's side ----
 
@@ -133,6 +137,8 @@ class DeletionService:
             raise DeletionExists from None
         self._audit.append(actor=user_id, action="deletion.requested", subject=user_id, details={"kind": "learner", "request": view.request_id,
                                                                                                "execute_after": view.execute_after.isoformat()})
+        if self._mail is not None:
+            self._mail.deletion_requested_learner(user_id, deletion_on=view.execute_after.date().isoformat())
         return view
 
     def request_candidate(self, user_id: str, attempt_id: str) -> RequestView:
@@ -155,6 +161,8 @@ class DeletionService:
             raise DeletionExists from None
         self._audit.append(actor=user_id, action="deletion.requested", subject=user_id, details={"kind": "candidate", "request": view.request_id, "org": str(info.org_id),
                                                                                                "decide_by": view.decide_by.isoformat()})
+        if self._mail is not None:
+            self._mail.deletion_requested_candidate(attempt_id, decide_by=view.decide_by.date().isoformat())
         return view
 
     def cancel(self, user_id: str, request_id: str) -> RequestView:
@@ -185,7 +193,8 @@ class DeletionService:
             query = query.where(DeletionRequest.status.in_(OPEN))
         with self._sessions() as session:
             rows = session.scalars(query.order_by(DeletionRequest.requested_at, DeletionRequest.id).limit(limit)).all()
-            return [CompanyRequest(r.id, r.attempt_id or "", r.status, _aware(r.requested_at), _aware(r.decide_by), _aware(r.execute_after)) for r in rows]
+            return [CompanyRequest(r.id, r.attempt_id or "", r.status, _aware(r.requested_at), _aware(r.decide_by), _aware(r.execute_after), r.escalated_at is not None)
+                    for r in rows]
 
     def decide(self, org_id: str, request_id: str, *, approve: bool, actor_id: str) -> CompanyRequest:
         """The company approves (the 7-day hold starts) or declines a candidate's request. Raises DeletionNotFound (not this company's), DeletionState (already decided)."""
@@ -200,8 +209,10 @@ class DeletionService:
                 raise DeletionNotFound
             if not moved:
                 raise DeletionState
-            out = CompanyRequest(row.id, row.attempt_id or "", row.status, _aware(row.requested_at), _aware(row.decide_by), _aware(row.execute_after))
+            out = CompanyRequest(row.id, row.attempt_id or "", row.status, _aware(row.requested_at), _aware(row.decide_by), _aware(row.execute_after), row.escalated_at is not None)
         self._audit.append(actor=actor_id, action="deletion.approved" if approve else "deletion.declined", subject=None, details={"org": org_id, "request": request_id})
+        if self._mail is not None and out.attempt_id:
+            self._mail.deletion_decided(out.attempt_id, approve=approve, deletion_on=out.execute_after.date().isoformat() if out.execute_after else None)
         return out
 
     def company_delete(self, org_id: str, attempt_id: str, *, actor_id: str) -> int:
@@ -210,6 +221,9 @@ class DeletionService:
         info = self._records.get(attempt_id)
         if info is not None and str(info.org_id) != org_id:
             raise DeletionNotFound
+        with self._sessions() as session:
+            asked_by = list(session.scalars(select(DeletionRequest.user_id).where(DeletionRequest.kind == "candidate", DeletionRequest.attempt_id == attempt_id,
+                                                                                  DeletionRequest.org_id == org_id, DeletionRequest.status.in_(OPEN))))
         erased, invites = self._erase_candidate(org_id, attempt_id, info.user_id if info else None, now)
         if info is None and invites == 0:
             raise DeletionNotFound
@@ -217,6 +231,9 @@ class DeletionService:
             session.execute(update(DeletionRequest).where(DeletionRequest.kind == "candidate", DeletionRequest.attempt_id == attempt_id, DeletionRequest.org_id == org_id,
                                                           DeletionRequest.status.in_(OPEN)).values(status="done", finished_at=now))
         self._audit.append(actor=actor_id, action="deletion.company_deleted", subject=None, details={"org": org_id, "attempts": erased, "invites": invites})
+        if self._mail is not None:
+            for user_id in asked_by:  # the person who asked is told it is done
+                self._mail.deletion_confirmed(user_id, completed_on=now.date().isoformat())
         return erased
 
     def _erase_candidate(self, org_id: str, attempt_id: str, user_id: str | None, now: datetime) -> tuple[int, int]:
@@ -240,15 +257,17 @@ class DeletionService:
     def run(self, now: datetime) -> str:
         escalated = 0
         with self._sessions() as session:
-            late = [(r.id, r.org_id) for r in session.scalars(select(DeletionRequest).where(
+            late = [(r.id, r.org_id, r.attempt_id, r.decide_by) for r in session.scalars(select(DeletionRequest).where(
                 DeletionRequest.kind == "candidate", DeletionRequest.status == "pending", DeletionRequest.escalated_at.is_(None), DeletionRequest.decide_by <= now).limit(BATCH))]
-        for request_id, org in late:
+        for request_id, org, late_attempt, due_by in late:
             with self._sessions.begin() as session:
                 moved = session.execute(update(DeletionRequest).where(DeletionRequest.id == request_id, DeletionRequest.status == "pending", DeletionRequest.escalated_at.is_(None))
                                         .values(escalated_at=now)).rowcount
             if moved:
                 escalated += 1
                 self._audit.append(actor="job:deletion_requests", action="deletion.escalated", subject=None, details={"org": org, "request": request_id})
+                if self._mail is not None and late_attempt:
+                    self._mail.deletion_escalated(late_attempt, request_id=request_id, decide_by=_aware(due_by).date().isoformat())
         with self._sessions() as session:
             due = [r.id for r in session.scalars(select(DeletionRequest).where(DeletionRequest.status.in_(OPEN), DeletionRequest.execute_after.is_not(None),
                                                                               DeletionRequest.execute_after <= now).order_by(DeletionRequest.execute_after).limit(BATCH))]
@@ -259,17 +278,23 @@ class DeletionService:
                 if row is None or row.status not in OPEN:
                     continue
                 kind, user_id, attempt_id, org_id = row.kind, row.user_id, row.attempt_id, row.org_id
+            address = None
             if kind == "learner":
+                with self._sessions() as session:
+                    address = session.scalar(select(User.email_ci).where(User.id == user_id))  # read now: the account may go in the next step
                 if self._execute_learner(user_id, now):
                     learners += 1
                 else:
                     kept += 1
+                    address = None  # the account is still there: the mail goes by its id
             else:
                 erased, invites = self._erase_candidate(org_id or "", attempt_id or "", user_id, now)
                 self._audit.append(actor="job:deletion_requests", action="deletion.candidate_done", subject=None, details={"org": org_id, "attempts": erased, "invites": invites})
                 candidates += 1
             with self._sessions.begin() as session:
                 session.execute(update(DeletionRequest).where(DeletionRequest.id == request_id, DeletionRequest.status.in_(OPEN)).values(status="done", finished_at=now))
+            if self._mail is not None:
+                self._mail.deletion_confirmed(user_id, completed_on=now.date().isoformat(), address=address, request_id=request_id)
         return f"{learners} learner requests done ({kept} kept the account for assessment data), {candidates} candidate requests done, {escalated} escalated"
 
     def delete_learner_account(self, user_id: str) -> bool:

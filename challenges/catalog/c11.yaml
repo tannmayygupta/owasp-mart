@@ -47,4 +47,5 @@ write_up:
   fix: >-
     Fail closed (reject or queue for manual review), strict input validation before the call, narrow exception types,
     one global handler, generic user errors, alert on provider errors.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

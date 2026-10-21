@@ -62,3 +62,29 @@ test('the lab deploy runs instances in gVisor by default, runc only when asked, 
   assert.equal(parseArgs(['lab', '--runtime', 'runc']).runtime, 'runc');
   assert.match(parseArgs(['lab', '--runtime', 'kata']).error, /runsc \(gVisor\) or runc/);
 });
+
+test('the platform deploy ships and builds the dashboards image beside the API image (production hardening, ADR 0074)', () => {
+  assert.deepEqual(IMAGES['vulnmart-web:prod'], ['apps/web/Dockerfile.prod', 'apps/web']);
+  assert.ok(SHIP.p.includes('vulnmart-web:prod') && SHIP.p.includes('vulnmart-api:prod'));
+});
+
+test('mail: a Brevo key means Brevo, no key stops the deploy unless the catcher was asked for', async () => {
+  const { mailMode, platformEnv, parseArgs } = await import('./live-deploy.mjs');
+  assert.equal(mailMode({ keyText: 'some-key\n', allowCatcher: false }), 'brevo');
+  assert.equal(mailMode({ keyText: '  \n', allowCatcher: true }), 'catcher');
+  assert.throws(() => mailMode({ keyText: '', allowCatcher: false }), /no Brevo key/);
+  assert.throws(() => mailMode({ keyText: undefined, allowCatcher: false }), /no Brevo key/);
+  assert.equal(parseArgs(['platform', '--allow-mail-catcher']).allowMailCatcher, true);
+  assert.equal(parseArgs(['platform']).allowMailCatcher, false);
+  const H = { i: { priv: '10.0.1.5' }, p: { priv: '10.0.0.5' } };
+  const base = { pg: { owner: 'o', app: 'a', keystore: 'k', valkey: 'v' }, platformHost: 'h.example', zone: 'z.example', H };
+  const brevo = platformEnv({ ...base, mail: 'brevo' });
+  assert.match(brevo, /^VULNMART_VALKEY_PASSWORD=v$/m);
+  assert.match(brevo, /^VULNMART_EMAIL_PROVIDER=brevo$/m);
+  assert.match(brevo, /^VULNMART_ALLOW_MAIL_CATCHER=false$/m);
+  assert.doesNotMatch(brevo, /COMPOSE_PROFILES|mailpit/);
+  const catcher = platformEnv({ ...base, mail: 'catcher' });
+  assert.match(catcher, /^VULNMART_ALLOW_MAIL_CATCHER=true$/m);
+  assert.match(catcher, /^COMPOSE_PROFILES=mail-catcher$/m);
+  assert.throws(() => platformEnv({ ...base, mail: 'x' }), /brevo or catcher/);
+});

@@ -241,19 +241,21 @@ def test_without_a_sink_the_witness_is_the_database_only(audit, sessions, clock)
     assert make_anchors(audit, sessions, clock, None).anchor().witness == "db"
 
 
-def test_an_empty_log_or_a_broken_chain_anchors_nothing(audit, sessions, clock):
+def test_an_empty_log_is_started_by_the_first_anchor_and_a_broken_chain_anchors_nothing(audit, sessions, clock):
     sink = ListAnchorSink()
     anchors = make_anchors(audit, sessions, clock, sink)
-    with pytest.raises(AuditChainBroken, match="empty"):
-        anchors.anchor()
+    first = anchors.anchor()  # a new deployment: the log is empty, so the anchor starts the chain with one entry and anchors that
+    assert first.created and first.head_seq == 1 and len(sink.published) == 1
+    assert [r.action for r in audit.entries()] == ["audit.chain_started"]
+    assert audit.verify().ok
     fill(audit, 3)
     with sessions.begin() as s:
         s.execute(text("UPDATE audit_log SET actor = 's-ZZZZZZZZZZZZZZZZ' WHERE seq = 2"))
     with pytest.raises(AuditChainBroken, match="entry 2"):
         anchors.anchor()
-    assert sink.published == []
+    assert len(sink.published) == 1
     with sessions() as s:
-        assert s.scalar(select(func.count()).select_from(AuditAnchor)) == 0
+        assert s.scalar(select(func.count()).select_from(AuditAnchor)) == 1
 
 
 def test_a_sink_that_cannot_write_leaves_no_anchor_row(audit, sessions, clock):

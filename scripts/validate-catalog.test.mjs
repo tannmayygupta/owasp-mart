@@ -158,3 +158,23 @@ test('main() handles --help, unknown args, missing values, and a valid run', () 
   assert.equal(quiet(() => main(['--dir'])), 2);
   assert.equal(quiet(() => main(['--dir', DEFAULT_DIR, '--schema', DEFAULT_SCHEMA])), 0);
 });
+
+// T-13 / WP-D: nothing a player can read carries a flag. The briefs, hints, write-ups, start states and milestone text live in the catalogue; the shop's own screens
+// and the challenge notes are the other player-visible text. A flag-shaped value (VM{...}) or a hex flag-like secret in any of them would hand out the answer.
+test('no player-visible text (catalogue, shop views, challenge notes) holds a flag-shaped value', () => {
+  const root = path.resolve(DEFAULT_DIR, '..', '..');
+  const shape = /VM\{[A-Za-z0-9_-]{6,}\}/;
+  const files = [];
+  const walk = (dir, exts) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules' && e.name !== 'tests') walk(f, exts); } else if (exts.some((x) => e.name.endsWith(x))) files.push(f);
+    }
+  };
+  walk(DEFAULT_DIR, ['.yaml']);
+  walk(path.join(root, 'apps', 'shop', 'src', 'views'), ['.njk']);
+  for (const dir of ['challenges', 'services/bot']) if (fs.existsSync(path.join(root, dir))) walk(path.join(root, dir), ['.md']);
+  assert.ok(files.length >= 11, 'the scan found the catalogue');
+  const hits = files.filter((f) => shape.test(fs.readFileSync(f, 'utf8'))).map((f) => path.relative(root, f));
+  assert.deepEqual(hits, [], `flag-shaped value in: ${hits.join(', ')}`);
+});

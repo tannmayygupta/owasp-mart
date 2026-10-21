@@ -1131,7 +1131,7 @@ describe('platform and web profiles on a real Docker engine', () => {
     assert.ok(beat, 'a heartbeat came');
 
     // the replay buffer is in Valkey: one stream per audience, holding the events as the browser reads them
-    const xlen = docker('exec', NAME('valkey'), 'valkey-cli', 'XLEN', `live:user:${userId}`).stdout.trim();
+    const xlen = docker('exec', '-e', 'REDISCLI_AUTH=vulnmart-valkey-dev-only-not-a-secret', NAME('valkey'), 'valkey-cli', 'XLEN', `live:user:${userId}`).stdout.trim();
     assert.equal(xlen, '3');
     const ids = stream.seen.filter((f) => f.event).map((f) => f.id);
     assert.equal(ids.length, 3);

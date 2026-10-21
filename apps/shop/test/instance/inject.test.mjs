@@ -12,6 +12,8 @@ import { readDocument as stubReadDocument } from '../../../../contracts/mocks/st
 import { createApp } from '../../src/app.mjs';
 import { openDb } from '../../src/db/index.mjs';
 import { documentProblems, EXIT, runInject } from '../../src/instance/inject.mjs';
+import { BRIEF_ACCOUNTS, reseededPassword } from '../../src/instance/placements.mjs';
+import { verify } from '../../src/identity/password.mjs';
 import { makeInstanceChallenges } from '../../src/instance/instance.mjs';
 import { readDocument } from '../../src/instance/read-document.mjs';
 import { buildSnapshot } from '../../seed/build-snapshot.mjs';
@@ -200,3 +202,78 @@ test('without the marker, or without a flag for the challenge, the shop is the c
 });
 
 function pathToFileUrl(p) { return new URL(`file:///${p.replace(/\\/g, '/').replace(/^\//, '')}`).href; }
+
+// ---- decoys (H-42, H-331): at-rest placements, content of `decoy_placement` ----
+const decoyDoc = (extra = []) => doc({ decoys: [
+  { challenge_key: 'C01', index: 0, value: flagN(20) },
+  { challenge_key: 'C05', index: 0, value: flagN(21), decoy_placement: 'shop-db' },
+  { challenge_key: 'C06', index: 0, value: flagN(22), decoy_placement: 'service-file' },
+  { challenge_key: 'C10', index: 1, value: flagN(23), decoy_placement: 'service-file' },
+  ...extra,
+] });
+
+test('decoys are planted per instance: sentinel rows no route reads, and files beside the C06 and C10 placements; none is in the flags file', async () => {
+  const l = layout('decoys');
+  const { code } = await inject(l, decoyDoc());
+  assert.equal(code, EXIT.OK);
+  const db = openDb(l.env.VM_SNAPSHOT_PATH, { readonly: true });
+  try {
+    const rows = Object.fromEntries(db.prepare("SELECT key, value FROM sentinel WHERE key LIKE 'decoy_%'").all().map((r) => [r.key, r.value]));
+    assert.deepEqual(rows, { decoy_c01_0: flagN(20), decoy_c05_0: flagN(21) });
+  } finally { db.close(); }
+  assert.equal(fs.readFileSync(path.join(l.imp, 'C06.decoy0'), 'utf8'), flagN(22));
+  assert.equal(fs.readFileSync(path.join(l.mock, 'C10.decoy1'), 'utf8'), flagN(23));
+  const flagsText = fs.readFileSync(l.env.VM_FLAGS_PATH, 'utf8');
+  for (const n of [20, 21, 22, 23]) assert.ok(!flagsText.includes(flagN(n)), 'a decoy is not in the flags file');
+});
+
+test('a decoy never changes a real placement: the real flags are still where the exploits read them', async () => {
+  const l = layout('decoys-real');
+  await inject(l, decoyDoc());
+  const db = openDb(l.env.VM_SNAPSHOT_PATH, { readonly: true });
+  try {
+    assert.equal(db.prepare("SELECT value FROM sentinel WHERE key = 'c05'").get().value, FLAGS.C05);
+    assert.equal(db.prepare("SELECT buyer_note FROM orders WHERE order_no = 'VM-100777'").get().buyer_note, FLAGS.C01);
+  } finally { db.close(); }
+  assert.equal(fs.readFileSync(path.join(l.imp, 'C06.placement'), 'utf8'), FLAGS.C06);
+});
+
+test('an unknown decoy_placement, or a service-file decoy for a challenge without a file placement, is a bad document', () => {
+  assert.deepEqual(documentProblems(decoyDoc()), []);
+  assert.deepEqual(documentProblems(doc({ decoys: [{ challenge_key: 'C01', index: 0, value: flagN(20), decoy_placement: 'somewhere' }] })), ['/decoys/0']);
+  assert.deepEqual(documentProblems(doc({ decoys: [{ challenge_key: 'C01', index: 0, value: flagN(20), decoy_placement: 'service-file' }] })), ['/decoys/0']);
+});
+
+// ---- per-instance reseed of the seeded passwords (D-02) ----------------------------
+
+test('every seeded account the brief does not name gets a password of this instance; the briefed logins keep theirs', async () => {
+  const demo = new Map([['owner.northwind@vulnmart.test', 'vulnmart-seed-demo'], ['customer.demo@vulnmart.test', 'vulnmart-seed-demo'], ['finance.ops@vulnmart.test', 'finance-ops-demo-c3'],
+    ['admin.root@vulnmart.test', 'admin-root-demo-e5'], ['bot.support@vulnmart.test', 'support-bot-demo-f6'], ['shopper.lee@vulnmart.test', 'filler-lee-demo-g7'], ['s.iyer@vulnmart.test', 'legacy-support-demo-d4']]);
+  const kept = new Map([['owner.harbor@vulnmart.test', 'vulnmart-seed-demo'], ['staff.harbor@vulnmart.test', 'harbor-staff-demo-a1'], ['player.customer@vulnmart.test', 'player-customer-demo-b2']]);
+  assert.deepEqual([...kept.keys()].sort(), [...BRIEF_ACCOUNTS].sort());
+  const l1 = layout('reseed1');
+  const l2 = layout('reseed2');
+  const d1 = doc({ flags: [{ challenge_key: 'C05', flag: FLAGS.C05 }], seed: 'a'.repeat(40) });
+  const d2 = doc({ flags: [{ challenge_key: 'C05', flag: FLAGS.C05 }], seed: 'b'.repeat(40) });
+  assert.equal((await inject(l1, d1)).code, EXIT.OK);
+  assert.equal((await inject(l2, d2)).code, EXIT.OK);
+  const hashOf = (l, email) => { const db = openDb(l.env.VM_SNAPSHOT_PATH, { readonly: true }); try { return db.prepare('SELECT password_hash FROM users WHERE email = ?').get(email).password_hash; } finally { db.close(); } };
+  for (const [email, pw] of demo) {
+    assert.equal(verify(pw, hashOf(l1, email)), false, `${email}: the documented demo password no longer opens it`);
+    assert.equal(verify(reseededPassword(d1.seed, email), hashOf(l1, email)), true, `${email}: it opens with this instance's derived password`);
+    assert.equal(verify(reseededPassword(d1.seed, email), hashOf(l2, email)), false, `${email}: another instance (another seed) has another password`);
+  }
+  for (const [email, pw] of kept) assert.equal(verify(pw, hashOf(l1, email)), true, `${email}: the brief's login still works`);
+});
+
+test('the C09 dormant account keeps its wordlist password when C09 is planted, and is reseeded otherwise', async () => {
+  const lc = layout('reseed-c09');
+  const dc = doc({ flags: [{ challenge_key: 'C09', flag: FLAGS.C09 }] });
+  await inject(lc, dc);
+  const hs = (l) => { const db = openDb(l.env.VM_SNAPSHOT_PATH, { readonly: true }); try { return db.prepare("SELECT password_hash FROM users WHERE email = 's.iyer@vulnmart.test'").get().password_hash; } finally { db.close(); } };
+  assert.equal(verify('monday123!', hs(lc)), true);
+  const ln = layout('reseed-none');
+  const dn = doc({ flags: [{ challenge_key: 'C05', flag: FLAGS.C05 }] });
+  await inject(ln, dn);
+  assert.equal(verify('monday123!', hs(ln)), false);
+});

@@ -68,6 +68,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounts/confirm-email-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Use the link mailed to a new email address
+         * @description Public (the link may be opened on another device). The token of the link (WP-B). Single use, stored only as a hash, valid 24 hours (placeholder); a link that was used,
+         *     replaced by a newer request, expired, whose address another account took meanwhile, or that never existed is 400 AUTH-TOKEN-INVALID (the answer does not tell which).
+         *     On success the account's address is the new one and counts as verified, every session of the account ends (the person signs in again with the new address), reset and
+         *     verification links made for the old address stop working, and the OLD address is told by mail. Consent records and invites bound to the account are not touched.
+         */
+        post: operations["confirmEmailChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounts/verify-email/resend": {
         parameters: {
             query?: never;
@@ -186,6 +209,30 @@ export interface paths {
          *     422. On success every other session of the user ends and the session id changes (FR-ACC-03).
          */
         post: operations["changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask to use another email address
+         * @description The new address and the current password (WP-B, FR-ACC-09). A single-use link goes to the NEW address; nothing changes until it is used (`confirmEmailChange`). A wrong
+         *     current password is 401 AUTH-INVALID-CREDENTIALS (the session stays; wrong tries are counted like a password change's). 202 whatever the new address is: an address that
+         *     already has an account gets the "already registered" mail instead and no pending change is made (no oracle). The same address as the current one, an address that is not
+         *     one, and (for a recruiter) a disposable address are 422. An administrator's account does not change its address here: 409 ATT-INVALID-STATE. One pending change per account:
+         *     a new request replaces the older one. A person whose invite went to another address can change to it and then accept the invite (FR-ACC-05).
+         */
+        post: operations["requestEmailChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -504,9 +551,10 @@ export interface paths {
         /**
          * Accept an invite
          * @description Binds the invite to the signed-in candidate (FR-ASM-04) and answers the `attempt_id` the consent screen is for (`getConsentNotice`, then `recordConsent`); the attempt is created
-         *     when consent is granted. Repeating it for the same account answers the same attempt. A closed invite, an invite another account accepted, an account that cannot take an
-         *     assessment (not an active, verified participant) and an account whose verified address is not the one the invite was sent to are one 409 ATT-INVALID-STATE: the answer must
-         *     not say what the invite's address is, and the registry has no invite codes (ADR 0058).
+         *     when consent is granted. Repeating it for the same account answers the same attempt. A closed invite, an invite another account accepted, and an account that cannot take an
+         *     assessment (not an active participant) are one 409 ATT-INVALID-STATE: the registry has no invite codes (ADR 0058). Two refusals now guide the person (ADR 0073, FR-ASM-04):
+         *     an account whose email address is not verified yet is 403 AUTH-EMAIL-NOT-VERIFIED, and an account whose verified address is not the one the invite was sent to is 409
+         *     ATT-INVALID-STATE with the field pointer /account/email (add the invited address to the account with requestEmailChange, or sign up with it). The answer never says what the invite's address is.
          */
         post: operations["acceptInvite"];
         delete?: never;
@@ -734,6 +782,188 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/company/deletion-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Candidates' requests to delete their data
+         * @description The deletion requests of candidates of the caller's company (WP-B, FR-PRV-08, FR-PRV-09), oldest first: the attempt, the address the candidate was invited with (the
+         *     company's own invite data), the status, the deadline to decide (`decide_by`), when the deletion would run once approved (`execute_after`) and whether the company missed
+         *     the deadline and the request was passed to the admins (`escalated`). `open_only` (default true) lists the pending and approved ones only. A recruiter of the company
+         *     sees them, nobody else; another company's requests are never listed.
+         */
+        get: operations["listCompanyDeletionRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/deletion-requests/{request_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or decline a candidate's deletion request
+         * @description `approve` starts the hold (the candidate can still undo it for the undo window, then the record is deleted); `decline` closes the request and keeps the record until its own
+         *     date. The candidate is told either way by mail. A request that was decided already (or undone by the candidate) is 409 ATT-INVALID-STATE; another company's request or none
+         *     is 404 ATT-NOT-FOUND. Answers the request after the decision. Rate limited per account.
+         */
+        post: operations["decideDeletionRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["schemas"]["AttemptId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a candidate's record now
+         * @description The company deletes the record of one of its candidates at any time, with no request (WP-B, FR-PRV-08): the attempt is erased, the invite and the person's view history for
+         *     this company go, the consent records are scheduled to go later (OI-37), and an open deletion request for it is settled and its candidate told. It cannot be undone.
+         *     Another company's attempt or none is 404 ATT-NOT-FOUND. Rate limited per account.
+         */
+        delete: operations["deleteCandidateRecord"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/join-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Colleagues who asked to join the company
+         * @description The open requests to join the caller's company, oldest first (WP-B, FR-ORG-03): a colleague with a work address on the company's domain asks to join and the owner decides.
+         *     Only the company's owner reaches this route; any other caller gets 404 REQ-ROUTE-UNKNOWN.
+         */
+        get: operations["listJoinRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/join-requests/{request_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept or reject a colleague
+         * @description The owner accepts (the colleague becomes an active member, told by mail) or rejects (told by mail) a request to join. A request decided already, or a company that is not
+         *     active, is 409 ATT-INVALID-STATE; another company's request or none is 404 ATT-NOT-FOUND; a caller who is not the owner is 404 REQ-ROUTE-UNKNOWN.
+         */
+        post: operations["decideJoinRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The company's active members
+         * @description The owner first, then the colleagues in the order they joined (WP-B, FR-ORG-03). Only the company's owner reaches this route; any other caller gets 404 REQ-ROUTE-UNKNOWN.
+         */
+        get: operations["listCompanyMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a colleague
+         * @description The owner removes a member, who loses access at once (their sessions end). The owner cannot remove themselves (409 ATT-INVALID-STATE); a person who is not an active
+         *     member of the owner's company is 404 ATT-NOT-FOUND, as for another company's member.
+         */
+        delete: operations["removeCompanyMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/company/templates/{template_id}/cohort": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The private cohort view of an assessment
+         * @description A ranking aid for one assessment of the caller's company (WP-B, FR-SCR-07, FR-SCR-08, D-93): the attempts that ended, best first by score, then more full captures, lower hint
+         *     cost, lower active time and earlier last capture. Ids only (join them with the invites for the address); no row is hidden or marked failed, and the label says the recruiter
+         *     decides. Off unless the template sets `cohort_board` (409 ATT-INVALID-STATE); another company's template or none is 404 ATT-NOT-FOUND. Never across companies.
+         */
+        get: operations["getCohort"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/exports": {
         parameters: {
             query?: never;
@@ -895,6 +1125,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every company with its status
+         * @description The company directory (WP-B, FR-ADM-01, FR-ORG-08), newest first, optionally of one `status`: the name, the owner's name and address domain, the status, how many active
+         *     members it has and its daily invite cap (the number in force and the admin's own number for this company, null when the global setting applies). The read is audited
+         *     (the owners' names are personal data). Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN.
+         */
+        get: operations["listCompanies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/companies/{org_id}/invite-cap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set one company's daily invite cap
+         * @description The admin's own cap for this company (WP-B, FR-ORG-08), 0 to 100,000 invites a day; `null` removes it and the global setting applies again. The change is audited with the old
+         *     and new numbers. Answers the company as the list shows it. An unknown company is 404. Only an admin whose session has proved a second factor reaches this route.
+         */
+        put: operations["setCompanyInviteCap"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/companies/pending": {
         parameters: {
             query?: never;
@@ -926,8 +1201,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve, reject, suspend or reinstate a company
-         * @description One decision on a company (FR-ADM-01). `reject`, `suspend` and `reinstate` need a `reason`; its text is not copied into the audit log. The company's owner is mailed the outcome. A company that is not in a state
+         * Approve, reject, suspend, reinstate or delete a company
+         * @description One decision on a company (FR-ADM-01). `reject`, `suspend`, `reinstate` and `delete` need a `reason`; its text is not copied into the audit log. The company's owner is mailed the outcome of an approval or a rejection. `delete` (WP-B) ends the company and its recruiters' access at once and releases its domain; the removal of its data follows the retention rules. A company that is not in a state
          *     the decision starts from (already decided) is 409; an unknown company is 404.
          *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
          */
@@ -1275,7 +1550,9 @@ export interface paths {
          * @description Asks for an instance of the learner's practice attempt. Answers 202 with state `requested`; the
          *     state then advances on its own (poll the instance, or listen to the live stream). Candidate
          *     instances are created by the platform when the attempt starts, not through this route.
-         *     409 INST-QUOTA-REACHED when the user already holds an instance (the numbers are OI-21).
+         *     409 INST-QUOTA-REACHED when the user already holds an instance or the admin's limit of the user or the company is reached (the numbers are OI-21; practice and
+         *     assessment are counted apart). 503 INST-NO-CAPACITY (with Retry-After) when the platform or the orchestrator has no place for another instance; since v2.2.0 this is no
+         *     longer a 429. 429 REQ-RATE-LIMITED when one account asks too often (an admin setting, per hour).
          */
         post: operations["requestInstance"];
         delete?: never;
@@ -1411,7 +1688,9 @@ export interface paths {
          * @description D-80 (OI-22 resolved): Start only asks for the instance; the clock starts when the instance is ready, so the cold start
          *     never counts against the candidate. Answers at once with the attempt (still ready while the instance starts); pressing
          *     again, or after it runs, answers the same attempt. Only the owner of an assessment attempt in state ready or running;
-         *     a learner starts through requestInstance, and any other state answers 409 ATT-INVALID-STATE. The body is empty.
+         *     a learner starts through requestInstance, and any other state answers 409 ATT-INVALID-STATE. Since v2.2.0 the invite behind the attempt must still allow it: Start moves a
+         *     consented invite to `started`; a revoked, expired, declined or cancelled invite answers 409 ATT-INVALID-STATE and cancels a ready attempt. 503 INST-NO-CAPACITY
+         *     and 429 REQ-RATE-LIMITED as for requestInstance. The body is empty.
          */
         post: operations["startAttempt"];
         delete?: never;
@@ -1462,6 +1741,31 @@ export interface paths {
          *     attempt route. The answer is the attempt with `results_released: true`. The body is empty.
          */
         post: operations["releaseResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a candidate's attempt (the recruiter of the company)
+         * @description Since v2.2.0 (FR-SES-07). The recruiter of the owning company cancels a company assessment attempt that has not ended (`ready` or `running`): the instance is
+         *     destroyed at once, nothing scores any more, and the attempt becomes `cancelled`, which the candidate sees in `getAttempt`. Any other state (also a repeat) is 409
+         *     ATT-INVALID-STATE. The candidate and anyone else get the 404 of every attempt route; a learner's practice attempt cannot be cancelled this way. 429 REQ-RATE-LIMITED
+         *     when one recruiter acts too often. The body is empty.
+         */
+        post: operations["cancelAttempt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2099,6 +2403,8 @@ export interface components {
             /** @enum {unknown} */
             results_visibility?: "after_submit" | "after_release";
             flag_submissions_per_minute?: number;
+            /** @description Turns the private cohort view on for this assessment (D-93). Off when left out. */
+            cohort_board?: boolean;
         };
         Template: {
             /** Format: uuid */
@@ -2116,6 +2422,8 @@ export interface components {
             /** @enum {unknown} */
             results_visibility: "after_submit" | "after_release";
             flag_submissions_per_minute: number;
+            /** @description The private cohort view is on for this assessment (D-93). */
+            cohort_board: boolean;
             version: number;
             updated_at: components["schemas"]["Timestamp"];
         };
@@ -2230,8 +2538,98 @@ export interface components {
         };
         CompanyDecisionRequest: {
             /** @enum {unknown} */
-            decision: "approve" | "reject" | "suspend" | "reinstate";
+            decision: "approve" | "reject" | "suspend" | "reinstate" | "delete";
             reason?: string;
+        };
+        ChangeEmailRequest: {
+            new_email: components["schemas"]["Email"];
+            current_password: string;
+        };
+        ChangedStatus: {
+            /** @constant */
+            status: "changed";
+        };
+        CompanyDeletionRequest: {
+            request_id: string;
+            attempt_id: components["schemas"]["AttemptId"];
+            /** @description The address the candidate was invited with (the company's own invite data); null when the invite is gone. */
+            candidate_email: components["schemas"]["Email"] | null;
+            /** @enum {unknown} */
+            status: "pending" | "approved" | "declined" | "cancelled" | "done";
+            requested_at: components["schemas"]["Timestamp"];
+            decide_by: components["schemas"]["Timestamp"] | null;
+            execute_after: components["schemas"]["Timestamp"] | null;
+            /** @description The company did not decide by `decide_by` and the request was passed to the admins. */
+            escalated: boolean;
+        };
+        CompanyDeletionRequestList: {
+            items: components["schemas"]["CompanyDeletionRequest"][];
+        };
+        DeletionDecisionRequest: {
+            /** @enum {unknown} */
+            decision: "approve" | "decline";
+        };
+        DeletedRecord: {
+            attempt_id: components["schemas"]["AttemptId"];
+            attempts_erased: number;
+        };
+        CompanyJoinRequest: {
+            /** Format: uuid */
+            request_id: string;
+            display_name: string;
+            requested_at: components["schemas"]["Timestamp"];
+        };
+        CompanyJoinRequestList: {
+            items: components["schemas"]["CompanyJoinRequest"][];
+        };
+        JoinDecisionRequest: {
+            /** @enum {unknown} */
+            decision: "approve" | "reject";
+        };
+        CompanyMember: {
+            user_id: components["schemas"]["UserId"];
+            display_name: string;
+            /** @enum {unknown} */
+            role: "owner" | "member";
+        };
+        CompanyMemberList: {
+            items: components["schemas"]["CompanyMember"][];
+        };
+        CohortRow: {
+            position: number;
+            attempt_id: components["schemas"]["AttemptId"];
+            score: number;
+            full_captures: number;
+            hint_cost_units: number;
+            active_seconds: number | null;
+            last_capture_at: components["schemas"]["Timestamp"] | null;
+            reason: string;
+        };
+        Cohort: {
+            /** Format: uuid */
+            template_id: string;
+            label: string;
+            items: components["schemas"]["CohortRow"][];
+        };
+        AdminCompany: {
+            org_id: string;
+            name: string;
+            /** @enum {unknown} */
+            status: "pending" | "active" | "rejected" | "suspended" | "deleted";
+            owner_name: string;
+            owner_email_domain: string;
+            created_at: components["schemas"]["Timestamp"];
+            members: number;
+            /** @description The daily invite cap in force (the admin's own number for the company, else the global setting). */
+            invite_cap: number;
+            /** @description The admin's own number for this company; null when the global setting applies. */
+            invite_cap_override: number | null;
+        };
+        AdminCompanyList: {
+            items: components["schemas"]["AdminCompany"][];
+        };
+        InviteCapRequest: {
+            invite_cap: number | null;
         };
         AdminUser: {
             user_id: components["schemas"]["UserId"];
@@ -2853,6 +3251,16 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description An administrator's account does not change its address here (ATT-INVALID-STATE). */
+        AccountConflict: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description The caller already has an open request of this kind, the request is not open any more, the attempt is not over, or the account is not a learner (ATT-INVALID-STATE). */
         DeletionConflict: {
             headers: {
@@ -2985,6 +3393,17 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description No instance can be started right now (the platform is at its limit or the orchestrator has no capacity). INST-NO-CAPACITY with Retry-After; try again later. Since v2.2.0. */
+        Unavailable: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
     };
     parameters: {
         ChallengeKeyPath: components["schemas"]["ChallengeKey"];
@@ -3091,6 +3510,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerifiedStatus"];
+                };
+            };
+            400: components["responses"]["TokenInvalid"];
+            403: components["responses"]["OriginForbidden"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    confirmEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            /** @description The address is changed. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangedStatus"];
                 };
             };
             400: components["responses"]["TokenInvalid"];
@@ -3325,6 +3775,29 @@ export interface operations {
             };
             401: components["responses"]["SessionOrPasswordFailed"];
             403: components["responses"]["CsrfFailed"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    requestEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeEmailRequest"];
+            };
+        };
+        responses: {
+            202: components["responses"]["Accepted"];
+            401: components["responses"]["SessionOrPasswordFailed"];
+            403: components["responses"]["CsrfFailed"];
+            409: components["responses"]["AccountConflict"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
@@ -3803,7 +4276,16 @@ export interface operations {
             };
             400: components["responses"]["TokenInvalid"];
             401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["CsrfFailed"];
+            /** @description The CSRF token or the Origin is wrong (AUTH-CSRF-FAILED, AUTH-ORIGIN-FORBIDDEN), or the account's email address is not verified yet (AUTH-EMAIL-NOT-VERIFIED, with field pointer /account/email, verify it, resendVerification sends the link again, then accept again). */
+            403: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             409: components["responses"]["InviteConflict"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
@@ -4216,6 +4698,238 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    listCompanyDeletionRequests: {
+        parameters: {
+            query?: {
+                open_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requests. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDeletionRequestList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    decideDeletionRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeletionDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description The request after the decision. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyDeletionRequest"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    deleteCandidateRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["schemas"]["AttemptId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The record is deleted. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedRecord"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listJoinRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requests. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyJoinRequestList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    decideJoinRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decided. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listCompanyMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The members. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyMemberList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    removeCompanyMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getCohort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cohort"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["CompanyNotFound"];
+            409: components["responses"]["CompanyConflict"];
+            422: components["responses"]["Invalid"];
+        };
+    };
     exportMyData: {
         parameters: {
             query?: never;
@@ -4451,6 +5165,68 @@ export interface operations {
             403: components["responses"]["CsrfFailed"];
             404: components["responses"]["AdminNotFound"];
             409: components["responses"]["AdminConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listCompanies: {
+        parameters: {
+            query?: {
+                status?: "pending" | "active" | "rejected" | "suspended" | "deleted";
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The companies. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanyList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    setCompanyInviteCap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteCapRequest"];
+            };
+        };
+        responses: {
+            /** @description The company. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompany"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
@@ -4988,6 +5764,8 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["Unavailable"];
         };
     };
     getInstance: {
@@ -5033,6 +5811,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     resetInstance: {
@@ -5058,6 +5837,7 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     stopInstance: {
@@ -5078,6 +5858,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getAttempt: {
@@ -5114,6 +5895,8 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["Unavailable"];
         };
     };
     submitAttempt: {
@@ -5158,6 +5941,27 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    cancelAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     withdrawAttempt: {
@@ -5498,6 +6302,7 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getReport: {

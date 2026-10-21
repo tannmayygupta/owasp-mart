@@ -34,6 +34,7 @@ OPERATIONS = {
     ("post", "/v1/instances"), ("get", "/v1/instances"), ("get", "/v1/instances/{instance_id}"),
     ("post", "/v1/instances/{instance_id}/reset"), ("post", "/v1/instances/{instance_id}/access"),
     ("post", "/v1/instances/{instance_id}/destroy"), ("post", "/v1/instances/{instance_id}/activity"), ("get", "/v1/host"), ("post", "/internal/v1/orch/state"),
+    ("get", "/internal/v1/orch/desired"),
 }
 SECRET_NAMES = {"flags", "flag", "decoys", "decoy", "flag_digests", "sha256", "seed", "event_key", "value", "owner_hash"}
 FREE_FORM = "<free-form object>"
@@ -282,7 +283,7 @@ def run(folder: Path) -> tuple[list[str], dict[str, int]]:
     for name in vman:
         if name not in vfiles:
             fail(f"valid manifest names {name}, which does not exist")
-    needed = {"CreateInstanceRequest", "InstanceStatus", "ResetInstanceRequest", "AccessRequest", "InstancePage", "HostStatus", "StateReport", "Problem"}
+    needed = {"CreateInstanceRequest", "InstanceStatus", "ResetInstanceRequest", "AccessRequest", "InstancePage", "HostStatus", "StateReport", "DesiredInstances", "Problem"}
     for schema in sorted(needed - set(vman.values())):
         fail(f"no valid example for {schema}")
 

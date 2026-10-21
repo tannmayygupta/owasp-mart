@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Read-only verification of a deployed platform (story P-32, NFR-SEC-01, NFR-SEC-03): it creates no account and changes nothing.
-//   node scripts/verify-deployed.mjs --base https://tanmay-platform-prod.duckdns.org [--bundle contracts/api/bundle/openapi.json] [--json]
+//   node scripts/verify-deployed.mjs --base https://tanmay-platform-prod.duckdns.org [--bundle contracts/api/bundle/openapi.json] [--json] [--platform-env <the .env of the platform stack>]
 // Checks: the public health route; the page security headers (a nonce CSP with frame-ancestors 'none', HSTS on https, nosniff, Referrer-Policy, no X-Powered-By);
 // http redirects to https; an unknown route is an IF-8 problem with a request id and no stack trace; a cross-site POST is refused (AUTH-ORIGIN-FORBIDDEN);
-// every dashboards page is served by the dashboards app; and every operation of the platform contract without a path parameter EXISTS on the deployed site (answered without a
+// every dashboards page is served by the dashboards app (the learner console owns `/` and keeps its strict CSP, ADR 0074); with --platform-env <the staged .env> the mail provider is not the catcher; and every operation of the platform contract without a path parameter EXISTS on the deployed site (answered without a
 // session, it must not be 404: a 404 means the deploy is older than the contract). Exit code 0 when every check passes, 1 otherwise, 2 for bad arguments.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -12,16 +12,17 @@ import path from 'node:path';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Operations the contract declares but marks PENDING and the API does not serve on purpose (createLiveTicket waits for the spike S-14).
 export const PENDING = new Set(['createLiveTicket']);
-export const PAGES = ['/', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/account', '/dashboard', '/invite', '/company',
+export const PAGES = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/account', '/dashboard', '/invite', '/company',
   '/company/candidates', '/admin'];
 
 export function parseArgs(argv) {
-  const out = { base: null, bundle: path.join(ROOT, 'contracts', 'api', 'bundle', 'openapi.json'), json: false, timeout: 15000 };
+  const out = { base: null, platformEnv: null, bundle: path.join(ROOT, 'contracts', 'api', 'bundle', 'openapi.json'), json: false, timeout: 15000 };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--base') out.base = argv[++i];
     else if (a === '--bundle') out.bundle = argv[++i];
     else if (a === '--json') out.json = true;
+    else if (a === '--platform-env') out.platformEnv = argv[++i];
     else if (a === '--timeout') out.timeout = Number(argv[++i]) * 1000;
     else if (a === '--help') return { help: true };
     else return { error: `unknown argument ${a}` };
@@ -45,7 +46,15 @@ export function platformOperations(bundle) {
   return ops;
 }
 
-export async function verify({ base, bundle, timeout = 15000, fetchImpl = fetch }) {
+/** The mail provider of the deployed stack from its `.env` text: `ok` is false when mail would go to the catcher (provider smtp, the catcher allowed, or the catcher profile on). */
+export function mailProviderCheck(envText) {
+  const env = Object.fromEntries(String(envText).split(/\r?\n/).map((l) => /^([A-Z0-9_]+)=(.*)$/.exec(l)).filter(Boolean).map((m) => [m[1], m[2].trim()]));
+  const provider = env.VULNMART_EMAIL_PROVIDER ?? 'brevo'; // the compose default
+  const catcher = provider === 'smtp' || env.VULNMART_ALLOW_MAIL_CATCHER === 'true' || /(^|,)mail-catcher(,|$)/.test(env.COMPOSE_PROFILES ?? '');
+  return { ok: !catcher, detail: `provider ${provider}${catcher ? ', the mail catcher is active: no e-mail reaches anyone' : ''}` };
+}
+
+export async function verify({ base, bundle, timeout = 15000, fetchImpl = fetch, platformEnv = null }) {
   const results = [];
   const add = (ok, name, detail = '') => results.push({ ok, name, detail });
   const get = (url, init = {}) => fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(timeout), ...init });
@@ -59,14 +68,23 @@ export async function verify({ base, bundle, timeout = 15000, fetchImpl = fetch 
     add(false, 'health is ok', `unreachable: ${e.message}`);
     return results; // nothing else can be checked
   }
-  // 2. page headers
-  const page = await get(`${base}/`);
+  // 2. page headers: the dashboards set a nonce CSP (Next.js, per request); the console at / keeps the strict static CSP
+  const page = await get(`${base}/login`);
   const h = (n) => page.headers.get(n) ?? '';
   add(/'nonce-[A-Za-z0-9+/=]+'/.test(h('content-security-policy')), 'pages carry a nonce CSP', h('content-security-policy').slice(0, 120));
   add(/frame-ancestors 'none'/.test(h('content-security-policy')), "the CSP forbids framing (frame-ancestors 'none')");
   add(h('x-content-type-options') === 'nosniff', 'X-Content-Type-Options: nosniff', h('x-content-type-options'));
   add(h('referrer-policy') !== '', 'a Referrer-Policy is set', h('referrer-policy'));
   add(h('x-powered-by') === '', 'no X-Powered-By header', h('x-powered-by'));
+  const consolePage = await get(`${base}/`);
+  const consoleCsp = consolePage.headers.get('content-security-policy') ?? '';
+  const consoleHtml = await consolePage.text().catch(() => '');
+  add(consolePage.status === 200 && !consoleHtml.includes('/_next/') && /style-src 'self'(;|$)/.test(consoleCsp) && !/nonce-|unsafe-inline/.test(consoleCsp),
+    'the learner console at / keeps the strict CSP (style-src self, no nonce)', `${consolePage.status} ${consoleCsp.slice(0, 80)}`);
+  if (platformEnv !== null) {
+    const mail = mailProviderCheck(platformEnv);
+    add(mail.ok, 'the mail provider is not the catcher (real e-mail is sent)', mail.detail);
+  }
   if (base.startsWith('https://')) {
     add(/max-age=\d+/.test(h('strict-transport-security')), 'HSTS is set', h('strict-transport-security'));
     try {
@@ -107,7 +125,7 @@ export async function verify({ base, bundle, timeout = 15000, fetchImpl = fetch 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log('node scripts/verify-deployed.mjs --base https://host [--bundle path] [--json] [--timeout seconds]');
+    console.log('node scripts/verify-deployed.mjs --base https://host [--bundle path] [--json] [--timeout seconds] [--platform-env path-of-the-staged-.env]');
     return 0;
   }
   if (args.error) {
@@ -115,7 +133,8 @@ async function main() {
     return 2;
   }
   const bundle = JSON.parse(readFileSync(args.bundle, 'utf8'));
-  const results = await verify({ base: args.base, bundle, timeout: args.timeout });
+  const platformEnv = args.platformEnv ? readFileSync(args.platformEnv, 'utf8') : null;
+  const results = await verify({ base: args.base, bundle, timeout: args.timeout, platformEnv });
   if (args.json) console.log(JSON.stringify(results, null, 2));
   else for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.name}${r.detail ? `  (${r.detail})` : ''}`);
   const failed = results.filter((r) => !r.ok).length;

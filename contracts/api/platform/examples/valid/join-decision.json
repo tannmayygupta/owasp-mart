@@ -1,0 +1,6 @@
+{
+  "schema": "JoinDecisionRequest",
+  "body": {
+    "decision": "reject"
+  }
+}

@@ -24,7 +24,7 @@ start_state: "Sign in as the customer player.customer@vulnmart.test with the pas
 milestones:
   m1:
     summary: the player used the legacy login route
-    signal: auth.attempt with route = legacy (separate from the shop security log)
+    signal: auth.attempt with route = legacy (separate from the shop security log; result is failure or success, account_id names the attacked account)
   m2:
     summary: an attack succeeded with zero security events recorded for the account
     signal: >-
@@ -50,4 +50,5 @@ write_up:
   fix: >-
     One shared auth service for all channels, log every authentication event, alert on thresholds, a test that every
     route emits events, retire legacy APIs.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

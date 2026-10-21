@@ -25,7 +25,7 @@ def runtime():
 
 def test_a_pasted_flag_with_no_recorded_activity_is_held_not_credited_and_not_zeroed():
     rt, clock = runtime()
-    s = rt.start_attempt("u-gate-1")
+    s = rt.start_attempt("u-gate-1", org_id="o-gate")  # an assessment: a capture the activity does not explain is held (a learner practice only flags it)
     clock.advance(minutes=10)
     r = rt.submit_flag(s.attempt_id, "C02", rt.keys.flag(s.instance_id, "C02", 1))
     assert (r.result, r.credit) == ("correct", "held")
@@ -33,6 +33,16 @@ def test_a_pasted_flag_with_no_recorded_activity_is_held_not_credited_and_not_ze
     assert rt.milestones.is_held(s.attempt_id, "C02")
     assert any(f.kind is IntegrityType.ACTIVITY for f in rt.integrity.of(s.attempt_id))
     assert rt.score(s.attempt_id).score == 0, "a held capture is out of the score until a human decides, and nothing is subtracted"
+
+
+def test_a_learner_practice_capture_is_credited_and_flagged_never_held_because_nobody_could_release_it():
+    rt, clock = runtime()
+    s = rt.start_attempt("u-gate-practice")  # a learner: no company, so no reviewer exists (wiring audit section 4)
+    assert rt.engine.get(s.attempt_id).rules.activity_check_mode == "flag"
+    clock.advance(minutes=10)
+    r = rt.submit_flag(s.attempt_id, "C02", rt.keys.flag(s.instance_id, "C02", 1))
+    assert (r.result, r.credit) == ("correct", "credited")
+    assert not rt.milestones.is_held(s.attempt_id, "C02")
 
 
 def test_the_same_paste_after_real_use_of_the_shop_is_credited():
@@ -47,7 +57,7 @@ def test_the_same_paste_after_real_use_of_the_shop_is_credited():
 
 def test_the_requests_of_an_earlier_epoch_do_not_explain_a_capture_of_the_next_one():
     rt, clock = runtime()
-    s = rt.start_attempt("u-gate-3")
+    s = rt.start_attempt("u-gate-3", org_id="o-gate")
     play(rt, s.instance_id, epoch=1)
     clock.advance(minutes=10)
     assert rt.reset_attempt(s.attempt_id) == 2

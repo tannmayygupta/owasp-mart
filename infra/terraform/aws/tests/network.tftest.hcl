@@ -219,7 +219,7 @@ run "keepalive_is_off_by_default_and_can_be_turned_on" {
   command = plan
 
   assert {
-    condition     = strcontains(local.user_data, "\"no\"]")
+    condition     = strcontains(local.user_data, "\" \"no\"")
     error_message = "keep-alive must be off by default"
   }
 }
@@ -231,7 +231,7 @@ run "keepalive_on_is_passed_to_the_baseline" {
   }
 
   assert {
-    condition     = strcontains(local.user_data, "\"yes\"]")
+    condition     = strcontains(local.user_data, "\" \"yes\"")
     error_message = "keepalive_enabled = true must reach the baseline script"
   }
 }

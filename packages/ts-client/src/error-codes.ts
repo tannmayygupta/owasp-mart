@@ -1,7 +1,7 @@
 // GENERATED from contracts/errors/error-codes.yaml. Do not edit: run `node scripts/generate-error-codes.mjs`.
-// Error registry (IF-8) version 1.0.0.
+// Error registry (IF-8) version 2.0.0.
 
-export const REGISTRY_VERSION = "1.0.0";
+export const REGISTRY_VERSION = "2.0.0";
 export const PROBLEM_TYPE_PREFIX = "urn:vulnmart:error:";
 
 export const ERROR_CODES = {
@@ -33,6 +33,7 @@ export const ERROR_CODES = {
   INST_INJECT_SNAPSHOT_PATCH: "INST-INJECT-SNAPSHOT-PATCH",
   INST_INVALID_STATE: "INST-INVALID-STATE",
   INST_LOST: "INST-LOST",
+  INST_NO_CAPACITY: "INST-NO-CAPACITY",
   INST_NOT_FOUND: "INST-NOT-FOUND",
   INST_NOT_READY: "INST-NOT-READY",
   INST_QUOTA_REACHED: "INST-QUOTA-REACHED",
@@ -107,6 +108,7 @@ export const ERRORS: Readonly<Record<ErrorCode, ErrorInfo>> = {
   "INST-INJECT-SNAPSHOT-PATCH": { status: null, title: "The snapshot patch failed.", retryable: false, exitCode: 11 },
   "INST-INVALID-STATE": { status: 409, title: "This action is not allowed in the instance's current state.", retryable: false },
   "INST-LOST": { status: null, title: "The instance was lost.", retryable: false },
+  "INST-NO-CAPACITY": { status: 503, title: "No instance can be started right now. Try again in a moment.", retryable: true },
   "INST-NOT-FOUND": { status: 404, title: "Instance not found.", retryable: false },
   "INST-NOT-READY": { status: 409, title: "The instance is not ready yet.", retryable: true },
   "INST-QUOTA-REACHED": { status: 409, title: "The instance limit has been reached.", retryable: false },

@@ -72,7 +72,7 @@ STAMPS = {"sent": "sent_at", "opened": "opened_at", "consented": "consented_at",
 # What a template can never switch off (FR-ASM-01): asking to is refused by name.
 FIXED_ON = frozenset({"flags", "flags_enabled", "per_instance_flags", "evidence", "evidence_capture", "audit", "audit_log", "consent", "consent_screen"})
 TEMPLATE_FIELDS = frozenset({"title", "challenge_keys", "time_limit_min", "hints_mode", "hint_cost_pct", "reset_limit", "invite_expiry_days", "retention_days",
-                             "writeup_required", "results_visibility", "flag_submissions_per_minute"})
+                             "writeup_required", "results_visibility", "flag_submissions_per_minute", "cohort_board"})
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f  ]")
 _SPACE = re.compile(r"\s+")
 
@@ -141,6 +141,7 @@ class TemplateView:
     flag_submissions_per_minute: int
     version: int
     updated_at: datetime
+    cohort_board: bool = False  # the private cohort view is on for this assessment (D-93); not part of the attempt's rules
 
     def rules(self) -> dict[str, Any]:
         """The rules an invite copies and an attempt runs under."""
@@ -244,11 +245,14 @@ def validate_template(values: Mapping[str, Any], *, default_retention: int = 180
         raise InvalidInput("/writeup_required")
     if visibility not in RESULTS_VISIBILITY:
         raise InvalidInput("/results_visibility")
+    cohort_board = values.get("cohort_board", False)
+    if type(cohort_board) is not bool:
+        raise InvalidInput("/cohort_board")
     return {
         "title": _clean_title(values.get("title")), "challenge_keys": sorted(keys), "hints_mode": hints_mode, "hint_cost_pct": cost,
         "time_limit_min": _int(values, "time_limit_min", 120, 30, 480), "reset_limit": _int(values, "reset_limit", 3, 0, 10),
         "invite_expiry_days": _int(values, "invite_expiry_days", 7, 1, 30), "retention_days": _int(values, "retention_days", default_retention, 30, 365),
-        "flag_submissions_per_minute": _int(values, "flag_submissions_per_minute", 10, 1, 60), "writeup_required": writeup, "results_visibility": visibility,
+        "flag_submissions_per_minute": _int(values, "flag_submissions_per_minute", 10, 1, 60), "writeup_required": writeup, "results_visibility": visibility, "cohort_board": cohort_board,
     }
 
 
@@ -290,13 +294,13 @@ class AssessmentService:
         s = dict(row.settings or {})
         return TemplateView(str(row.id), row.title, tuple(sorted(keys)), row.time_limit_min, row.hints_mode, row.hint_cost_pct, row.reset_limit, row.invite_expiry_days,
                             row.retention_days, bool(s.get("writeup_required", False)), s.get("results_visibility", "after_submit"),
-                            int(s.get("flag_submissions_per_minute", 10)), row.version, _aware(row.updated_at))
+                            int(s.get("flag_submissions_per_minute", 10)), row.version, _aware(row.updated_at), bool(s.get("cohort_board", False)))
 
     def _write_template(self, session: Session, row: AssessmentTemplate, fields: dict[str, Any]) -> None:
         row.title, row.time_limit_min, row.hints_mode, row.hint_cost_pct = fields["title"], fields["time_limit_min"], fields["hints_mode"], fields["hint_cost_pct"]
         row.reset_limit, row.invite_expiry_days, row.retention_days = fields["reset_limit"], fields["invite_expiry_days"], fields["retention_days"]
         row.settings = {"writeup_required": fields["writeup_required"], "results_visibility": fields["results_visibility"],
-                        "flag_submissions_per_minute": fields["flag_submissions_per_minute"]}
+                        "flag_submissions_per_minute": fields["flag_submissions_per_minute"], "cohort_board": fields["cohort_board"]}
 
     def create_template(self, actor: Scope, values: Mapping[str, Any]) -> TemplateView:
         org = self._recruiter_org(actor)
@@ -417,6 +421,12 @@ class AssessmentService:
                                        details={"org": str(org), "invite": old.id, "replaced_by": invite_id})
                 if session.scalar(select(Invite.id).where(Invite.template_id == tid, Invite.email_ci == email_ci, Invite.state.in_(LIVE_STATES))) is not None:
                     raise InviteExists
+                if supersedes is None:
+                    # a repeat invite after an earlier one closed (expired, declined, revoked, withdrawn attempt): the lab keeps one attempt per account and template, so the
+                    # new invite takes the next generation and with it an attempt key of its own (wiring audit, dangling attempt id)
+                    earlier = session.scalar(select(func.max(Invite.generation)).where(Invite.template_id == tid, Invite.email_ci == email_ci))
+                    if earlier is not None:
+                        generation = max(generation, earlier + 1)
                 if supersedes is None and session.scalar(select(Invite.id).where(Invite.template_id == tid, Invite.email_ci == email_ci, Invite.state == "started")) is not None:
                     raise AlreadyStarted
                 invite = Invite(id=invite_id, org_id=org, template_id=tid, template_version=template.version, rules=view.rules(), email_ci=email_ci,
@@ -599,7 +609,9 @@ class AssessmentService:
 
     def revoke(self, actor: Scope, invite_id: str) -> InviteView:
         """sent, opened or consented -> revoked: the link stops working."""
-        return self._recruiter_close(actor, invite_id, from_states=("sent", "opened", "consented"), to_state="revoked")
+        view = self._recruiter_close(actor, invite_id, from_states=("sent", "opened", "consented"), to_state="revoked")
+        self._cancel_attempt(view.attempt_id, by=actor.user_id, why="revoked")  # a ready attempt must not stay startable behind a revoked invite (wiring audit F-06)
+        return view
 
     def _recruiter_close(self, actor: Scope, invite_id: str, *, from_states: tuple[str, ...], to_state: str) -> InviteView:
         org = self._recruiter_org(actor)
@@ -723,6 +735,19 @@ class AssessmentService:
                 company = session.get(Organization, org)
                 return None if company is None else (view, str(org), company.name)
 
+    def start_gate(self, attempt_id: str) -> tuple[str, str, str] | None:
+        """What the lab asks before it starts a candidate attempt: (invite state, company id, invite id) of the invite that names the attempt, or None when there is none
+        (a practice run, or a lab with no platform). The state is what it is NOW: a live invite past its expiry reads as `expired` even before the scheduler closed it.
+        Read as the signed-in candidate, so only their own invite is visible (policy `own_invite`)."""
+        found = self.for_attempt(attempt_id)
+        if found is None:
+            return None
+        view, org_id, _ = found
+        state = view.state
+        if state in ("created", "sent", "opened", "consented") and view.expires_at <= self._now():
+            state = "expired"
+        return state, org_id, view.invite_id
+
     def describe(self, org_id: str, invite: InviteView) -> CandidateInvite:
         """The company's name and the template's title for an invite, read in the company's own scope (the candidate has none). A template deleted since the invite
         was sent leaves the title empty; the invite keeps its own copy of the rules."""
@@ -800,15 +825,34 @@ class AssessmentService:
             with self._sessions.begin() as session:
                 return session.execute(delete(Invite).where(Invite.org_id == oid, Invite.attempt_id == attempt_id)).rowcount
 
+    def _cancel_attempt(self, attempt_id: str | None, *, by: str, why: str) -> None:
+        """Cancel the lab attempt behind a closed invite when it can still be cancelled (ready, or in consent). Best effort and logged: the invite is already closed, and
+        the start route refuses a closed invite as well, so a failure here leaves nothing startable."""
+        if attempt_id is None or self._attempts is None:
+            return
+        try:
+            self._attempts.cancel(attempt_id, by=by)
+        except (AttemptNotFound, AttemptGone, AttemptStateInvalid) as reason:
+            logger.info("invite %s: attempt %s was not cancelled (%s)", why, attempt_id, type(reason).__name__)
+
     def expire_due(self, org_id: str) -> int:
-        """Close the live invites of one company that are past their expiry. Returns how many."""
+        """Close the live invites of one company that are past their expiry and cancel the attempts they leave `ready`. Returns how many invites it closed."""
         oid = self._uuid(org_id, InviteNotFound)
         now = self._now()
+        attempts: list[str] = []
         with self._scope.acting_as(self._system(oid)):
             with self._sessions.begin() as session:
                 rows = session.scalars(select(Invite).where(Invite.org_id == oid, Invite.state.in_(("created", "sent", "opened", "consented")),
                                                             Invite.expires_at <= now)).all()
-                return sum(1 for invite in rows if self._close(session, invite, "expired", now))
+                closed = 0
+                for invite in rows:
+                    if self._close(session, invite, "expired", now):
+                        closed += 1
+                        if invite.attempt_id is not None:
+                            attempts.append(invite.attempt_id)
+        for attempt_id in attempts:
+            self._cancel_attempt(attempt_id, by="system:invites", why="expired")
+        return closed
 
     def expire_all(self) -> int:
         """`expire_due` for every company (the scheduler of story P-24 calls it). The companies are read through the admin-visible company directory."""

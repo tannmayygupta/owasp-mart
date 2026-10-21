@@ -27,7 +27,8 @@ from vulnmart_attempts import AttemptRecord, InvalidTransition, WindowClosed
 from vulnmart_attempts.review import NotHeld, ReviewFinal, ReviewForbidden
 from vulnmart_models.error_codes import ErrorCode
 
-from vulnmart.accounts.http import Authenticated, Strict, authenticated, authenticated_with_csrf, read_json
+from vulnmart.assessments.service import InviteClosed
+from vulnmart.accounts.http import Authenticated, Strict, authenticated, authenticated_with_csrf, limit, read_json
 from vulnmart.ingest.stores import FlagAlreadyDecided, InstanceInfo
 from vulnmart.kernel.service import NO_STORE
 from vulnmart.lab.catalog import HINT_KINDS
@@ -39,6 +40,7 @@ from vulnmart.ports.errors import (
     ChallengeNotFound,
     FlagRateLimited,
     InstanceMissing,
+    InstanceNoCapacity,
     InstanceNotReady,
     InstanceQuotaReached,
     InstanceStateInvalid,
@@ -91,6 +93,13 @@ class DecisionBody(Strict):
 
 # ---- small helpers ----
 
+def throttle(request: Request, auth: Authenticated, name: str, setting: str) -> None:
+    """A per-account hourly limit (an admin setting) on a costly authenticated route; 429 REQ-RATE-LIMITED with Retry-After. A missing limiter (no platform) is no limit."""
+    limiter = getattr(request.app.state, "rate_limiter", None)
+    if limiter is not None:
+        limit(request, limiter, f"lab-{name}:user", auth.session.user.id, setting)
+
+
 def lab(request: Request) -> LabRuntime:
     runtime = getattr(request.app.state, "lab", None)
     if runtime is None:
@@ -132,6 +141,8 @@ def call(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         return fn(*args, **kwargs)
     except FlagRateLimited as exc:
         raise ProblemError(ErrorCode.ATT_FLAG_RATE_LIMITED, headers={"Retry-After": str(exc.retry_after)}) from None
+    except InstanceNoCapacity:
+        raise ProblemError(ErrorCode.INST_NO_CAPACITY, headers={"Retry-After": "15"}) from None  # the platform is full: 503, try again
     except (AttemptNotFound, AttemptGone, AttemptStateInvalid, ChallengeNotFound, InstanceMissing, InstanceNotReady,
             InstanceQuotaReached, InstanceStateInvalid) as exc:
         raise ProblemError(exc.code) from None
@@ -148,8 +159,8 @@ def call(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     except InstanceNotFound:
         raise ProblemError(ErrorCode.INST_NOT_FOUND) from None
     except Busy:
-        # the host has no capacity or the orchestrator is busy: tell the browser to try again (429), not that the platform broke
-        raise ProblemError(ErrorCode.REQ_RATE_LIMITED, headers={"Retry-After": "15"}) from None
+        # the orchestrator has no capacity: 503 INST-NO-CAPACITY with Retry-After (it was a 429 "too many requests", which blamed the user)
+        raise ProblemError(ErrorCode.INST_NO_CAPACITY, headers={"Retry-After": "15"}) from None
     except OrchestratorError:
         log.exception("the orchestrator refused or did not answer")
         raise ProblemError(ErrorCode.REQ_INTERNAL) from None  # INST-START-FAILED is the code of a failed instance, not an HTTP answer
@@ -190,7 +201,7 @@ def mode_of(rec: AttemptRecord) -> str:
 
 
 def hints_enabled(rec: AttemptRecord) -> bool:
-    return rec.org_id is None  # practice has hints; an assessment's template decides (placeholder: off until stream P sets it)
+    return rec.org_id is None or rec.rules.hints_mode == "on"  # practice has free hints; an assessment has them only when its template turned them on (F-07)
 
 
 def is_owner(auth: Authenticated, rec: AttemptRecord) -> bool:
@@ -333,7 +344,7 @@ def score_rows(rt: LabRuntime, rec: AttemptRecord) -> tuple[int, list[dict[str, 
 def hint_view(rt: LabRuntime, rec: AttemptRecord, key: str, level: int) -> dict[str, Any]:
     unlocked = level in rt.hints.levels(rec.id, key)
     catalog = rt.catalog
-    return {"level": level, "kind": HINT_KINDS[level - 1], "unlocked": unlocked, "cost_pct": level * 10 if rec.org_id else 0,
+    return {"level": level, "kind": HINT_KINDS[level - 1], "unlocked": unlocked, "cost_pct": rt.hint_cost_pct(rec.id, level),
             "text": catalog.hint_text(key, level) if unlocked else None}
 
 
@@ -408,11 +419,12 @@ async def get_catalogue_challenge(challenge_key: str, request: Request, auth: Au
 async def list_my_attempts(request: Request, auth: Authenticated = Depends(authenticated)) -> JSONResponse:
     rt = lab(request)
     params = query(request, ("limit",))
-    limit = parse_limit(params, 50, 100)
+    max_items = parse_limit(params, 50, 100)
+    # practice and assessment attempts share this list on purpose (IF-1); every item carries `mode`, and a screen filters on it (the lab console does)
     rows = [r for r in await run(rt.engine.for_user, auth.session.user.id) if r.purged_at is None and r.state.value != "deleted"]
     items = [{"attempt_id": r.id, "mode": mode_of(r), "state": r.state.value, "instance_id": r.instance_id,
-              "created_at": stamp(r.created_at), "deadline_at": stamp(r.deadline_at)} for r in rows[:limit]]
-    return json_ok({"items": items, "has_more": len(rows) > limit})
+              "created_at": stamp(r.created_at), "deadline_at": stamp(r.deadline_at)} for r in rows[:max_items]]
+    return json_ok({"items": items, "has_more": len(rows) > max_items})
 
 
 # ---- instances ----
@@ -421,6 +433,7 @@ async def list_my_attempts(request: Request, auth: Authenticated = Depends(authe
 async def request_instance(request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
     rt = lab(request)
     await read_json(request, RequestInstanceBody)
+    throttle(request, auth, "instance-start", "rate_instance_start_per_user_per_hour")
     user_id = auth.session.user.id
     existing = rt.engine.find(user_id, rt.template_id)  # the one attempt of this user for this template
     if existing is not None and rt.instance_alive(existing.instance_id) and existing.state.value == "running":
@@ -443,6 +456,7 @@ async def open_instance(instance_id: str, request: Request, auth: Authenticated 
     rt = lab(request)
     info, rec = own_instance(rt, auth, instance_id)
     await no_body(request)
+    throttle(request, auth, "instance-open", "rate_instance_open_per_user_per_hour")
     st = await run(rt.host.get, info.instance_id)
     if st.state not in _OPENABLE or st.access is not Access.OPEN:
         raise ProblemError(ErrorCode.INST_NOT_READY)
@@ -459,6 +473,7 @@ async def reset_instance(instance_id: str, request: Request, auth: Authenticated
     rt = lab(request)
     info, rec = own_instance(rt, auth, instance_id)
     await read_json(request, ConfirmBody)
+    throttle(request, auth, "instance-stop", "rate_instance_stop_per_user_per_hour")
     st = await run(rt.host.get, info.instance_id)
     if st.state not in _OPENABLE or not can_change(rt, rec):
         raise ProblemError(ErrorCode.INST_INVALID_STATE)
@@ -472,6 +487,7 @@ async def stop_instance(instance_id: str, request: Request, auth: Authenticated 
     rt = lab(request)
     info, rec = own_instance(rt, auth, instance_id)
     await no_body(request)
+    throttle(request, auth, "instance-stop", "rate_instance_stop_per_user_per_hour")
     st = await run(rt.host.get, info.instance_id)
     if st.state in (InstanceState.STOPPING, InstanceState.DESTROYED):
         return json_ok(await run(instance_view, rt, info, rec), 200)
@@ -495,6 +511,37 @@ async def get_attempt(attempt_id: str, request: Request, auth: Authenticated = D
     return json_ok(attempt_view(rt, readable(rt, auth, attempt_id)))
 
 
+def invite_gate(request: Request, rt: LabRuntime, rec: AttemptRecord) -> None:
+    """The invite behind a candidate attempt decides whether it may start (wiring audit F-05, F-06). `consented` becomes `started` (a started invite no longer expires while
+    its attempt runs or has ended); `started` stays; any other state (revoked, expired, declined, cancelled, still being consented) refuses with 409 and cancels a `ready` attempt, so
+    nothing stays startable behind a closed invite. No platform service (a lab without invites) or no invite for the attempt means no gate."""
+    assessments = getattr(request.app.state, "assessments", None)
+    if assessments is None:
+        return
+    gate = assessments.start_gate(rec.id)
+    if gate is None:
+        return
+    state, org_id, invite_id = gate
+    if state == "consented":
+        try:
+            assessments.advance(org_id, invite_id, "started")
+        except InviteClosed as late:
+            if late.state != "started":  # another press moved it first: fine; anything else closed it
+                state = late.state
+            else:
+                return
+        else:
+            return
+    if state == "started":
+        return
+    if rec.state.value == "ready":
+        try:
+            rt.cancel_attempt(rec.id, by="system:invites", reason=f"invite_{state}")
+        except Exception:
+            log.warning("cancelling attempt %s behind a closed invite failed", rec.id, exc_info=True)
+    raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+
+
 @router.post("/api/v1/attempts/{attempt_id}/start", operation_id="startAttempt")
 async def start_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
     """H-356, D-80: the candidate's Start asks for the instance of the attempt a consent created; the clock starts when the instance is ready, not at the press.
@@ -504,6 +551,8 @@ async def start_attempt(attempt_id: str, request: Request, auth: Authenticated =
     await no_body(request)
     if rec.org_id is None or rec.state.value not in ("ready", "running"):
         raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    throttle(request, auth, "instance-start", "rate_instance_start_per_user_per_hour")
+    await run(invite_gate, request, rt, rec)  # the invite must still allow it (F-05, F-06); a candidate's Start moves it to `started`
     await run(rt.start_existing_async, rec.id)
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
 
@@ -528,11 +577,42 @@ async def release_results(attempt_id: str, request: Request, auth: Authenticated
     if Role.RECRUITER not in auth.session.roles or rec.org_id is None:
         raise ProblemError(ErrorCode.ATT_NOT_FOUND)
     await no_body(request)
+    throttle(request, auth, "review", "rate_review_action_per_user_per_hour")
     if rec.state.value not in ("submitted", "reported", "expired"):
         raise ProblemError(ErrorCode.ATT_INVALID_STATE)
     if not await run(results_released, rt, rec):
         await run(rt.attempt_log.append, {"event": "results_released", "attempt_id": rec.id, "at": rt.clock().isoformat(), "viewer_id": auth.session.user.id})
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
+@router.post("/api/v1/attempts/{attempt_id}/cancel", operation_id="cancelAttempt")
+async def cancel_attempt(attempt_id: str, request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """FR-SES-07, IF-2 2.2.0: the recruiter of the owning company cancels a candidate attempt that has not ended (`ready` or `running`). The instance is destroyed, nothing scores
+    any more, the attempt becomes `cancelled` and the candidate sees that state. The candidate, a recruiter of another company and anyone else get the 404 of every route; a learner's
+    practice cannot be cancelled this way. A repeat or an ended attempt is 409. The mail to the candidate is the notification story's: it reads the attempt-state domain event."""
+    rt = lab(request)
+    rec = load_attempt(rt, attempt_id)
+    if not is_reviewer(auth, rec) or Role.RECRUITER not in auth.session.roles or rec.org_id is None:
+        raise ProblemError(ErrorCode.ATT_NOT_FOUND)
+    await no_body(request)
+    throttle(request, auth, "review", "rate_review_action_per_user_per_hour")
+    if rec.state.value not in ("ready", "running"):
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE)
+    await run(rt.cancel_attempt, rec.id, by=auth.session.user.id, reason="recruiter")
+    return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
+
+
+def record_withdrawal(request: Request, auth: Authenticated, rec: AttemptRecord) -> None:
+    """FR-SES-10: the minimal consent record of the withdrawal (`withdrawn`), kept as proof. Written after the withdrawal stands and never blocks it: a failure is logged and the
+    next repeat of the same call writes it (the service writes one only when none exists yet). The recruiter's mail is the notification story's."""
+    consent = getattr(request.app.state, "consent_service", None)
+    if consent is None:
+        return
+    try:
+        consent.record_withdrawal(user_id=auth.session.user.id, attempt_id=rec.id)
+        log.info("candidate withdrew from attempt %s (consent record written)", rec.id)
+    except Exception:
+        log.error("the withdrawal of attempt %s stands but its consent record could not be written", rec.id, exc_info=True)
 
 
 @router.post("/api/v1/attempts/{attempt_id}/withdraw", operation_id="withdrawAttempt")
@@ -544,6 +624,7 @@ async def withdraw_attempt(attempt_id: str, request: Request, auth: Authenticate
     if rec.org_id is None:  # a learner has no assessment to withdraw from (their practice data is erased through the privacy routes)
         raise ProblemError(ErrorCode.ATT_INVALID_STATE)
     await run(rt.withdraw, rec.id)
+    await run(record_withdrawal, request, auth, rec)
     return json_ok(attempt_view(rt, load_attempt(rt, rec.id)))
 
 
@@ -595,7 +676,8 @@ async def list_challenges(attempt_id: str, request: Request, auth: Authenticated
         practice = rec.org_id is None and is_owner(auth, rec)  # a write-up is for a learner of their own practice, never in an assessment
         now = rt.clock()
         clocks = {c.challenge_key: c for c in rt.challenge_clocks(rec.id)}
-        for key in rt.challenge_keys:
+        keys = rt.keys_for(rec.id)  # the template's subset for an assessment
+        for key in keys:
             clock = clocks[key]
             if sequenced and not clock.visible:
                 continue  # a sandbox run shows one challenge at a time: the ones after the current one do not exist for the learner yet
@@ -622,7 +704,7 @@ async def list_challenges(attempt_id: str, request: Request, auth: Authenticated
         meta: dict[str, Any] = {}
         if sequenced:
             current = next((c for c in clocks.values() if c.state in ("ready", "active")), None)
-            meta = {"total": len(rt.challenge_keys), "current_key": current.challenge_key if current else None, "server_time": stamp(now)}
+            meta = {"total": len(keys), "current_key": current.challenge_key if current else None, "server_time": stamp(now)}
         return out, meta
 
     items, meta = await run(build)
@@ -665,7 +747,7 @@ def hint_context(rt: LabRuntime, auth: Authenticated, attempt_id: str, challenge
     rec = not_gone(owned(rt, auth, attempt_id))  # ownership 404, then 410, then the hints-off 404
     if not hints_enabled(rec):
         raise ProblemError(ErrorCode.ATT_HINTS_DISABLED)
-    if not _CHALLENGE.fullmatch(challenge_key):
+    if not _CHALLENGE.fullmatch(challenge_key) or challenge_key not in rt.keys_for(rec.id):
         raise ProblemError(ErrorCode.ATT_CHALLENGE_NOT_FOUND)
     return rec
 
@@ -738,6 +820,7 @@ async def decide_integrity_flag(attempt_id: str, integrity_flag_id: str, request
     rec = reviewable(rt, auth, attempt_id)
     if Role.RECRUITER not in auth.session.roles:
         raise ProblemError(ErrorCode.ATT_NOT_FOUND)  # the owner may read but not decide (OI-38): the same 404 as for anyone else
+    throttle(request, auth, "review", "rate_review_action_per_user_per_hour")
     number = flag_number(integrity_flag_id)
     rows = {r.flag_id: r for r in await run(rt.integrity.of, rec.id)}
     if number is None or number not in rows:

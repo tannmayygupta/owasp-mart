@@ -145,10 +145,12 @@ def test_the_signup_route_makes_a_participant_and_no_registered_route_creates_an
                               "/api/v1/me/deletion-requests/{request_id}", "/api/v1/invites/open", "/api/v1/invites/accept", "/api/v1/recruiters",
                               "/api/v1/company/reapply", "/api/v1/company/terms", "/api/v1/company/templates", "/api/v1/company/templates/{template_id}",
                               "/api/v1/company/invites", "/api/v1/company/invites/{invite_id}/actions", "/api/v1/me/exports",
-                              "/api/v1/company/exports"}
+                              "/api/v1/company/exports", "/api/v1/me/email", "/api/v1/accounts/confirm-email-change",  # WP-B: change of address, company side of deletion requests, colleagues
+                              "/api/v1/company/deletion-requests/{request_id}/decision", "/api/v1/company/attempts/{attempt_id}",
+                              "/api/v1/company/join-requests/{request_id}/decision", "/api/v1/company/members/{user_id}"}
     assert not any("admin" in p for p in state_changing), "no route can create an admin (FR-ACC-11): admins come from a seed command or an admin"
     # the admin area (story P-28) is behind `requires(Role.ADMIN)` and changes companies, accounts, settings and quotas; none of its routes makes or promotes an admin account
     assert admin_area == {"/api/v1/admin/companies/{org_id}/decision", "/api/v1/admin/users/{user_id}/actions", "/api/v1/admin/attempts/{attempt_id}/force-stop",
                           "/api/v1/admin/settings/{name}", "/api/v1/admin/quotas", "/api/v1/admin/break-glass", "/api/v1/admin/break-glass/{session_id}/close",
-                          "/api/v1/admin/break-glass/{session_id}/review"}
+                          "/api/v1/admin/break-glass/{session_id}/review", "/api/v1/admin/companies/{org_id}/invite-cap"}
     assert not any(p.rstrip("/").endswith(("admins", "roles")) for p in admin_area)

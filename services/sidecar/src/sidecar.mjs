@@ -14,7 +14,7 @@ import { buildCapture, BODY_CAP_BYTES, requestRef } from './capture.mjs';
 import { flagSeenEvent, evidenceCaptureEvent, proxyRequestEvent, crsMatchEvent, isoNow } from './events.mjs';
 import { methodClass, routeTemplate } from './route.mjs';
 
-export { SEQ_MAX, DEFAULT_STATE_PATH, loadCounter } from './outbox.mjs';
+export { SEQ_MAX, DEFAULT_STATE_PATH, DEFAULT_OUTBOX_PATH, loadCounter } from './outbox.mjs';
 export { readStartDocument, startDocumentOk } from './start.mjs';
 
 // Hop-by-hop headers and host: same handling as the stub's passThrough.
@@ -38,6 +38,8 @@ export function createSidecar({
   requestTimeoutMs = 3000,
   upstreamTimeoutMs = 10000,
   statePath = null, // main.mjs passes DEFAULT_STATE_PATH; a unit test passes a temp file or none
+  outboxPath = null, // the durable journal of the outbox (main.mjs passes DEFAULT_OUTBOX_PATH); none: memory only
+  maxBytes, authRetryMax, metricsMs = 30000,
   alarm = (m) => console.error(m),
   scanCapBytes = SCAN_CAP_BYTES,
   aggregateMs = 10000,
@@ -49,7 +51,7 @@ export function createSidecar({
 } = {}) {
   const validatePosted = compile(SCHEMAS.posted);
   const validateWire = compile(SCHEMAS.wire);
-  const outbox = createOutbox({ start, relayUrl, bufferMax, retryMinMs, retryMaxMs, requestTimeoutMs, statePath, alarm, validateWire });
+  const outbox = createOutbox({ start, relayUrl, bufferMax, retryMinMs, retryMaxMs, requestTimeoutMs, statePath, outboxPath, alarm, validateWire, ...(maxBytes !== undefined ? { maxBytes } : {}), ...(authRetryMax !== undefined ? { authRetryMax } : {}) });
   const { queue, stats } = outbox;
   Object.assign(stats, { requests: 0, scanned: 0, scan_skipped: 0, scan_errors: 0, flag_events: 0, evidence_events: 0, flag_repeats: 0, emit_errors: 0, aggregate_overflow: 0, crs_events: 0, crs_errors: 0 });
 
@@ -90,6 +92,17 @@ export function createSidecar({
   }
   const timer = setInterval(() => { try { flushAggregate(); } catch { alarmCounted('summary flush failed'); } }, aggregateMs);
   timer.unref();
+
+  // The drop counters of the outbox as one line, whenever one of them has grown (the only place an operator sees them: the shop-facing port shows no metrics). Counts only.
+  let lastDrops = '';
+  const dropLine = () => {
+    const m = outbox.metrics();
+    const drops = { never_succeed: m.dropped_never_succeed, auth: m.dropped_auth, overflow_low: m.dropped_overflow_low, overflow_normal: m.dropped_overflow_normal, overflow_critical: m.dropped_overflow_critical, journal_errors: m.journal_errors };
+    const text = JSON.stringify(drops);
+    if (Object.values(drops).some((n) => n > 0) && text !== lastDrops) { lastDrops = text; try { alarm(`metric: outbox drops ${text} queued=${m.queued}`); } catch { /* the sink must not break traffic */ } }
+  };
+  const metricsTimer = setInterval(dropLine, metricsMs);
+  metricsTimer.unref();
 
   // ---- the same candidate on the same route is reported once per window ----
   const recent = new Map(); // `${sha}|${method}|${route}` -> time first sent
@@ -223,10 +236,10 @@ export function createSidecar({
 
   return {
     events, player, stats, queue, flushAggregate, crs,
-    nextSeq: outbox.nextSeq,
+    nextSeq: outbox.nextSeq, outboxMetrics: outbox.metrics,
     async listen({ eventsPort = 9000, playerPort = 8080, host = '0.0.0.0' } = {}) {
       return { eventsPort: await listen(events, eventsPort, host), playerPort: await listen(player, playerPort, host) };
     },
-    async stop() { clearInterval(timer); try { crs?.stop(); } catch { /* gone */ } outbox.stop(); await Promise.all([closeServer(events), closeServer(player)]); },
+    async stop() { clearInterval(timer); clearInterval(metricsTimer); dropLine(); try { crs?.stop(); } catch { /* gone */ } outbox.stop(); await Promise.all([closeServer(events), closeServer(player)]); },
   };
 }

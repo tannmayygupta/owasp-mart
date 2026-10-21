@@ -37,7 +37,7 @@ from vulnmart.live.models import DomainEvent
 from vulnmart.notifications.models import EmailOutbox
 from vulnmart.notifications.service import DbOutboxPort
 from vulnmart.notifications.templates import validate_params
-from vulnmart.orgs.service import CompanyService, PendingCompany
+from vulnmart.orgs.service import CompanyRow, CompanyService, PendingCompany
 from vulnmart.ports.audit import AuditPort
 from vulnmart.ports.scope import Scope
 from vulnmart.ports.settings import SETTINGS, SettingsPort
@@ -48,7 +48,7 @@ logger = logging.getLogger("vulnmart.admin")
 
 USER_ID = re.compile(r"^u-[A-Z2-7]{16}$")
 ATTEMPT_ID = re.compile(r"^a-[A-Z2-7]{16}$")
-COMPANY_ACTIONS = ("approve", "reject", "suspend", "reinstate")
+COMPANY_ACTIONS = ("approve", "reject", "suspend", "reinstate", "delete")
 USER_ACTIONS = ("lock", "unlock", "reset_password", "delete")
 MAX_SEARCH = 100
 MAX_TEXT_SETTING = 200
@@ -71,6 +71,7 @@ RANGES: dict[str, tuple[int, int]] = {
     "instance_max_minutes": (1, 1440),
     "instance_company_cap": (0, MAX_QUOTA),
     "instance_total_cap": (0, MAX_QUOTA),
+    "instance_assessment_reserve": (0, MAX_QUOTA),
     "invite_cap_per_company_per_day": (0, 100_000),
     "evidence_max_bytes": (256, 1_048_576),
 }
@@ -158,10 +159,33 @@ class AdminOps:
                 self._companies.reject(actor, org_id, reason or "")
             elif decision == "suspend":
                 self._companies.suspend(actor, org_id, reason or "")
+            elif decision == "delete":
+                self._companies.delete_company(actor, org_id, reason or "")
             else:
                 self._companies.reinstate(actor, org_id, reason or "")
         except CompanyNotFound:
             raise NotFound from None
+
+    def companies(self, actor: Scope, *, status: str | None = None, limit: int = 100) -> list[CompanyRow]:
+        """Every company with its status, size and invite cap. The list shows owners' names and address domains, personal data, so the read is audited (FR-DSH-05)."""
+        admin_id = self._admin(actor)
+        rows = self._companies.list_companies(actor, status=status, limit=limit)
+        self._audit.append(actor=admin_id, action="admin.companies_read", subject=None, details={"count": len(rows), "status": status})
+        return rows
+
+    def set_company_invite_cap(self, actor: Scope, org_id: str, cap: int | None) -> CompanyRow:
+        """Set (or, with None, remove) one company's daily invite cap (FR-ORG-08); the company service audits it. Raises NotFound, InvalidInput (`/invite_cap`)."""
+        from vulnmart.orgs.service import CompanyNotFound
+
+        self._admin(actor)
+        try:
+            self._companies.set_invite_cap(actor, org_id, cap)
+        except CompanyNotFound:
+            raise NotFound from None
+        rows = self._companies.list_companies(actor, org_id=org_id, limit=1)
+        if not rows:
+            raise NotFound
+        return rows[0]
 
     # ---- users (FR-ADM-02) ----
 

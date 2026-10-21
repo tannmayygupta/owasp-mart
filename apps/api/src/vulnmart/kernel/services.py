@@ -63,6 +63,7 @@ def build_ports(settings: Settings, *, engine: Engine | None = None, session_sou
     `session_source` returns the session of the transaction in progress; with it (and a database) the outbox writes emails to
     `email_outbox` in that transaction (story P-09). The request layer that owns such a session arrives with story P-11, so the
     API process passes none yet and keeps the in-memory outbox (events stay in memory until story P-22 in any case)."""
+    strict = settings.env in ("staging", "production")
     scope = ContextScopePort()
     if engine is None and settings.postgres_dsn:
         engine = make_engine(settings.postgres_dsn)
@@ -73,7 +74,8 @@ def build_ports(settings: Settings, *, engine: Engine | None = None, session_sou
     outbox: OutboxPort = events
     if sessions is not None:
         events = DbEventPublisher(sessions, session_source)  # events are durable as soon as there is a database (story P-22)
-        outbox = LiveOutbox(events, FakeOutboxPort())  # emails stay in the stand-in until a request session exists
+        # Emails are written by the modules through DbOutboxPort in their own transaction; this port carries domain events only. In production its email side is closed (no stand-in).
+        outbox = LiveOutbox(events, None if strict else FakeOutboxPort())
     if sessions is not None and session_source is not None:
         outbox = DbOutboxPort(session_source, events, validator=validate_params)
         stubs.remove("outbox")

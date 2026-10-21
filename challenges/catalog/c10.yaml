@@ -22,7 +22,7 @@ start_state: "Sign in as the seller owner owner.harbor@vulnmart.test with the pa
 milestones:
   m1:
     summary: the player pointed the image importer at an internal-looking address
-    signal: importer.fetch_attempt with url_class in loopback, private, link_local, internal_name
+    signal: importer.fetch_attempt with url_class in loopback, private, link_local, internal_name and blocked = false (the address filter let an internal address through)
   m2:
     summary: the importer reached the internal metadata service
     signal: meta.request_served with ua_class = importer (the importer reached an internal service)
@@ -46,4 +46,6 @@ write_up:
   fix: >-
     An allow-list of image hosts, resolve DNS then check the final IP against private ranges, re-check after redirects,
     deny internal ranges at the network layer, token-based metadata, generic errors, do not return bodies.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"
+  - "also a decoy file beside the placement file in the volume only that service mounts (decoy_placement service-file)"

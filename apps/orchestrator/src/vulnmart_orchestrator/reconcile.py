@@ -62,6 +62,62 @@ class FakeDesiredState:
         return self.ids
 
 
+DESIRED_TARGET = "/internal/v1/orch/desired"
+MAX_DESIRED_BODY = 256 * 1024
+
+
+class HttpDesiredState:
+    """The platform's list of wanted instances (contract section 8a, handoff H-123): a signed GET to `<report url>/internal/v1/orch/desired`, signed with the
+    report key. Any answer but a good 200 (a network error, another status, a body that is not `{"instance_ids": [valid ids]}`, a redirect) raises, which the
+    reconciler turns into safe mode: nothing is destroyed for being unwanted. `get` is injectable for tests: (url, headers, timeout) -> (status, body)."""
+
+    def __init__(self, url: str, key: bytes, *, timeout_s: float = 5.0, get=None) -> None:
+        import urllib.parse
+
+        from .reports import check_report_url
+
+        check_report_url(url)
+        self._url = url.rstrip("/") + DESIRED_TARGET
+        self._target = urllib.parse.urlsplit(url).path.rstrip("/") + DESIRED_TARGET  # the request target that is signed
+        self._key, self._timeout, self._get = key, timeout_s, get or self._http_get
+
+    @staticmethod
+    def _http_get(url: str, headers: dict[str, str], timeout: float) -> tuple[int, bytes]:
+        import urllib.error
+        import urllib.request
+
+        from .reports import _NoRedirect
+
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+        try:
+            with opener.open(urllib.request.Request(url, method="GET", headers=headers), timeout=timeout) as resp:
+                return resp.status, resp.read(MAX_DESIRED_BODY + 1)
+        except urllib.error.HTTPError as err:
+            try:
+                return err.code, b""
+            finally:
+                err.close()
+
+    def desired(self) -> frozenset[str]:
+        import secrets
+
+        from .auth import body_sha256, sign
+
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        nonce = secrets.token_hex(16)
+        headers = {"X-VM-Timestamp": ts, "X-VM-Nonce": nonce, "X-VM-Signature": sign(self._key, "GET", self._target, ts, nonce, body_sha256(b""))}
+        status, body = self._get(self._url, headers, self._timeout)
+        if status != 200:
+            raise RuntimeError(f"desired state: status {status}")
+        if len(body) > MAX_DESIRED_BODY:
+            raise RuntimeError("desired state: body too large")
+        data = json.loads(body)
+        ids = data.get("instance_ids") if isinstance(data, dict) and set(data) == {"instance_ids"} else None
+        if not isinstance(ids, list) or len(ids) > 1000 or not all(isinstance(i, str) and INSTANCE_ID.fullmatch(i) for i in ids):
+            raise RuntimeError("desired state: the body is not a list of instance ids")
+        return frozenset(ids)
+
+
 class _Everything(frozenset):
     """Contains every id: nothing is ever unwanted."""
 
@@ -163,8 +219,12 @@ def _parse_time(value: str | None) -> datetime | None:
 
 
 class Reconciler:
-    def __init__(self, engine: Orchestrator, port: DesiredStatePort) -> None:
+    def __init__(self, engine: Orchestrator, port: DesiredStatePort, *, unwanted_passes: int = 1) -> None:
         self.engine, self.port = engine, port
+        # An instance is destroyed for being unlisted only after it was unlisted in this many passes in a row (the service uses 2: a create accepted a moment
+        # before the platform noted its id is never destroyed by one pass).
+        self.unwanted_passes = max(1, unwanted_passes)
+        self._unlisted: dict[str, int] = {}
         self._pass_lock = threading.Lock()  # one pass at a time
 
     def run_once(self, execute: Callable[[Callable[[], None]], None] | None = None) -> ReconcileResult:
@@ -212,6 +272,21 @@ class Reconciler:
                 self._sweep(iid, None, result, lambda: self._idle(rec))
         else:
             self._known(rec, objs, desired, result, execute)
+
+    def _unwanted(self, iid: str, desired) -> bool:
+        """True when the instance is not listed and has been missing from `unwanted_passes` passes in a row. Safe mode (`desired` None) never says yes and forgets the count."""
+        if desired is None:
+            self._unlisted.clear()
+            return False
+        if iid in desired:
+            self._unlisted.pop(iid, None)
+            return False
+        n = self._unlisted.get(iid, 0) + 1
+        self._unlisted[iid] = n
+        if n >= self.unwanted_passes:
+            self._unlisted.pop(iid, None)
+            return True
+        return False
 
     def _unrecorded(self, iid: str) -> bool:
         with self.engine._lock:
@@ -286,7 +361,7 @@ class Reconciler:
                 if e.mark_incomplete(rec) and self._sweep(iid, None, result, guard):
                     result.failed.append(iid)
                 return
-        if desired is not None and iid not in desired:
+        if self._unwanted(iid, desired):
             self._destroy(rec, "the platform does not list the instance", result, execute)
 
     def _unknown(self, iid: str, objs: list[Seen], desired, result: ReconcileResult, execute) -> None:
@@ -328,7 +403,7 @@ class Reconciler:
             result.failed.append(iid)
             return
         result.adopted.append(iid)
-        if desired is not None and iid not in desired:
+        if self._unwanted(iid, desired):
             self._destroy(rec, "the platform does not list the instance", result, execute)
 
     @staticmethod

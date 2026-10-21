@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
 info:
   title: Orchestrator API (IF-5), contract v1.0.0
-  version: 1.1.0
+  version: 1.2.0
   description: |
     The calls between the platform worker (stream P, VM-P) and the lab orchestrator (stream L, VM-I).
     Seven calls go from the platform to the orchestrator; one signed state report goes back.
@@ -307,6 +307,35 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
         '422': { $ref: '#/components/responses/Invalid' }
+  /internal/v1/orch/desired:
+    get:
+      tags: [state-report]
+      operationId: getDesiredInstances
+      summary: The instances the platform wants to exist (orchestrator to platform API), signed
+      description: |
+        Asked by the orchestrator at start and then with every reconciler pass. Signed like the state report, with the
+        orchestrator's own key (a GET has an empty body). The answer lists the ids of every instance the platform asked for and has not
+        seen destroyed, an instance whose create is still being sent included. The reconciler destroys an instance it finds on
+        its host that is not listed (after it was missing from two passes in a row), and adopts the ones that are. Any answer other than 200
+        (an error, a timeout, a bad body) means the platform cannot tell: the orchestrator then destroys nothing for being unwanted and
+        refuses new creates until a pass works (safe mode, story 3.5). An empty list is a valid answer and means that nothing is wanted.
+      servers:
+        - url: https://api.internal.invalid
+          description: Platform API on VM-P (private address, mTLS). The host name is a placeholder.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '200':
+          description: The wanted instances.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'private, no-store' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesiredInstances' }
+        '401': { $ref: '#/components/responses/BadSignature' }
 components:
   parameters:
     Timestamp:
@@ -618,6 +647,17 @@ components:
             - { $ref: '#/components/schemas/ErrorCode' }
             - { type: 'null' }
         health: { $ref: '#/components/schemas/Health' }
+    DesiredInstances:
+      description: The ids of the instances the platform wants on its hosts. At most 1000 (the host holds a handful).
+      type: object
+      additionalProperties: false
+      required: [instance_ids]
+      properties:
+        instance_ids:
+          type: array
+          maxItems: 1000
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/InstanceId' }
     Problem:
       description: |
         The error body of IF-8 (contracts/errors/problem.schema.json), copied here so that this file is self-contained;

@@ -1,0 +1,7 @@
+{
+  "schema": "ChangeEmailRequest",
+  "body": {
+    "new_email": "yara.work@example.org",
+    "current_password": "correct-horse-battery-staple"
+  }
+}

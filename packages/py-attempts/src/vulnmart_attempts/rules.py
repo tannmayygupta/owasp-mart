@@ -1,6 +1,7 @@
 """The rules copied from the template when an attempt starts (all numbers are placeholders, OI-25)."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 
@@ -18,11 +19,29 @@ class Rules:
     activity_check_mode: str = "hold"  # D-94: "hold" or "flag" (flag only, the capture counts)
     withdrawal_undo_days: int = 7
     results_visibility: str = "after_submit"  # H-355, OI-15: "after_submit" or "after_release" (the recruiter releases the candidate's results)
+    # What the recruiter's template says (wiring audit F-07); they apply to a company assessment, a learner's practice has free hints and every challenge.
+    hints_mode: str = "off"  # "off" or "on" (FR-HNT-02: off by default for a candidate)
+    hint_cost_pct: int = 0  # the cost of hint level L is hint_cost_pct x L percent of the challenge's points (10 gives the 10, 20, 30 of PRD Appendix A), capped at 100
+    challenge_keys: tuple[str, ...] = ()  # the challenges of the assessment; empty means every challenge
+    flag_submissions_per_minute: int = 10  # pasted flags per minute and attempt (a company's own limit)
+    writeup_required: bool = False  # the template asks for a short write-up per solved challenge
 
     def __post_init__(self) -> None:
         if min(self.min_capture_seconds, self.idle_capture_seconds, self.instant_capture_seconds,
                self.withdrawal_undo_days) < 0:
             raise ValueError("integrity thresholds and the undo window cannot be negative")
+        if self.hints_mode not in ("off", "on"):
+            raise ValueError("hints_mode must be 'off' or 'on'")
+        if type(self.hint_cost_pct) is not int or not 0 <= self.hint_cost_pct <= 100:
+            raise ValueError("hint_cost_pct must be a whole number from 0 to 100")
+        keys = tuple(self.challenge_keys)
+        if any(not isinstance(k, str) or not re.fullmatch(r"C(0[1-9]|10|11)", k) for k in keys) or len(set(keys)) != len(keys):
+            raise ValueError("challenge_keys must be distinct challenge keys (C01 to C11)")
+        object.__setattr__(self, "challenge_keys", tuple(sorted(keys)))
+        if type(self.flag_submissions_per_minute) is not int or not 1 <= self.flag_submissions_per_minute <= 60:
+            raise ValueError("flag_submissions_per_minute must be a whole number from 1 to 60")
+        if type(self.writeup_required) is not bool:
+            raise ValueError("writeup_required must be true or false")
         if self.results_visibility not in ("after_submit", "after_release"):
             raise ValueError("results_visibility must be 'after_submit' or 'after_release'")
         if self.activity_check_mode not in ("hold", "flag"):
@@ -52,6 +71,11 @@ class Rules:
             "activity_check_mode": self.activity_check_mode,
             "withdrawal_undo_days": self.withdrawal_undo_days,
             "results_visibility": self.results_visibility,
+            "hints_mode": self.hints_mode,
+            "hint_cost_pct": self.hint_cost_pct,
+            "challenge_keys": list(self.challenge_keys),
+            "flag_submissions_per_minute": self.flag_submissions_per_minute,
+            "writeup_required": self.writeup_required,
         }
 
     @classmethod
@@ -77,9 +101,20 @@ class Rules:
         visibility = data.get("results_visibility", defaults.results_visibility)
         if not isinstance(visibility, str):
             raise ValueError("results_visibility must be text")
+        hints_mode = data.get("hints_mode", defaults.hints_mode)
+        if not isinstance(hints_mode, str):
+            raise ValueError("hints_mode must be text")
+        keys = data.get("challenge_keys", defaults.challenge_keys)
+        if not isinstance(keys, (list, tuple)) or any(not isinstance(k, str) for k in keys):
+            raise ValueError("challenge_keys must be a list of challenge keys")
+        writeup = data.get("writeup_required", defaults.writeup_required)
+        if type(writeup) is not bool:
+            raise ValueError("writeup_required must be true or false")
         return cls(
             time_limit_minutes=whole("time_limit_minutes"), grace_seconds=whole("grace_seconds"), warning_minutes=tuple(warnings),
             freeze_minutes=whole("freeze_minutes"), reset_limit=whole("reset_limit"), min_capture_seconds=whole("min_capture_seconds"),
             idle_capture_seconds=whole("idle_capture_seconds"), instant_capture_seconds=whole("instant_capture_seconds"),
             activity_check_mode=mode, withdrawal_undo_days=whole("withdrawal_undo_days"), results_visibility=visibility,
+            hints_mode=hints_mode, hint_cost_pct=whole("hint_cost_pct"), challenge_keys=tuple(keys),
+            flag_submissions_per_minute=whole("flag_submissions_per_minute"), writeup_required=writeup,
         )

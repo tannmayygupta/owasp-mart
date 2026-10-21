@@ -9,11 +9,18 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Rename, removal, retyping, or making an optional field required: **breaking**. It needs approval from every consumer and an expand-then-contract path. Before v1.0.0 it bumps the minor number and is declared here with a bullet line that starts with `BREAKING:` and a reason (exact case; "no BREAKING changes" does not count); from v1.0.0 it is a major bump.
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
+- registry change: `.github/workflows/ci.yml` gets a new job `shop-instance` (builds the shop image and runs the instance harness; work package D, 2026-10-21). No contract file, rule, pin or checker changes.
 - registry change: `scripts/check-contract-rules.mjs` (rule `approvals`) and `contracts/COMPAT.md` on 2026-10-21 (D-105, ADR 0095): a line `**Sole maintainer:** @handle` in the base COMPAT.md makes a pull request authored by that handle pass the approvals rule, because nobody else can review it; the breaking-change diff, validators, changelog, mock and registry rules are unchanged. Without it the first contract change after the tag `contracts-v1.0.0` could not be merged.
 - registry change: `contracts/COMPAT.md` is edited on 2026-10-21 (decisions D-102 and D-104: the team is the leader and Claude, and Claude approves under the leader's standing authority). The three rows that were `pending` for former developers (IF-2 2.1.0 consumer, DB 2.2.0 owner, DB 2.2.0 consumer) now name `@tannmayygupta` and are `approved`. Evidence: `apps/api/tests/test_table_owners.py` and `test_lab_contract.py` 191 passed, `pnpm run api:check` clean, the typecheck of `apps/web` against the regenerated types clean, `pnpm run contracts:rules` 16 PASS 0 FAIL, and the sign-off method is the standard one for a single maintainer: breaking-change detection by oasdiff plus the consumers' own test suites. No contract file changes.
 - registry change: `.github/workflows/ci.yml` gets a step for the records check (`scripts/check-records.mjs`), a Valkey service for the api job and the release gate in the exploit-runner job (tracker audit 2026-10-21, story 12). No contract file, rule, pin or checker changes.
+- registry change: `.github/workflows/ci.yml` gets the deployed-compose lint, the route check, the pytest skip budget and the production dashboards image build (work package C, 2026-10-21). No contract file, rule, pin or checker changes.
 
 ## Platform API (IF-1), `contracts/api/platform/`
+
+### 1.8.0 (2026-10-21, Tanmay, work package B, ADR 0073)
+
+- Additive, not breaking (the OpenAPI `info.version` is not changed here, as in the entries below): twelve operations that were implemented in services and had no route. Company: `listCompanyDeletionRequests` `GET /api/v1/company/deletion-requests`, `decideDeletionRequest` `POST .../{request_id}/decision`, `deleteCandidateRecord` `DELETE /api/v1/company/attempts/{attempt_id}` (the company side of candidate deletion requests, FR-PRV-08, FR-PRV-09, with the `escalated` flag), `listJoinRequests` `GET /api/v1/company/join-requests`, `decideJoinRequest` `POST .../{request_id}/decision`, `listCompanyMembers` `GET /api/v1/company/members`, `removeCompanyMember` `DELETE /api/v1/company/members/{user_id}` (colleagues, FR-ORG-03, owner only), `getCohort` `GET /api/v1/company/templates/{template_id}/cohort` (the private cohort view, D-93). Admin: `listCompanies` `GET /api/v1/admin/companies`, `setCompanyInviteCap` `PUT /api/v1/admin/companies/{org_id}/invite-cap`, and the decision `delete` is added to `decideCompany` (`CompanyDecisionRequest.decision`). Accounts: `requestEmailChange` `POST /api/v1/me/email` and `confirmEmailChange` `POST /api/v1/accounts/confirm-email-change` (FR-ACC-09). The `Template` answer gains the required member `cohort_board` and `TemplateRequest` the optional `cohort_board` (default false). The schemas `ChangeEmailRequest`, `ChangedStatus`, `CompanyDeletionRequest(List)`, `DeletionDecisionRequest`, `DeletedRecord`, `CompanyJoinRequest(List)`, `JoinDecisionRequest`, `CompanyMember(List)`, `Cohort`, `CohortRow`, `AdminCompany(List)`, `InviteCapRequest` and the response `AccountConflict` are added; no new error code. Behaviour of `acceptInvite` (documented, no new operation): an account whose email address is not verified is now answered 403 AUTH-EMAIL-NOT-VERIFIED (it was a 409 ATT-INVALID-STATE) and an account whose verified address is not the invite's is 409 ATT-INVALID-STATE with the Problem member `field` set to `/account/email` (the client then offers `resendVerification` or `requestEmailChange`); the invite's address is never said. The 403 response of `acceptInvite` gains this code in its description and example (an existing status, so not breaking). Not a contract change but made in the same pull request: the route of `openBreakGlass` now enforces the 20 to 500 characters the contract and the service already had, and the bulk invite body may be up to 192 KiB (500 addresses of 254 characters; the other routes keep 16 KiB). The bundle (81 platform operations, 101 in all) and the generated models and client are regenerated. no mock change: the mock is a server of the bundle and serves the new operations from their examples (four valid and five invalid request examples added; the invalid example `admin-decision-bad-value` now uses `archive`, because `delete` became a value).
+- registry change: `contracts/COMPAT.md` is edited: the IF-1 row of Versions names 1.8.0 and the DB row 2.2.0; the owner rows of IF-1 and DB and the consumer rows of DB are set to those versions with status `pending` until the leader signs them off (the one developer of the project now, 2026-10-21).
 
 ### 1.7.0 (2026-10-20, Akshay, story 3.6)
 
@@ -74,6 +81,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Error codes and error format (IF-8), `contracts/errors/`
 
+### 2.0.0 (2026-10-21, Tanmay with Claude, backlog story 12, ADR 0071)
+- Additive: one code, `INST-NO-CAPACITY` (503, retryable): no instance can be started right now (the platform is at its limit or the orchestrator has no capacity); the lab API answers it instead of a 429. Constants regenerated (61 codes).
+- BREAKING: none in substance. The rules engine cannot compare `error-codes.yaml` and treats any change as breaking, so the major number is raised (the same reading as IF-2 2.0.0). Checked by hand: 1 added, 0 removed, 0 changed.
+- registry change: `contracts/COMPAT.md` IF-8 row names 2.0.0 (the approval rows are the leader's to close). No mock change: no mock sends this code.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, label change plus one code (below); no mock change. Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -170,6 +181,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Lab API (IF-2), `contracts/api/lab/`
 
+### 2.2.0 (2026-10-21, Tanmay with Claude, backlog story 12, ADR 0071: the attempt lifecycle, template settings, quotas and rate limits)
+- Additive: one operation, `cancelAttempt` (`POST /api/v1/attempts/{attempt_id}/cancel`), for the recruiter of the owning company (FR-SES-07): a `ready` or `running` company attempt becomes `cancelled`, the instance is destroyed, the candidate sees the state in `getAttempt`. Documented responses added: `429 REQ-RATE-LIMITED` (per-account hourly limit) on `requestInstance`, `startAttempt`, `openInstance`, `resetInstance`, `stopInstance`, `releaseResults`, `decideIntegrityFlag`; `503 INST-NO-CAPACITY` (component `Unavailable`, with `Retry-After`) on `requestInstance` and `startAttempt`.
+- Behaviour: a full orchestrator or platform answered 429 `REQ-RATE-LIMITED` before; it now answers 503 `INST-NO-CAPACITY` (new IF-8 code, registry 2.0.0). `startAttempt` checks the invite (a revoked, expired, declined or cancelled invite is 409 and cancels a ready attempt; a consented invite becomes `started`). The template's challenge subset, hints mode, hint cost and flags per minute now apply to `listChallenges`, hints, flags, score and report. No existing member, value or route changed.
+- BREAKING: none in substance (no value of a response enum or member was added, removed or changed). The one visible change is the status of a full platform on `requestInstance` (429 to 503); no consumer relies on it (apps/web and lab-console show the problem text), so there is no contract step to follow.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (`cancelAttempt`); example `examples/valid/attempt.cancelled.json`. Generated code and bundle regenerated.
 ### 2.1.0 (2026-10-20, Tanmay, backlog story 10, handoff H-355: the recruiter releases a candidate's results)
 - Additive: one operation, `releaseResults` (`POST /api/v1/attempts/{attempt_id}/release`), for the recruiter of the owning company; the optional member `results_released` (boolean) of `Attempt`, present only on a company assessment whose invite says `after_release`. No existing value, member or route changed.
 - Behaviour: when the invite says `after_release` the candidate's own `getScore` answers 404 and `listChallenges` shows nothing earned until the recruiter releases the finished attempt (OI-15, the developer's answer of 2026-10-18). `after_submit` (the default) and a learner's practice are as before.
@@ -234,6 +250,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
 
+### 1.2.0 (2026-10-21, the leader and Claude, work package C, handoff H-123)
+
+- Additive, not breaking: `GET /internal/v1/orch/desired` (`getDesiredInstances`, orchestrator to platform API, signed with the orchestrator key like the state report): the ids of the instances the platform wants, so that the reconciler can destroy what no one asked for and adopt the rest; the schema `DesiredInstances`; one valid and one invalid example; section 8a of `orchestrator-api.md`. Any answer but a good 200 keeps the orchestrator in safe mode. no mock change: the route is served by the platform API (the fake orchestrator is the other side and only sends reports), so the fake service has nothing to serve for it.
+- registry change: `.github/workflows/ci.yml` runs three more checks (`scripts/check-deployed-compose.mjs`, `scripts/check-pytest-skips.mjs` on the `api` and `scripts` jobs, `scripts/check_spec_routes.py`), and `scripts/check_orchestrator_contract.py` lists the new operation; no rule of `scripts/check-contract-rules.mjs` changes (the leader's instruction of 2026-10-21, D-102).
+
 ### 1.1.0 (2026-10-19, Tanmay, audit blocker B1)
 - Additive: `POST /v1/instances/{id}/activity` (`reportActivity`, body `{ "at": <RFC 3339> }`, signed like the other calls, 200 with the instance status, 409 ORCH-INVALID-STATE when the instance is not ready, active or idle). Without it the real service never learned that a player was active, so the idle limit ran from `ready` and cut off players mid-attempt. Examples: `activity.request.json` and three invalid ones.
 - Mock changed with it: `contracts/mocks/fake-orchestrator/server.mjs` (route, validation, `active` transition).
@@ -278,6 +299,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance events (IF-4), `contracts/events/`
 
+### 1.0.1 (2026-10-21, the leader and Claude, work package D, H-43)
+
+- Documentation only, no schema or example change (clarification, no version label change in COMPAT): section 7 of `app-events.md` now states the milestone mapping (H-43, OI-17): the catalogue `signal` text names the event type and field values, the platform rules file implements it, tests prove the vulnerable and the fixed build; the C09 M2 negative observation uses `shop.security_event_written`, which the shop now posts. no mock change: documentation only.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -316,6 +340,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Table owners (DB), `contracts/db/`
 
+### 2.3.0 (2026-10-21, Tanmay, work package B)
+- Additive: one row in `table-owners.yaml`, `email_changes` (owner accounts), created by migration `0018` (a pending change of an account's address: the new address and the hash of the single-use link mailed to it, one row per account; FR-ACC-09). The schema of every other table is unchanged. The application role may select, insert, update and delete the new table.
+
 ### 2.2.0 (2026-10-20, Tanmay, backlog story 6)
 - Additive: one row in `table-owners.yaml`, `challenge_opens` (owner attempts), created by migration `0017`: when a learner began each challenge of a sequenced run, the start of its countdown. The same migration replaces the unique constraint `uq_attempts_user_id_template_id` of `attempts` by the partial unique index `uq_attempts_current`, so a learner can start a new run after a finished one (a company attempt stays one per invite). The schema is unchanged.
 - no mock change: nothing runs against the table-owners list (`noMock` in the registry).
@@ -352,6 +379,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Additive: three optional fields on a challenge entry — `brief` (a short player-facing description, never a flag), `write_up` (`{ vulnerable, fix }`) and `decoys` (string array of foil locations). Existing entries stay valid; a stub omits them. No mock change (the catalogue is data read by validators, nothing runs against it). Not breaking (new optional properties; `exploit_test` and `fixed_build` patterns unchanged — they stay logical references, with `challenges/catalog/README.md` noting the real self-test folders are `challenges/tests/cNN-<name>` and the fixed build is the `VM_CHALLENGE_<KEY>` env flag). `validate-catalog.mjs` now also requires a `complete` entry to have non-null milestone signals, non-null hints and a brief.
 - All 11 `challenges/catalog/cNN.yaml` entries are now `status: complete` (T-30): milestone detection signals, the three hint texts, a flag-free brief, the vulnerable/fix write-up and decoy locations, filled from `docs/design/challenge-specs.md`.
 
+### 1.2.1 (2026-10-21, the leader and Claude, work package D, H-42, H-43, H-331)
+
+- Data and documentation only, no schema change (clarification; work package D, the leader and Claude, no schema change, no version bump): the milestone `signal` text of C01 M2, C03 M3, C05 M2, C07 M1, C08 M1 and M2, C09 M1 and C10 M1 is tightened to what the platform rules read; every entry now lists its decoy placements in `decoys` (H-42, H-331: kinds `shop-db` and `service-file`, described in `contracts/catalog/README.md`); the mapping of milestone to event name (H-43) is settled in IF-4 section 7. no mock change: the catalogue is data read by validators.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -400,3 +430,4 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ### 2026-10-11 (Tanmay, story 1.15)
 - registry change: IF-7 (challenge catalogue, owner T) is registered and `contracts/catalog` is no longer reserved; the checker, its registry, the oasdiff pins and the workflow now run from the base commit (trusted checker, ADR 0026); deleting a whole contract is a breaking change; the marker is the exact line `BREAKING:`.
+- registry change: `.github/workflows/ci.yml` gets a step `node scripts/check-asvs.mjs` in the `scripts` job on 2026-10-21 (work package G, task P-32): the ASVS 5.0.0 checklist `docs/security/asvs-checklist.md` must hold one row per requirement with a status, an owner and evidence whose files exist. No contract file changes, no rule of the contract checker changes.
