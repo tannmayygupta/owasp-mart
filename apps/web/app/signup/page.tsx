@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { api, say } from '../../lib/api';
+import { AuthShell } from '../auth-shell';
 
 // Sign-up (FR-ACC-01, FR-ORG-01): a learner (18 and over), or a recruiter with the company's name (the company waits for an admin's approval, story P-18). The
 // answer is the same whether the address is new or known (no account enumeration); the mail says what to do.
@@ -39,11 +40,11 @@ export default function SignupPage() {
     );
   }
   return (
-    <div className="card narrow">
-      <h1>Create an account</h1>
-      <div className="row" role="radiogroup" aria-label="Account type">
-        <label className="check"><input type="radio" name="kind" checked={kind === 'learner'} onChange={() => setKind('learner')} /> <span>I want to practise</span></label>
-        <label className="check"><input type="radio" name="kind" checked={kind === 'recruiter'} onChange={() => setKind('recruiter')} /> <span>I recruit for a company</span></label>
+    <AuthShell>
+      <h2>Create an account</h2>
+      <div className="segmented" role="radiogroup" aria-label="Account type">
+        <label><input type="radio" name="kind" checked={kind === 'learner'} onChange={() => setKind('learner')} /> <span>I want to practise</span></label>
+        <label><input type="radio" name="kind" checked={kind === 'recruiter'} onChange={() => setKind('recruiter')} /> <span>I recruit for a company</span></label>
       </div>
       {error && <p className="banner bad" role="alert">{error}</p>}
       <form onSubmit={onSubmit}>
@@ -63,12 +64,12 @@ export default function SignupPage() {
         {kind === 'learner' && (
           <label className="check" htmlFor="age">
             <input id="age" name="age" type="checkbox" required />
-            <span>I am 18 or over.</span>
+            <span>I am 18 or over, and I will only attack the lab, never anything else.</span>
           </label>
         )}
-        <p><button type="submit" disabled={busy}>Create account</button></p>
-        <p className="muted">Already have one? <Link href="/login">Sign in</Link></p>
+        <p><button type="submit" className="btn-block" disabled={busy}>Create account</button></p>
+        <p className="muted switch">Already have one? <Link href="/login">Sign in</Link></p>
       </form>
-    </div>
+    </AuthShell>
   );
 }
