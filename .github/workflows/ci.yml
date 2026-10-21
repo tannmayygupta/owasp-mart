@@ -51,6 +51,8 @@ jobs:
       # story 3.2: the same protocol, wire, http, report and mTLS suites against the Python orchestrator service (reset cases skipped until story 3.4)
       - run: VM_ORCH_SERVICE=python uv run --locked --package vulnmart-api pytest -q apps/api/tests/test_protocol.py apps/api/tests/test_wire_rules.py apps/api/tests/test_http_service.py apps/api/tests/test_reports.py apps/api/tests/test_mtls.py
       - run: pnpm run contracts:check
+      # tracker audit 2026-10-21: the records (requirements, handoffs, decision records, story plans) must agree with each other
+      - run: pnpm run records:check
 
 
   # D-46 (story 1.15, docs/adr/0026): the rules engine must not be weakenable by the pull request it grades. The job runs the checker, the registry rules
@@ -218,6 +220,7 @@ jobs:
           test -n "$(find challenges/tests -name '*.test.mjs' -print -quit)" \
             || { echo 'no challenge exploit tests found'; exit 1; }
       - run: node --test "challenges/tests/**/*.test.mjs"
+      # The release gate: every challenge must be exploitable on its vulnerable build and safe on its fixed build (11 of 11, about 75 s). Tracker audit 2026-10-21, item T-31.
       - run: node scripts/release-gate.mjs
   shop-instance:
     name: shop instance harness
@@ -266,9 +269,17 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U vulnmart -d vulnmart" --health-interval 3s --health-timeout 3s --health-retries 30
+      # A real Valkey (same image as the Compose file): the live hub, rate limit and broker tests run here instead of skipping (tracker audit 2026-10-21; run locally: 136 passed).
+      valkey:
+        image: valkey/valkey:9.0.6-alpine3.24@sha256:187679e3bd4036959631e3f03983ab2ba503ab21e6fd0454d508e909db2ee989
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping" --health-interval 3s --health-timeout 3s --health-retries 30
     env:
       VULNMART_TEST_POSTGRES_DSN: postgresql://vulnmart:ci-owner-throwaway@localhost:5432/postgres
       VULNMART_TEST_APP_DSN: postgresql://vulnmart_app:ci-app-throwaway@localhost:5432/vulnmart
+      VULNMART_TEST_VALKEY_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The fake orchestrator of the tests (contracts/mocks) is Node and imports js-yaml (story 1.16), so the workspace must be installed.

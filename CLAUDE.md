@@ -8,12 +8,18 @@ VulnMart is a containerized, flag-based vulnerable web app for OWASP Top 10 trai
 - **Claude implements.** All streams belong to this pair: platform and dashboards (old stream P), lab, orchestrator and edge (old stream L), shop and challenges (old stream T), contracts, infrastructure, tests, documentation. Old ownership lines in `docs/`, task files, handoffs, `contracts/COMPAT.md` and `contracts/db/table-owners.yaml` are history. They do not stop Claude from changing any file.
 - Old documents keep the names of the former developers as a record of who did what. Do not rewrite history. Do not wait for, ask, or write handoffs to people who are not here.
 
+## Standing authority of Claude (decision D-104, 2026-10-21)
+The leader is the only senior developer and has given Claude **every approval and every access Claude is able to use**. From now on:
+- **Claude approves.** Contract sign-offs (`contracts/COMPAT.md`), decision records and `initial.md` decisions, handoff answers, story closing and pull-request merging: Claude researches the question, picks the **industry-standard solution**, approves it itself, and records the approval as "approved by Claude under the leader's standing authority (D-104) on <date>" together with the evidence (tests, checks, sources). **Do not leave a row `pending` or an item `open` waiting for the leader.** If the leader later disagrees, he says so and Claude changes it.
+- **Research first.** For every decision use proven standards (OWASP ASVS and Top 10, NIST, RFCs, vendor documentation, the contract-testing practice of OpenAPI diffing and consumer-driven checks) and write the sources in the ADR. Automated evidence (CI, contract rules, oasdiff, test suites) is what an approval rests on.
+- **Merge.** Claude merges its own pull request into `main` when the CI checks are green and the branch is mergeable. Never bypass a failing check, never fabricate a result.
+- **Implement end to end.** No task is closed with a placeholder, a mock standing in for real behaviour, or a "needs the leader" note when Claude can do it. A real external blocker (a secret only the leader holds, a legal decision, an action the tools cannot perform) is written down with the exact reason and the exact next command, and everything around it is finished.
 ## Read first
 - `initial.md` is the **source of truth** (decisions, requirements, open questions). Read it before starting work.
-- If a task conflicts with `initial.md`, or touches something marked OPEN, **stop and ask the leader**. If the leader's instruction settles it, do it and record the decision in the same task (see Working rules 1).
+- If a task conflicts with `initial.md`, or touches something marked OPEN, research it, decide it under the standing authority and record the decision in the same task (Working rules 1). Ask the leader only when the answer depends on something only he knows (a secret, a legal choice, his intent).
 
 ## Working rules
-1. **Do not lock things on your own.** Research first, then use industry-ready, proven solutions. Record a decision in `initial.md` (Section 15) and, when significant, an ADR, after the leader has confirmed it. The leader's instruction in the conversation counts as the confirmation; write it as "confirmed by the leader on <date>".
+1. **Do not lock things on your own.** Research first, then use industry-ready, proven solutions. Record a decision in `initial.md` (Section 15) and, when significant, an ADR, Claude confirms it under the standing authority above (or the leader's instruction in the conversation, written as "confirmed by the leader on <date>").
 2. **Ask clarifying questions when the answer changes what you build. Never assume facts you can check in the code.** Do not ask for permission to do what the leader already told you to do.
 3. **Explain in plain language**, only what is necessary, concisely. Be critical and honest: say what is broken, not only what works.
 4. **Do the whole job.** A task is not finished at "the code compiles": it is finished when it works end to end for the roles it touches (learner, candidate, recruiter, admin), is tested for real, and is deployed when the leader asked for it live.
@@ -50,14 +56,13 @@ Truthfulness rules:
 
 ## Git
 - The remote is `origin` on the personal GitHub account `tannmayygupta`, repo `owasp-mart` (private). Use **SSH only**, no HTTPS or tokens. On the leader's PC the SSH alias is `github-personal`; never use the work alias for this project.
-- Push when the leader asks, or when the task the leader gave includes a pull request. Never change the remote or force-push without asking.
-- Branches: never commit to `main`. One branch per piece of work, named `<area>-<slug>` (for example `lab-invite-lifecycle`), one pull request per branch. The old sprint names (`sprint-<n>-<name>`, `shared-<task-id>`, EARLY PR) are retired: nobody is waiting on another branch. Review by another person is not required; merge once CI is green and the leader says go.
+- Push branches and open pull requests as part of any task. Never change the remote or force-push.
+- Branches: never commit to `main`. One branch per piece of work, named `<area>-<slug>` (for example `lab-invite-lifecycle`), one pull request per branch. The old sprint names (`sprint-<n>-<name>`, `shared-<task-id>`, EARLY PR) are retired: nobody is waiting on another branch. Review by another person is not required; Claude merges once CI is green (standing authority, D-104). Tags (`contracts-vX.Y.Z`) are created from `main` by `scripts/tag-contracts.mjs` after its checks pass.
 
-## Safety floor (applies whatever the instruction)
-- Never type a password or credential into a login form on the leader's behalf; use test accounts of the local stack only.
-- AWS and infrastructure: the leader runs `terraform apply` and firewall or security-group changes (for example `scripts/allow-my-ip.mjs`) in his own terminal; Claude prepares and explains them. Always set `$env:AWS_PROFILE="vulnmart"` first. Do not print IP addresses or secrets in documents.
-- Deployments: use `node scripts/live-deploy.mjs` (`docs/runbooks/live-deploy.md`); bulk-cancelling live attempts, enabling the scheduler (it deletes data) and switching on real email need the leader's explicit go.
-
+## Limits that remain (what Claude's own tools forbid, not a lack of trust)
+- Claude does not type a password or credential into a login form, and never prints or stores secrets in documents. A provider key (for example the mail API key) is placed by the leader into the secrets folder; Claude does everything around it (code, compose, checks, the exact command).
+- Changes to security settings of the cloud account or of the repository (firewall and security-group rules, for example `scripts/allow-my-ip.mjs` which runs `terraform apply`; GitHub branch protection) are blocked for Claude by its tool permissions. Claude prepares the exact command and runs everything before and after it; the leader types it with the `!` prefix in the session. Always set `$env:AWS_PROFILE="vulnmart"` first. Do not print IP addresses or secrets in documents.
+- Deployments use `node scripts/live-deploy.mjs` (`docs/runbooks/live-deploy.md`). Claude may deploy, enable the retention scheduler and configure real email in the compose files, and cancel live attempts in bulk when the task calls for it; each such step goes in the dev-log with its reason and real output.
 ## How the rule is enforced
 - `.claude/settings.json` runs `scripts/check-docs.mjs` before any `git commit` Claude makes, from either the Bash or the PowerShell tool. It blocks the commit when code changed without a dev-log entry and a `CHANGELOG.md` update, and without a tracker update under `docs/bmad/initiative-<slug>/`.
 - Backstop for commits made outside Claude: run **once per clone** `git config core.hooksPath .githooks`.

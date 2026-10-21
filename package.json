@@ -9,6 +9,7 @@
     "test:e2e": "node --test --test-concurrency=1 \"scripts/e2e/*.test.mjs\"",
     "dev": "node scripts/dev.mjs",
     "progress": "node scripts/progress-page.mjs --serve",
+    "records:check": "node scripts/check-records.mjs",
     "contracts:check": "node scripts/validate-contracts.mjs && node scripts/validate-events.mjs && uv run --locked --package vulnmart-api python scripts/check_orchestrator_contract.py && uv run --locked --package vulnmart-api python scripts/check_lab_contract.py && uv run --locked --package vulnmart-api python scripts/check_platform_contract.py",
     "ci:linux": "node scripts/ci-linux.mjs",
     "contracts:rules": "node scripts/check-contract-rules.mjs",

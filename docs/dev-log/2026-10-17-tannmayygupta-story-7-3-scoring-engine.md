@@ -9,7 +9,7 @@
 | Report tag | scoring, hiring formula, Appendix A, FR-SCR-01 to FR-SCR-06, FR-SCR-09, FR-SCR-10, D-85, D-86, D-87 |
 
 ## Requirements covered
-FR-SCR-01 to 06, 09, 10 (library part); PRD Appendix A examples; decisions D-85, D-86, D-87 (new, Proposed); ADR 0041; handoff H-329 (new). Task L-23 (stays unticked).
+FR-SCR-01 to 06, 09, 10 (library part); PRD Appendix A examples; decisions D-85, D-86, D-87 (new, Proposed); ADR 0091; handoff H-329 (new). Task L-23 (stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 A pure function now turns three facts per challenge (best milestone, hint levels unlocked, held or not) and a weight table into a score from 0 to 1000. Time, wrong submissions and other players are not inputs, so they cannot change it. Hints never push one challenge below zero, a held capture counts as if it had not happened until a human decides, and learner mode gets stars, a tick and a badge instead of a score.
@@ -30,10 +30,10 @@ Hiring: per challenge `net = max(0, W x (share(best milestone) - sum of hint per
 - `packages/py-attempts/src/vulnmart_attempts/{catalogue,scoring}.py`, `__init__.py` (exports) - new / changed
 - `packages/py-attempts/tests/test_scoring_*.py`, `test_learner_progress.py` - new
 - `docs/assets/story-7-3-scoring-engine/test-output.txt` - raw output
-- Docs: this entry, ADR 0041, `initial.md` (D-85 to D-87), HANDOFFS (H-329), CHANGELOG, traceability, dev1 file
+- Docs: this entry, ADR 0091, `initial.md` (D-85 to D-87), HANDOFFS (H-329), CHANGELOG, traceability, dev1 file
 
 ## Decisions made
-D-85 (score is a pure function of three facts and the weight table), D-86 (exact half-up integer rounding, cumulative hint cost, floor at zero per challenge), D-87 (held capture computed as if not reached, recomputed from facts, learner mode shows no hint penalty). Deviations inside the plan: the percentages live in a new `ScoringRules` and not in story 7.1's `Rules`, so the `attempts.rules` jsonb shape did not change; `Fact` has a fourth field `fallback`, valid only with `held`. See `docs/adr/0041-attempt-clock-scoring-and-expiry.md`.
+D-85 (score is a pure function of three facts and the weight table), D-86 (exact half-up integer rounding, cumulative hint cost, floor at zero per challenge), D-87 (held capture computed as if not reached, recomputed from facts, learner mode shows no hint penalty). Deviations inside the plan: the percentages live in a new `ScoringRules` and not in story 7.1's `Rules`, so the `attempts.rules` jsonb shape did not change; `Fact` has a fourth field `fallback`, valid only with `held`. See `docs/adr/0091-attempt-clock-scoring-and-expiry.md`.
 
 ## Tests
 - `uv run --locked --package vulnmart-attempts pytest -q packages/py-attempts/tests`: 221 passed in 0.52 s (153 existing, 68 new). Raw output in the evidence file.
