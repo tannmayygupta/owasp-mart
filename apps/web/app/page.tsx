@@ -31,6 +31,12 @@ export default function Page() {
     loadHealth().then(setState);
   }, []);
 
+  // In production the host serves the landing page and the lab console at `/` and never reaches this page; in development and in the browser tests it is the front door,
+  // and a signed-in visitor has no use for it.
+  useEffect(() => {
+    if (!loading && user) window.location.replace('/dashboard');
+  }, [loading, user]);
+
   return (
     <>
       <h1>VulnMart</h1>

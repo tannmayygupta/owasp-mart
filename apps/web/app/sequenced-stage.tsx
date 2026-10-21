@@ -72,11 +72,12 @@ export function SequencedStage(p: StageProps) {
             <li key={key} className={cls}>
               <button
                 type="button"
-                className="dot"
-                disabled={!it}
+                className={it ? 'dot' : 'dot locked'}
+                aria-disabled={it ? undefined : true}
+                title={it ? `Challenge ${n + 1}: ${titleOf(it)}` : `Challenge ${n + 1} is locked. Capture challenge ${n}, or let its time run out, to open it.`}
                 aria-current={it && item && item.challenge_key === key ? 'step' : undefined}
-                aria-label={`Challenge ${n + 1}${it ? `: ${titleOf(it)}` : ''}, ${ph === 'future' ? 'not open yet' : ph}`}
-                onClick={() => p.onPick(key)}
+                aria-label={`Challenge ${n + 1}${it ? `: ${titleOf(it)}` : ''}, ${ph === 'future' ? 'locked' : ph}`}
+                onClick={() => { if (it) p.onPick(key); }}
               >
                 {ph === 'solved' ? '✓' : n + 1}
               </button>

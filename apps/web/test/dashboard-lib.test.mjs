@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { ApiError, api, download, duration, say, setCsrf } from '../lib/api.ts';
-import { safeNext } from '../lib/paths.ts';
+import { afterSignIn, safeNext } from '../lib/paths.ts';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -86,4 +86,14 @@ test('story 2.3: the time warning is 15 from fifteen minutes left, 5 from five, 
   const { timeWarning } = await import('../lib/api.ts');
   assert.deepEqual([16 * 60, 15 * 60 + 1, 15 * 60, 14 * 60, 5 * 60 + 1, 5 * 60, 60, 1, 0, -5, null, undefined, NaN].map(timeWarning),
     [null, null, 15, 15, 15, 5, 5, 5, null, null, null, null, null]);
+});
+
+test('after signing in a learner goes to the lab, anyone else to the dashboards, and a valid ?next= always wins', () => {
+  assert.equal(afterSignIn(null, 'participant'), '/');
+  assert.equal(afterSignIn(null, 'recruiter'), '/dashboard');
+  assert.equal(afterSignIn(null, 'admin'), '/dashboard');
+  assert.equal(afterSignIn('/assessment/a-AAAAAAAAAAAAAAAA', 'participant'), '/assessment/a-AAAAAAAAAAAAAAAA');
+  assert.equal(afterSignIn('/dashboard', 'participant'), '/dashboard');
+  assert.equal(afterSignIn('//evil.example', 'participant'), '/', 'an unsafe next is ignored, not followed');
+  assert.equal(afterSignIn('https://evil.example', 'recruiter'), '/dashboard');
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api, say } from '../../lib/api';
 import { AuthShell } from '../auth-shell';
 
@@ -9,6 +9,10 @@ import { AuthShell } from '../auth-shell';
 // answer is the same whether the address is new or known (no account enumeration); the mail says what to do.
 export default function SignupPage() {
   const [kind, setKind] = useState<'learner' | 'recruiter'>('learner');
+  // "Create a company account" on the landing page links here with ?as=recruiter
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('as') === 'recruiter') setKind('recruiter');
+  }, []);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);

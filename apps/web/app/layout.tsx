@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import { headers } from 'next/headers';
 import { SessionProvider } from '../lib/session';
 import { Nav } from './nav';
+import { SiteFooter } from './site-footer';
 import './globals.css';
 
-export const metadata = { title: 'VulnMart' };
+export const metadata = { title: 'VulnMart', icons: { icon: '/favicon.svg' } };
 
 // Reading the request headers makes every page render per request, which the CSP nonce needs (proxy.ts sets it;
 // Next.js puts it on its own scripts). Styles come from a stylesheet: the CSP allows no inline style in production.
@@ -16,6 +17,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <SessionProvider>
           <Nav />
           <main>{children}</main>
+          <SiteFooter />
         </SessionProvider>
       </body>
     </html>
