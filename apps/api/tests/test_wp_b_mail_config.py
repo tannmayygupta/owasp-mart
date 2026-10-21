@@ -30,7 +30,6 @@ def test_a_production_with_brevo_a_key_and_a_real_sender_is_accepted():
 @pytest.mark.parametrize("over, words", [
     ({"email_provider": "smtp", "smtp_host": "mailpit"}, ["production sends through Brevo only", "mail catcher"]),
     ({"email_provider": "smtp", "smtp_host": None}, ["production sends through Brevo only"]),
-    ({"smtp_host": "mailpit"}, ["mail catcher"]),  # even with Brevo chosen, a left-over catcher host is refused
     ({"brevo_api_key": None}, ["needs VULNMART_BREVO_API_KEY"]),
     ({"email_sender_address": "no-reply@vulnmart.invalid"}, ["placeholder"]),
     ({"email_sender_address": "not an address"}, ["real address"]),
@@ -41,6 +40,11 @@ def test_each_wrong_production_mail_setting_fails_the_start_and_names_the_variab
     for word in words:
         assert word in str(err.value)
     assert "test-key-not-real" not in str(err.value), "the key is never printed"
+
+
+def test_a_catcher_host_is_ignored_while_brevo_is_the_provider():
+    # the deployed compose names Mailpit for its optional catcher profile; the host is only used when SMTP is the provider (which production refuses)
+    validate_mail_settings(settings(smtp_host="mailpit"))
 
 
 def test_dev_staging_and_test_keep_mailpit():

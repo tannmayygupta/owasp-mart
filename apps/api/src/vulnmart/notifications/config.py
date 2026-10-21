@@ -39,7 +39,7 @@ def problems(provider: str, *, brevo_key: str | None, sender: str | None, smtp_h
     out: list[str] = []
     if provider != "brevo":
         out.append(f"VULNMART_EMAIL_PROVIDER={provider}: production sends through Brevo only (mail to a catcher reaches nobody)")
-    if _is_catcher(smtp_host):
+    if provider == "smtp" and _is_catcher(smtp_host):  # the SMTP host is only used when SMTP is the provider; the deployed compose names Mailpit for its optional catcher profile
         out.append("VULNMART_SMTP_HOST names a mail catcher (Mailpit): it is forbidden in production")
     if provider == "brevo" and not brevo_key:
         out.append("VULNMART_EMAIL_PROVIDER=brevo needs VULNMART_BREVO_API_KEY or VULNMART_BREVO_API_KEY_FILE")
@@ -71,5 +71,5 @@ def check_deployed_env(env: Mapping[str, str], *, key_present: bool) -> list[str
     provider = value("VULNMART_EMAIL_PROVIDER", "smtp").lower()
     smtp_host = value("VULNMART_SMTP_HOST") or None
     return problems(provider, brevo_key="present" if key_present else None,
-                    sender=re.sub(r"\$\{[^}]*\}", "deploy.vulnmart.app", value("VULNMART_EMAIL_SENDER_ADDRESS")),
+                    sender=re.sub(r"\$\{[^}]*\}", "deploy.vulnmart.app", re.sub(r"^\$\{[^}]*\}$", "no-reply@${deploy}", value("VULNMART_EMAIL_SENDER_ADDRESS"))),  # a bare variable: the deployment supplies the address (live-deploy writes it into the .env)
                     smtp_host=smtp_host if provider == "smtp" else None)  # a catcher host only matters when SMTP is the provider
