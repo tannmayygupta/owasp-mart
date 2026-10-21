@@ -142,3 +142,17 @@ test('collector keeps the last 20 hits only', async () => {
     assert.match(inbox.hits[0].data, /n=5/);
   } finally { server.close(); }
 });
+
+test('metadata: a decoy file beside the placement is never served, whatever its name sorts like', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-meta-decoy-'));
+  fs.writeFileSync(path.join(dir, 'A.decoy0'), 'VM{DECOYDECOYDECOYDECOYDEC}');
+  fs.writeFileSync(path.join(dir, 'C10.decoy1'), 'VM{DECOYDECOYDECOYDECOYDEC}');
+  fs.writeFileSync(path.join(dir, 'C10.placement'), 'VM{AAAAAAAAAAAAAAAAAAAAAAAA}');
+  const { server } = createMetadata({ placementDir: dir });
+  const base = await start(server);
+  try {
+    const ud = await (await get(base, '/latest/user-data')).text();
+    assert.match(ud, /VM\{AAAAAAAAAAAAAAAAAAAAAAAA\}/);
+    assert.doesNotMatch(ud, /DECOY/);
+  } finally { server.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+});

@@ -46,4 +46,6 @@ write_up:
   fix: >-
     The safe merge that drops __proto__/constructor/prototype and bounds depth; freeze or null-prototype the target;
     keep the import in a sandboxed, network-less per-job process.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"
+  - "also a decoy file beside the placement file in the volume only that service mounts (decoy_placement service-file)"

@@ -5,4 +5,5 @@
 <table><tr><th>#</th><th>Status</th><th class="num">Total</th></tr>
 {% for o in orders %}<tr><td><a href="/orders/{{ o.id }}">{{ o.id }}</a></td><td><span class="badge b-{{ o.status }}">{{ o.status }}</span></td><td class="num">{{ o.total_cents | cents }}</td></tr>
 {% else %}<tr><td colspan="3" class="muted">No orders yet.</td></tr>{% endfor %}</table>
+{% include "partials/pager.njk" %}
 {% endblock %}

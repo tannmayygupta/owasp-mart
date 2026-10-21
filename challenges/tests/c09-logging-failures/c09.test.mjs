@@ -16,7 +16,7 @@ import exploit from './exploit.mjs';
 const MARKER = 'C09-CASENOTE-FLAG-MARKER';
 const WEAK = 'monday123!'; // matches the last word in the exploit's list
 
-async function bootShop(mode) {
+export async function bootShop(mode) {
   const db = openDb(':memory:');
   migrate(db);
   await seedAll(db);
@@ -40,22 +40,32 @@ test('C09 exploit PASSES on the vulnerable build (legacy brute force, nothing lo
     assert.equal(secEvents, 0, 'the legacy route must write no security event for the account');
     assert.equal(events.some((e) => e.type === 'shop.security_event_written' && e.data.account_id === String(iyerId)), false);
     assert.ok(events.some((e) => e.type === 'auth.attempt' && e.data.route === 'legacy'), 'expected legacy auth.attempt events');
+    // The platform's M2 rule counts failures GROUPED BY THE ACCOUNT: every failed guess must name the attacked account, not unknown.
+    const failures = events.filter((e) => e.type === 'auth.attempt' && e.data.route === 'legacy' && e.data.result === 'failure');
+    assert.ok(failures.length >= 20, `expected at least 20 legacy failures, saw ${failures.length}`);
+    assert.ok(failures.every((e) => e.data.account_id === String(iyerId)), 'every legacy failure names the attacked account');
+    assert.ok(events.some((e) => e.type === 'auth.attempt' && e.data.route === 'legacy' && e.data.result === 'success' && e.data.account_id === String(iyerId)));
+    assert.equal(events.filter((e) => e.type === 'shop.security_event_written').length, 0, 'the vulnerable legacy route posts no security event');
   } finally { server.close(); }
 });
 
 test('C09 exploit FAILS on the fixed build (legacy route logs + locks)', async () => {
-  const { db, server, baseUrl, iyerId } = await bootShop('fixed');
+  const { db, server, baseUrl, iyerId, events } = await bootShop('fixed');
   try {
     const r = await runExploit({ baseUrl, name: 'c09', test: exploit, timeoutMs: 20000 });
     assert.equal(r.passed, false);
     assert.equal(r.failed, true, 'fixed build locks the account (clean fail)');
     const secEvents = db.prepare('SELECT COUNT(*) AS c FROM security_events WHERE account_id = ?').get(iyerId).c;
     assert.ok(secEvents > 0, 'the fixed legacy route writes security events');
+    // The M2 negative observation: the fixed build posts shop.security_event_written for the attacked account (so M2 can never be credited there).
+    const written = events.filter((e) => e.type === 'shop.security_event_written' && e.data.account_id === String(iyerId));
+    assert.ok(written.length > 0, 'the fixed legacy route posts shop.security_event_written');
+    assert.ok(written.every((e) => ['login_failed', 'login_success', 'login_locked'].includes(e.data.kind)));
   } finally { server.close(); }
 });
 
 test('the WEB login always logs and locks after the threshold', async () => {
-  const { db, server, baseUrl, iyerId } = await bootShop('vulnerable');
+  const { db, server, baseUrl, iyerId, events } = await bootShop('vulnerable');
   try {
     const H = { 'content-type': 'application/x-www-form-urlencoded' };
     const page = await fetch(`${baseUrl}/login`);
@@ -70,5 +80,6 @@ test('the WEB login always logs and locks after the threshold', async () => {
     assert.ok(secEvents >= 5, 'the web login writes a security event per attempt');
     const alerts = db.prepare('SELECT COUNT(*) AS c FROM alerts').get().c;
     assert.ok(alerts >= 1, 'the web login raises an alert after the threshold');
+    assert.ok(events.filter((e) => e.type === 'shop.security_event_written' && e.data.account_id === String(iyerId)).length >= 5, 'the web login posts one security event per attempt');
   } finally { server.close(); }
 });

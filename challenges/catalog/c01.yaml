@@ -27,7 +27,7 @@ milestones:
     signal: app event shop.cross_store_order_read (caller store differs from the order store), first one
   m2:
     summary: the player read several foreign orders or the target store’s order
-    signal: platform counts distinct order_id in shop.cross_store_order_read (>= 3), or order_store is the target store
+    signal: platform counts distinct order_id in shop.cross_store_order_read (>= 3), or any shop.cross_store_order_read with order_store_id = 2 (Northwind Tea Co., the target store)
   m3:
     summary: flag captured
     signal: proxy.flag_seen on /api/seller/orders/{orderNo} from a session whose store is not the target
@@ -48,3 +48,4 @@ write_up:
     per-endpoint test that a second tenant gets 403/404.
 decoys:
   - other seeded orders hold fake buyer notes and no secrets
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"
