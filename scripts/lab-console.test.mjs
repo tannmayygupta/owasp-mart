@@ -67,8 +67,8 @@ const LIST = (items, current = 'C01') => ({ items, has_more: false, total: 2, cu
 const ROUTES = (over = {}) => ({
   'GET /api/v1/session': { status: 'authenticated', user: { display_name: 'Ada' }, csrf_token: 'CSRF' },
   'GET /api/v1/challenges': CATALOG,
-  'GET /api/v1/me/attempts': { items: [{ attempt_id: A, state: 'running' }] },
-  [`GET /api/v1/attempts/${A}`]: { attempt_id: A, state: 'running', instance_id: 'i-BBBBBBBBBBBBBBBB', deadline_at: far(3600) },
+  'GET /api/v1/me/attempts': { items: [{ attempt_id: A, mode: 'learner', state: 'running' }] },
+  [`GET /api/v1/attempts/${A}`]: { attempt_id: A, mode: 'learner', state: 'running', instance_id: 'i-BBBBBBBBBBBBBBBB', deadline_at: far(3600) },
   'GET /api/v1/instances/i-BBBBBBBBBBBBBBBB': { instance_id: 'i-BBBBBBBBBBBBBBBB', state: 'ready', access: 'open', epoch: 1 },
   [`GET /api/v1/attempts/${A}/score`]: { score: 0, per_challenge: [{ challenge_key: 'C01', points: 0 }, { challenge_key: 'C02', points: 0 }] },
   [`GET /api/v1/attempts/${A}/challenges`]: LIST([ITEM()]),
@@ -182,8 +182,8 @@ test('with no run the learner is offered one primary action; after a finished ru
   assert.ok(none.calls.includes('POST /api/v1/instances'));
 
   const done = boot(ROUTES({
-    'GET /api/v1/me/attempts': { items: [{ attempt_id: A, state: 'submitted' }] },
-    [`GET /api/v1/attempts/${A}`]: { attempt_id: A, state: 'submitted', instance_id: null, deadline_at: null },
+    'GET /api/v1/me/attempts': { items: [{ attempt_id: A, mode: 'learner', state: 'submitted' }] },
+    [`GET /api/v1/attempts/${A}`]: { attempt_id: A, mode: 'learner', state: 'submitted', instance_id: null, deadline_at: null },
     [`GET /api/v1/attempts/${A}/score`]: { score: 94, per_challenge: [{ challenge_key: 'C01', points: 94 }, { challenge_key: 'C02', points: 0 }] },
     [`GET /api/v1/attempts/${A}/challenges`]: LIST([ITEM({ state: 'solved', solved: true }), ITEM({ challenge_key: 'C02', title: 'Cryptographic Failures', state: 'expired' })]),
   }));
@@ -228,4 +228,39 @@ test('Copy link for Burp asks for a fresh ticket, shows it, copies it and never 
   assert.deepEqual(app.copied, ['https://i-bbbbbbbbbbbbbbbb.labs.example/_vm/enter?t=ticket']);
   assert.equal(app.calls.filter((c) => c.startsWith('POST /api/v1/instances/')).length, 1);
   assert.match(app.byId.get('banner').textContent, /Link copied/);
+});
+
+const CAND = 'a-CCCCCCCCCCCCCCCC';
+
+test('a company assessment is never picked as the practice run, even when it is the only live attempt', async () => {
+  const app = boot(ROUTES({
+    'GET /api/v1/me/attempts': { items: [{ attempt_id: CAND, mode: 'candidate', state: 'running' }] },
+    [`GET /api/v1/attempts/${CAND}`]: { attempt_id: CAND, mode: 'candidate', state: 'running', instance_id: 'i-DDDDDDDDDDDDDDDD', deadline_at: far(3600) },
+  }));
+  await app.load(); await settle();
+  assert.ok(!app.calls.includes(`GET /api/v1/attempts/${CAND}`), 'the candidate attempt is not even read');
+  assert.ok(!app.calls.some((c) => c.includes(`/attempts/${CAND}/`)), 'nothing of it is loaded');
+  const m = app.mission();
+  assert.match(m.textContent, /Start my lab/);
+  assert.match(m.textContent, /company assessment/);
+  const link = m.all((n) => n.tagName === 'A')[0];
+  assert.equal(link.href, `/assessment/${CAND}`, 'the note links to the assessment page');
+  assert.equal(m.withClass('flag-input').length, 0);
+});
+
+test('with a practice run and an assessment, the practice run is shown and the assessment is left alone', async () => {
+  const app = boot(ROUTES({
+    'GET /api/v1/me/attempts': { items: [{ attempt_id: CAND, mode: 'candidate', state: 'running' }, { attempt_id: A, mode: 'learner', state: 'running' }] },
+  }));
+  await app.load(); await settle();
+  assert.match(app.mission().textContent, /Broken Access Control/);
+  assert.ok(!app.calls.some((c) => c.includes(CAND)));
+  assert.doesNotMatch(app.mission().textContent, /company assessment/, 'no note while a practice run exists');
+});
+
+test('an attempt whose own answer says candidate is dropped even if the list said learner', async () => {
+  const app = boot(ROUTES({ [`GET /api/v1/attempts/${A}`]: { attempt_id: A, mode: 'candidate', state: 'running', instance_id: null, deadline_at: far(60) } }));
+  await app.load(); await settle();
+  assert.match(app.mission().textContent, /Start my lab/);
+  assert.equal(app.mission().withClass('flag-input').length, 0);
 });
