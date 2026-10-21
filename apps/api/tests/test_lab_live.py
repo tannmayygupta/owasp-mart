@@ -66,7 +66,7 @@ def test_a_counted_capture_a_hint_and_the_states_of_an_attempt_are_announced_in_
 
 def test_a_held_capture_is_not_announced_as_a_capture():
     rt, clock, host, seen = world()
-    s = rt.start_attempt("u-live-3")  # no recorded activity: the paste is held (FR-ACH-02)
+    s = rt.start_attempt("u-live-3", org_id="o-acme")  # an assessment, no recorded activity: the paste is held (FR-ACH-02)
     seen.clear()
     assert rt.submit_flag(s.attempt_id, "C02", rt.keys.flag(s.instance_id, "C02", 1)).credit == "held"
     assert "attempt.flag_captured" not in types(seen) and "attempt.milestone_reached" not in types(seen)

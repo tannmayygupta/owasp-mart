@@ -24,6 +24,7 @@ class QuotaLimits:
     user: int  # live instances of this user
     company: int | None  # live instances of the user's company (None: the user has no company)
     total: int  # live instances on the whole platform
+    assessment_reserve: int = 0  # of the total, the places kept for company assessments: a learner's practice may not take them
 
 
 @runtime_checkable

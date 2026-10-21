@@ -126,7 +126,7 @@ async function refresh() {
   if (state.busy) return;
   state.busy = true;
   try {
-    const mine = (await api('GET', '/api/v1/me/attempts')).items;
+    const mine = (await api('GET', '/api/v1/me/attempts')).items.filter((a) => a.mode !== 'candidate'); // practice only: an assessment attempt of the same account is never shown (or driven) as practice
     const current = mine.find((a) => ['running', 'ready'].includes(a.state)) || mine[0] || null; // a live run first, else the latest one
     state.attempt = current ? await api('GET', `/api/v1/attempts/${current.attempt_id}`) : null;
     state.instance = state.attempt?.instance_id ? await api('GET', `/api/v1/instances/${state.attempt.instance_id}`).catch(() => null) : null;

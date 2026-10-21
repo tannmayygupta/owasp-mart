@@ -38,7 +38,11 @@ class FlagSubmissionResult:
 class FlagSubmitService:
     def __init__(self, *, attempts: AttemptPort, directory: InstanceDirectory, checker: FlagChecker, milestones: MilestoneStore,
                  integrity: IntegritySink, log: FlagSubmissionLog, clock: Callable[[], datetime],
-                 gate: ActivityGate | None = None, max_incorrect: int = MAX_INCORRECT, window_s: int = WINDOW_S) -> None:
+                 gate: ActivityGate | None = None, max_incorrect: int = MAX_INCORRECT, window_s: int = WINDOW_S,
+                 per_minute_of: Callable[[str], int | None] | None = None) -> None:
+        # `per_minute_of(attempt_id)`: the company template's limit of pasted flags per minute for this attempt (None: no extra limit)
+        self._per_minute_of = per_minute_of
+        self._pastes: dict[str, deque[datetime]] = defaultdict(deque)
         self.attempts, self.directory, self.checker = attempts, directory, checker
         self.milestones, self.integrity, self.log, self.clock = milestones, integrity, log, clock
         self.gate: ActivityGate = gate or AllowAllGate()
@@ -79,7 +83,9 @@ class FlagSubmitService:
         if repeat is not None:
             return FlagSubmissionResult("correct", repeat)  # IF-2: before the rate limit, records nothing new
         with self._lock:
-            wait = self._retry_after(key, now)
+            wait = self._pasted_too_fast(attempt_id, now)
+            if wait is None:
+                wait = self._retry_after(key, now)
             if wait is not None:
                 self.log.record(attempt_id, challenge_key, "rate_limited", now)
                 raise FlagRateLimited("too many incorrect submissions", retry_after=wait)
@@ -88,6 +94,19 @@ class FlagSubmitService:
                 self._misses[key].append(now)
             self.log.record(attempt_id, challenge_key, "correct" if correct else "incorrect", now)
         return FlagSubmissionResult("correct" if correct else "incorrect", credit)
+
+    def _pasted_too_fast(self, attempt_id: str, now: datetime) -> int | None:
+        """Seconds to wait when the attempt pasted its template's number of flags in the last minute, else None; a paste that is let through is counted."""
+        limit = self._per_minute_of(attempt_id) if self._per_minute_of is not None else None
+        if limit is None:
+            return None
+        q = self._pastes[attempt_id]
+        while q and q[0] <= now - timedelta(seconds=60):
+            q.popleft()
+        if len(q) >= limit:
+            return max(1, math.ceil((q[0] + timedelta(seconds=60) - now).total_seconds()))
+        q.append(now)
+        return None
 
     def _repeat_of_credit(self, attempt_id: str, challenge_key: str, info, text: object) -> str | None:
         """`credited` or `held` when the right value is pasted again for a challenge that already has that credit; else None."""

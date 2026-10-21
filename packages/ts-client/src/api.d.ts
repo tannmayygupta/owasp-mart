@@ -1275,7 +1275,9 @@ export interface paths {
          * @description Asks for an instance of the learner's practice attempt. Answers 202 with state `requested`; the
          *     state then advances on its own (poll the instance, or listen to the live stream). Candidate
          *     instances are created by the platform when the attempt starts, not through this route.
-         *     409 INST-QUOTA-REACHED when the user already holds an instance (the numbers are OI-21).
+         *     409 INST-QUOTA-REACHED when the user already holds an instance or the admin's limit of the user or the company is reached (the numbers are OI-21; practice and
+         *     assessment are counted apart). 503 INST-NO-CAPACITY (with Retry-After) when the platform or the orchestrator has no place for another instance; since v2.2.0 this is no
+         *     longer a 429. 429 REQ-RATE-LIMITED when one account asks too often (an admin setting, per hour).
          */
         post: operations["requestInstance"];
         delete?: never;
@@ -1411,7 +1413,9 @@ export interface paths {
          * @description D-80 (OI-22 resolved): Start only asks for the instance; the clock starts when the instance is ready, so the cold start
          *     never counts against the candidate. Answers at once with the attempt (still ready while the instance starts); pressing
          *     again, or after it runs, answers the same attempt. Only the owner of an assessment attempt in state ready or running;
-         *     a learner starts through requestInstance, and any other state answers 409 ATT-INVALID-STATE. The body is empty.
+         *     a learner starts through requestInstance, and any other state answers 409 ATT-INVALID-STATE. Since v2.2.0 the invite behind the attempt must still allow it: Start moves a
+         *     consented invite to `started`; a revoked, expired, declined or cancelled invite answers 409 ATT-INVALID-STATE and cancels a ready attempt. 503 INST-NO-CAPACITY
+         *     and 429 REQ-RATE-LIMITED as for requestInstance. The body is empty.
          */
         post: operations["startAttempt"];
         delete?: never;
@@ -1462,6 +1466,31 @@ export interface paths {
          *     attempt route. The answer is the attempt with `results_released: true`. The body is empty.
          */
         post: operations["releaseResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attempts/{attempt_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a candidate's attempt (the recruiter of the company)
+         * @description Since v2.2.0 (FR-SES-07). The recruiter of the owning company cancels a company assessment attempt that has not ended (`ready` or `running`): the instance is
+         *     destroyed at once, nothing scores any more, and the attempt becomes `cancelled`, which the candidate sees in `getAttempt`. Any other state (also a repeat) is 409
+         *     ATT-INVALID-STATE. The candidate and anyone else get the 404 of every attempt route; a learner's practice attempt cannot be cancelled this way. 429 REQ-RATE-LIMITED
+         *     when one recruiter acts too often. The body is empty.
+         */
+        post: operations["cancelAttempt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2979,6 +3008,17 @@ export interface components {
             headers: {
                 "Cache-Control": components["headers"]["CacheControl"];
                 Allow: components["headers"]["Allow"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description No instance can be started right now (the platform is at its limit or the orchestrator has no capacity). INST-NO-CAPACITY with Retry-After; try again later. Since v2.2.0. */
+        Unavailable: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
@@ -4988,6 +5028,8 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["Unavailable"];
         };
     };
     getInstance: {
@@ -5033,6 +5075,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     resetInstance: {
@@ -5058,6 +5101,7 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     stopInstance: {
@@ -5078,6 +5122,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getAttempt: {
@@ -5114,6 +5159,8 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["Unavailable"];
         };
     };
     submitAttempt: {
@@ -5158,6 +5205,27 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    cancelAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: components["parameters"]["AttemptIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AttemptOk"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     withdrawAttempt: {
@@ -5498,6 +5566,7 @@ export interface operations {
             413: components["responses"]["TooLarge"];
             415: components["responses"]["UnsupportedMedia"];
             422: components["responses"]["Invalid"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getReport: {

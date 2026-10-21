@@ -7,9 +7,9 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 - **LB-1 No real mail.** Deployed API uses `VULNMART_EMAIL_PROVIDER: smtp` to the Mailpit container (platform.compose.yaml:22-24, runbook live-deploy.md:27). Invites, verification and reset mails never reach a real person.
 - **LB-2 Only the learner console is deployed.** Caddy serves `apps/lab-console` plus `/api/*` (live-deploy.md:8). The Next.js app (`apps/web`: candidate, recruiter, admin, account pages) is not deployed (Vercel L-11 / P-07 unticked). Recruiters, candidates and admins have an API but no live screen.
 - **LB-3 Scheduler is off live.** `VULNMART_SCHEDULER_ENABLED` appears only in `infra/compose/compose.yaml:199`, not in the deployed platform compose. Retention, invite purge, learner warning and deletion-request jobs do not run live (lazy invite expiry still works).
-- **LB-4 Template rules do not reach the attempt (code, not config).** `InviteConsentTargets.proceed` calls `create_from_consent(...)` with no `rules=` (assessments/accept.py:132-134), so time limit, reset limit and `results_visibility` of the template are replaced by engine defaults (120 min, 3 resets, `after_submit`) (py-attempts rules.py:8-20; ports/engine_attempts.py:19-32). `hints_enabled()` is `org_id is None` (lab/api.py:192), so hints are never on for candidates; the lab runtime has one global `challenge_keys` (runtime.py:128), so the recruiter's challenge subset is ignored.
-- **LB-5 Admin quotas and instance settings are cosmetic.** `QuotaPort` is never called by `LabRuntime` or `HttpInstanceHost` (no "quota" token in `lab/*.py`); settings `instance_idle_minutes`, `instance_max_minutes`, `instance_*_cap`, `hints_enabled_default`, `flag_submit_per_minute` are read nowhere outside admin/ops.py and quota.py.
-- **LB-6 Invite never reaches `started`.** Nothing calls `advance(..., "started")`; `_refresh` expires any `consented` invite at its expiry date (assessments/service.py:548), even if the attempt is running or finished. Candidate page then says "This invitation is expired" (assessment/[attemptId]/page.tsx:106) and the recruiter monitor stops linking the report (candidates/page.tsx:26). `AlreadyStarted` is therefore dead code.
+- **LB-4 Template rules do not reach the attempt (code, not config).** `InviteConsentTargets.proceed` calls `create_from_consent(...)` with no `rules=` (assessments/accept.py:132-134), so time limit, reset limit and `results_visibility` of the template are replaced by engine defaults (120 min, 3 resets, `after_submit`) (py-attempts rules.py:8-20; ports/engine_attempts.py:19-32). `hints_enabled()` is `org_id is None` (lab/api.py:192), so hints are never on for candidates; the lab runtime has one global `challenge_keys` (runtime.py:128), so the recruiter's challenge subset is ignored. **WP-A 2026-10-21: fixed.** The rules, the hints, the subset and the flag limit reach the attempt and the lab (ADR 0071, `test_template_settings_reach_the_lab.py`).
+- **LB-5 Admin quotas and instance settings are cosmetic.** `QuotaPort` is never called by `LabRuntime` or `HttpInstanceHost` (no "quota" token in `lab/*.py`); settings `instance_idle_minutes`, `instance_max_minutes`, `instance_*_cap`, `hints_enabled_default`, `flag_submit_per_minute` are read nowhere outside admin/ops.py and quota.py. **WP-A 2026-10-21: fixed for the quotas and rate limits** (ADR 0071, `test_lab_quota.py`); the idle and maximum minutes settings are still read by the orchestrator side only.
+- **LB-6 Invite never reaches `started`.** Nothing calls `advance(..., "started")`; `_refresh` expires any `consented` invite at its expiry date (assessments/service.py:548), even if the attempt is running or finished. Candidate page then says "This invitation is expired" (assessment/[attemptId]/page.tsx:106) and the recruiter monitor stops linking the report (candidates/page.tsx:26). `AlreadyStarted` is therefore dead code. **WP-A 2026-10-21: fixed.** Start moves the invite to started; a started invite does not expire (`test_invite_lifecycle.py`).
 
 ## 1. Learner vs candidate model (proposal, consistent with D-05, D-19, D-25, FR-ACC-05/06)
 
@@ -52,8 +52,8 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | L-18 | Close browser or lose connection mid-countdown; return later; server clock, SSE replay/poll | IMPL+WIRED | stored `opened_at` (sequence.py); live hub; console `skew` |
 | L-19 | Idle 60 min / 4 h cap: instance destroyed, attempt keeps clock, restart possible | PARTIAL: timed idle destroy never proven live (audit 2026-10-18 B1) and idle can outlast a 60 min Hard countdown | runtime.py:65; lab-stream-audit B1 |
 | L-20 | Instance fails to start or crashes: learner sees failure, can start again | PARTIAL: console message map has no crash text, generic error | app.js:28-35; api.py:153-155 |
-| L-21 | Platform at capacity: clear message, retry, queue | PARTIAL: orchestrator `Busy` becomes HTTP 429 "Too many tries" (misleading text), no queue | api.py:150-152; app.js:30 |
-| L-22 | One running instance per learner; admin per-user quota | PARTIAL: blocks a second running attempt only; quotas not consulted (LB-5) | api.py:426; no "quota" in lab/ |
+| L-21 | Platform at capacity: clear message, retry, queue | PARTIAL: orchestrator `Busy` becomes HTTP 429 "Too many tries" (misleading text), no queue | api.py:150-152; app.js:30 **FIXED 2026-10-21 (WP-A): the orchestrator's Busy is 503 INST-NO-CAPACITY with Retry-After; no queue; `test_lab_quota.py`** |
+| L-22 | One running instance per learner; admin per-user quota | PARTIAL: blocks a second running attempt only; quotas not consulted (LB-5) | api.py:426; no "quota" in lab/ **FIXED 2026-10-21 (WP-A): quotas are consulted; `test_lab_quota.py`** |
 | L-23 | Export own data (zip JSON+CSV), request deletion with 7-day undo | IMPL+WIRED (web account page; not in console, not live) | export_api.py:46; deletion_api.py:63 |
 | L-24 | 30-day warning email, deletion 12 months after last login | PARTIAL: jobs built, scheduler not enabled live (LB-3) | retention/build.py:38-49; compose |
 | L-25 | Accessibility: keyboard, aria-live, reduced motion, WCAG 2.2 AA (OI-30) | PARTIAL: aria-live and reduced-motion present, no audit or test | lab-console index.html:68, style.css:176 |
@@ -74,24 +74,24 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | C-09 | Recruiter or admin account opens an invite | IMPL+WIRED (generic 409) | accept.py:79 |
 | C-10 | Consent screen: plain notice, not pre-ticked, version and hash, stale notice refused | IMPL+WIRED | privacy/api.py:49-80; assessment page |
 | C-11 | Decline: invite declined, no attempt, company told | IMPL+WIRED (company told only by monitor, no mail) | accept.py:124-127 |
-| C-12 | Start: instance prepared, clock starts at ready (D-80), no pause | IMPL+WIRED | api.py:498; runtime.py:554 |
-| C-13 | Template rules apply: time limit, reset limit, challenge set, results timing | MISSING (LB-4) | accept.py:132; runtime.py:128 |
-| C-14 | Timed run: server deadline, 15 and 5 min warnings, refused after deadline with 60 s grace | IMPL+WIRED (default 120 min only, LB-4) | runtime.py:596; py-attempts rules.py |
+| C-12 | Start: instance prepared, clock starts at ready (D-80), no pause | IMPL+WIRED | api.py:498; runtime.py:554 **FIXED 2026-10-21 (WP-A): Start checks the invite and moves it to started; `test_invite_lifecycle.py`** |
+| C-13 | Template rules apply: time limit, reset limit, challenge set, results timing | MISSING (LB-4) | accept.py:132; runtime.py:128 **FIXED 2026-10-21 (WP-A): the template's subset, resets, time and results timing apply; `test_template_settings_reach_the_lab.py`** |
+| C-14 | Timed run: server deadline, 15 and 5 min warnings, refused after deadline with 60 s grace | IMPL+WIRED (default 120 min only, LB-4) | runtime.py:596; py-attempts rules.py **FIXED 2026-10-21 (WP-A): the template's time limit is the attempt's; `test_template_settings_reach_the_lab.py`** |
 | C-15 | Attack, milestones credited, evidence captured, held captures shown as "held for review" | IMPL+WIRED | api.py:584-630 |
-| C-16 | Recruiter turned hints on: cost confirmation, deducted | MISSING | api.py:192-193 `hints_enabled` false for any org attempt |
+| C-16 | Recruiter turned hints on: cost confirmation, deducted | MISSING | api.py:192-193 `hints_enabled` false for any org attempt **FIXED 2026-10-21 (WP-A): hints on per template, cost = percentage x level, taken from the score; `test_template_settings_reach_the_lab.py`** |
 | C-17 | Reset within limit, new flags, milestones kept, clock continues | IMPL+WIRED (limit fixed at 3) | runtime.py:633-667 |
 | C-18 | Submit early with confirmation; freeze 15 min; destroy; cannot reopen | IMPL+WIRED | api.py:511; D-83 |
 | C-19 | Time runs out: expired, auto-submit with what was captured | IMPL+WIRED | engine tick, D-83 |
 | C-20 | Browser closed mid-timer, return to same instance; second login ends the older tab | IMPL+WIRED | runtime.py:773 `bump_access_for_user` |
 | C-21 | Lost connection or wrong laptop clock: countdown correctness | PARTIAL: web countdown uses `Date.now()` against `deadline_at`, ignores `server_time` (console corrects skew, web does not) | attempt-board.tsx:82 |
 | C-22 | Instance crashes or fails to start mid-assessment | PARTIAL: server restarts instance on Start (runtime.py:452-470) but UI offers Start only in state `ready` | attempt-board.tsx:143 |
-| C-23 | Results timing: `after_submit` vs `after_release` | PARTIAL: UI honours invite setting; server only honours attempt rule, which is always default (LB-4), so score API answers after submit regardless | api.py:252-256; attempt-board |
-| C-24 | Withdraw mid-attempt: lock, instance destroyed, 7-day undo, recruiter notified, consent "withdrawn" record | PARTIAL: lock and undo work; no `withdrawn` consent record written; no recruiter mail; undo does not resume attempt | api.py:538-559; privacy grep: only model lists "withdrawn" |
+| C-23 | Results timing: `after_submit` vs `after_release` | PARTIAL: UI honours invite setting; server only honours attempt rule, which is always default (LB-4), so score API answers after submit regardless | api.py:252-256; attempt-board **FIXED 2026-10-21 (WP-A): the rule reaches the attempt through the real consent path; `test_template_settings_reach_the_lab.py` (last test)** |
+| C-24 | Withdraw mid-attempt: lock, instance destroyed, 7-day undo, recruiter notified, consent "withdrawn" record | PARTIAL: lock and undo work; no `withdrawn` consent record written; no recruiter mail; undo does not resume attempt | api.py:538-559; privacy grep: only model lists "withdrawn" **PARTIAL, improved 2026-10-21 (WP-A): the withdrawn consent record is written once; undo keeps the attempt withdrawn (D-91), re-invite gives a fresh attempt; recruiter mail left to the notification work; `test_invite_lifecycle.py`** |
 | C-25 | Request deletion of record: company decides in 14 days, then escalation, execution 7 days after approval | PARTIAL: candidate side and job exist; company has no route to decide | deletion_api.py docstring; deletion.py:190 |
 | C-26 | Export own data and see which companies viewed it | IMPL+WIRED | export_api.py:46; deletion_api.py:104; api.py:259 |
-| C-27 | Re-invite after a fault: new attempt, old kept `superseded` | PARTIAL: service and route exist, no recruiter button; new attempt key `tpl~n` | service.py:471; accept.py:46 |
-| C-28 | Invite expires (7 days from creation) while attempt running or finished | PARTIAL (bug, LB-6): candidate loses the attempt page, recruiter loses the report link | service.py:548; page.tsx:106 |
-| C-29 | Candidate already mid-practice-run when invited | PARTIAL: separate attempt and instance (different template key), but no cross-mode instance cap and no capacity priority | engine.py:89-108; runtime.py:445 |
+| C-27 | Re-invite after a fault: new attempt, old kept `superseded` | PARTIAL: service and route exist, no recruiter button; new attempt key `tpl~n` | service.py:471; accept.py:46 **FIXED in the lab and service 2026-10-21 (WP-A): a re-invite gives a new attempt and the old stays; no recruiter button yet (web); `test_invite_lifecycle.py`** |
+| C-28 | Invite expires (7 days from creation) while attempt running or finished | PARTIAL (bug, LB-6): candidate loses the attempt page, recruiter loses the report link | service.py:548; page.tsx:106 **FIXED 2026-10-21 (WP-A): a started invite never expires; `test_invite_lifecycle.py`** |
+| C-29 | Candidate already mid-practice-run when invited | PARTIAL: separate attempt and instance (different template key), but no cross-mode instance cap and no capacity priority | engine.py:89-108; runtime.py:445 **FIXED 2026-10-21 (WP-A): two separate runs, separate counting, reserve for assessments, the recruiter sees no practice; `test_invite_lifecycle.py`, `test_lab_quota.py`** |
 | C-30 | Extra time or accommodation for a candidate (reopen, change limit) | MISSING | no route; compare Codility "Reopen" below |
 | C-31 | Duplicate flag paste on solved challenge | IMPL+WIRED (idempotent) | flags/submit.py:93 |
 | C-32 | Flag copied from another candidate or decoy | IMPL+WIRED (per-instance HMAC; sharing and decoy integrity flags) | flags/checker.py; api.py:347 |
@@ -112,23 +112,23 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | R-05 | Colleague signs up with same domain, owner approves join | IMPL-NOT-WIRED | request creates join row (service.py:285); no route lists or decides (company_api.py has none) |
 | R-06 | Owner removes a member | IMPL-NOT-WIRED | service.py:548 |
 | R-07 | Optional TOTP for recruiters | IMPL+WIRED | mfa_api.py |
-| R-08 | Create template (title, challenges, time, hints, resets, expiry, retention, write-up, results timing) | PARTIAL: API full, web form omits retention, resets, expiry; set values not applied to attempts (LB-4) | company_api.py:193; company/page.tsx:118-157 |
+| R-08 | Create template (title, challenges, time, hints, resets, expiry, retention, write-up, results timing) | PARTIAL: API full, web form omits retention, resets, expiry; set values not applied to attempts (LB-4) | company_api.py:193; company/page.tsx:118-157 **PARTIAL, improved 2026-10-21 (WP-A): the values now reach the attempt and the lab; the web form gaps stay; `test_template_settings_reach_the_lab.py`** |
 | R-09 | Edit template; invites keep their copy; version bump | PARTIAL: API only, no UI | service.py:316 |
 | R-10 | Delete unused template | IMPL+WIRED | service.py:356 |
-| R-11 | Challenge subset honoured in the candidate's attempt and score | MISSING | runtime.py:128, 598 |
+| R-11 | Challenge subset honoured in the candidate's attempt and score | MISSING | runtime.py:128, 598 **FIXED 2026-10-21 (WP-A): subset honoured in list, flags, hints, score and report; `test_template_settings_reach_the_lab.py`** |
 | R-12 | Single and bulk invite (500), skipped reasons, remaining when capped | IMPL+WIRED | company_api.py:232; service.py:435 |
 | R-13 | Candidate actually receives the invite | PARTIAL (LB-1) | platform.compose.yaml:22 |
 | R-14 | Resend, cancel, revoke, re-invite | PARTIAL: routes exist, web has no buttons | company_api.py:247; Grep web "resend/revoke" none |
 | R-15 | Invite a person who already has a learner account; recruiter must not learn practice history | IMPL+WIRED | api.py:200-205 reviewer is org-bound |
-| R-16 | Invite same address twice | PARTIAL: duplicate live invite refused; `AlreadyStarted` guard dead (LB-6) | service.py:418-421 |
+| R-16 | Invite same address twice | PARTIAL: duplicate live invite refused; `AlreadyStarted` guard dead (LB-6) | service.py:418-421 **FIXED 2026-10-21 (WP-A): a repeat invite after a closed one takes the next generation; `test_invite_lifecycle.py`** |
 | R-17 | Daily invite cap, admin override per company | PARTIAL: cap works; admin override has no route | service.py:398; orgs/service.py:614 |
 | R-18 | Live monitor: state, countdown, milestones, captures without refresh | IMPL+WIRED (web, not live) | candidates/page.tsx; live/api.py |
 | R-19 | Candidate report: score of 1000, per challenge, time to capture, active time, hints, evidence, timeline | IMPL+WIRED (web, not live) | api.py:762; [attemptId]/page.tsx |
 | R-20 | Technique label and tags (D-07) | MISSING | api.py:777 `"technique_label": None` |
 | R-21 | Integrity flags: read, accept or reject with note, audited | IMPL+WIRED | api.py:724-759 |
 | R-22 | Held capture review within 7 days, reminder only | IMPL+WIRED | runtime.py:348, 754 |
-| R-23 | Release results to the candidate (`after_release`) | PARTIAL: route and button work; enforcement depends on rule that is never set (C-23) | api.py:522 |
-| R-24 | Cancel a ready or running attempt (FR-SES-07) | MISSING for recruiter (engine cancel only used by re-invite) | ports/engine_attempts.py:87; no route |
+| R-23 | Release results to the candidate (`after_release`) | PARTIAL: route and button work; enforcement depends on rule that is never set (C-23) | api.py:522 **FIXED 2026-10-21 (WP-A): enforcement now works because the rule reaches the attempt; `test_template_settings_reach_the_lab.py`** |
+| R-24 | Cancel a ready or running attempt (FR-SES-07) | MISSING for recruiter (engine cancel only used by re-invite) | ports/engine_attempts.py:87; no route **FIXED in the API 2026-10-21 (WP-A): cancelAttempt (IF-2 2.2.0), the candidate sees cancelled, the mail is the notification work's; no web button yet; `test_invite_lifecycle.py`** |
 | R-25 | Grant extra time or reopen | MISSING | none |
 | R-26 | Cohort view and ranking aid (D-93) | IMPL-NOT-WIRED | ports/engine_cohort.py; no route |
 | R-27 | Export results CSV and JSON per template, audited, recorded in candidates' view history | IMPL+WIRED | export_api.py:56; exports.py |
@@ -152,10 +152,10 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | A-06 | User search, lock, unlock, reset password, delete (audited, reads logged) | IMPL+WIRED | ops.py:168-221 |
 | A-07 | Delete participant who holds assessment data: locked instead | IMPL+WIRED | ops.py:236 |
 | A-08 | Create further admins, change roles | PARTIAL: seed command only by design; role service has no route | roles.py:77; FR-ACC-11 |
-| A-09 | Set per-user, company, global instance quotas | PARTIAL: stored and audited, never enforced (LB-5) | kernel/quota.py; no use in lab/ |
-| A-10 | Edit settings with ranges and audit | PARTIAL: instance, hint and flag-rate settings unused by runtime | ops.py:287; Grep result |
+| A-09 | Set per-user, company, global instance quotas | PARTIAL: stored and audited, never enforced (LB-5) | kernel/quota.py; no use in lab/ **FIXED 2026-10-21 (WP-A): the lab enforces user, company and platform limits at request time; `test_lab_quota.py`** |
+| A-10 | Edit settings with ranges and audit | PARTIAL: instance, hint and flag-rate settings unused by runtime | ops.py:287; Grep result **PARTIAL, improved 2026-10-21 (WP-A): the quota and rate-limit settings, hints and the template's flag limit are used; idle and max minutes stay as before; `test_lab_quota.py`** |
 | A-11 | Capacity view: instances, memory, mail queue, failures | PARTIAL: no instance queue depth | ops.py:362-377 |
-| A-12 | Capacity full policy: queue or reserve for assessments | MISSING | api.py:150 only 429 |
+| A-12 | Capacity full policy: queue or reserve for assessments | MISSING | api.py:150 only 429 **FIXED 2026-10-21 (WP-A): a reserve of places for assessments, a full platform is 503 INST-NO-CAPACITY; `test_lab_quota.py`** |
 | A-13 | Force-stop an instance; owner mailed; audit | IMPL+WIRED (attempt state unchanged, candidate not told in-app) | ops.py:252; runtime.py:697 |
 | A-14 | Job status and failures; retention runs visible | PARTIAL: view exists, scheduler off live (LB-3) | admin/api.py:181 |
 | A-15 | Read audit log (hash chain, anchor, pseudonymised), reads logged | IMPL+WIRED | breakglass.py audit_entries; kernel/audit.py |
@@ -179,14 +179,14 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | X-01 | Learner practises, then recruiter invites the same address; person signs in, accepts, consents, starts | IMPL+WIRED in code (blocked live by LB-1, LB-2) | accept.py:70-135 |
 | X-02 | Recruiter never sees practice history, points or runs | IMPL+WIRED | api.py:200-205; account_progress skips org attempts runtime.py:284 |
 | X-03 | Practice and assessment attempts separated by `org_id`, template key, instance | IMPL+WIRED | api.py:188; engine.py:89 |
-| X-04 | Same person, two live instances (practice and assessment) | PARTIAL: allowed, uncapped, login bump touches both | runtime.py:773-795 |
+| X-04 | Same person, two live instances (practice and assessment) | PARTIAL: allowed, uncapped, login bump touches both | runtime.py:773-795 **FIXED 2026-10-21 (WP-A): counted per mode and capped; the login bump still touches both; `test_lab_quota.py`** |
 | X-05 | Delete learner account that holds candidate data | IMPL+WIRED (locked) | ops.py:231-242 |
 | X-06 | Candidate withdraws; practice untouched, FR-ACC-06 | IMPL+WIRED | api.py:538; erase per attempt |
-| X-07 | Re-invite after fault end to end (recruiter button, new attempt, old superseded and visible) | PARTIAL (R-14, C-27) | service.py:471 |
-| X-08 | Repeat assessment same template later (second invite after expiry) | PARTIAL: engine returns the old attempt for same user and template key generation 1 (create returns existing) | engine.py:93-95 |
+| X-07 | Re-invite after fault end to end (recruiter button, new attempt, old superseded and visible) | PARTIAL (R-14, C-27) | service.py:471 **PARTIAL, improved 2026-10-21 (WP-A): service and lab done, recruiter button missing in the web; `test_invite_lifecycle.py`** |
+| X-08 | Repeat assessment same template later (second invite after expiry) | PARTIAL: engine returns the old attempt for same user and template key generation 1 (create returns existing) | engine.py:93-95 **FIXED 2026-10-21 (WP-A): a second invite after a closed one has its own attempt; `test_invite_lifecycle.py`** |
 | X-09 | Company suspended or deleted with candidates mid-attempt | PARTIAL (R-33) | orgs/service.py:416 |
 | X-10 | Retention expiry across invite, attempt, consent (12 months) | PARTIAL (code complete, off live) | candidates.py; LB-3 |
-| X-11 | Capacity exhausted by learners when a candidate presses Start | MISSING: no reservation or priority; total cap unenforced, host `Busy` becomes 429 | api.py:150; LB-5 |
+| X-11 | Capacity exhausted by learners when a candidate presses Start | MISSING: no reservation or priority; total cap unenforced, host `Busy` becomes 429 | api.py:150; LB-5 **FIXED 2026-10-21 (WP-A): reserve for assessments and the 503 answer; `test_lab_quota.py`** |
 | X-12 | Instance crash mid-assessment: clock keeps running, candidate restarts, recruiter sees state | PARTIAL (C-22) | runtime.py:452 |
 | X-13 | Duplicate flags and sharing across candidates | IMPL+WIRED | C-31, C-32 |
 | X-14 | Integrity signals reach recruiter, no auto-reject (GDPR Art. 22 style human review) | IMPL+WIRED | api.py:724; FR-ACH-06 |
@@ -196,7 +196,7 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | X-18 | Time zones and DST across emails, UI, deadlines | IMPL+WIRED | UTC in API, local display |
 | X-19 | Accessibility and accommodations | PARTIAL / MISSING (C-30, L-25) | |
 | X-20 | Whole hiring journey on the live site (company sign-up to released result) | MISSING (LB-1, LB-2, LB-3, LB-4) | live-deploy.md:8,27 |
-| X-21 | Consent withdrawal evidence kept and company told | PARTIAL (C-24) | |
+| X-21 | Consent withdrawal evidence kept and company told | PARTIAL (C-24) | **PARTIAL, improved 2026-10-21 (WP-A): the withdrawn record is kept; the company is not mailed yet; `test_invite_lifecycle.py`** |
 
 ## 7. Prioritised list: 20 most damaging MISSING or PARTIAL scenarios
 

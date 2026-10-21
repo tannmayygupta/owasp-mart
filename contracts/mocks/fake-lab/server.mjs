@@ -418,6 +418,17 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     if (a.afterRelease) a.released = true;
     send(res, 200, attemptView(a));
   };
+  H.cancelAttempt = ({ res, user, params, take }) => { // IF-2 2.2.0, FR-SES-07: the recruiter of the owning company cancels a ready or running candidate attempt
+    const a = findAttempt(res, params.attempt_id); // not the reviewable helper: a repeat on a cancelled attempt is 409, not the 410 of derived reads
+    if (a && !isReviewer(user, a)) return attemptNotFound(res);
+    if (!a || take() === false) return;
+    if (user.role !== 'recruiter' || a.orgId === null) return attemptNotFound(res);
+    if (!['ready', 'running'].includes(a.state)) return problem(res, 409, 'ATT-INVALID-STATE', `cancel is not allowed in state ${a.state}`);
+    a.state = 'cancelled';
+    const r = a.instanceId ? instances.get(a.instanceId) : null;
+    if (r && r.state !== 'destroyed') { r.state = 'destroyed'; r.access = 'closed'; r.updatedAt = stamp(); }
+    send(res, 200, attemptView(a));
+  };
   H.withdrawAttempt = ({ res, user, params, take }) => {
     const a = owned(res, user, params.attempt_id);
     if (!a) return;
@@ -669,6 +680,7 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     ['GET', new RegExp(`^/api/v1/attempts/${ID}$`), ['attempt_id'], 'getAttempt'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/start$`), ['attempt_id'], 'startAttempt', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/release$`), ['attempt_id'], 'releaseResults', 'none'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/cancel$`), ['attempt_id'], 'cancelAttempt', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/submit$`), ['attempt_id'], 'submitAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw$`), ['attempt_id'], 'withdrawAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw/undo$`), ['attempt_id'], 'undoWithdrawal', 'none'],

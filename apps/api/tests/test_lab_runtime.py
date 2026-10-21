@@ -401,6 +401,9 @@ def test_a_hint_costs_points_only_in_an_assessment_and_never_in_practice():
     rt.submit_flag(learner.attempt_id, "C01", rt.keys.flag(learner.instance_id, "C01", 1))
     rt.unlock_hint(learner.attempt_id, "C01", 1)
     free = rt.score(learner.attempt_id).score
+    from vulnmart_attempts import Rules
+
+    rt.engine.create("u-candidate", rt.template_id, "c-1", org_id="o-acme", rules=Rules(hints_mode="on", hint_cost_pct=10))  # the template turned hints on at 10 percent a level
     candidate = rt.start_attempt("u-candidate", org_id="o-acme")
     play(rt, candidate.instance_id)
     rt.submit_flag(candidate.attempt_id, "C01", rt.keys.flag(candidate.instance_id, "C01", 1))

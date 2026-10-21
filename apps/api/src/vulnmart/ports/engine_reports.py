@@ -30,7 +30,10 @@ class FactSource(Protocol):
 class EngineReportPort:
     def __init__(self, *, attempts: AttemptPort, facts: FactSource, integrity: InMemoryIntegritySink | None = None,
                  catalogue: Catalogue | None = None, rules: ScoringRules | None = None,
-                 clock: Callable[[], datetime] | None = None, evidence=None) -> None:
+                 clock: Callable[[], datetime] | None = None, evidence=None,
+                 profile: Callable[[str], tuple[Catalogue, ScoringRules]] | None = None) -> None:
+        # `profile(attempt_id)`: the challenges and the hint costs of THIS attempt (the template of a company assessment); without it every attempt scores over the default catalogue
+        self._profile = profile
         self._attempts, self._facts, self._integrity = attempts, facts, integrity
         self._evidence = evidence  # an `EvidenceReader` (ingest/evidence.py) or None: then there is no evidence
         self._catalogue, self._rules = catalogue or Catalogue(), rules or ScoringRules()
@@ -38,7 +41,8 @@ class EngineReportPort:
 
     def score(self, attempt_id: str) -> Score:
         self._attempts.get(attempt_id)  # raises AttemptNotFound or AttemptGone
-        result = compute_score(self._facts.facts(attempt_id), self._catalogue, self._rules)
+        catalogue, rules = self._profile(attempt_id) if self._profile is not None else (self._catalogue, self._rules)
+        result = compute_score(self._facts.facts(attempt_id), catalogue, rules)
         rows = tuple(ChallengeResult(r.challenge_key, Milestone(r.milestone.label), r.hints_used, r.points) for r in result.per_challenge)
         return Score(attempt_id, result.shown, rows, self._clock().strftime("%Y-%m-%dT%H:%M:%SZ"))
 
