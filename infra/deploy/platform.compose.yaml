@@ -140,7 +140,6 @@ services:
       VULNMART_ORCH_CERT_KEY_FILE: /run/pki/client.key
       VULNMART_ORCH_REPORT_KEY_FILE: /run/secrets/report_key
       VULNMART_LAB_READY_TIMEOUT_S: "180"
-      VULNMART_LAB_SEQUENCE: "1"  # the learner board runs the sequenced mode (challenges begun one by one); the lab console implements it
       # The retention scheduler (story P-24, ADR 0054, production hardening ADR 0074): invite expiry, candidate and learner retention, deletion requests after the undo window,
       # the audit anchor, log and token purges. Every job acts only on rows past their retention or undo window and runs under a lease (job_runs), see docs/runbooks/live-deploy.md.
       # To turn it off: set this to "false" and `docker compose up -d api`; nothing is deleted while it is off.
