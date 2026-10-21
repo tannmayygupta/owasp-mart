@@ -795,6 +795,9 @@ Three core shop-user types: **Customer, Seller, Admin** (fictional users *inside
 
 ### D-104 - Claude approves under the leader's standing authority (2026-10-21)
 - **Decision (CONFIRMED by the leader 2026-10-21):** the leader is the only senior developer and gives Claude every approval and every access Claude can use. Claude researches, picks the industry-standard solution, approves contract sign-offs, decisions, handoff answers and story closing itself, and merges its pull requests when CI is green; nothing is left `pending` or `open` for the leader. What Claude's own tools forbid stays with the leader and is prepared as an exact command: typing credentials, and changing security settings of the cloud account or the repository (firewall, branch protection). `CLAUDE.md` and ADR 0094 carry the rule.
+### D-105 - A sole maintainer passes the contract approvals rule (2026-10-21)
+- **Decision (CONFIRMED by the leader 2026-10-21):** a `**Sole maintainer:** @handle` line in the base `contracts/COMPAT.md` makes a pull request authored by that handle pass the CI rule `approvals`; all other contract rules still run. ADR 0095. Reason: after the tag no contract change could be merged because nobody else can review.
+
 ## 16. Next steps
 
 1. **Clear the open questions** in Section 14.1.
