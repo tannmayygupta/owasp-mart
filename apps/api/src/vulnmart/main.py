@@ -46,7 +46,9 @@ from vulnmart.live.snapshot import EmptySnapshot, LabSnapshotSource, SnapshotSou
 from vulnmart.live.store import StreamReader, ValkeyStreamStore
 from vulnmart.lab.tickets import TicketMinter, minter_from_environ
 from vulnmart.assessments.service import AssessmentService
+from vulnmart.orgs.colleague_api import router as colleague_router
 from vulnmart.orgs.company_api import router as company_router
+from vulnmart.orgs.company_privacy_api import router as company_privacy_router
 from vulnmart.orgs.service import CompanyService
 from vulnmart.ports.attempts import AttemptPort
 from vulnmart.privacy.api import router as consent_router
@@ -211,7 +213,8 @@ def create_app(
     app.state.accounts = accounts or _accounts_from(settings, app.state.ports, policy)
     app.state.rate_limiter = rate_limiter or _limiter_from(settings)
     app.state.session_service = sessions or _sessions_from(settings, app.state.ports)
-    app.state.self_service = self_service or (SelfService(app.state.ports.sessions, app.state.session_service, policy)
+    app.state.self_service = self_service or (SelfService(app.state.ports.sessions, app.state.session_service, policy, settings=app.state.ports.settings,
+                                                                    keys=field_keys_from(settings), public_origin=settings.public_origin, audit=app.state.ports.audit)
                                               if app.state.ports.sessions is not None and app.state.session_service is not None else None)
     # The role and admin services have no route yet (the admin area is story P-28); later stories find them here. The audit port is the
     # real log (DbAuditPort behind PseudonymisingAudit) when a database is configured, the in-memory stand-in otherwise (story P-17).
@@ -261,6 +264,15 @@ def create_app(
     from vulnmart.privacy.views import ViewHistory
 
     app.state.view_history = ViewHistory(ports.sessions) if ports.sessions is not None else None  # who viewed me (story P-25); the recruiter views (P-27, P-29) record into it
+    # The mails the attempt flows cause (consent withdrawn, time warning, submission, release) and the deletion notices: the lab calls `app.state.mail_triggers`.
+    from vulnmart.notifications.triggers import MailTriggers
+
+    app.state.mail_triggers = (MailTriggers(ports.sessions, ports.scope, public_origin=settings.public_origin, keys=field_keys or field_keys_from(settings))
+                               if ports.sessions is not None else None)
+    if lab is not None and app.state.mail_triggers is not None and getattr(lab, "mail_log", None) is not None:
+        from vulnmart.lab.mail_log import mail_sink
+
+        lab.mail_log.sink = mail_sink(app.state.mail_triggers)  # time warning, submission, withdrawal and release now cause their mails (F-10)
     if ports.sessions is not None and app.state.assessments is not None:
         from vulnmart.privacy.subjects import SubjectService
         from vulnmart.privacy.retention.build import build_scheduler
@@ -271,7 +283,7 @@ def create_app(
         from vulnmart.privacy.retention.records import SqlAttemptRecords
 
         app.state.deletion_service = DeletionService(ports.sessions, app.state.assessments, SqlAttemptRecords(ports.sessions), ports.settings, ports.audit, subjects,
-                                                     lab.erase if lab is not None else None)
+                                                     lab.erase if lab is not None else None, mail=app.state.mail_triggers)
         app.state.scheduler = build_scheduler(sessions=ports.sessions, assessments=app.state.assessments, settings=ports.settings, audit=ports.audit,
                                               subjects=subjects,
                                               eraser=lab.erase if lab is not None else None, anchors=app.state.audit_anchors,
@@ -322,6 +334,8 @@ def create_app(
     app.include_router(deletion_router)
     app.include_router(invite_router)
     app.include_router(company_router)
+    app.include_router(company_privacy_router)
+    app.include_router(colleague_router)
     app.include_router(export_router)
     app.include_router(live_router)
 
@@ -341,4 +355,13 @@ def create_app(
     return app
 
 
-app = create_app(configure_logs=True)
+def create_entry_app() -> FastAPI:
+    """The app of the API process: production does not start with Mailpit, a missing Brevo key or a placeholder sender (FR-NTF-03, wiring finding F-03).
+    The check lives here and not in `create_app`, which tests build with any settings."""
+    from vulnmart.notifications.config import validate_mail_settings
+
+    validate_mail_settings(get_settings())
+    return create_app(configure_logs=True)
+
+
+app = create_entry_app()

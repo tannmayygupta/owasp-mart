@@ -58,5 +58,6 @@
 | 0059 | [Recruiter routes, and the recruiter dashboard over the lab's reviewer routes](0059-recruiter-routes-and-the-recruiter-dashboard.md) | Proposed (the builder's design for the developer to confirm) |
 | 0060 | [Exports built on the server as audited zips](0060-exports-built-on-the-server-as-audited-zips.md) | Proposed (the builder's design for the developer to confirm) |
 | 0062 | [Break-glass sessions and the admin's audit log](0062-break-glass-sessions-and-the-admin-audit-log.md) | Proposed (the builder's design for the developer to confirm) |
+| 0073 | [Company administration, privacy workflows and real mail](0073-company-administration-privacy-workflows-and-real-mail.md) | Accepted (leader, 2026-10-21) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

@@ -28,6 +28,7 @@ from vulnmart_attempts.review import HeldCaptureReview, HeldItem, default_may_re
 from vulnmart.flags.checker import FlagChecker
 from vulnmart.flags.material import CHALLENGE_KEYS, build_material
 from vulnmart.flags.submit import FlagSubmissionResult, FlagSubmitService
+from vulnmart.lab.mail_log import MailingAttemptLog
 from vulnmart.ingest.bots import BotRecorder
 from vulnmart.ingest.engine import MilestoneEngine
 from vulnmart.ingest.evidence import EvidenceReader, EvidenceRecorder
@@ -127,7 +128,8 @@ class LabRuntime:
         s = stores or memory_stores()
         self.stores = s
         self.catalog = catalog or Catalog({})  # titles and hint texts (IF-7); empty means keys and placeholders
-        self.attempt_log = s.attempt_log  # ids and metadata only (FR-TIM-04)
+        self.mail_log = MailingAttemptLog(s.attempt_log)  # the plain log until the application sets `mail_log.sink` (the mails of FR-NTF-01)
+        self.attempt_log = self.mail_log  # ids and metadata only (FR-TIM-04)
         self.hints = s.hints
         self.milestones = s.milestones
         self.integrity = s.integrity

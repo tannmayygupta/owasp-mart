@@ -1,0 +1,8 @@
+{
+  "schema": "DeletionDecisionRequest",
+  "body": {
+    "decision": "delete"
+  },
+  "path": "/decision",
+  "rule": "approve or decline only"
+}

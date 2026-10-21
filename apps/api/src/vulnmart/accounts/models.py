@@ -101,6 +101,23 @@ class EmailToken(Timestamps, Base):
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")  # wrong codes tried with an `mfa` ticket (five at most)
 
 
+class EmailChange(Timestamps, Base):
+    """A pending change of the address of an account (WP-B, FR-ACC-09): the new address, the hash of the single-use link mailed to it, and when the link ends. One per account
+    (a new request replaces the old one). The account's own address does not change until the link is used, so a mistyped or someone else's address changes nothing."""
+
+    __tablename__ = "email_changes"
+    __table_args__ = (
+        ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE", name="fk_email_changes_user_id_users"),
+        UniqueConstraint("token_hash", name="uq_email_changes_token_hash"),
+    )
+
+    user_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    new_email: Mapped[str] = mapped_column(String(254), nullable=False)
+    new_email_ci: Mapped[str] = mapped_column(String(254), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # SHA-256 hex of the link's token
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class MfaCredential(Timestamps, Base):
     """The TOTP credential of an account (architecture 04): one per user. `enabled_at` is null while the enrolment is pending (the secret was
     shown but no code from the app has confirmed it). The secret is sealed with the field key and bound to the account (`accounts/fieldkeys.py`).

@@ -12,6 +12,7 @@ tables:
   - { table: recovery_codes, owner: accounts }
   - { table: sessions, owner: accounts }
   - { table: email_tokens, owner: accounts }
+  - { table: email_changes, owner: accounts, note: "Added by migration 0018 (WP-B): a pending change of an account's address, one row per account." }
   # 2.2 organisations (P)
   - { table: organizations, owner: orgs }
   - { table: org_members, owner: orgs }

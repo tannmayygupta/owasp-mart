@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import Field
 from vulnmart_models.error_codes import ErrorCode
 
-from vulnmart.accounts.http import Authenticated, Strict, accepted, check_origin, hash_slots, invalid, ip_of, limit, read_json, requires, services, timestamp
+from vulnmart.accounts.http import BULK_BODY_BYTES, Authenticated, Strict, accepted, check_origin, hash_slots, invalid, ip_of, limit, read_json, requires, services, timestamp
 from vulnmart.accounts.security import normalize_email
 from vulnmart.accounts.service import InvalidInput
 from vulnmart.assessments.service import (
@@ -70,6 +70,7 @@ class TemplateBody(Strict):
     writeup_required: bool | None = None
     results_visibility: Literal["after_submit", "after_release"] | None = None
     flag_submissions_per_minute: int | None = None
+    cohort_board: bool | None = None  # the private cohort view (D-93): off unless the assessment turns it on
 
     def values(self) -> dict[str, Any]:
         return {k: v for k, v in self.model_dump().items() if v is not None}
@@ -114,7 +115,7 @@ def template_body(t: TemplateView) -> dict[str, Any]:
     return {"template_id": t.template_id, "title": t.title, "challenge_keys": list(t.challenge_keys), "time_limit_min": t.time_limit_min, "hints_mode": t.hints_mode,
             "hint_cost_pct": t.hint_cost_pct, "reset_limit": t.reset_limit, "invite_expiry_days": t.invite_expiry_days, "retention_days": t.retention_days,
             "writeup_required": t.writeup_required, "results_visibility": t.results_visibility, "flag_submissions_per_minute": t.flag_submissions_per_minute,
-            "version": t.version, "updated_at": timestamp(t.updated_at)}
+            "cohort_board": t.cohort_board, "version": t.version, "updated_at": timestamp(t.updated_at)}
 
 
 def invite_body(i: InviteView) -> dict[str, Any]:
@@ -233,7 +234,7 @@ async def list_company_invites(request: Request, auth: Authenticated = Depends(r
 async def create_invites(request: Request, auth: Authenticated = Depends(recruiter_write)) -> JSONResponse:
     """One address: the invite or the refusal (409 a live invite exists, 429 the daily cap). Several: the bulk result, address by address (FR-ASM-06)."""
     _, assessments = parts(request)
-    body = await read_json(request, InvitesBody)
+    body = await read_json(request, InvitesBody, max_bytes=BULK_BODY_BYTES)
     template_id = body.template_id.lower()
     if len(body.emails) == 1:
         made = await run(assessments.create_invite, auth.session.scope, template_id, body.emails[0])

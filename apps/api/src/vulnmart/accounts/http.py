@@ -39,6 +39,7 @@ from .sessions import ResolvedSession, SessionService, UserView
 logger = logging.getLogger("vulnmart.accounts")
 
 MAX_BODY_BYTES = 16 * 1024
+BULK_BODY_BYTES = 192 * 1024  # 500 addresses of 254 characters, quoted and separated, plus the template id: about 130 KB (IF-1 InvitesRequest)
 HASH_SLOTS = 4
 HOUR = 3600
 SESSION_COOKIE = "__Host-vm_session"
@@ -96,18 +97,19 @@ def ua_class(request: Request) -> str:
 
 # ---- the body ---------------------------------------------------------------------------------------------------------
 
-async def read_json(request: Request, model: type[M]) -> M:
-    """A bounded JSON body, validated. 415 for another media type, 413 when too large, 422 (never echoing a value) when it does not fit."""
+async def read_json(request: Request, model: type[M], *, max_bytes: int = MAX_BODY_BYTES) -> M:
+    """A bounded JSON body, validated. 415 for another media type, 413 when too large, 422 (never echoing a value) when it does not fit. `max_bytes` raises the bound for the
+    one route whose contract allows a long list (the bulk invite: 500 addresses of up to 254 characters)."""
     media = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if media != "application/json":
         raise ProblemError(ErrorCode.REQ_UNSUPPORTED_MEDIA_TYPE)
     declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+    if declared and declared.isdigit() and int(declared) > max_bytes:
         raise ProblemError(ErrorCode.REQ_TOO_LARGE)
     body = bytearray()
     async for chunk in request.stream():
         body += chunk
-        if len(body) > MAX_BODY_BYTES:
+        if len(body) > max_bytes:
             raise ProblemError(ErrorCode.REQ_TOO_LARGE)
     try:
         data: Any = json.loads(bytes(body))

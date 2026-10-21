@@ -29,6 +29,8 @@ INVENTORY = {
     "sessions": ("Session data: hashed session value, coarse network prefix, browser class, times",
                  {"id_hash", "user_id", "created_at", "last_seen_at", "absolute_expires_at", "revoked_at", "ip_trunc", "ua_class", "mfa_at"}),
     "email_tokens": ("Account data: hashed verification, reset and login-ticket tokens", {"token_hash", "user_id", "purpose", "expires_at", "used_at", "created_at", "attempts"}),
+    "email_changes": ("Email: a pending change of the address (the new address and the hash of its single-use link), one per account, removed when the link is used or ends",
+                      {"user_id", "new_email", "new_email_ci", "token_hash", "expires_at", "created_at"}),
     "mfa_credentials": ("Account data: the sealed second-factor secret", {"user_id", "type", "secret_enc", "enabled_at", "last_used_step", "created_at", "updated_at"}),
     "recovery_codes": ("Account data: keyed hashes of recovery codes", {"code_hash", "user_id", "used_at", "created_at"}),
     "consent_records": ("Consent records: notice version, text snapshot and hash, retention and company shown, hashed address and browser, audit link",

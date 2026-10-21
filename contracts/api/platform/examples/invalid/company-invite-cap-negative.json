@@ -1,0 +1,8 @@
+{
+  "schema": "InviteCapRequest",
+  "body": {
+    "invite_cap": -1
+  },
+  "path": "/invite_cap",
+  "rule": "0 to 100000, or null for the global setting"
+}

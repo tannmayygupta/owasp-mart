@@ -16,6 +16,7 @@ from dramatiq import Broker
 
 from vulnmart.kernel.settings import Settings
 
+from .config import validate_mail_settings
 from .fakes import DevRecipients
 from .provider import BrevoApiProvider, EmailProvider, SmtpProvider
 from .service import EmailOutboxService, RecipientLookup, Renderer
@@ -43,6 +44,7 @@ def make_broker(valkey_url: str) -> Broker:
 
 def make_provider(settings: Settings) -> EmailProvider:
     """The adapter the environment names. Brevo needs its key; an unset key fails the start, not the first send."""
+    validate_mail_settings(settings)  # production: Brevo, a key and a real sender, never Mailpit
     if settings.email_provider == "brevo":
         key = settings.brevo_key_value()
         if not key:

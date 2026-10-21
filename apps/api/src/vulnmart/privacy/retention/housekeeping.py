@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from vulnmart.accounts.models import EmailToken, UserSession
+from vulnmart.accounts.models import EmailChange, EmailToken, UserSession
 from vulnmart.assessments.service import AssessmentService
 from vulnmart.kernel.audit import AuditAnchors
 from vulnmart.kernel.models import JobRun
@@ -59,6 +59,7 @@ class AccountHousekeeping:
         with self._sessions.begin() as session:
             gone = session.execute(delete(UserSession).where(UserSession.absolute_expires_at < now - timedelta(days=days))).rowcount
             tokens = session.execute(delete(EmailToken).where(EmailToken.expires_at < now - timedelta(days=TOKEN_DAYS))).rowcount
+            tokens += session.execute(delete(EmailChange).where(EmailChange.expires_at < now)).rowcount  # a pending change whose link ended (the new address is not kept)
         return f"{gone} sessions and {tokens} tokens deleted"
 
 

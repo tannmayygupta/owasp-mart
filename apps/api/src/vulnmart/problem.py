@@ -43,12 +43,13 @@ class ProblemError(Exception):
     Only codes that are sent as an HTTP answer are accepted.
     """
 
-    def __init__(self, code: ErrorCode, *, headers: Mapping[str, str] | None = None) -> None:
+    def __init__(self, code: ErrorCode, *, headers: Mapping[str, str] | None = None, field: str | None = None) -> None:
         if ERRORS[code].status is None:
             raise ValueError(f"{code.value} is never sent as an HTTP answer")
         super().__init__(code.value)
         self.code = code
         self.headers = dict(headers or {})
+        self.field = field  # a JSON Pointer that tells the client what to fix or where to go (a fixed pointer, never a submitted value)
 
 
 # Headers of a framework error that stay useful to the client.
@@ -70,6 +71,7 @@ def problem_response(
     *,
     errors: Sequence[Mapping[str, str]] | None = None,
     headers: Mapping[str, str] | None = None,
+    field: str | None = None,
 ) -> JSONResponse:
     """Build the answer for a registry code. A code that is never an HTTP answer is a programming error."""
     info = ERRORS[code]
@@ -82,6 +84,8 @@ def problem_response(
         "code": code.value,
         "request_id": request_id,
     }
+    if field is not None:
+        body["field"] = field
     if errors:
         body["errors"] = [dict(e) for e in errors][:MAX_ERRORS]
     # Every error answer is uncacheable: the proxy honours upstream cache headers (architecture 03, section 1.3).
@@ -131,7 +135,7 @@ def install_problem_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(ProblemError)
     async def _problem(request: Request, exc: ProblemError) -> JSONResponse:
-        return problem_response(exc.code, request_id_for(request), headers=exc.headers)
+        return problem_response(exc.code, request_id_for(request), headers=exc.headers, field=exc.field)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:

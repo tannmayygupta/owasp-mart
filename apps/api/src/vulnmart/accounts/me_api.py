@@ -1,4 +1,4 @@
-"""The signed-in user's own routes of IF-1: getMe, updateMe, changePassword (FR-ACC-09).
+"""The signed-in user's own routes of IF-1: getMe, updateMe, changePassword, requestEmailChange (FR-ACC-09).
 
 `changePassword` needs the current password: a wrong one is 401 AUTH-INVALID-CREDENTIALS and the session stays, but wrong guesses are
 counted per account like a login's (a stolen session must not be a free password-guessing oracle) and the route is limited per visitor
@@ -13,14 +13,16 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import Field, model_validator
 from vulnmart_models.error_codes import ErrorCode
 
+from vulnmart.kernel.ratelimit import email_key
 from vulnmart.kernel.service import NO_STORE
 from vulnmart.problem import ProblemError
 
+from .security import normalize_email
 from .http import (
-    Authenticated, Strict, authenticated, authenticated_with_csrf, hash_slots, invalid, ip_of, limit, limiter_call, read_json, services,
+    accepted, Authenticated, Strict, authenticated, authenticated_with_csrf, hash_slots, invalid, ip_of, limit, limiter_call, read_json, services,
     set_session_cookie, userview_body, session_service,
 )
-from .self_service import SelfService, SessionEnded
+from .self_service import EmailChangeNotAllowed, EmailChangeUnavailable, SelfService, SessionEnded
 from .service import InvalidInput
 from .sessions import InvalidCredentials
 
@@ -35,6 +37,11 @@ class UpdateMeBody(Strict):
         if not self.model_fields_set:
             raise ValueError("at least one member")
         return self
+
+
+class ChangeEmailBody(Strict):
+    new_email: str = Field(min_length=3, max_length=254)
+    current_password: str = Field(min_length=1, max_length=128)
 
 
 class ChangePasswordBody(Strict):
@@ -93,3 +100,46 @@ async def change_password(request: Request, auth: Authenticated = Depends(authen
     response = Response(status_code=204, headers=NO_STORE)
     set_session_cookie(response, new_token)
     return response
+
+
+@router.post("/api/v1/me/email", operation_id="requestEmailChange", status_code=202)
+async def request_email_change(request: Request, auth: Authenticated = Depends(authenticated_with_csrf)) -> JSONResponse:
+    """Ask to use another address (WP-B): the current password is needed, a link goes to the new address, nothing changes until it is used. 202 for a free address and for one
+    that has an account alike. A wrong password is 401 AUTH-INVALID-CREDENTIALS and counted like a login's; an administrator's account is 409 ATT-INVALID-STATE."""
+    service = self_service(request)
+    _, limiter = services(request)
+    settings = request.app.state.ports.settings
+    user_id = auth.session.user.id
+    limit(request, limiter, "emailchange:ip", ip_of(request), "rate_login_per_ip_per_hour")
+    body = await read_json(request, ChangeEmailBody)
+    address = normalize_email(body.new_email)
+    if address is None:
+        raise invalid(InvalidInput("/new_email"))
+    limit(request, limiter, "emailchange:email", email_key(address), "rate_signup_per_email_per_hour")  # also bounds the mails one address can receive
+    key = f"pwchange:fail:{user_id}"  # the same count as the password change: both check the current password
+    allowed = int(settings.get("login_failures_per_window"))
+    wait = limiter_call(limiter.peek, key, allowed)
+    if not wait.allowed:
+        raise ProblemError(ErrorCode.REQ_RATE_LIMITED, headers={"Retry-After": str(wait.retry_after)})
+
+    def refuse_disposable(address_ci: str) -> None:
+        if auth.session.user.account_type == "recruiter":
+            from vulnmart.orgs.disposable import is_disposable
+
+            if is_disposable(address_ci):
+                raise InvalidInput("/new_email", "disposable_email")
+
+    try:
+        async with hash_slots(request):
+            await asyncio.to_thread(lambda: service.request_email_change(user_id=user_id, current_password=body.current_password, new_email=body.new_email,
+                                                                         check_email=refuse_disposable))
+    except InvalidCredentials:
+        limiter_call(limiter.hit, key, allowed, int(settings.get("login_failure_window_minutes")) * 60)
+        raise ProblemError(ErrorCode.AUTH_INVALID_CREDENTIALS) from None
+    except InvalidInput as exc:
+        raise invalid(exc) from None
+    except EmailChangeNotAllowed:
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
+    except EmailChangeUnavailable:
+        raise ProblemError(ErrorCode.REQ_INTERNAL) from None
+    return accepted()

@@ -20,7 +20,7 @@ from vulnmart.accounts.http import Authenticated, Strict, authenticated, authent
 from vulnmart.kernel.service import NO_STORE
 from vulnmart.problem import ProblemError
 
-from .accept import AddressMismatch, InviteAcceptance, LinkInvalid, NotEligible
+from .accept import AddressMismatch, InviteAcceptance, LinkInvalid, NotEligible, NotVerified
 from .service import AssessmentService, CandidateInvite, InviteClosed, InviteNotFound, InviteTaken
 from .tokens import org_of
 
@@ -86,7 +86,11 @@ async def accept_invite(request: Request, auth: Authenticated = Depends(authenti
         found = await asyncio.to_thread(run)
     except LinkInvalid:
         raise ProblemError(ErrorCode.AUTH_TOKEN_INVALID) from None
-    except (InviteClosed, InviteTaken, InviteNotFound, NotEligible, AddressMismatch):
+    except NotVerified:  # guidance: verify the address first (POST /accounts/verify-email/resend sends the link again)
+        raise ProblemError(ErrorCode.AUTH_EMAIL_NOT_VERIFIED, field="/account/email") from None
+    except AddressMismatch:  # guidance: the invite was made for another address; add it to this account (POST /me/email) or sign up with it. The address itself is never said.
+        raise ProblemError(ErrorCode.ATT_INVALID_STATE, field="/account/email") from None
+    except (InviteClosed, InviteTaken, InviteNotFound, NotEligible):
         raise ProblemError(ErrorCode.ATT_INVALID_STATE) from None
     return JSONResponse(invite_body(found, with_ids=True), headers=NO_STORE)
 
