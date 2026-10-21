@@ -23,7 +23,7 @@ start_state: "No account needed. The finance mailbox address is on the public Co
 milestones:
   m1:
     summary: the player requested a password reset for the finance account
-    signal: auth.reset_requested with account_role = finance from a non-finance session
+    signal: auth.reset_requested with account_role = finance and account_found = true (no finance session exists in a lab instance, so every such request is the player)
   m2:
     summary: the finance password was changed through the reset flow
     signal: "auth.password_reset_completed with account_role = finance (backup: >500 failed confirms then a success)"
@@ -45,4 +45,5 @@ write_up:
   fix: >-
     A 128-bit single-use token hashed at rest, an attempt limit per token and per account, generic responses, notify the
     owner, end sessions after reset.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

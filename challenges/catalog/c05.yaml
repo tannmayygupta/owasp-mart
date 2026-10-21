@@ -26,7 +26,7 @@ milestones:
     signal: shop.verbose_error with handler = c05_api
   m2:
     summary: an unauthenticated /_ops/ diagnostics page was served
-    signal: ops.page_served (path /_ops/ or any child), client class not internal
+    signal: ops.page_served with path = /_ops/diagnostics and a client class that is not internal (the index page alone earns nothing)
   m3:
     summary: flag captured
     signal: proxy.flag_seen on /_ops/diagnostics plus ops.page_served path = /_ops/diagnostics
@@ -47,3 +47,4 @@ write_up:
     id; no secrets in dumps; a release hardening checklist.
 decoys:
   - the diagnostics object holds synthetic values only (no real config)
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

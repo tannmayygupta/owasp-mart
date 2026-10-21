@@ -64,10 +64,13 @@ export function readFlag(flagsPath, challengeKey) {
 // Which challenges are exploitable in THIS instance: those whose flag the injector planted (IF-6 section 5). Before the marker nothing is (the default build is the
 // correct one), and a flags file that cannot be read means none. The object is read lazily on each use, so it is correct as soon as the shop is ready; the
 // flags file never changes inside an epoch (a reset starts a new instance process set), so the answer is cached once it is read.
-export function makeInstanceChallenges(flagsPath, { injected = isInjected, readFile = fs.readFileSync } = {}) {
+export function makeInstanceChallenges(flagsPath, { injected = isInjected, readFile = fs.readFileSync, env = process.env } = {}) {
   let cache = null;
   const load = () => {
     if (cache) return cache;
+    // VM_BUILD=fixed is the lab's verification switch (T-32 and the local proof): the same instance and the same planted data, but every challenge runs its FIXED code,
+    // so each exploit must fail. It is not on the instance-contract allowlist and the orchestrator never sets it, so a player instance is never fixed by accident.
+    if (env.VM_BUILD === 'fixed') return {};
     if (!injected(flagsPath)) return {};
     try {
       const doc = JSON.parse(readFile(flagsPath, 'utf8'));

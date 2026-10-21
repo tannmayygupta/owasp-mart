@@ -22,10 +22,10 @@ start_state: "Sign in as the customer player.customer@vulnmart.test with the pas
 milestones:
   m1:
     summary: the player posted their own payment event to the webhook
-    signal: webhook.received with source = non_gateway (the call did not come from the gateway)
+    signal: webhook.received with source = non_gateway that names an order (order_id is not unknown); the call did not come from the gateway
   m2:
     summary: an unsigned event was accepted and the order turned paid
-    signal: order.paid with verified = false, plus webhook.received accepted = true
+    signal: order.paid with verified = false and via = webhook (only posted after the webhook accepted the event, so accepted = true is implied)
   m3:
     summary: flag captured
     signal: proxy.flag_seen on the webhook response or the order page
@@ -46,4 +46,5 @@ write_up:
   fix: >-
     Always verify the HMAC (constant-time, timestamp window, event-id idempotency), remove the bypass, confirm payment
     with the provider API.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

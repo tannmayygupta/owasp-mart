@@ -48,3 +48,4 @@ write_up:
     failures.
 decoys:
   - staff test cards (serials 2 and 3) carry a proof marker, not the flag
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

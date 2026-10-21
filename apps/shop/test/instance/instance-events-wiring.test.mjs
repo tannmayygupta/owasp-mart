@@ -3,7 +3,7 @@
 // snapshot handle (gated by /readyz) and that a REAL player HTTP action posts a
 // schema-valid app event to the sidecar:
 //   - /readyz is 503 until the injector marker, then 200;
-//   - a real POST /login posts auth.attempt (success / unknown) the sidecar accepts;
+//   - a real POST /login posts auth.attempt (success / failure) the sidecar accepts;
 //   - a real checkout posts order.paid.
 // The sidecar is a stand-in that validates the posted body against the actual
 // IF-4 posted schema, so a body the real sidecar would 422 fails the test.
@@ -140,11 +140,11 @@ test('after the marker the shop serves the marketplace and a real login posts au
   assert.equal(success.source, 'shop');
 });
 
-test('a failed login posts auth.attempt with result "unknown" and no account id', async () => {
+test('a failed login for an unknown email posts auth.attempt with result "failure" and no account id', async () => {
   const csrf = csrfFrom(await (await get('/login')).text());
   const bad = await post('/login', { email: 'nobody@vulnmart.test', password: 'wrong' }, csrf);
   assert.equal(bad.status, 401);
-  const miss = await waitForEvent((e) => e.type === 'auth.attempt' && e.data.result === 'unknown');
+  const miss = await waitForEvent((e) => e.type === 'auth.attempt' && e.data.result === 'failure');
   assert.ok(miss, 'a failed-login auth.attempt reached the sidecar');
   assert.ok(validatePosted(miss), 'schema-valid');
   assert.equal(miss.data.account_id, 'unknown');

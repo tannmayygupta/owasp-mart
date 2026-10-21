@@ -275,6 +275,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance events (IF-4), `contracts/events/`
 
+### 1.0.1 (2026-10-21, the leader and Claude, work package D, H-43)
+
+- Documentation only, no schema or example change (clarification, no version label change in COMPAT): section 7 of `app-events.md` now states the milestone mapping (H-43, OI-17): the catalogue `signal` text names the event type and field values, the platform rules file implements it, tests prove the vulnerable and the fixed build; the C09 M2 negative observation uses `shop.security_event_written`, which the shop now posts. no mock change: documentation only.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -349,6 +352,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Additive: three optional fields on a challenge entry — `brief` (a short player-facing description, never a flag), `write_up` (`{ vulnerable, fix }`) and `decoys` (string array of foil locations). Existing entries stay valid; a stub omits them. No mock change (the catalogue is data read by validators, nothing runs against it). Not breaking (new optional properties; `exploit_test` and `fixed_build` patterns unchanged — they stay logical references, with `challenges/catalog/README.md` noting the real self-test folders are `challenges/tests/cNN-<name>` and the fixed build is the `VM_CHALLENGE_<KEY>` env flag). `validate-catalog.mjs` now also requires a `complete` entry to have non-null milestone signals, non-null hints and a brief.
 - All 11 `challenges/catalog/cNN.yaml` entries are now `status: complete` (T-30): milestone detection signals, the three hint texts, a flag-free brief, the vulnerable/fix write-up and decoy locations, filled from `docs/design/challenge-specs.md`.
 
+### 1.2.1 (2026-10-21, the leader and Claude, work package D, H-42, H-43, H-331)
+
+- Data and documentation only, no schema change (clarification; work package D, the leader and Claude, no schema change, no version bump): the milestone `signal` text of C01 M2, C03 M3, C05 M2, C07 M1, C08 M1 and M2, C09 M1 and C10 M1 is tightened to what the platform rules read; every entry now lists its decoy placements in `decoys` (H-42, H-331: kinds `shop-db` and `service-file`, described in `contracts/catalog/README.md`); the mapping of milestone to event name (H-43) is settled in IF-4 section 7. no mock change: the catalogue is data read by validators.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.

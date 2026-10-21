@@ -1,0 +1,3 @@
+{% if pager and (pager.prev or pager.next) %}<nav class="pager" aria-label="Pages" style="margin:12px 0;display:flex;gap:12px;align-items:center">
+  {% if pager.prev %}<a href="{{ pager.prev }}">Previous</a>{% endif %}<span class="muted">Page {{ pager.page }}</span>{% if pager.next %}<a href="{{ pager.next }}">Next</a>{% endif %}
+</nav>{% endif %}
