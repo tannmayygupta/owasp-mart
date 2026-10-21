@@ -37,6 +37,10 @@
 | 0033 | [Orchestrator engine and Docker instance builder](0033-orchestrator-engine-docker-builder.md) | Proposed (D-52, decided on the developer's delegation 2026-10-12) |
 | 0034 | [Orchestrator service: the IF-5 API over the engine](0034-orchestrator-service-fastapi-signing-mtls-reports.md) | Proposed (D-53, decided on the developer's delegation 2026-10-12) |
 | 0035 | [Orchestrator reset, the reaper and the timing settings](0035-orchestrator-reset-reaper-and-timing-settings.md) | Proposed (D-54, decided on the developer's delegation 2026-10-15) |
+| 0036 | [Orchestrator reconciler: Docker labels are the truth, tombstones in a small file](0036-orchestrator-reconciler-labels-and-tombstones.md) | Accepted (D-55, decided on the developer's delegation; confirmed by the developer 2026-10-17) |
+| 0037 | [Isolation probe from inside an instance network](0037-isolation-probe-from-inside-an-instance-network.md) | Accepted (D-57, decided on the developer's delegation; confirmed by the developer 2026-10-17) |
+| 0038 | [A socket proxy now, rootless Docker later (spike S-8 stays open)](0038-socket-proxy-before-rootless-docker.md) | Accepted (D-58, decided on the developer's delegation, story 4.2 "Docker socket behind a proxy for the orchestrator", 2026-10-16; confirmed by the developer 2026-10-17) |
+| 0039 | [No warm pool for the first release; the numbers that would change it](0039-no-warm-pool-for-the-first-release.md) | Accepted (D-59, decided on the developer's delegation, story 3.6 "Concurrency, quotas, start failures, warm-pool decision", 2026-10-16; confirmed by the developer 2026-10-17) |
 | 0040 | [Email: Postgres outbox with a relay, retries in the row, Brevo as the first real provider](0040-email-outbox-relay-and-retries-in-the-row.md) | Proposed (provider answer of the developer 2026-10-17, OI-32; design for the developer to confirm) |
 | 0041 | [Signup: Argon2id profile, hashed single-use links, fail-closed rate limits](0041-signup-argon2id-link-tokens-and-fail-closed-rate-limits.md) | Proposed (OI-29 answer of the developer 2026-10-17; design for the developer to confirm) |
 | 0042 | [Sessions: hashed cookie value, HMAC CSRF token, origin check, login throttle](0042-sessions-hashed-cookie-hmac-csrf-and-login-throttle.md) | Proposed (the builder's design for the developer to confirm) |
@@ -53,6 +57,7 @@
 | 0053 | [Stream authorisation: the company's standing, passive session checks, and HTTP/2 through the front](0053-stream-authorisation-company-standing-passive-sessions-and-http2-through-the-front.md) | Proposed (the builder's design for the developer to confirm) |
 | 0054 | [Retention: a scheduler with leased runs, two privileged purge functions, and the candidate's clock](0054-retention-scheduler-leased-runs-privileged-purge-functions-and-the-candidate-clock.md) | Proposed (the builder's design for the developer to confirm) |
 | 0055 | [Deletion requests: the 7-day undo window, the company's part, and company-level view history](0055-deletion-requests-the-undo-window-the-company-s-part-and-company-level-view-history.md) | Proposed (the builder's design for the developer to confirm) |
+| 0056 | [Instance containers run in gVisor (runsc)](0056-instances-run-in-gvisor.md) | Accepted (the developer's instruction in chat, 2026-10-20: implement the sandbox experiments and adopt what passes) |
 | 0057 | [Admin operations: admin-only routes, a real quota port, and setting ranges](0057-admin-operations-admin-only-routes-a-real-quota-port-and-setting-ranges.md) | Proposed (the builder's design for the developer to confirm) |
 | 0058 | [Candidate invite routes, and the dashboards as client pages over the same-origin API](0058-candidate-invite-routes-and-dashboards-as-client-pages.md) | Proposed (the builder's design for the developer to confirm) |
 | 0059 | [Recruiter routes, and the recruiter dashboard over the lab's reviewer routes](0059-recruiter-routes-and-the-recruiter-dashboard.md) | Proposed (the builder's design for the developer to confirm) |
@@ -62,5 +67,8 @@
 | 0063 | [Sequenced learner runs with a countdown per challenge](0063-sequenced-learner-runs-with-a-countdown-per-challenge.md) | Accepted (the developer answered the questions on 2026-10-20) |
 | 0064 | [The team is the leader and Claude only](0064-the-team-is-the-leader-and-claude-only.md) | Accepted (the leader instructed it on 2026-10-21) |
 | 0070 | [Browser tests run the production build of the dashboards against the real API app on a throw-away database](0070-browser-tests-run-the-real-api-app-on-a-throw-away-database.md) | Accepted (the leader asked for real browser tests on 2026-10-21; choices to review in the pull request) |
+| 0090 | [Edge, gate, ticket and strict hostname model](0090-edge-gate-ticket-and-hostname-model.md) | Proposed (decided on the developer's delegation; to be confirmed). D-61, D-65, D-66 are planned only: their stories are not built. |
+| 0091 | [Attempt clock, expiry sequence and scoring rules](0091-attempt-clock-scoring-and-expiry.md) | Proposed (decided on the developer's delegation; to be confirmed) |
+| 0092 | [Flag material, sidecar form, matching and milestone rules](0092-flags-sidecar-and-milestone-decisions.md) | Proposed (decided on the developer's delegation; to be confirmed). D-77 and D-78 are planned only: their story is not built. |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

@@ -5,18 +5,26 @@ Sahil owns the vulnerable marketplace and its 11 challenges: the shop, its servi
 | | |
 |---|---|
 | Ticket tree | `docs/bmad/initiative-target/` |
-| Excel tracker | `docs/bmad/VulnMart-Tracker.xlsx`, sheet "3 Sahil (Target)" (updated by hand) |
+| Excel tracker | `docs/bmad/VulnMart-Tracker.xlsx`, sheet "3 Sahil (Target)" (updated by hand)  **Retired 2026-10-21**: the workbook is no longer maintained by hand and shows 0 Done; do not use it (CLAUDE.md, D-102). |
 | Tasks | 32 tasks in 4 weekly sprints |
 | Read first | [START-HERE.md](START-HERE.md): how to run every task with BMAD and Claude Code |
 | Branches | one branch per sprint: `sprint-<n>-sahil`, one pull request per sprint; tasks marked EARLY PR get their own small pull request `shared-<task-id>` |
 | Status | Draft plan written 2026-10-08 by Claude Code; not yet approved by the team |
+
+## Tick rule (one rule for this file, set 2026-10-21)
+
+1. A task is ticked `[x]` only when its **Done when** is met AND that is verified by real tests or recorded evidence (test output, a live-run file under `docs/assets/`, a gate result). A claim in a story or a dev-log is not enough.
+2. A task whose Done-when is only partly met stays unticked `[ ]` (verdict PARTIAL) and its **Status (2026-10-21)** line lists what is missing. A story being `done` does not tick a task whose Done-when has gaps.
+3. A task with live-only or Postgres/Valkey-only proof that the audit could not re-run is ticked only when the evidence file or CI run exists; its Status line says DONE-CLAIMED-UNVERIFIED and what was not re-run.
+4. Each task has ONE authoritative line `Status (2026-10-21)`, taken from `docs/audit/2026-10-21-tracker-audit.md` (verdict tables 3.1, 4.1, 5.1). Older `Closed`, `Status`, `Audit`, `Live` lines are kept below a `(history)` marker; where they disagree with the Status (2026-10-21) line, the Status line wins.
+5. Work being built right now by another work package is not counted as done. The Excel workbook is retired (see the table above); this file and the story plans under `docs/bmad/` are the tracker.
 
 ## How to work from this file
 
 1. Take the next unticked task whose "Waits on" items are done. If a wait is on another developer, use the mock or fake named in the task and carry on; do not stop. One task at a time.
 2. Create the story with `bmad-ticket`, build it with `bmad-build`, review it, test it. The line "BMAD story" under each task says whether the story already exists. A task that is too big may become more than one story.
 3. When the tests have really passed: tick the box below, update the story state in `docs/bmad/initiative-target/`, write the dev-log entry, changelog line and traceability rows, then commit.
-4. Update the Excel sheet by hand (Done = Yes).
+4. (Retired 2026-10-21) The Excel workbook is no longer updated; the tick and the Status (2026-10-21) line in this file are the record.
 
 Sprint dates are a proposal: the final submission is in the first week of November (exact date not yet given). The exact acceptance criteria of each task are written when the task starts. Open questions named in a task (OI-xx) must be answered by the team before that part is built.
 
@@ -34,6 +42,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and the shop data model is in place.
 
 - [x] **T-01. Shop skeleton runs in a container (tracer bullet)**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/shop/Dockerfile`; shop tests pass Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Set up your Windows environment and run an Express app on Node 24 in a hardened container that answers /healthz, /readyz and /version.
@@ -43,6 +52,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Handoffs: H-30 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-02. Challenge catalogue schema and 11 stub entries (IF-7)**
+  - Status (2026-10-21): DONE-VERIFIED. `challenges/catalog/c01.yaml` to `c11.yaml`; story never marked done Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-target-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. P-04 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -53,6 +63,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Handoffs: H-25, H-32, H-41, H-43 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-03. Review the instance contract and event schema as consumer**
+  - Status (2026-10-21): DONE-VERIFIED. IF-6 sign-off in COMPAT; DB 2.2.0 consumer row pending Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Review IF-6 and IF-4 against what the shop needs and file change requests through the contract rules.
@@ -62,6 +73,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Handoffs: H-24 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-04. Shop skeleton meets the instance contract in the lab harness**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/shop/instance-harness/`; real injector wired by Tanmay (H-350, review by Sahil never given) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.4` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: Make the skeleton ready only after the injector marker, serve a planted flag and emit one app event inside the lab harness.
@@ -71,6 +83,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Handoffs: H-26, H-30, H-34, H-35, H-56 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-05. Exploit test runner skeleton**
+  - Status (2026-10-21): DONE-VERIFIED. `challenges/tests/runner/run-exploit.mjs`; release gate uses it Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-target-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-target-baseline` (find it with `bmad-ticket`)
   - Build: A runner that executes a test against any instance URL, with its own tiny vulnerable and fixed stubs.
@@ -79,6 +92,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Done when: A trivial test passes on the vulnerable stub and fails on the fixed stub in CI.
 
 - [x] **T-06. Shop data model and seven state machines**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/shop/migrations/0001_init.sql`, `db.test.mjs` Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: About 20 tables with migrations and the seven state machines.
@@ -87,6 +101,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Done when: Migrations run on SQLite and state transitions are tested.
 
 - [x] **T-07. Shop identity, six roles, permissions and strong hashing**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/shop/src/identity/password.mjs`; scrypt; story never marked done Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Neutral marketplace look, accounts, six roles with the permission matrix, strong password hashing.
@@ -95,6 +110,7 @@ Goal: The shop skeleton runs in the lab harness, the catalogue schema exists and
   - Done when: Role permissions are tested and no MD5 or unsalted hash exists in the shop.
 
 - [x] **T-08. Snapshot seeding mechanism**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/shop/seed/registry.mjs`; start time measured; story never marked done Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Build a seeded snapshot in CI and a per-epic seed-data mechanism so later work adds seed data without editing shared files.
@@ -110,6 +126,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 > Tick vs plan status (CLAUDE.md task-cycle step 4): a `[x]` here means the task's "Done when" criteria are met and verified (tests/harness/demo with recorded output). The matching BMAD story plan under `docs/bmad/initiative-target/` stays `status: built` — in review on PR #14 — and advances to `done` (via `bmad-ticket`) only when the developer (Sahil) confirms, per step 4. So `[x]` here with `built` in the plan is expected while the sprint PR is open, not a mismatch to "fix".
 
 - [x] **T-09. Health, readiness after the injector marker and runtime profile**
+  - Status (2026-10-21): DONE-VERIFIED. harness 12/12 per deferred-work; runs under gVisor live (Tanmay L-29) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Health endpoints, ready only after the injector writes the marker, running non-root with a read-only filesystem and no egress.
@@ -119,6 +136,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Handoffs: H-24, H-26, H-27, H-30, H-31, H-32, H-33, H-34 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-10. Shop boundaries and signed app events**
+  - Status (2026-10-21): DONE-VERIFIED. traceability FR-SHP-14 still "Partial" Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The shop has no route to the platform database, Valkey, the orchestrator or other instances, and sends signed app events through the sidecar.
@@ -128,6 +146,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Handoffs: H-35, H-36, H-37, H-38, H-39, H-40 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-11. Mock services container**
+  - Status (2026-10-21): DONE-VERIFIED. `services/mock-services/src/server.mjs`; H-121 emits `meta.request_served` (done there) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: Combined mock services: payment, KYC, metadata and the XSS collector, reachable only inside the instance network.
@@ -137,6 +156,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Handoffs: H-28, H-31, H-36, H-37, H-38, H-40, H-47, H-52, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-12. Isolated import service**
+  - Status (2026-10-21): DONE-VERIFIED. `services/import-service/` Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: An import service that runs a fresh process per job with no network and no database access.
@@ -146,6 +166,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Handoffs: H-28, H-29, H-31, H-36, H-38 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-13. Support-agent bot**
+  - Status (2026-10-21): DONE-CLAIMED-UNVERIFIED (ticked; evidence exists, the audit did not re-run it). bot is a jsdom visitor (ADR 0061), not a real browser; S-5 memory figure not re-measured; `VM_BOT_BROWSER=0` falls back to a plain GET Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-instance-integration`
   - BMAD story: not planned yet; created when you incept `epic-shop-instance-integration` (see START-HERE.md, section "First task of an epic")
   - Build: The bot controller that opens only pages of its own instance for a fixed time.
@@ -155,6 +176,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Handoffs: H-31, H-36, H-38, H-44 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-14. Customer flows**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/shop/src/web/`; login throttling and `needsRehash` wiring deferred (deferred-work) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Browse, search, cart, checkout with the simulated payment, orders, reviews and support tickets.
@@ -163,6 +185,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: A customer can complete the whole flow in a fresh instance.
 
 - [x] **T-15. Support, finance and admin flows**
+  - Status (2026-10-21): DONE-VERIFIED. `staff-service.mjs` tests; `assignTicket`, `holdPayout` have no UI buttons Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Support, finance and admin screens following the permission matrix.
@@ -171,6 +194,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
   - Done when: Each role works as the matrix says in tests.
 
 - [x] **T-16. Seeded accounts for the challenges**
+  - Status (2026-10-21): DONE-VERIFIED. FR-SHP-08 Done; one demo password per account set is an open point (D-02, deferred-work) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-core-and-roles`
   - BMAD story: not planned yet; created when you incept `epic-shop-core-and-roles` (see START-HERE.md, section "First task of an epic")
   - Build: Seeded accounts for every challenge.
@@ -184,6 +208,7 @@ Goal: The shop runs inside an instance (health, events, mock services, import se
 Goal: Seller and money flows, and challenges C01 to C06.
 
 - [x] **T-17. Seller flows**
+  - Status (2026-10-21): DONE-VERIFIED. seller service tests Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-seller-and-money`
   - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: Seller store registration and approval, products, fulfilment and staff.
@@ -192,6 +217,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: A seller registers, waits for approval, lists products and fulfils orders; a pending seller cannot publish.
 
 - [x] **T-18. Refunds, disputes, commissions and payouts**
+  - Status (2026-10-21): DONE-VERIFIED. money tests; `BEGIN IMMEDIATE` stock check deferred Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-shop-seller-and-money`
   - BMAD story: not planned yet; created when you incept `epic-shop-seller-and-money` (see START-HERE.md, section "First task of an epic")
   - Build: The correct marketplace money model with refunds, disputes, proportional commission reversal, append-only ledger.
@@ -200,6 +226,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Done when: A partial refund reverses commission in proportion and refunded total never exceeds the amount paid on any path.
 
 - [x] **T-19. C01 Broken Access Control (cross-store order read)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS C01 Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C01 as designed with its flag, milestones, hints, write-up and exploit test.
@@ -209,6 +236,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Handoffs: H-45 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-20. C02 Cryptographic Failures (gift-card codes from a weak hash)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS C02 Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C02 as designed with its flag, milestones, hints, write-up and exploit test.
@@ -218,6 +246,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Handoffs: H-46 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-21. C03 Injection (SQL injection and stored XSS)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS; `exploits-live-c03b.json` shows the deployed exploit passing; stale note in deferred-work says live loop deferred Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C03 parts A and B: SQL injection against a read-only catalogue file and stored XSS visited by the bot.
@@ -227,6 +256,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Handoffs: H-47 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-22. C04 Insecure Design (refund total beyond the amount paid)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS C04 Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c01-c04`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c01-c04` (see START-HERE.md, section "First task of an epic")
   - Build: Build C04 as a separate quick-refund path on top of the correct model.
@@ -236,6 +266,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Handoffs: H-48 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-23. C05 Security Misconfiguration (unauthenticated diagnostics page)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS C05; M2 fires on any hit (wiring section 4) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C05 with a diagnostics page that shows only a synthetic object.
@@ -245,6 +276,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
   - Handoffs: H-49 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-24. C06 Vulnerable Components (prototype pollution in the import service)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS; live run found and fixed a defect on 2026-10-20 (Tanmay) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C06 with the old lodash in the isolated import service; confirm the pollution input works on Node 24.
@@ -258,6 +290,7 @@ Goal: Seller and money flows, and challenges C01 to C06.
 Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the release gate and deployed verification.
 
 - [x] **T-25. C07 Authentication Failures (weak password-reset code)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS; live run found and fixed a defect on 2026-10-20; M1 deviation in spec; story still `built` Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C07 on the finance account; the reset mailbox is unreadable by the player.
@@ -267,6 +300,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Handoffs: H-51 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-26. C08 Software or Data Integrity Failures (unsigned payment webhook)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS; M1 loose Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c05-c08`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c05-c08` (see START-HERE.md, section "First task of an epic")
   - Build: Build C08 with an unsigned payment webhook that releases a sentinel flag only on an unsigned sandbox event.
@@ -275,7 +309,8 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The exploit test passes and fails as required.
   - Handoffs: H-52 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [x] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
+- [ ] **T-27. C09 Logging and Alerting Failures (legacy login route not logged)**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: release gate PASS, but `shop.security_event_written` is never emitted (`apps/shop/src/challenges/c09-logging-failures.mjs`, `void emit`); the code comment says the schema lacks it, but `contracts/events/app-events.md` lists it now; so the M2 negative-observation signal cannot tell vulnerable from fixed Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C09 so that the attack leaves zero events in the shop's own events.
@@ -285,6 +320,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Handoffs: H-53 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-28. C10 Server-Side Request Forgery (seller image import)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS; live run found and fixed a defect on 2026-10-20 Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C10 with a seller image import that can reach only the fake metadata service.
@@ -294,6 +330,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Handoffs: H-28, H-54 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-29. C11 Mishandling of Exceptional Conditions (KYC check fails open)**
+  - Status (2026-10-21): DONE-VERIFIED. release gate PASS; H-120 mock error shape open Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-challenges-c09-c11`
   - BMAD story: not planned yet; created when you incept `epic-challenges-c09-c11` (see START-HERE.md, section "First task of an epic")
   - Build: Build C11 with a seller KYC check that fails open and a sentinel flag.
@@ -302,7 +339,8 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: The flag shows only when the store was approved by the fail-open path and the exploit test passes and fails as required.
   - Handoffs: H-55 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
-- [x] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
+- [ ] **T-30. Catalogue content: tags, tiers, briefs, hints, write-ups and decoy locations**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: 11 catalogue files, no placeholder hint text; open: decoy placement not delivered to the injector (H-331, H-42), milestone mapping to IF-4 names not settled (H-43), OI-14 write-up timing answered by D-99 but not checked in the pages; story `built` Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-catalogue-hints-and-verification`
   - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
   - EARLY PR: yes. P-26 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -313,6 +351,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Handoffs: H-42, H-43 (see docs/dev/HANDOFFS.md; read them when you plan this task)
 
 - [x] **T-31. Cross-challenge tests and exploit tests as a CI release gate**
+  - Status (2026-10-21): DONE-VERIFIED. `scripts/release-gate.mjs` 11/11 (mine); `challenges/tests/independence.test.mjs`; not confirmed that CI blocks on it Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-catalogue-hints-and-verification`
   - BMAD story: not planned yet; created when you incept `epic-catalogue-hints-and-verification` (see START-HERE.md, section "First task of an epic")
   - Build: Prove that solving one challenge captures no other flag, and run the 11 exploit tests in CI as a release gate.
@@ -321,6 +360,7 @@ Goal: Challenges C07 to C11, the catalogue content, cross-challenge tests, the r
   - Done when: A failing exploit test blocks a release and the independence tests pass.
 
 - [ ] **T-32. Deployed verification on the instance VM**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: Tanmay ran 57 of 57 checks against a deployed instance (`exploits-live-all.json`, vulnerable build only); the "fails on the fixed build, deployed" leg and a formal close are missing Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `All target epics`
   - BMAD story: not planned yet; created when you incept `All target epics` (see START-HERE.md, section "First task of an epic")
   - EARLY PR: yes. L-30 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.

@@ -9,7 +9,7 @@
 | Report tag | edge gate, access ticket, host-only cookie, FR-INS-10, FR-SES-04, FR-SES-11, D-60, D-63, D-68 |
 
 ## Requirements covered
-FR-INS-10, FR-SES-04, FR-SES-11 (gate core only); ADR 0004 (status changed to Accepted by delegation, pending the developer's confirmation); decisions D-60, D-63, D-68 (Proposed, in ADR 0040); handoffs H-336, H-337, H-338 (new). Task L-17 (first story; stays unticked).
+FR-INS-10, FR-SES-04, FR-SES-11 (gate core only); ADR 0004 (status changed to Accepted by delegation, pending the developer's confirmation); decisions D-60, D-63, D-68 (Proposed, in ADR 0090); handoffs H-336, H-337, H-338 (new). Task L-17 (first story; stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 Nothing decided who may reach an instance; the stub gate let everything through. There is now a small Node library that checks a signed one-time ticket, exchanges it for a host-only cookie and decides per request: allow, show a "paused" page (frozen), show an "ended" page (closed or unknown), or refuse. Only a strict hostname shape is accepted. The orchestrator will push the access state to it through admin handlers; the secret and keys are read from files.
@@ -30,7 +30,7 @@ Ticket: `base64url(JSON) . base64url(HMAC-SHA256(K_gate, "vm-ticket-v1\n" + payl
 - `contracts/registry.json`, `contracts/CHANGELOG.md`, `contracts/COMPAT.md` - contract `GATE` registered
 - `apps/edge/src/{tickets,state,gate,admin}.mjs`, `apps/edge/test/*.mjs` - new
 - `package.json` - test glob
-- `docs/adr/0004-instance-access-gate.md` (status), `docs/adr/0040-edge-gate-ticket-and-hostname-model.md`, `initial.md`, HANDOFFS, CHANGELOG, traceability, dev1 file
+- `docs/adr/0004-instance-access-gate.md` (status), `docs/adr/0090-edge-gate-ticket-and-hostname-model.md`, `initial.md`, HANDOFFS, CHANGELOG, traceability, dev1 file
 - `docs/assets/story-edge-1-gate-core/test-output.txt`
 
 ## Decisions made
