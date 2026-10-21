@@ -72,6 +72,7 @@
 | 0073 | [Company administration, privacy workflows and real mail](0073-company-administration-privacy-workflows-and-real-mail.md) | Accepted (leader, 2026-10-21) |
 | 0074 | [Production hardening of the deployed stack: dashboards, scheduler, real mail, fail-closed starts](0074-production-hardening-of-the-deployed-stack.md) | Accepted |
 | 0075 | [Durable gate and sidecar state, and the platform's list of wanted instances](0075-durable-gate-and-sidecar-state-and-the-platform-s-wanted-instances.md) | Accepted |
+| 0076 | [Recruiter and admin screens, the real-route rule and the accessibility gate](0076-recruiter-and-admin-screens-and-the-accessibility-gate.md) | Accepted (the leader's brief of 2026-10-21) |
 | 0090 | [Edge, gate, ticket and strict hostname model](0090-edge-gate-ticket-and-hostname-model.md) | Proposed (decided on the developer's delegation; to be confirmed). D-61, D-65, D-66 are planned only: their stories are not built. |
 | 0091 | [Attempt clock, expiry sequence and scoring rules](0091-attempt-clock-scoring-and-expiry.md) | Proposed (decided on the developer's delegation; to be confirmed) |
 | 0092 | [Flag material, sidecar form, matching and milestone rules](0092-flags-sidecar-and-milestone-decisions.md) | Proposed (decided on the developer's delegation; to be confirmed). D-77 and D-78 are planned only: their story is not built. |
@@ -79,4 +80,3 @@
 | 0095 | [A sole maintainer passes the contract approvals rule](0095-sole-maintainer-passes-the-contract-approvals-rule.md) | Accepted (the leader instructed it on 2026-10-21; Claude approved under D-104) |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.
-| 0076 | [Recruiter and admin screens, the real-route rule and the accessibility gate](0076-recruiter-and-admin-screens-and-the-accessibility-gate.md) | Accepted (the leader's brief of 2026-10-21) |

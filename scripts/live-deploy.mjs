@@ -92,9 +92,9 @@ export function parseArgs(argv) {
     const a = rest[i];
     if (a === '--dry-run') o.dryRun = true;
     else if (a === '--allow-mail-catcher') o.allowMailCatcher = true;
-    else if (['--secrets', '--zone', '--platform-host', '--runtime'].includes(a)) {
+    else if (['--secrets', '--zone', '--platform-host', '--runtime', '--mail-sender'].includes(a)) {
       if (rest[i + 1] === undefined) return { error: `${a} needs a value` };
-      o[{ '--secrets': 'secrets', '--zone': 'zone', '--platform-host': 'platformHost', '--runtime': 'runtime' }[a]] = rest[++i];
+      o[{ '--secrets': 'secrets', '--zone': 'zone', '--platform-host': 'platformHost', '--runtime': 'runtime', '--mail-sender': 'mailSender' }[a]] = rest[++i];
       if (a === '--runtime' && !['runsc', 'runc'].includes(o.runtime)) return { error: '--runtime is runsc (gVisor) or runc' };
     } else return { error: `unknown argument ${a}` };
   }
@@ -102,9 +102,9 @@ export function parseArgs(argv) {
 }
 
 /** The .env of the platform stack on vm-p (mode 600, never committed). Mail: Brevo when a key was staged; the catcher only when the operator allowed it knowingly (--allow-mail-catcher). */
-export function platformEnv({ pg, platformHost, zone, H, mail }) {
+export function platformEnv({ pg, platformHost, zone, H, mail, sender }) {
   const lines = [`VULNMART_OWNER_DB_PASSWORD=${pg.owner}`, `VULNMART_APP_DB_PASSWORD=${pg.app}`, `VULNMART_KEYSTORE_PASSWORD=${pg.keystore}`, `VULNMART_VALKEY_PASSWORD=${pg.valkey}`,
-    `VULNMART_PLATFORM_HOST=${platformHost}`, `VULNMART_LABS_ZONE=${zone}`, `VULNMART_VMI_PRIVATE_IP=${H.i.priv}`, `VULNMART_VMP_PRIVATE_IP=${H.p.priv}`];
+    `VULNMART_PLATFORM_HOST=${platformHost}`, `VULNMART_LABS_ZONE=${zone}`, `VULNMART_VMI_PRIVATE_IP=${H.i.priv}`, `VULNMART_VMP_PRIVATE_IP=${H.p.priv}`, `VULNMART_EMAIL_SENDER_ADDRESS=${sender || `no-reply@${platformHost}`}`];
   if (mail === 'brevo') lines.push('VULNMART_EMAIL_PROVIDER=brevo', 'VULNMART_ALLOW_MAIL_CATCHER=false');
   else if (mail === 'catcher') lines.push('VULNMART_EMAIL_PROVIDER=smtp', 'VULNMART_SMTP_HOST=mailpit', 'VULNMART_ALLOW_MAIL_CATCHER=true', 'COMPOSE_PROFILES=mail-catcher');
   else throw new Error('mail is brevo or catcher');
@@ -305,7 +305,7 @@ rm -rf stage
   const rd = (n) => fs.readFileSync(k(n), 'utf8').trim();
   // a secrets folder made before the Valkey password existed gets one now (the other secrets are never touched)
   if (!fs.existsSync(k('valkey_password')) && !cfg.dryRun) fs.writeFileSync(k('valkey_password'), crypto.randomBytes(24).toString('hex'), { mode: 0o600 });
-  fs.writeFileSync(envFile, platformEnv({ pg: { owner: rd('pg_owner_password'), app: rd('pg_app_password'), keystore: rd('keystore_password'), valkey: rd('valkey_password') }, platformHost, zone, H, mail }));
+  fs.writeFileSync(envFile, platformEnv({ pg: { owner: rd('pg_owner_password'), app: rd('pg_app_password'), keystore: rd('keystore_password'), valkey: rd('valkey_password') }, platformHost, zone, H, mail, sender: o.mailSender }));
   stage(host, [{ local: envFile, name: '.env' }], '/opt/vulnmart/platform', 'root:root', '600', '755');
   fs.rmSync(envFile, { force: true });
   log('swap, images and start');

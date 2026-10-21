@@ -100,7 +100,7 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | C-33 | Cheating signals: held captures, timing flags; never auto-fail | IMPL+WIRED (matrix: VERIFIED) | RecordedActivityGate runtime.py:166 |
 | C-34 | Time zone: times shown in local zone, deadline server UTC; invite expiry told as days | IMPL+WIRED (matrix: VERIFIED) | lib/api.ts:323 |
 | C-35 | Candidate under 18 | PARTIAL (self-declaration only) (matrix: PARTIAL) | accounts/api.py:36 |
-| C-36 | Candidate accessibility (screen reader, contrast, time) | PARTIAL (matrix: EXTERNAL) **axe-core WCAG 2.x A and AA check of every main page passes (`zz-accessibility.spec.mjs`, ADR 0076); no manual screen-reader pass yet** | see L-25 |
+| C-36 | Candidate accessibility (screen reader, contrast, time) | PARTIAL (matrix: EXTERNAL) | see L-25 |
 | C-37 | Write-up (optional or required) | MISSING (matrix: MISSING-UNOWNED) | no write-up route; `writeup_required` stored only |
 
 ## 4. Recruiter scenarios (R)
@@ -111,30 +111,30 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | R-02 | Verify email; state `pending approval` | IMPL+WIRED (matrix: VERIFIED) | orgs/service.py:163 |
 | R-03 | Admin approves or rejects with reason; mail outcome; owner re-applies | IMPL+WIRED (mail to Mailpit) (matrix: VERIFIED) | admin/api.py:100; company_api.py:162 |
 | R-04 | Owner accepts versioned DPA terms; invites blocked before; changed text refused | IMPL+WIRED (matrix: VERIFIED) | company_api.py:169-181; service.py:567-603 |
-| R-05 | Colleague signs up with same domain, owner approves join | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) **WEB DONE by WP-F 2026-10-21: owner lists and decides join requests on `/company` (browser test `recruiter.spec.mjs`)** | request creates join row (service.py:285); no route lists or decides (company_api.py has none) |
-| R-06 | Owner removes a member | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) **WEB DONE by WP-F 2026-10-21: owner removes a member on `/company` (browser test `recruiter.spec.mjs`)** | service.py:548 |
+| R-05 | Colleague signs up with same domain, owner approves join | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) | request creates join row (service.py:285); no route lists or decides (company_api.py has none) |
+| R-06 | Owner removes a member | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) | service.py:548 |
 | R-07 | Optional TOTP for recruiters | IMPL+WIRED (matrix: VERIFIED) | mfa_api.py |
-| R-08 | Create template (title, challenges, time, hints, resets, expiry, retention, write-up, results timing) | PARTIAL: API full, web form omits retention, resets, expiry; set values not applied to attempts (LB-4) (matrix: PARTIAL) **WEB DONE by WP-F 2026-10-21: the form has every field incl. resets, expiry, retention, flag rate, cohort board (`recruiter.spec.mjs`)** | company_api.py:193; company/page.tsx:118-157 |
-| R-09 | Edit template; invites keep their copy; version bump | PARTIAL: API only, no UI (matrix: PARTIAL) **WEB DONE by WP-F 2026-10-21: Edit on `/company`, version goes up (`recruiter.spec.mjs`)** | service.py:316 |
+| R-08 | Create template (title, challenges, time, hints, resets, expiry, retention, write-up, results timing) | PARTIAL: API full, web form omits retention, resets, expiry; set values not applied to attempts (LB-4) (matrix: PARTIAL) | company_api.py:193; company/page.tsx:118-157 |
+| R-09 | Edit template; invites keep their copy; version bump | PARTIAL: API only, no UI (matrix: PARTIAL) | service.py:316 |
 | R-10 | Delete unused template | IMPL+WIRED (matrix: VERIFIED) | service.py:356 |
 | R-11 | Challenge subset honoured in the candidate's attempt and score | MISSING (matrix: MISSING-OWNED-BY-A) | runtime.py:128, 598 |
 | R-12 | Single and bulk invite (500), skipped reasons, remaining when capped | IMPL+WIRED (matrix: VERIFIED) | company_api.py:232; service.py:435 |
 | R-13 | Candidate actually receives the invite | PARTIAL (LB-1) (matrix: PARTIAL) | platform.compose.yaml:22 |
-| R-14 | Resend, cancel, revoke, re-invite | PARTIAL: routes exist, web has no buttons (matrix: PARTIAL) **WEB DONE by WP-F 2026-10-21: resend, cancel, revoke, re-invite buttons and bulk resend and revoke on `/company/candidates`; re-invite is drawn but its click is covered by the API tests only** | company_api.py:247; Grep web "resend/revoke" none |
+| R-14 | Resend, cancel, revoke, re-invite | PARTIAL: routes exist, web has no buttons (matrix: PARTIAL) | company_api.py:247; Grep web "resend/revoke" none |
 | R-15 | Invite a person who already has a learner account; recruiter must not learn practice history | IMPL+WIRED (matrix: VERIFIED) | api.py:200-205 reviewer is org-bound |
 | R-16 | Invite same address twice | PARTIAL: duplicate live invite refused; `AlreadyStarted` guard dead (LB-6) (matrix: PARTIAL) | service.py:418-421 |
-| R-17 | Daily invite cap, admin override per company | PARTIAL: cap works; admin override has no route (matrix: PARTIAL) **ADMIN WEB DONE by WP-F 2026-10-21: the company directory sets and clears the cap (`admin.spec.mjs`)** | service.py:398; orgs/service.py:614 |
+| R-17 | Daily invite cap, admin override per company | PARTIAL: cap works; admin override has no route (matrix: PARTIAL) | service.py:398; orgs/service.py:614 |
 | R-18 | Live monitor: state, countdown, milestones, captures without refresh | IMPL+WIRED (web, not live) (matrix: PARTIAL) | candidates/page.tsx; live/api.py |
 | R-19 | Candidate report: score of 1000, per challenge, time to capture, active time, hints, evidence, timeline | IMPL+WIRED (web, not live) (matrix: VERIFIED) | api.py:762; [attemptId]/page.tsx |
 | R-20 | Technique label and tags (D-07) | MISSING (matrix: MISSING-UNOWNED) | api.py:777 `"technique_label": None` |
 | R-21 | Integrity flags: read, accept or reject with note, audited | IMPL+WIRED (matrix: VERIFIED) | api.py:724-759 |
 | R-22 | Held capture review within 7 days, reminder only | IMPL+WIRED (matrix: VERIFIED) | runtime.py:348, 754 |
 | R-23 | Release results to the candidate (`after_release`) | PARTIAL: route and button work; enforcement depends on rule that is never set (C-23) (matrix: VERIFIED) | api.py:522 |
-| R-24 | Cancel a ready or running attempt (FR-SES-07) | MISSING for recruiter (engine cancel only used by re-invite) (matrix: MISSING-OWNED-BY-A) **WEB DONE by WP-F 2026-10-21: Cancel attempt on `/company/candidates` (`recruiter.spec.mjs`)** | ports/engine_attempts.py:87; no route |
+| R-24 | Cancel a ready or running attempt (FR-SES-07) | MISSING for recruiter (engine cancel only used by re-invite) (matrix: MISSING-OWNED-BY-A) | ports/engine_attempts.py:87; no route |
 | R-25 | Grant extra time or reopen | MISSING (matrix: MISSING-UNOWNED) | none |
-| R-26 | Cohort view and ranking aid (D-93) | IMPL-NOT-WIRED (matrix: MISSING-UNOWNED) **WEB DONE by WP-F 2026-10-21: `/company/templates/[id]/cohort` over `getCohort`, ranking-aid wording, no decision control (`recruiter.spec.mjs`)** | ports/engine_cohort.py; no route |
+| R-26 | Cohort view and ranking aid (D-93) | IMPL-NOT-WIRED (matrix: MISSING-UNOWNED) | ports/engine_cohort.py; no route |
 | R-27 | Export results CSV and JSON per template, audited, recorded in candidates' view history | IMPL+WIRED (matrix: VERIFIED) | export_api.py:56; exports.py |
-| R-28 | Handle candidate deletion requests; delete a candidate now | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) **WEB DONE by WP-F 2026-10-21: deletion requests list, approve, decline on `/company` and delete a record now on the report (`recruiter.spec.mjs` covers the requests; the delete-now button has no browser test)** | deletion.py:182-220; no route |
+| R-28 | Handle candidate deletion requests; delete a candidate now | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) | deletion.py:182-220; no route |
 | R-29 | Retention: 30 to 365 days, auto-delete, see when a record goes | PARTIAL: job built, off live (LB-3), no UI to show date (matrix: PARTIAL) | candidates.py; compose |
 | R-30 | Write-up required, similarity review | MISSING (matrix: MISSING-UNOWNED) | FR-ACH-04 not found |
 | R-31 | Notifications: submission, withdrawal, deletion request | MISSING (live events only; no mail templates) (matrix: MISSING-OWNED-BY-B) | grep enqueue_email list |
@@ -149,7 +149,7 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | A-01 | Seed admin, mandatory TOTP; session without MFA has no admin role | IMPL+WIRED (matrix: VERIFIED) | seed_admin.py; sessions.py:236 |
 | A-02 | Admin idle timeout 15 min, absolute 12 h | IMPL+WIRED (matrix: VERIFIED) | sessions.py:152 |
 | A-03 | Approval queue: approve, reject (reason), suspend, reinstate company | IMPL+WIRED (matrix: VERIFIED) | admin/api.py:93-104 |
-| A-04 | Delete a company | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) **WEB DONE by WP-F 2026-10-21: Delete in the company directory (`admin.spec.mjs`)** | orgs/service.py:409; decision literal lacks `delete` (admin/api.py:43) |
+| A-04 | Delete a company | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) | orgs/service.py:409; decision literal lacks `delete` (admin/api.py:43) |
 | A-05 | Suspend one recruiter | IMPL+WIRED via user lock (matrix: VERIFIED) | ops.py:208 |
 | A-06 | User search, lock, unlock, reset password, delete (audited, reads logged) | IMPL+WIRED (matrix: VERIFIED) | ops.py:168-221 |
 | A-07 | Delete participant who holds assessment data: locked instead | IMPL+WIRED (matrix: VERIFIED) | ops.py:236 |
@@ -169,7 +169,7 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | A-21 | Backup, restore, key shredding | PARTIAL: runbook and manual scripts, no schedule or off-host copy (audit 2026-10-18) (matrix: EXTERNAL) | docs/runbooks/backup-restore.md |
 | A-22 | Revoke candidate role or lock cheating learner | PARTIAL: lock only (matrix: PARTIAL) | roles.py:81 |
 | A-23 | Admin dashboard reachable live | MISSING (LB-2) (matrix: MISSING-OWNED-BY-F) | live-deploy.md:8 |
-| A-24 | Per-company invite cap override | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) **WEB DONE by WP-F 2026-10-21: invite cap per company in the directory (`admin.spec.mjs`)** | orgs/service.py:614 |
+| A-24 | Per-company invite cap override | IMPL-NOT-WIRED (matrix: MISSING-OWNED-BY-B) | orgs/service.py:614 |
 | A-25 | Monitoring and alerts (health, certs, budget) | MISSING (matrix: MISSING-OWNED-BY-C) | lab-stream-audit "no monitoring" |
 | A-26 | Orchestrator restart or host loss: reconciler repairs, access healed | IMPL+WIRED (matrix: VERIFIED) | runtime.py:801; D-55 |
 | A-27 | Admin sees assessments waiting or failing to start | MISSING (matrix: MISSING-UNOWNED) | no route |
@@ -196,7 +196,7 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | X-16 | Invite email differs from the person's account email | PARTIAL (C-06) (matrix: MISSING-OWNED-BY-B) | accept.py:81 |
 | X-17 | Minor attempts to register or is invited | PARTIAL (self-declaration) (matrix: PARTIAL) | OI-33 |
 | X-18 | Time zones and DST across emails, UI, deadlines | IMPL+WIRED (matrix: VERIFIED) | UTC in API, local display |
-| X-19 | Accessibility and accommodations | PARTIAL / MISSING (C-30, L-25) (matrix: EXTERNAL) **automated axe-core check passes for every role (ADR 0076); accommodations (extra time) still missing** | |
+| X-19 | Accessibility and accommodations | PARTIAL / MISSING (C-30, L-25) (matrix: EXTERNAL) | |
 | X-20 | Whole hiring journey on the live site (company sign-up to released result) | MISSING (LB-1, LB-2, LB-3, LB-4) (matrix: EXTERNAL) | live-deploy.md:8,27 |
 | X-21 | Consent withdrawal evidence kept and company told | PARTIAL (C-24) (matrix: MISSING-OWNED-BY-B) | |
 
