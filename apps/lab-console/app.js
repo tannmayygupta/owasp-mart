@@ -4,7 +4,7 @@
 // It only calls the documented browser routes of IF-1 and IF-2 on its own origin. Everything the server sends is put on the page with textContent, never as HTML.
 const $ = (id) => document.getElementById(id);
 const state = {
-  csrf: null, user: null, attempt: null, instance: null, catalog: [], items: [], meta: {}, score: null, account: null, points: {},
+  csrf: null, user: null, attempt: null, assessment: null, instance: null, catalog: [], items: [], meta: {}, score: null, account: null, points: {},
   hints: {}, hintErr: {}, flagMsg: null, draft: {}, picked: null, busy: false, poll: null, tick: null, skew: 0, ring: null, ringTotal: 0, lastLeft: null,
 };
 const TIER_MIN = { Easy: 20, Medium: 40, Hard: 60 };
@@ -107,7 +107,7 @@ async function onLogin(ev) {
 async function onLogout() {
   try { await api('DELETE', '/api/v1/session'); } catch { /* the session may be gone already */ }
   clearInterval(state.poll); clearInterval(state.tick);
-  Object.assign(state, { csrf: null, user: null, attempt: null, instance: null, items: [], meta: {}, score: null, account: null, points: {}, hints: {}, hintErr: {}, flagMsg: null, draft: {}, picked: null });
+  Object.assign(state, { csrf: null, user: null, attempt: null, assessment: null, instance: null, items: [], meta: {}, score: null, account: null, points: {}, hints: {}, hintErr: {}, flagMsg: null, draft: {}, picked: null });
   $('link-box').hidden = true; $('report-box').hidden = true;
   show('auth'); tab('login'); banner('Signed out.', 'ok');
 }
@@ -126,9 +126,13 @@ async function refresh() {
   if (state.busy) return;
   state.busy = true;
   try {
-    const mine = (await api('GET', '/api/v1/me/attempts')).items;
+    const all = (await api('GET', '/api/v1/me/attempts')).items;
+    // only practice runs belong here: a company assessment (mode "candidate") is never shown as practice, whatever its state
+    const mine = all.filter((a) => a.mode === 'learner');
+    state.assessment = all.find((a) => a.mode === 'candidate' && !FINISHED.includes(a.state)) || all.find((a) => a.mode === 'candidate') || null;
     const current = mine.find((a) => ['running', 'ready'].includes(a.state)) || mine[0] || null; // a live run first, else the latest one
     state.attempt = current ? await api('GET', `/api/v1/attempts/${current.attempt_id}`) : null;
+    if (state.attempt && state.attempt.mode !== 'learner') state.attempt = null; // the attempt answer must agree with the list
     state.instance = state.attempt?.instance_id ? await api('GET', `/api/v1/instances/${state.attempt.instance_id}`).catch(() => null) : null;
     if (state.attempt && state.attempt.state !== 'ready') await loadProgress();
     else { state.items = []; state.meta = {}; state.score = null; }
@@ -270,10 +274,20 @@ function renderMission() {
 
 function startPanel(title, text, label) {
   const body = el('div', 'm-body');
+  if (state.assessment && !state.attempt) body.append(assessmentNote(state.assessment));
   body.append(el('div', 'empty-art', '>_'), el('h1', 'm-title', title), el('p', 'lede', text));
   const cta = el('div', 'cta'); cta.append(button(label, 'primary big', onStart)); body.append(cta);
   body.append(el('p', 'note', 'Challenges open one at a time. Each has a countdown that starts when you press Begin: Easy 20, Medium 40, Hard 60 minutes.'));
   return body;
+}
+
+// An account that is invited to a company assessment keeps it on its own page: this console is the practice lab only.
+function assessmentNote(a) {
+  const p = el('p', 'note assessment-note');
+  p.append('You also have a company assessment. It is not part of this practice lab: ');
+  const link = el('a', '', 'open it on the assessment page'); link.href = `/assessment/${a.attempt_id}`;
+  p.append(link, '.');
+  return p;
 }
 
 function preparingPanel() {

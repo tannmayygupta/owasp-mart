@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- Learner and candidate screens of the dashboards (story 41, audit F-14): the learner screen plays the sequenced run (one challenge at a time, begin, countdown from the server clock, account points, write-up when time runs out, new run), a company assessment is never drawn as practice and the other way round (also in the lab console), the candidate screens got the preparing, closed-invite, expired, withdrawn and results-hidden states; first browser tests (Playwright, real API app on a throw-away database, ADR 0070, pnpm --filter @vulnmart/web test:e2e) and 17 web unit tests.
 - Team change (D-102, ADR 0064): the project is now the leader and Claude only; `CLAUDE.md` rewritten (no per-developer streams, trackers, handoffs, sprint branches or hand-kept Excel; one tracker `docs/bmad/initiative-lab`; safety floor kept).
 - Fix: the template's rules (time limit, reset limit, results visibility) now reach the attempt that a consent creates; before, `accept.py` dropped them, so a recruiter's settings had no effect on a real candidate (found by the role-scenario audit).
 - Test repairs after the full API run: migration head 0017 and the table list in the settings tests, the withdrawn-run refusal test uses a company attempt, the invite-rules test uses a valid visibility, the run-order test no longer depends on a random id.
