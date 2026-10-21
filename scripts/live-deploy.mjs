@@ -314,6 +314,8 @@ if [ ! -f /swapfile ]; then sudo fallocate -l 2G /swapfile && sudo chmod 600 /sw
 cd /opt/vulnmart/platform
 sudo docker compose -f compose.yaml --env-file .env config -q
 sudo docker compose -f compose.yaml --env-file .env up -d --no-build --pull missing --wait --wait-timeout 300
+# Caddy reads its Caddyfile only at start and compose does not recreate it for a changed bind-mounted file: restart it so the page routes of this deploy are served
+sudo docker restart vulnmart-caddy >/dev/null
 sudo docker ps --format '{{.Names}} {{.Status}}' | sort
 `);
   log('PASS platform stack started on vm-p');
