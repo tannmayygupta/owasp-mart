@@ -24,14 +24,13 @@ def test_the_real_contract_and_the_real_routes_agree(check):
 
 
 def test_each_kind_of_drift_is_named(check):
-    spec = {("GET", "/api/v1/a"): ("getA", False), ("POST", "/api/v1/b"): ("postB", False), ("GET", "/api/v1/live/ticket"): ("createLiveTicket", True),
-            ("POST", "/api/v1/attempts/{attempt_id}/start"): ("startAttempt", False)}
+    spec = {("GET", "/api/v1/a"): ("getA", False), ("POST", "/api/v1/b"): ("postB", False), ("GET", "/api/v1/live/ticket"): ("createLiveTicket", True)}
     routes = {("GET", "/api/v1/a"): "otherName", ("GET", "/api/v1/extra"): "extra"}
     problems = check.compare(spec, routes)
     assert any("in the contract, not served: POST /api/v1/b" in p for p in problems)
     assert any("operationId differs for GET /api/v1/a" in p for p in problems)
     assert any("served, not in the contract: GET /api/v1/extra" in p for p in problems)
-    assert not any("createLiveTicket" in p or "startAttempt" in p for p in problems), "the two pending operations are exempt while unrouted"
+    assert not any("createLiveTicket" in p for p in problems), "the pending operation is exempt while unrouted (startAttempt is served since H-356)"
 
 
 def test_an_exemption_that_is_no_longer_needed_fails(check):

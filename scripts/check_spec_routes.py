@@ -26,7 +26,7 @@ ROUTER_MODULES = (
     "vulnmart.privacy.api", "vulnmart.privacy.deletion_api", "vulnmart.privacy.export_api",
 )
 # operation id -> does the contract have to mark it `x-pending` for the exemption to hold
-PENDING = {"createLiveTicket": True, "startAttempt": False}  # contract-pending, deliberately not served (spike S-14; OI-22)
+PENDING = {"createLiveTicket": True}  # contract-pending, deliberately not served (spike S-14); startAttempt is served since H-356 (OI-22 resolved by D-80)
 
 
 def spec_operations(bundle: dict) -> dict[tuple[str, str], tuple[str, bool]]:
