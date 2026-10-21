@@ -72,3 +72,4 @@
 | 0092 | [Flag material, sidecar form, matching and milestone rules](0092-flags-sidecar-and-milestone-decisions.md) | Proposed (decided on the developer's delegation; to be confirmed). D-77 and D-78 are planned only: their story is not built. |
 
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.
+| 0094 | [Claude approves under the leader's standing authority](0094-claude-approves-under-the-leaders-standing-authority.md) | Accepted (the leader instructed it on 2026-10-21) |
