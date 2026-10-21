@@ -15,7 +15,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { buildSnapshot } from '../../seed/build-snapshot.mjs';
 import { createApp } from '../../src/app.mjs';
-import { makeReadiness, readFlag, shopEvent, postEvent, markerPath, isInjected } from '../../src/instance/instance.mjs';
+import { makeReadiness, makeInstanceChallenges, readFlag, shopEvent, postEvent, markerPath, isInjected } from '../../src/instance/instance.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const POSTED_SCHEMA = path.join(ROOT, 'contracts', 'events', 'instance-events.posted.schema.json');
@@ -179,4 +179,17 @@ test('posting is best-effort: a hung sidecar hits the timeout and resolves to 0'
   } finally {
     hung.close();
   }
+});
+
+test('VM_BUILD=fixed makes every challenge run its fixed code even when flags are planted; without it a planted flag turns the challenge on', () => {
+  const doc = JSON.stringify({ flags: [{ challenge_key: 'C09', flag: 'x' }, { challenge_key: 'C03', flag: 'y' }] });
+  const opts = (env) => ({ injected: () => true, readFile: () => doc, env });
+  const vuln = makeInstanceChallenges('/f', opts({})).challenges;
+  assert.equal(vuln.C09, 'vulnerable');
+  assert.equal(vuln.C03A, 'vulnerable');
+  const fixed = makeInstanceChallenges('/f', opts({ VM_BUILD: 'fixed' })).challenges;
+  assert.equal(fixed.C09, undefined);
+  assert.equal(fixed.C03A, undefined);
+  assert.deepEqual(Object.keys(fixed), []);
+  assert.equal(makeInstanceChallenges('/f', opts({ VM_BUILD: 'vulnerable' })).challenges.C09, 'vulnerable');
 });

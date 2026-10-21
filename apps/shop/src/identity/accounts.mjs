@@ -1,7 +1,7 @@
 // Account identity for the shop (T-07, FR-SHP-01). Create and authenticate
 // users over the T-06 `users` table, with passwords hashed by password.mjs.
 // Sessions, routes and the reset flow are later (T-14/T-15; reset is C07).
-import { hash, verify } from './password.mjs';
+import { hash, verify, needsRehash } from './password.mjs';
 import { isRole } from '../domain/roles.mjs';
 
 export class DuplicateEmailError extends Error {
@@ -55,6 +55,11 @@ export function authenticate(db, email, password) {
     return null;
   }
   if (!verify(password, row.password_hash)) return null;
+  // Rehash on a successful login: the password is in hand and correct, so a hash made with weaker parameters than today's floor (or an old format that still verifies) is
+  // replaced with a current one. A failure to store it must never fail the login.
+  if (needsRehash(row.password_hash)) {
+    try { db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash(password), row.id); } catch { /* keep the old hash; the login still succeeds */ }
+  }
   // Never hand the password hash back to callers.
   const { password_hash, ...safe } = row;
   void password_hash;

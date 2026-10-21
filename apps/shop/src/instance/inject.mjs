@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from '../db/index.mjs';
-import { FILE_PLACEMENTS, flagMap, plantDatabase } from './placements.mjs';
+import { DECOY_PLACEMENTS, FILE_DECOY_KEYS, FILE_PLACEMENTS, decoyList, flagMap, plantDatabase, plantDecoysDatabase, reseedAccounts } from './placements.mjs';
 import { readDocument } from './read-document.mjs';
 
 export const EXIT = { OK: 0, BAD_DOCUMENT: 10, SNAPSHOT: 11, PLACEMENT: 12, MARKER: 13 };
@@ -39,7 +39,7 @@ export function documentProblems(d) {
   d.flags.forEach((f, i) => { if (!exact(f, ['challenge_key', 'flag'], ['challenge_key', 'flag']) || !KEY.test(f.challenge_key) || !FLAG.test(f.flag)) p.push(`/flags/${i}`); });
   d.decoys.forEach((x, i) => {
     if (!exact(x, ['challenge_key', 'index', 'value', 'decoy_placement'], ['challenge_key', 'index', 'value']) || !KEY.test(x.challenge_key) || !wholeNumber(x.index, 0) || !FLAG.test(x.value)
-      || ('decoy_placement' in x && (typeof x.decoy_placement !== 'string' || x.decoy_placement.length < 1 || x.decoy_placement.length > 128))) p.push(`/decoys/${i}`);
+      || ('decoy_placement' in x && (typeof x.decoy_placement !== 'string' || !DECOY_PLACEMENTS.includes(x.decoy_placement) || (x.decoy_placement === 'service-file' && !FILE_DECOY_KEYS.includes(x.challenge_key))))) p.push(`/decoys/${i}`);
   });
   if (p.length) return p;
   const dup = (items, key) => new Set(items.map(key)).size !== items.length;
@@ -57,7 +57,7 @@ function writeFile(file, data, mode) {
 }
 
 /** Copy the baked snapshot, plant the instance's data, and publish it read-only. Returns the keys planted. */
-export function buildInstanceSnapshot({ base = BASE_SNAPSHOT, target, flags }) {
+export function buildInstanceSnapshot({ base = BASE_SNAPSHOT, target, flags, decoys = [], seed = null }) {
   const tmp = `${target}.tmp`;
   fs.rmSync(tmp, { force: true });
   fs.copyFileSync(base, tmp);
@@ -66,7 +66,9 @@ export function buildInstanceSnapshot({ base = BASE_SNAPSHOT, target, flags }) {
   const db = openDb(tmp);
   try {
     db.exec('BEGIN');
+    if (seed) reseedAccounts(db, seed); // before plantDatabase: the C09 dormant account gets its weak password from there
     planted = plantDatabase(db, flags);
+    plantDecoysDatabase(db, decoys);
     db.exec('COMMIT');
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch { /* nothing to roll back */ }
@@ -98,10 +100,16 @@ export async function runInject({
   const doc = read.value;
   const flags = flagMap(doc);
 
-  try { buildInstanceSnapshot({ base, target: snapshotPath, flags }); } catch { return fail(EXIT.SNAPSHOT); }
+  const decoys = decoyList(doc);
+  try { buildInstanceSnapshot({ base, target: snapshotPath, flags, decoys, seed: doc.seed }); } catch { return fail(EXIT.SNAPSHOT); }
 
   try {
     for (const p of placements) if (flags[p.challenge_key]) writeFile(path.join(p.dir, p.file), flags[p.challenge_key], 0o400);
+    // service-file decoys sit next to the placement of the same challenge, in the same volume (only that service mounts it)
+    for (const x of decoys) {
+      const p = placements.find((q) => q.challenge_key === x.challenge_key);
+      if (x.placement === 'service-file' && p) writeFile(path.join(p.dir, `${x.challenge_key}.decoy${x.index}`), x.value, 0o400);
+    }
   } catch { return fail(EXIT.PLACEMENT); }
 
   try {

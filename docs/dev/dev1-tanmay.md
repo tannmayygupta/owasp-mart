@@ -5,18 +5,26 @@ Tanmay owns the instance plane and the assessment engine: contracts and the lab 
 | | |
 |---|---|
 | Ticket tree | `docs/bmad/initiative-lab/` |
-| Excel tracker | `docs/bmad/VulnMart-Tracker.xlsx`, sheet "1 Tanmay (Lab)" (updated by hand) |
+| Excel tracker | `docs/bmad/VulnMart-Tracker.xlsx`, sheet "1 Tanmay (Lab)" (updated by hand)  **Retired 2026-10-21**: the workbook is no longer maintained by hand and shows 0 Done; do not use it (CLAUDE.md, D-102). |
 | Tasks | 31 tasks in 4 weekly sprints |
 | Read first | [START-HERE.md](START-HERE.md): how to run every task with BMAD and Claude Code |
 | Branches | one branch per sprint: `sprint-<n>-tanmay`, one pull request per sprint; tasks marked EARLY PR get their own small pull request `shared-<task-id>` |
 | Status | Draft plan written 2026-10-08 by Claude Code; not yet approved by the team |
+
+## Tick rule (one rule for this file, set 2026-10-21)
+
+1. A task is ticked `[x]` only when its **Done when** is met AND that is verified by real tests or recorded evidence (test output, a live-run file under `docs/assets/`, a gate result). A claim in a story or a dev-log is not enough.
+2. A task whose Done-when is only partly met stays unticked `[ ]` (verdict PARTIAL) and its **Status (2026-10-21)** line lists what is missing. A story being `done` does not tick a task whose Done-when has gaps.
+3. A task with live-only or Postgres/Valkey-only proof that the audit could not re-run is ticked only when the evidence file or CI run exists; its Status line says DONE-CLAIMED-UNVERIFIED and what was not re-run.
+4. Each task has ONE authoritative line `Status (2026-10-21)`, taken from `docs/audit/2026-10-21-tracker-audit.md` (verdict tables 3.1, 4.1, 5.1). Older `Closed`, `Status`, `Audit`, `Live` lines are kept below a `(history)` marker; where they disagree with the Status (2026-10-21) line, the Status line wins.
+5. Work being built right now by another work package is not counted as done. The Excel workbook is retired (see the table above); this file and the story plans under `docs/bmad/` are the tracker.
 
 ## How to work from this file
 
 1. Take the next unticked task whose "Waits on" items are done. If a wait is on another developer, use the mock or fake named in the task and carry on; do not stop. One task at a time.
 2. Create the story with `bmad-ticket`, build it with `bmad-build`, review it, test it. The line "BMAD story" under each task says whether the story already exists. A task that is too big may become more than one story.
 3. When the tests have really passed: tick the box below, update the story state in `docs/bmad/initiative-lab/`, write the dev-log entry, changelog line and traceability rows, then commit.
-4. Update the Excel sheet by hand (Done = Yes).
+4. (Retired 2026-10-21) The Excel workbook is no longer updated; the tick and the Status (2026-10-21) line in this file are the record.
 
 Sprint dates are a proposal: the final submission is in the first week of November (exact date not yet given). The exact acceptance criteria of each task are written when the task starts. Open questions named in a task (OI-xx) must be answered by the team before that part is built.
 
@@ -34,6 +42,7 @@ Sprint dates are a proposal: the final submission is in the first week of Novemb
 Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosting moved from Oracle, see D-41), so the other two streams can build against stable contracts and fakes.
 
 - [x] **L-01. Repository skeleton and tooling run end to end (tracer bullet)**
+  - Status (2026-10-21): DONE-VERIFIED. pins and CI green, 2026-10-18 audit; no branch protection on main Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.1` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. P-01, T-01, T-02 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -41,9 +50,11 @@ Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosti
   - Covers: LB-1, LB-2
   - Waits on: Nothing. This is the first task of the whole project.
   - Done when: `node scripts/dev.mjs hello` starts a hello container on your PC and the CI skeleton runs green on a pull request.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-18: VERIFIED. Pins, hello stack and CI green on pull requests. No branch protection on main. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-02. Instance contract v0 (IF-6)**
+  - Status (2026-10-21): DONE-VERIFIED. `contracts/instance/`; Sahil sign-off in `contracts/COMPAT.md` Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.2` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. T-03 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -51,10 +62,12 @@ Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosti
   - Covers: LB-3
   - Waits on: L-01.
   - Done when: The contract validates and Sahil has approved it as consumer.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed with (2026-10-11): the contract validates; "Sahil has approved it" was waived by D-37 (review optional during initial development) and is not met; handoffs H-24 to H-35 are open.
   - Audit 2026-10-18: VERIFIED. IF-6 validates (7 valid, 192 invalid examples); Sahil approved at 1.0.0 (COMPAT). Owner rows are part of L-09. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-03. Instance event schema (IF-4), app-event names and fake ingest**
+  - Status (2026-10-21): DONE-VERIFIED. `contracts/events/`; 29 valid, 69 invalid examples Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.3` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. T-03 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -63,20 +76,25 @@ Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosti
   - Waits on: L-02.
   - Done when: Every example event validates and the fake ingest rejects a malformed or oversize one.
   - Handoffs: H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-18: VERIFIED. 29 valid events, 69 invalid refused, fake ingest 44 of 44. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-04. Orchestrator API (IF-5), InstanceHost protocol and fake orchestrator**
+  - Status (2026-10-21): DONE-VERIFIED. orchestrator suite 473 passed (mine); client is hand-written, not generated Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.4` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - Build: Write the orchestrator HTTP contract, the InstanceHost protocol the orchestrator drives, and a fake orchestrator with a FakeInstanceHost.
   - Covers: LB-5
   - Waits on: L-01.
   - Done when: A client built from the contract creates, resets and destroys instances against the fake, and the fake host passes the protocol tests the real one must pass later.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed with (2026-10-11): met locally with a hand-written client (not generated); the GitHub CI run of the new jobs has never happened; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-82 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Audit 2026-10-18: VERIFIED with a caveat: the fake host passes the protocol tests; the client is hand-written, not generated from the contract. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-05. Lab fragment of the platform API (IF-2) with a mock**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/api/tests/test_lab_contract.py` in the 2684 passed; ADR 0019 still Proposed Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19: TICKED. The fragment validates (`check_lab_contract.py`: 20 operations, 41 valid and 101 invalid examples), the mock answers every operation (`apps/api/tests/test_lab_contract.py` 186 passed, `scripts/fake-lab.test.mjs` 8 passed), the real API serves the same routes and passes the same schemas (`test_lab_api.py`, deployed journey 34 of 34), and stream P read it as consumer (`docs/reviews/2026-10-12-p08-contract-sign-off.md`, condition F-2 met). Still open and not part of this task: the formal COMPAT.md sign-off rows (L-09), handoffs H-84 to H-89 confirmations, ADR 0019 is still Proposed (the developer accepts it).
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.9` in `epic-lab-baseline` (find it with `bmad-ticket`)
@@ -90,6 +108,7 @@ Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosti
   - Audit 2026-10-18: WAITING ON Akshay: his consumer review of IF-2 is pending; ADR 0019 is still Proposed. Our side (fragment, mock, checks) is done. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-06. Stub shop, fake ingest and lab harness**
+  - Status (2026-10-21): DONE-VERIFIED. harness and conformance in CI (audit) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.5` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - EARLY PR: yes. T-04 (another developer, same sprint) wait on it, so merge it through its own pull request as soon as it is done.
@@ -97,28 +116,33 @@ Goal: Contracts v1, the lab harness and the two AWS hosts in Sydney exist (hosti
   - Covers: LB-6
   - Waits on: L-02, L-03, L-04.
   - Done when: One command starts a full stub instance on a laptop: it answers health, becomes ready only after the injection marker, serves a planted flag, emits one app event the fake ingest validates, and passes the contract conformance check.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed with (2026-10-11): met locally on one PC; the GitHub CI run of the `compose` job has never happened; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-74 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Audit 2026-10-18: VERIFIED. Harness and conformance run in CI (jobs compose and e2e), green. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-07. Contract checks live in CI**
+  - Status (2026-10-21): DONE-VERIFIED. checker tests; a red breaking PR on GitHub was never recorded Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-lab-baseline`
   - BMAD story: already planned, ref `1.6` in `epic-lab-baseline` (find it with `bmad-ticket`)
   - Build: Add the contract checks to CI (schema validity, breaking change, bundle current, mock validity, provider conformance, migrations, table ownership, compatibility file), including the ownership and single-Alembic-head checks the other streams rely on.
   - Covers: LB-7
   - Waits on: L-02, L-03, L-04.
   - Done when: A deliberately breaking contract change fails CI and a valid one passes.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed with (2026-10-11): proven by the local tests and a Linux container run; job `contract-rules` has never run as a pull request on GitHub; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-73 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Audit 2026-10-18: VERIFIED. Checker with 84 tests; trusted (base) and head runs green on GitHub. A breaking pull request going red on GitHub is not recorded. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-08. AWS account (Sydney), two VMs, private link and firewall** (was Oracle; see D-41)
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: hosts real; budget e-mail unconfirmed, one dev key, stop/start rehearsal not done, local-only Terraform state (task file line 122, audit B3 now fixed) Source: docs/audit/2026-10-21-tracker-audit.md.
   - Epic: `epic-environments-and-deployment`
   - BMAD story: not planned yet; created when you incept `epic-environments-and-deployment` (see START-HERE.md, section "First task of an epic")
   - Build: Create VM-P and VM-I, a private link between them, key-only SSH and only ports 80 and 443 public; keep-alive and budget alert; send the Oracle terms-of-service email.
   - Covers: LE-1, LE-6; spikes S-11, S-17
   - Waits on: Decision on who owns the Oracle account (Q-32).
   - Done when: Both VMs are reachable by key-only SSH, only 80, 443 and SSH are open, the private link works, and the account owner, budget alert and keep-alive routine are written down.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed with (2026-10-11): the hosts were built and checked live (verify-hosts 94 checks, private-link-check 22); open: budget alert e-mail unconfirmed, only one developer key installed, stop and start rehearsal and idle observation not done; tracked in `docs/dev/sprint-1-pr-checklist.md`.
   - Handoffs: H-68 (see docs/dev/HANDOFFS.md; read them when you plan this task)
   - Audit 2026-10-18: OPEN (human). Hosts, firewall and private link are real. Budget e-mail unconfirmed; only one developer key installed; stop/start rehearsal not done; keep-alive off; Terraform state is one local file; ports 80/443 are open only to the developer's own IP (audit B3). Details: docs/audit/2026-10-18-lab-stream-audit.md
@@ -130,6 +154,8 @@ Goal: Instances start, reset, tear down and are isolated; the deployment pipelin
 Truth summary (2026-10-13): built and verified locally: L-09 preparation and release commit, L-10 to L-13 code. NOT built: L-14, L-15, L-16.
 
 - [ ] **L-09. Tag contracts v1.0.0 and start the change rules**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: tag `contracts-v1.0.0` does not exist; COMPAT rows pending: IF-2 2.1.0 (Akshay), DB 2.2.0 owner (Akshay), DB 2.2.0 consumer (Sahil), plus single-owner rows; IF-2 2.0.0 is breaking with a pending consumer row; no branch protection Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19: versions and release labels are PASS in the dry-run (COMPAT.md real versions incl. IF-1 1.1.0 and DB 2.1.0 after Akshay's P-25, rule amended); still open: 18 pending sign-offs and 19 of 62 checklist lines (H-352 asks Akshay and Sahil), then the tag.
   - Unticked 2026-10-18 on the developer's instruction after a code-based status check: the tag contracts-v1.0.0 does not exist and the COMPAT.md approvals are pending, so the Done-when is not met.
   - Closed 2026-10-12 on the developer's instruction. Release commit done 2026-10-13 (0a2a43b). NOT met: tag contracts-v1.0.0 does not exist; all 19 COMPAT.md Approvals rows pending (Akshay, Sahil, and Tanmay's own); the approvals rule is NOT-APPLICABLE until the tag; handoff checklist has 27 unticked lines (node scripts/tag-contracts.mjs --dry-run).
@@ -144,6 +170,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-18: WAITING ON Akshay (P-08), Sahil (T-03) and Tanmay (own rows): no tag contracts-v1.0.0; 16 approval rows pending; COMPAT.md is stale (IF-2 1.0.1, DB 2.0.0); no branch protection. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-10. DuckDNS names and certificates**
+  - Status (2026-10-21): DONE-CLAIMED-UNVERIFIED (ticked; evidence exists, the audit did not re-run it). `docs/assets/production-readiness/l10-renewal-live.json` exists, not re-run; S-16 recorded Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19 (final): TICKED. Real certificates on both hosts, automatic renewal by timer, one forced renewal on vm-i through the real unit (serial changed, Caddy restarted, no alert), an alert on a failed unit and `scripts/live-ops-check.mjs` (`l10-renewal-live.json`).
   - Live 2026-10-17 (L-10 Done-when MET): S-16 recorded (a random label under the labs name resolves to the vm-i address), real Let's Encrypt certificates issued on both hosts (`tanmay-platform-prod.duckdns.org` on vm-p, `*.tanmay-labs-prod.duckdns.org` on vm-i; 89 days left), the renewal timer is enabled on both and one real renewal worked (docs/assets/l-10-certificates/live-run.txt). Fixed live: the script used the wrong lego v5 syntax, and the hosts need `LEGO_EXTRA_ARGS=--dns.propagation.disable-ans` (they reach only the VPC resolver). Still open for L-11 and L-17: Caddy does not mount the files yet (the reload hook finds no container), H-115 file ownership.
   - Domain decision 2026-10-17 (developer): there is no custom domain, only AWS credit and Vercel. The plan stands unchanged: two free DuckDNS names (labs wildcard by DNS-01, platform) on the AWS hosts, and the free `*.vercel.app` name for the site with the same-origin rewrite to the platform DuckDNS name. First live check is S-16 (does `*.<labs-name>.duckdns.org` resolve); if it fails, research a fallback before any certificate work.
@@ -158,6 +186,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-18: OPEN. Real certificates, one real renewal on vm-p. The reload hook was broken (it restarted a container that does not exist): fixed and deployed on 2026-10-18 (audit B2); a forced renewal on vm-i is still to be proved; no alert on a failed renewal. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-11. Vercel project, same-origin rewrite and live-stream check**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: only a throwaway probe project; the real dashboards are not on Vercel; demo site served direct from vm-p with no origin-secret check (task file line 161) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19: NOT TICKED, and one claim of the 2026-10-18 line below no longer holds. The probe alias answers through the rewrite (health 200), but the public demo site is now served straight from vm-p with no origin-secret check on the pages and the API, so "direct access to the VM without the secret is refused" is false for the demo configuration. S-14 itself says plan A holds (the stream is not buffered), so `createLiveTicket` in IF-1 should be removed (H-353 asks Akshay; it is his contract). The production dashboards (P-26 to P-30) are not built; `apps/web` is a skeleton.
   - Live 2026-10-18 (L-11 Done-when MET): the throwaway Vercel project reaches the API through `/api/*` (production alias, real Let's Encrypt certificate on vm-p, Caddy gate), a request straight to vm-p without the secret is 403, and S-14 is recorded: all ten checks pass (stream not buffered, held 129 s, cookies pass, secret cannot be spoofed, no shared cache) on the shape in `infra/vercel/s14-probe/vercel.json`, which now also needs the route-level header `x-vercel-enable-rewrite-caching: 0` (found live: the shared cache leaked one visitor's answer to another until then; validator and template updated, tests 27 passed). Details and the byte-order-mark trap: `docs/research/s-14-vercel-sse.md`. Port 443 was opened to the internet for the run only and closed again. NOT met: the real project from Akshay's dashboards (P-07), the API's timing-safe re-check and heartbeat (H-116).
   - Closed 2026-10-12 on the developer's instruction (ticked on the developer's instruction, live steps open). Still open: live Vercel S-14 run; wiring with Akshay P-07; port 443 via public_web_cidrs. NOT met: Done-when (site reaches the API through /api/*, S-14 recorded).
@@ -173,6 +203,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-18: WAITING ON Akshay (P-07): only a throwaway Vercel probe exists; the real site is not deployed. S-14 recorded. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-12. Image builds for amd64 and arm64 and deploy pipelines**
+  - Status (2026-10-21): DONE-CLAIMED-UNVERIFIED (ticked; evidence exists, the audit did not re-run it). `l12-hello-deploy.txt` exists; amd64 only (D-51); deploy is a person running a script, no pipeline Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-20 (final): TICKED. The hello stack built by CI (images workflow on main, public image, digest pinned) was deployed by the developer with `scripts/deploy.mjs` to vm-p, vm-i and the laptop: all checks PASS including `verify image` (the container runs the pulled digest), twice (`docs/assets/production-readiness/l12-hello-deploy.txt`). By design (ADR 0032) CI holds no deploy credential: a person runs the deploy; arm64 is off (D-51).
   - Unticked 2026-10-18 on the developer's instruction after a code-based status check: no recorded run shows a hello stack from CI on both VMs and the laptop, so the Done-when is not met.
   - Closed 2026-10-12 on the developer's instruction (ticked on the developer's instruction, live steps open). arm64 not built (D-51 amends LE-4); only amd64 is in scope. Still open (developer, live): run images workflow on GitHub, make the hello package public, deploy to both VMs and laptop. NOT met: Done-when (hello stack from CI on both VMs and the laptop).
@@ -186,6 +218,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-18: OPEN. images.yml builds and pushes amd64 only; there is no deploy pipeline (deploy is scripts/live-deploy.mjs from the developer's PC); arm64 dropped by D-51. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-13. Orchestrator creates an instance from a template**
+  - Status (2026-10-21): DONE-VERIFIED. 473 passed; real shop ready in 6.1 s live (claim) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Live 2026-10-17 (S-4): cold start measured on vm-i with the STUB image (median 2.12 s, p95 2.81 s, 10 rounds; about 30 MiB per instance; evidence `docs/assets/orchestrator-measure/vm-i-s4-measure-result.json`, `docs/research/s4-cold-start-and-memory.md`). The Done-when "cold-start time measured and recorded" is met for the stub; the real shop images (T-04, L-12) will be heavier and must be measured again.
   - Closed 2026-10-12 on the developer's instruction. Done-when NOT met: S-4 not measured on vm-i (developer run, runbook `docs/runbooks/measure-instances.md`); reset (3.4) and reconciler (3.5) belong to L-14. ONE sprint PR carries L-13 too (branch shared-L-13 is not pushed); Sahil's T-09 waits for this PR being merged, tell him then.
   - Epic: `epic-orchestrator-and-instance-lifecycle`
@@ -200,6 +234,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-19: VERIFIED on the real shop. Readiness only after the injector marker; the orchestrator now creates instances of the REAL shop (real injector built, handoff H-350), ready in 6.1 s from the request on vm-i, 30 of 30 in the deployed journey. S-4 on the old stub numbers (median 2.1 s) is superseded by this live figure. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-14. Reset, teardown, timing defaults and reconciler**
+  - Status (2026-10-21): DONE-CLAIMED-UNVERIFIED (ticked; evidence exists, the audit did not re-run it). `l14-reaper-live.json`, `l14-kill-test-live.json` exist; real 60-minute idle wait never sat out; reconciler desired-state is "want everything" (H-123 open, Akshay) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19 (final): TICKED. Limits 60 idle and 240 total for a learner (`LabRuntime`); proved live: an instance with 3 idle minutes and one with 4 total minutes were destroyed by the reaper, the control lived (`l14-reaper-live.json`); the orchestrator was restarted during provisioning and the reconciler adopted 1, failed and swept the half-made one, 0 containers left (`l14-kill-test-live.json`). The full 60-minute wait was not sat out.
   - Audit 2026-10-19 (limits): the lab was putting 1440 idle and 1440 total minutes into every instance, so abandoned instances held slots for a day (the load check left five of seven slots busy after 68 minutes). Fixed in code: 60 and 240 for a learner, longer for a candidate (`LabRuntime._limits_for`, tests). NOT proved live: an instance destroyed after 60 idle minutes (needs the deploy of this change and an hour of waiting); the kill test of the Done-when is still not run.
   - Epic: `epic-orchestrator-and-instance-lifecycle`
@@ -213,6 +249,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-19: OPEN. Blocker B1 fixed and live: the platform now reports player activity to the orchestrator (IF-5 1.1.0, signed route; the deployed journey shows the instance `active` after play). Not yet run live: an instance actually destroyed after its idle limit without play and kept alive with play; the reconciler's all-wanted desired state (H-123, Akshay); no live kill test. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-15. Instance isolation and hardening**
+  - Status (2026-10-21): DONE-CLAIMED-UNVERIFIED (ticked; evidence exists, the audit did not re-run it). probe 18 of 18 live (claim); S-15 emulated, not 20 real instances Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Live 2026-10-17 (partial, not ticked): on vm-i the baseline isolation probe PASSES with the host rule on (16 forbidden targets blocked, control reached, gateway rows timeout; `docs/assets/story-4-1-isolation-probe/vm-i-rule-on.json`). NOT done: S-3 host rule off (the auto-mode safety check refused the script; the developer runs steps 5 to 7 of `docs/runbooks/isolation-vm-i.md`), the subnet check 3b, Docker restart and reboot (steps 8 and 9), the port scan, S-15 with 20 instances, the socket proxy in front of the orchestrator on vm-i.
   - Epic: `epic-isolation-and-hardening`
   - BMAD story: not planned yet; created when you incept `epic-isolation-and-hardening` (see START-HERE.md, section "First task of an epic")
@@ -226,6 +264,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
   - Audit 2026-10-19: VERIFIED live. Blocker B4 fixed: the labs chain accepts no tcp/443 for containers and drops traffic between container networks; the probe on vm-i passes 18 of 18 forbidden targets (peer network on 80/443, the platform event port, gateway, metadata, LAN, public) with the control reached and nothing left over; host audit 9 PASS. The probe uses the network profile the orchestrator builds, not an orchestrator-made instance. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-16. Concurrency, quotas, start failures and warm-pool decision**
+  - Status (2026-10-21): DONE-VERIFIED. build cap and quota tests in suites I ran; capacity numbers are stub numbers, vm-i admits 7 Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed 2026-10-17 after a live run on vm-i (Claude over SSH, developer's authorisation): 10 and 20 stub instances started at once, 10 of 10 and 20 of 20 ready, 0 failed, 0 refused, wall 8.0 s and 16.1 s, p95 ready 8.0 s and 16.1 s, build cap held at 4, about 30 MiB per instance, nothing left behind (`docs/assets/story-3-6-concurrency-quotas/vm-i-concurrent-10.json`, `-20.json`); quotas and failed starts were proven locally (story 3.6). ADR 0039 stays accepted: no warm pool unless the real shop's p95 exceeds 30 s or a start is refused. NOT met: numbers with the real images (T-04, L-12), the real InstancePort and quota numbers (Akshay, H-79, H-126).
   - Epic: `epic-orchestrator-and-instance-lifecycle`
   - BMAD story: not planned yet; created when you incept `epic-orchestrator-and-instance-lifecycle` (see START-HERE.md, section "First task of an epic")
@@ -242,6 +282,8 @@ Truth summary (2026-10-13): built and verified locally: L-09 preparation and rel
 Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt engine and scoring work end to end.
 
 - [x] **L-17. Edge and gate for instance access**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/edge` tests; gate access map is in memory (wiring: after an edge restart every lab answers "ended") Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed 2026-10-17 on the developer's instruction after local proof (edge e2e 11 passed on Docker Desktop, orchestrator attaches the edge and pushes access state: 458 orchestrator tests, real-Docker test_edge_attach.py). NOT met live: vm-i run, real certificate, real browser, gate admin reachability: decided 2026-10-17, orchestrator runs as a container on labs-core and is proven locally (H-343 answered, open points in H-347); D-60 to D-68 and ADR 0004 still Proposed.
   - Epic: `epic-edge-gate-and-event-path`
   - BMAD story: not planned yet; created when you incept `epic-edge-gate-and-event-path` (see START-HERE.md, section "First task of an epic")
@@ -253,6 +295,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-18: VERIFIED. Gate tests 96 of 96; live: wildcard certificate, ticket once only, forged ticket refused, no instance port published. Not run live: a second account against another's instance. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-18. Event relay, ingest and one active browser session**
+  - Status (2026-10-21): DONE-VERIFIED. `apps/api/tests/test_login_bump.py`; side effect: a login on any device bumps the epoch of a running assessment too (wiring section 5) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19: TICKED. The platform half of FR-SES-11 is built (H-341): a new login raises the access epoch of the account's live instances (`LabRuntime.bump_access_for_user`, hook in `SessionService.open_session`, retried by the tick when the orchestrator is away; tests `apps/api/tests/test_login_bump.py` 3 passed). Proved on the deployed system (vm-i gate, `docs/assets/production-readiness/e2e-run14-login-bump.json`, 34 of 34): after a second login the older tab gets 403 at the gate and the new login gets a working ticket. Signed relay, forged and replayed refusal were already proved (ingest-relay e2e). Not done on purpose: the platform's older sessions are not ended (the user's session list is P-12; H-353 asks Akshay).
   - Closed 2026-10-17 after local proof: signed event relayed to the real ingest verifier, forged and replayed refused (ingest-relay e2e), second session handled by the access epoch (apps/edge session-epoch test, 7 passed). NOT met: the platform half of FR-SES-11 (login bump, H-341) and the vm-i run.
   - Epic: `epic-edge-gate-and-event-path`
@@ -266,6 +310,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-18: WAITING ON Akshay: the platform half of FR-SES-11 (login bumps the access epoch, H-341). Relay, signatures and replay checks are verified. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-19. Flag derivation, injection and secrecy**
+  - Status (2026-10-21): DONE-VERIFIED. flag-leak scan is a CI step in `images.yml`; decoy placement into the catalogue not wired (H-331 open) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19 (final): TICKED. Different flags per instance and the reset invalidating the old one (live journey), CI scan of every image layer (green on every pull request), and a scan of a running instance on vm-i (logs, inspect, orchestrator and gate logs, deployed shop image): clean (`l19-vmi-scan.txt`). Open follow-up, not in the Done-when: decoy placement in the shop (FR-FLG-07, H-331).
   - Audit 2026-10-19 (CI): the scan is now a CI step (`images.yml`: `--load`, then `node scripts/scan-flags.mjs --image` for every image of a pull request; workflow shape test). Local scan of the shop, mock-services, import-service and bot images: CLEAN. Still open: a scan of a running instance on vm-i (the script needs docker on that host) and the decoy placement list (H-331).
   - Closed 2026-10-17 after local proof: two instances get different flags, a reset invalidates the old ones (test_lab_loop.py), flag leak scan built (scripts/scan-flags.mjs). NOT met: the real KeyPort and real InstancePort (Akshay), a scan of vm-i, decoy placement in the catalogue (H-331).
@@ -280,6 +326,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-19: OPEN (one item). Flags derived and planted by the real injector, two rounds hold different flags and a reset invalidates the old one (live, real shop), key service real. Still open: the CI flag-pattern scan is a script, not a CI job (L-19 Done-when). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-20. Coraza sidecar, automatic capture and paste**
+  - Status (2026-10-21): DONE-VERIFIED. sidecar tests pass (in my 326); S-6 accuracy mixed, `classifier_accuracy_verified` false; CRS 4.25.0 not the 4.30.0 the PRD names Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed 2026-10-17 after local proof: the Coraza and Core Rule Set helper (story 6.5) is built into the sidecar image and S-6 is measured (15 of 32 exploits seen, 0 of 60 benign flagged, sidecar suite 69 passed, Go tests passed, re-run by the coordinator). The sidecar never blocks (tests). NOT met: nothing on vm-i, no full compose harness run with the product image; the accuracy is mixed so `classifier_accuracy_verified` stays false (your decision); CRS is 4.25.0 (newest Go module; upstream 4.30.0 exists, loading it needs the release tarball in the image build), the PRD names 4.30.0.
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
@@ -292,6 +340,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-18: VERIFIED with limits: automatic capture credited live, S-6 measured. Detection is hint-level (15 of 16 request-visible exploits; the logic-bug challenges depend on shop events from Sahil). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-21. Milestone engine, evidence capture and sharing signal**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: engine and 33 rules exist, tests pass; open: spec deviations (C01 M2, C03, C07 M1, C08 M2), C09 M2 cannot fire because the shop never emits `shop.security_event_written`, C05 M2 and C08 M1 fire on any hit Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed 2026-10-17 after local proof: milestone engine with 33 rules for all 11 challenges, C09 negative-observation rule, evidence sealed through KeyPort (fake), activity metadata and bot visits wired into the runtime. NOT met: the real tables and worker (H-330), the real catalogue (Sahil T-02/T-30).
   - Epic: `epic-flags-detection-and-sidecar`
   - BMAD story: not planned yet; created when you incept `epic-flags-detection-and-sidecar` (see START-HERE.md, section "First task of an epic")
@@ -304,6 +354,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-19: OPEN. Blocker B5 fixed (events after the end credit nothing; the C09 window survives a restart). Still open: spec deviations (C01 M2 alternative, C03 single key, C07 M1, C08 M2 pairing) to be settled against the real catalogue of Sahil (T-30), and FR-TIM-04 events never emitted. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-22. Attempt state machine and server clock**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: `packages/py-attempts` 357 passed; open: template rules did not reach attempts until `ef7d5c7` (wiring F-01, no regression test), invite never becomes `started` (F-05), start ignores invite state (F-06) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed 2026-10-17 after local proof: attempt engine and rules in packages/py-attempts (clock from instance ready, D-80 confirmed by the developer 2026-10-17), reachable over the demo routes. NOT met: the SQL store, the scheduler job and the real API adapter (H-346).
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
@@ -315,6 +367,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-19: OPEN. Engine verified; blocker B5 fixed (a paste or event after the deadline scores nothing even before the tick). Still open: template rules (time limit, resets, hint mode) never reach the attempt (with Akshay); the scheduler scans every row. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-23. Scoring engine**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: reproduces PRD Appendix A (tests pass); hint cost and hint mode from the template are ignored by the lab (wiring F-07, H-351) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed 2026-10-17 after local proof: scoring reproduces all six PRD Appendix A examples; held captures stay out of the score (test_lab_loop.py, score 147 by hand). NOT met: the real ReportPort over tables (H-346), the recruiter screen.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
@@ -326,6 +380,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
   - Audit 2026-10-19: OPEN (one item). Reproduces all six Appendix A examples; the learner hint-cost defect is fixed (hints cost points only in an assessment, learners' are free; tested). Still open: template hint settings (hint cost percent, hints on or off) do not reach the attempt yet (handoff H-351 with Akshay). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-24. Backups, laptop fallback and remaining spikes**
+  - Status (2026-10-21): DONE-CLAIMED-UNVERIFIED (ticked; evidence exists, the audit did not re-run it). `l24-backup-live.json` exists; no copy to cloud storage; keystore not covered by design; backups on the same host plus a manual pull to the dev PC Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19 (final): TICKED. Daily backup of both databases on vm-p with read-back check and 7-day retention, off-host copy to the developer PC (`scripts/backup-pull.mjs`), restore into a scratch database on the live Postgres: 39 of 39 tables, 45 of 45 users (`l24-backup-live.json`); laptop fallback tested earlier on the PC. A copy to cloud object storage is not built (needs a bucket in the developer's account).
   - Closed 2026-10-17 on local proof only: encrypted dump, checksum, restore into a scratch database with equal row counts, wrong passphrase and a flipped byte fail, laptop fallback up/check/down on this PC (docs/assets/story-8-4-backup-fallback/). NOT met: the backup to S3 and a restore on a VM (runbook steps), no real platform data was backed up.
   - Epic: `epic-environments-and-deployment`
@@ -341,6 +397,8 @@ Goal: The edge and gate, event relay, flags, the detection sidecar, the attempt 
 Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load check and the demo rehearsal.
 
 - [x] **L-25. Time metrics and event log**
+  - Status (2026-10-21): DONE-VERIFIED. tests in the suites I ran; the invite and consent web events have no live run Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-20 (final): TICKED. All 20 allow-listed events are written (invite_created, invite_opened and consent_given from the accept flow with real times; recruiter_viewed_report on the report read; request_seen as a marker), the 500 is fixed, time is on the report beside the score, resets are counted, the log holds ids and instants only. Verified by tests (port with the real engine; API with a stubbed recruiter session); the invite and consent web routes of stream P do not exist yet, so there is no live run of those three.
   - Audit 2026-10-19 (events): the lab now writes instance_requested, instance_ready and flag_auto_detected; still not written: invite_created, invite_opened, consent_given, recruiter_viewed_report (stream P) and request_seen.
   - Audit 2026-10-19: the 500 is fixed (a capture dated before the start counts zero seconds, `clamp_to_start`, test). Still open: the allow-listed FR-TIM-04 events are never emitted, and the dashboard shows nothing yet (stream P).
@@ -354,6 +412,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Audit 2026-10-18: OPEN. Metrics and ids-only log verified; allow-listed events never emitted; time_metrics can raise (500). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-26. Reset and withdrawal during an assessment**
+  - Status (2026-10-21): DONE-VERIFIED. `test_lab_review_reset_withdraw.py`; the live check made the candidate attempt through the runtime, not the invite routes Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19: TICKED (the earlier audit line below is superseded). `POST /api/v1/attempts/{id}/withdraw` and `/withdraw/undo` are in IF-2 1.1.0 and served by the lab (`apps/api/tests/test_lab_api.py`, `test_lab_contract.py`; mock and examples updated). Proved on the deployed system (real Postgres and orchestrator, `docs/assets/production-readiness/e2e-run15-withdraw.json`, 11 of 11): the owner withdraws, the instance is destroyed, nothing is accepted afterwards, a second withdrawal keeps the date, the undo cancels the deletion, a foreign account gets 404. The candidate attempt was created through the lab runtime of the API container because the invite routes (stream P) do not exist yet; the route itself is the real one. Cancel and purge routes stay with stream P (H-353).
   - Closed 2026-10-17 after local proof: reset counted with limit 3 (fourth refused before the instance is touched), withdrawal destroys, schedules deletion after 7 days, undo inside the window (engine and runtime tests). NOT met: the platform routes (H-346).
   - Epic: `epic-attempts-scoring-and-integrity`
@@ -365,6 +425,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Audit 2026-10-19: WAITING ON Akshay (H-346): no HTTP withdraw, cancel or undo route. Reset limit, withdrawal, undo and erase (key shred, purge, retry) are verified; the lab now announces attempt state changes to the live hub. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-27. Anti-cheat signals and held-capture review**
+  - Status (2026-10-21): DONE-VERIFIED. thresholds are placeholders (OI-25); write-up similarity and idle-gap not wired; a learner's held capture can never be released (wiring section 4) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Closed 2026-10-17 after local proof: held captures stay out of the score until a named recruiter or admin of the owning organisation decides, the decision is audited and final, nobody is zeroed (library and runtime tests). The idle and too-fast numbers are placeholders (OI-25). NOT met: FR-ACH-01 and 02 (submission limit coverage, the real activity gate), the review screen, D-92 (OI-38) confirmed 2026-10-17.
   - Epic: `epic-attempts-scoring-and-integrity`
   - BMAD story: not planned yet; created when you incept `epic-attempts-scoring-and-integrity` (see START-HERE.md, section "First task of an epic")
@@ -375,6 +437,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Audit 2026-10-19: VERIFIED in code and tests. Blocker B6 fixed: pasted flags are checked against recorded activity (held for a named reviewer, mode flag counts with a flag, a too-fast capture raises a timing flag); review is audited and final; nobody is zeroed. Not wired: write-up similarity (needs write-ups) and the idle-gap signal. Not run live (a live paste needs a held capture and a recruiter session). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-28. Cohort board and ranking aid**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: `ports/engine_cohort.py` and tests exist; no IF-1 route and no recruiter screen, so a recruiter cannot see the board (H-353) Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-19: NOT TICKED. The platform adapter now exists (`apps/api/src/vulnmart/ports/engine_cohort.py`, `LabRuntime.cohort`; tests `test_engine_cohort.py` 3 passed: only ended attempts of one company and one assessment, aid order, refusal before any row is read, no cross-company call). Still missing, and Akshay's: the IF-1 route that reads `cohort_board` of the assessment and the recruiter screen (H-353). Without them a recruiter cannot see the board, so the Done-when is not demonstrable.
   - Closed 2026-10-17 after local proof: ranking aid and private, scoped cohort rules, board off by default (D-93 confirmed by the developer 2026-10-17, OI-26 answered). NOT met: the platform port and recruiter screen.
   - Epic: `epic-attempts-scoring-and-integrity`
@@ -386,6 +450,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Audit 2026-10-18: WAITING ON Akshay (P-27 recruiter dashboard) plus a small EngineCohortPort on our side: library only, no route. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [x] **L-29. Isolation proof and extra hardening on VM-I**
+  - Status (2026-10-21): DONE-CLAIMED-UNVERIFIED (ticked; evidence exists, the audit did not re-run it). `l29-*` evidence (gVisor on vm-i, 18 of 18, 34 of 34) exists; user-namespace remapping failed and was dropped; S-15 emulated Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-20 (final): TICKED. gVisor installed on vm-i and the whole lab run on it with the developer's approval; the isolation probe passes 18 of 18 under runc and runsc, the sandbox probe shows the container sees gVisor's kernel (4.19.0-gvisor, no host modules) instead of the host's, the deployed journey passes 34 of 34 with 12 instance containers all under runsc (`vmi-audit --expect-runtime runsc`); user-namespace remapping was tried on a throwaway daemon and breaks the uid-65532 volumes; the address pool was already raised (256 networks, `daemon-pools` PASS). S-15 stays the emulated result. Records `docs/assets/production-readiness/l29-*`, research `docs/research/s-8-instance-sandboxing.md`, ADR 0056.
   - Unticked 2026-10-18 on the developer's instruction after a code-based status check: S-8 was not tested live and the audit does not yet read the VULNMART-LABS chain (review finding D1), so the Done-when is not fully met.
   - Ticked 2026-10-18 with a caveat: S-8 (user namespaces, rootless Docker, gVisor) was NOT tested live; the developer skipped it for the demo and the result is reasoning only (docs/research/s-8-instance-sandboxing.md, story dropped). The isolation tests do pass on VM-I.
@@ -400,6 +466,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Audit 2026-10-18: OPEN. B4; S-8 live tests skipped; S-15 emulated; address pools not raised. Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-30. End-to-end suite and load check**
+  - Status (2026-10-21): PARTIAL (unticked; Done-when not fully met). Missing or open: learner journey 34 of 34, 57 of 57 exploit checks (vulnerable build only), load of 6 gave 4 ready and 2 clean 429s; no invite, assessment, recruiter report in the suite; Sahil's T-32 and Akshay's P-32 not closed Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Audit 2026-10-20 (lab half): every challenge was attacked against a deployed instance the way a player would (HTTPS requests with the gate cookie, as in Burp): 57 of 57 checks, score 1000, flags of another learner's instance refused (`docs/assets/production-readiness/exploits-live-all.json`). It found and fixed C10, C06 and C07; C03 part B (stored XSS) still needs a JavaScript-running bot. Still missing for the Done-when: the assessment attempt, invite and recruiter report (stream P routes) and Sahil's T-32.
   - Audit 2026-10-19 (load numbers): the deployed learner journey now has 34 checks including FR-SES-11 and passes 34 of 34 (`e2e-run14-login-bump.json`); load check of 8 learners (`e2e-run16-load8.json`): 5 of 8 instances ready (first 8 s, median 13.7 s, p90 17.4 s, slowest 17.4 s, wall 19 s), 3 answered a clean 429 `REQ-RATE-LIMITED` because vm-i admits 7 instances (5600 MB at 768 MB) and earlier test instances still held slots. Re-run on the merged main (2026-10-19, after the capacity was freed): journey 34 of 34 (`e2e-run19-main.json`), withdraw and undo 11 of 11 (`e2e-run20-withdraw-main.json`), load check of 6 learners (`e2e-run21-load6.json`): 4 of 6 ready (first 8.3 s, median 13.8 s, p90 13.9 s, wall 17 s), 2 clean 429 because earlier test instances still held 3 of the 7 slots; the load check now stops its own instances (4 of 4). Still missing: the assessment attempt, invite and recruiter report in the suite (stream P routes, P-32) and Sahil's T-32.
   - Status 2026-10-17 (not ticked): local loops exist (in-process `apps/api/tests/test_lab_loop.py`; the Docker Desktop loop passes 10 of 10 steps with the stub image and the load check passes 6 of 6, laptop numbers, story 8.3), `scripts/live-smoke.mjs` is built; nothing ran on the deployed system, which the Done-when requires.
@@ -412,6 +480,8 @@ Goal: Time metrics, anti-cheat, isolation proof, the end-to-end suite, the load 
   - Audit 2026-10-19: WAITING ON Akshay (P-32) and Sahil (T-32), partly unblocked: the learner journey passes 30 of 30 on the REAL shop (docs/assets/production-readiness/e2e-run11-real-shop.json) and Sahil can now run T-32. Still no assessment attempt, invite or recruiter report in the journey (routes and screens of stream P are missing). Details: docs/audit/2026-10-18-lab-stream-audit.md
 
 - [ ] **L-31. Demo rehearsal and submission pack**
+  - Status (2026-10-21): NOT STARTED (unticked). rehearsal never run (task file line 415); the pack checker only counts files Source: docs/audit/2026-10-21-tracker-audit.md.
+  - (history) the lines below are older status notes, kept as a record; the Status (2026-10-21) line above is the only authoritative one.
   - Status 2026-10-17 (not ticked): the demo runbook (docs/runbooks/demo-19-oct.md) and the submission pack checker (21 items pass) are built; no rehearsal has been run or recorded.
   - Epic: `epic-integration-and-demo-readiness`
   - BMAD story: not planned yet; created when you incept `epic-integration-and-demo-readiness` (see START-HERE.md, section "First task of an epic")

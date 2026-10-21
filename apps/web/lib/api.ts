@@ -134,7 +134,7 @@ export type Session = { status: 'authenticated'; user: User; csrf_token: string 
 export type MfaRequired = { status: 'mfa_required'; mfa_ticket: string };
 export type CatalogueItem = { challenge_key: string; title: string; owasp_2021: string | null; owasp_2025: string; difficulty: number; tier: string };
 export type AttemptSummary = { attempt_id: string; mode: 'learner' | 'candidate'; state: string; instance_id: string | null; created_at: string; deadline_at: string | null };
-export type Attempt = AttemptSummary & { hints_enabled: boolean; started_at: string | null; submitted_at: string | null; delete_after?: string | null; results_released?: boolean };
+export type Attempt = AttemptSummary & { hints_enabled: boolean; started_at: string | null; submitted_at: string | null; delete_after?: string | null; results_released?: boolean; server_time?: string };
 export type Instance = { instance_id: string; state: string; access: string; epoch: number };
 export type Progress = {
   challenge_key: string;
@@ -325,3 +325,18 @@ export function when(stamp: string | null | undefined): string {
   const d = new Date(stamp);
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString();
 }
+
+// ===== learner and candidate screens (work package E, 2026-10-21): the sequenced practice run, IF-2 1.3.0 =====
+// A learner's run is sequenced when the lab runs with VULNMART_LAB_SEQUENCE=1: the list holds only the challenges reached, and each entry has a state and a countdown.
+export type ChallengeProgress = Progress & {
+  state?: 'ready' | 'active' | 'solved' | 'expired';
+  title?: string;
+  tier?: 'Easy' | 'Medium' | 'Hard';
+  time_limit_seconds?: number;
+  opened_at?: string | null;
+  expires_at?: string | null;
+  seconds_left?: number | null;
+};
+export type ProgressList = { items: ChallengeProgress[]; has_more?: false; total?: number; current_key?: string | null; server_time?: string };
+export type AccountProgress = { total_points: number; runs: number; per_challenge: { challenge_key: string; best_points: number }[] };
+// ===== end of the learner and candidate block =====

@@ -10,7 +10,9 @@ import { noteTicketMarkup } from '../challenges/c03b-ticket-xss.mjs';
 import { collectorBase, collectorIdFor, readInbox } from '../challenges/c03b-bot.mjs';
 import { quickRefund, refundStatement } from '../challenges/c04-quick-refund.mjs';
 import { createPendingOrder } from '../challenges/c08-payment-webhook.mjs';
-import { isLocked, recordAuth } from '../challenges/c09-logging-failures.mjs';
+import { isLocked, recordAuth, recordSecurityEvent } from '../challenges/c09-logging-failures.mjs';
+import { createLoginThrottle } from './login-throttle.mjs';
+import { pageOf, slicePage } from './paging.mjs';
 
 // Map a service error to an HTTP response; rethrow anything unexpected.
 function handleError(err, res) {
@@ -40,7 +42,7 @@ const hj = (fn) => async (req, res, next) => {
   try { await fn(req, res); } catch (e) { try { handleJsonError(e, res); } catch (u) { next(u); } }
 };
 
-export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getCatalogDb = null, bot = null, mockUrl, instanceId } = {}) {
+export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getCatalogDb = null, bot = null, mockUrl, instanceId, loginThrottle = createLoginThrottle() } = {}) {
   app.get('/', (_req, res) => res.redirect('/shop'));
 
   // C03 part A (Injection): product search over the separate read-only catalog
@@ -84,8 +86,10 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
 
   // Catalogue
   app.get('/shop', h((req, res) => {
-    const q = req.query.q ?? '';
-    res.render('index', { products: shop.listProducts(db, { q }), q });
+    const q = String(req.query.q ?? '').slice(0, 100);
+    const pg = pageOf(req.query);
+    const { rows, pager } = slicePage(shop.listProducts(db, { q, limit: pg.limit, offset: pg.offset }), pg, '/shop', q ? `&q=${encodeURIComponent(q)}` : '');
+    res.render('index', { products: rows, q, pager });
   }));
   app.get('/product/:id', h((req, res) => {
     const product = shop.getPublishedProduct(db, req.params.id);
@@ -102,22 +106,26 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
     // is written as a security event and the account locks after a threshold. The
     // legacy mobile route is what skips this (vulnerable build).
     const found = req.body.email ? db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(String(req.body.email).toLowerCase()) : null;
-    if (isLocked(db, found?.id)) {
+    const source = req.ip ?? 'unknown';
+    if (isLocked(db, found?.id) || loginThrottle.blocked(source)) {
+      // refused before the password is checked; written to the security log and posted like every other attempt (kind login_locked)
       emit('auth.attempt', { route: 'web', account_id: found ? String(found.id) : 'unknown', result: 'locked' });
+      recordSecurityEvent(db, { userId: found?.id, kind: 'login_locked', route: 'web', emit });
       return res.status(429).render('login', { error: 'Too many attempts. Try again in a few minutes.' });
     }
     const user = authenticate(db, req.body.email, req.body.password);
     const active = !!user && user.status === 'active';
-    // IF-4 auth.attempt: every login attempt. `result` keeps an unknown
-    // credential ('unknown') from a found-but-refused account ('rejected') so the
-    // event is not a user-enumeration oracle; no password or email is ever sent.
+    // IF-4 auth.attempt: every login attempt, `success` or `failure` (the same words
+    // as the legacy route, which the C09 rule reads). account_id is the account the
+    // attempt named, so repeated failures against one account can be counted; an
+    // unknown email is `unknown`. No password or email is ever sent.
     emit(
       'auth.attempt',
-      { route: 'web', account_id: user ? String(user.id) : 'unknown', result: active ? 'success' : user ? 'rejected' : 'unknown' },
+      { route: 'web', account_id: found ? String(found.id) : 'unknown', result: active ? 'success' : 'failure' },
       { user_id: user ? String(user.id) : null },
-    );
-    recordAuth(db, { userId: found?.id, success: active, route: 'web', emit });
+    );    recordAuth(db, { userId: found?.id, success: active, route: 'web', emit });
     if (!active) {
+      loginThrottle.fail(source);
       return res.status(401).render('login', { error: 'Wrong email or password.' });
     }
     // Rotate the CSRF token on login so a pre-auth token cannot be fixed and
@@ -146,7 +154,11 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
   }));
 
   // Orders
-  app.get('/orders', requireCustomer, h((req, res) => res.render('orders', { orders: shop.listOrders(db, req.user) })));
+  app.get('/orders', requireCustomer, h((req, res) => {
+    const pg = pageOf(req.query);
+    const { rows, pager } = slicePage(shop.listOrders(db, req.user, { limit: pg.limit, offset: pg.offset }), pg, '/orders');
+    res.render('orders', { orders: rows, pager });
+  }));
   app.get('/orders/:id', requireCustomer, h((req, res) => res.render('order', { order: shop.getOrder(db, req.user, req.params.id) })));
 
   // Reviews / refunds / disputes / tickets
@@ -162,7 +174,11 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
     shop.openDispute(db, req.user, req.body.order_item_id, req.body.reason);
     res.render('message', { title: 'Dispute opened', message: 'Your dispute was opened.' });
   }));
-  app.get('/tickets', requireCustomer, h((req, res) => res.render('tickets', { tickets: shop.listTickets(db, req.user) })));
+  app.get('/tickets', requireCustomer, h((req, res) => {
+    const pg = pageOf(req.query);
+    const { rows, pager } = slicePage(shop.listTickets(db, req.user, { limit: pg.limit, offset: pg.offset }), pg, '/tickets');
+    res.render('tickets', { tickets: rows, pager });
+  }));
   app.post('/tickets', requireCustomer, h((req, res) => {
     const id = shop.createTicket(db, req.user, req.body.subject, req.body.body);
     // C03 part B signal: a stored ticket message that carries an HTML tag. The

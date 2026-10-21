@@ -613,6 +613,11 @@ function changedSince(root, commit, folders) {
 const handles = (rows) => [...new Set(rows.map((r) => r.handle))];
 const at = (hs) => hs.map((h) => `@${h}`).join(', ');
 
+// The sole maintainer named in COMPAT.md ("**Sole maintainer:** @handle"), lower case, or null.
+export function soleMaintainer(text) {
+  const m = /^\*\*Sole maintainer:\*\*\s*@([A-Za-z0-9-]+)/m.exec(text ?? '');
+  return m ? m[1].toLowerCase() : null;
+}
 export function approvalsCheck({ root, reg, baseReg, base, tag, changed, baseLog, headLog, reviews: reviewsInput, requireReviews = false, prAuthor }) {
   if (!tag) return { status: NA, details: ['the approvals rule starts with the first tag contracts-v* (the tag contracts-v1.0.0); no such tag exists yet'] };
   const compatBase = baseText(root, base.tip ?? base.sha, 'contracts/COMPAT.md');
@@ -639,6 +644,12 @@ export function approvalsCheck({ root, reg, baseReg, base, tag, changed, baseLog
   if (!work.length) return { status: PASS, details: ['no file of any contract changed, so no approval is needed'] };
   if (!prAuthor) return { status: FAIL, details: ['the author of the pull request is unknown (--pr-author <login>), so an own review cannot be left out'] };
   const author = prAuthor.replace(/^@/, '').toLowerCase();
+  // One-maintainer repository (decisions D-102, D-104 and D-105, ADR 0095): when the BASE COMPAT.md names the author as the sole maintainer, nobody else can review, so the
+  // author's own sign-off stands. The line is read from the base copy (a pull request cannot add itself); every other contract rule (breaking-change diff, validators,
+  // changelog, mocks, registry) still applies in full, so the approval rests on those machine checks.
+  if (soleMaintainer(compatBase) === author) {
+    return { status: PASS, details: work.map((w) => `${w.id} (${w.why}): authored by the sole maintainer @${author}; the approval rests on the other contract rules (the "Sole maintainer" line of the base COMPAT.md)`) };
+  }
   const latest = latestReviews(loaded.reviews);
 
   const details = [];

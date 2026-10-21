@@ -162,7 +162,7 @@ def test_a_rule_edit_changes_behaviour():
     play(w, [("shop.verbose_error", {"route": "/x", "handler": "c10_import"})])
     assert w.best("C05") == "M1"
     stricter = copy.deepcopy(RULES)
-    stricter["challenges"]["C01"]["m2"]["at_least"] = 2
+    stricter["challenges"]["C01"]["m2"]["of"][0]["at_least"] = 2
     w = World(rules=stricter)
     w.add_instance()
     play(w, [xs("o-1"), xs("o-2")])

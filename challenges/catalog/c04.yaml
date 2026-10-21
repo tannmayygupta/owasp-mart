@@ -47,4 +47,5 @@ write_up:
   fix: >-
     One assertRefundable on every path, a per-order refundable balance enforced in a transaction, a count cap,
     idempotency keys, an abuse-case review.
-decoys: []
+decoys:
+  - "at rest, never beside the real flag, a decoy flag-shaped value is planted per instance in the shop sentinel table under a key no route reads (decoy_placement shop-db)"

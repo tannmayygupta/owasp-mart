@@ -9,7 +9,7 @@
 | Report tag | flag material, flag checker, leak scan, FR-FLG-01, FR-FLG-02, FR-FLG-03, FR-FLG-07, FR-FLG-08, D-71, D-72, D-79 |
 
 ## Requirements covered
-FR-FLG-01, 02, 03, 07, 08 (FR-FLG-07 half met, see limitations), D-02, D-23; decisions D-71, D-72, D-79 (new, Proposed, in ADR 0042); handoffs H-63 (partly answered), H-330, H-331 (new). Task L-19 (stays unticked).
+FR-FLG-01, 02, 03, 07, 08 (FR-FLG-07 half met, see limitations), D-02, D-23; decisions D-71, D-72, D-79 (new, Proposed, in ADR 0092); handoffs H-63 (partly answered), H-330, H-331 (new). Task L-19 (stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 The platform can now build the flag material of a create or reset (one flag per challenge, two decoys each, digests of the real flags, the event key and a seed) using only the KeyPort interface, and can classify a candidate text as correct, decoy, stale epoch, other instance or wrong by recomputing the expected flag. A new scan script looks for the flag pattern in image layers, container logs, `docker inspect` output and a text file. No flag table exists and no flag value is printed anywhere.
@@ -31,10 +31,10 @@ Flags come only from the `KeyPort` methods `flag`, `decoy`, `event_key`; the cod
 - `apps/api/tests/{test_flags_material,test_flags_checker}.py` - new
 - `scripts/scan-flags.mjs`, `scripts/scan-flags.test.mjs` - new
 - `docs/assets/story-6-1-flag-material/test-output.txt`
-- Docs: this entry, ADR 0042, `initial.md` (D-71, D-72, D-79), HANDOFFS, CHANGELOG, traceability, dev1 file
+- Docs: this entry, ADR 0092, `initial.md` (D-71, D-72, D-79), HANDOFFS, CHANGELOG, traceability, dev1 file
 
 ## Decisions made
-D-71 (where the detection code lives: `apps/api/src/vulnmart/flags/` and `ingest/`, pure functions and Protocols), D-72 (flag rules: format unchanged, two decoys per challenge, digests of real flags only, verification always a recompute), D-79 (fake KeyPort only through the composition root). See `docs/adr/0042-flags-sidecar-and-milestone-decisions.md`. Decisions inside the plan: `build_material` returns the decoy values only (IF-5 `FlagMaterial` has no field for placement text) and `DECOY_PLACEMENT` is a module table; the real-Docker scan case is in the Node test, not in `apps/orchestrator/tests`; `scan-flags.mjs` with no arguments prints "nothing to scan" and exits 0.
+D-71 (where the detection code lives: `apps/api/src/vulnmart/flags/` and `ingest/`, pure functions and Protocols), D-72 (flag rules: format unchanged, two decoys per challenge, digests of real flags only, verification always a recompute), D-79 (fake KeyPort only through the composition root). See `docs/adr/0092-flags-sidecar-and-milestone-decisions.md`. Decisions inside the plan: `build_material` returns the decoy values only (IF-5 `FlagMaterial` has no field for placement text) and `DECOY_PLACEMENT` is a module table; the real-Docker scan case is in the Node test, not in `apps/orchestrator/tests`; `scan-flags.mjs` with no arguments prints "nothing to scan" and exits 0.
 
 ## Tests
 Raw output in `docs/assets/story-6-1-flag-material/test-output.txt`.

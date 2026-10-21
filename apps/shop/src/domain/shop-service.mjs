@@ -6,6 +6,7 @@
 // transaction. No deliberate weaknesses here (those are the challenge epics).
 import { can } from './permissions.mjs';
 import { assertTransition } from './state-machines.mjs';
+import { LIMITS, capShip, capText, pageArgs } from './limits.mjs';
 
 export class ForbiddenError extends Error {
   constructor(msg = 'forbidden') { super(msg); this.name = 'ForbiddenError'; }
@@ -24,9 +25,10 @@ function parseId(v) {
   return n;
 }
 
-// Run writes atomically; roll back on any error (unless already committed).
-function inTransaction(db, fn) {
-  db.exec('BEGIN');
+// Run writes atomically; roll back on any error (unless already committed). immediate takes the write lock at BEGIN (BEGIN IMMEDIATE), so a check made inside the
+// transaction (stock at payment) cannot be overtaken by a second writer between the check and the write.
+function inTransaction(db, fn, { immediate = false } = {}) {
+  db.exec(immediate ? 'BEGIN IMMEDIATE' : 'BEGIN');
   let committed = false;
   const commit = () => { db.exec('COMMIT'); committed = true; };
   try {
@@ -41,17 +43,18 @@ function inTransaction(db, fn) {
 
 // ---- Catalogue (browse / search / product) --------------------------------
 
-export function listProducts(db, { q = '' } = {}) {
-  const term = String(q).trim();
+export function listProducts(db, { q = '', limit, offset } = {}) {
+  const term = String(q).trim().slice(0, 100);
+  const page = pageArgs({ limit, offset });
   if (term) {
     // Parameterised search (correct flow; the C03 SQL-injection path is separate).
     // Escape LIKE wildcards so a literal "50%" is not a match-all.
     const safe = term.replace(/[\\%_]/g, (m) => `\\${m}`);
     return db
-      .prepare("SELECT * FROM products WHERE status = 'published' AND title LIKE ? ESCAPE '\\' ORDER BY id")
-      .all(`%${safe}%`);
+      .prepare("SELECT * FROM products WHERE status = 'published' AND title LIKE ? ESCAPE '\\' ORDER BY id LIMIT ? OFFSET ?")
+      .all(`%${safe}%`, page.limit, page.offset);
   }
-  return db.prepare("SELECT * FROM products WHERE status = 'published' ORDER BY id").all();
+  return db.prepare("SELECT * FROM products WHERE status = 'published' ORDER BY id LIMIT ? OFFSET ?").all(page.limit, page.offset);
 }
 
 export function getPublishedProduct(db, productId) {
@@ -72,6 +75,7 @@ function getOrCreateCart(db, userId) {
 }
 
 export const MAX_CART_QTY = 99;
+export const MAX_CART_LINES = 50;
 
 export function addToCart(db, user, productId, qty = 1) {
   if (!can('customer', 'cart_checkout', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
@@ -86,6 +90,8 @@ export function addToCart(db, user, productId, qty = 1) {
   if (existing) {
     // Merge but keep the line capped so repeated adds cannot exceed the cap.
     db.prepare('UPDATE cart_items SET qty = MIN(qty + ?, ?) WHERE id = ?').run(n, MAX_CART_QTY, existing.id);
+  } else if (db.prepare('SELECT COUNT(*) AS c FROM cart_items WHERE cart_id = ?').get(cart.id).c >= MAX_CART_LINES) {
+    throw new ValidationError(`a cart holds at most ${MAX_CART_LINES} different products`);
   } else {
     db.prepare('INSERT INTO cart_items (cart_id, product_id, qty) VALUES (?, ?, ?)').run(cart.id, product.id, n);
   }
@@ -116,10 +122,11 @@ function simulatePayment({ card = '' }) {
   return { ok, last4: ok ? digits.slice(-4) : null };
 }
 
-export function checkout(db, user, { ship = {}, card = '', note = '' }) {
+export function checkout(db, user, { ship: shipIn = {}, card = '', note = '' }) {
   if (!can('customer', 'cart_checkout', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
-  if (!ship.line1 || !ship.city || !ship.country) throw new ValidationError('a shipping address is required');
-  const buyerNote = note ? String(note).slice(0, 2000) : null;
+  if (!shipIn.line1 || !shipIn.city || !shipIn.country) throw new ValidationError('a shipping address is required');
+  const ship = capShip(shipIn);
+  const buyerNote = note ? capText('note', note, LIMITS.order_note) : null;
   const cart = getOrCreateCart(db, user.id);
   const { items, total_cents } = getCart(db, user);
   if (items.length === 0) throw new ValidationError('the cart is empty');
@@ -171,13 +178,14 @@ export function checkout(db, user, { ship = {}, card = '', note = '' }) {
     db.prepare('DELETE FROM cart_items WHERE cart_id = ?').run(cart.id);
     commit();
     return getOrder(db, user, orderId);
-  });
+  }, { immediate: true });
 }
 
 // ---- Orders ----------------------------------------------------------------
 
-export function listOrders(db, user) {
-  return db.prepare('SELECT * FROM orders WHERE customer_id = ? ORDER BY id DESC').all(user.id);
+export function listOrders(db, user, { limit, offset } = {}) {
+  const page = pageArgs({ limit, offset });
+  return db.prepare('SELECT * FROM orders WHERE customer_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(user.id, page.limit, page.offset);
 }
 
 export function getOrder(db, user, orderId) {
@@ -211,6 +219,7 @@ export function addReview(db, user, productId, rating, body) {
   if (!can('customer', 'write_review', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
   const r = Number(rating);
   if (!Number.isInteger(r) || r < 1 || r > 5) throw new ValidationError('rating must be 1 to 5');
+  const reviewBody = capText('review', body, LIMITS.review_body);
   const pid = parseId(productId);
   const purchased = db
     .prepare(
@@ -221,7 +230,7 @@ export function addReview(db, user, productId, rating, body) {
   if (!purchased) throw new ForbiddenError('you can only review a product you purchased');
   try {
     db.prepare("INSERT INTO reviews (product_id, user_id, rating, body, status) VALUES (?, ?, ?, ?, 'visible')")
-      .run(pid, user.id, r, body ?? null);
+      .run(pid, user.id, r, reviewBody || null);
   } catch (err) {
     if (/UNIQUE/i.test(err.message)) throw new ValidationError('you have already reviewed this product');
     throw err;
@@ -230,8 +239,9 @@ export function addReview(db, user, productId, rating, body) {
 
 // ---- Refunds and disputes (own order items) --------------------------------
 
-export function requestRefund(db, user, orderItemId, reason) {
+export function requestRefund(db, user, orderItemId, reasonIn) {
   if (!can('customer', 'request_refund', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
+  const reason = capText('reason', reasonIn, LIMITS.reason) || null;
   const item = ownOrderItem(db, user, orderItemId);
   if (item.status === 'cancelled') throw new ValidationError('a cancelled item cannot be refunded');
   // Any refund that is not rejected blocks a new one — including a `processed`
@@ -254,8 +264,9 @@ export function requestRefund(db, user, orderItemId, reason) {
   return Number(info.lastInsertRowid);
 }
 
-export function openDispute(db, user, orderItemId, reason) {
+export function openDispute(db, user, orderItemId, reasonIn) {
   if (!can('customer', 'open_dispute', { actor_id: user.id, owner_id: user.id })) throw new ForbiddenError();
+  const reason = capText('reason', reasonIn, LIMITS.reason) || null;
   const item = ownOrderItem(db, user, orderItemId);
   if (item.status === 'cancelled') throw new ValidationError('a cancelled item cannot be disputed');
   const open = db
@@ -278,15 +289,17 @@ export function openDispute(db, user, orderItemId, reason) {
 
 export function createTicket(db, user, subject, body) {
   if (!can('customer', 'create_ticket', { actor_id: user.id })) throw new ForbiddenError();
-  if (!subject || !String(subject).trim()) throw new ValidationError('a subject is required');
-  const t = db.prepare("INSERT INTO tickets (requester_id, subject, status) VALUES (?, ?, 'open')").run(user.id, String(subject));
+  const subjectText = capText('subject', subject, LIMITS.ticket_subject, { required: true });
+  const bodyText = capText('message', body, LIMITS.ticket_body);
+  const t = db.prepare("INSERT INTO tickets (requester_id, subject, status) VALUES (?, ?, 'open')").run(user.id, subjectText);
   const ticketId = Number(t.lastInsertRowid);
-  db.prepare('INSERT INTO ticket_messages (ticket_id, author_id, body) VALUES (?, ?, ?)').run(ticketId, user.id, String(body ?? ''));
+  db.prepare('INSERT INTO ticket_messages (ticket_id, author_id, body) VALUES (?, ?, ?)').run(ticketId, user.id, bodyText);
   return ticketId;
 }
 
-export function listTickets(db, user) {
-  return db.prepare('SELECT id, subject, status FROM tickets WHERE requester_id = ? ORDER BY id DESC LIMIT 50').all(user.id);
+export function listTickets(db, user, { limit, offset } = {}) {
+  const page = pageArgs({ limit, offset }, 50);
+  return db.prepare('SELECT id, subject, status FROM tickets WHERE requester_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(user.id, page.limit, page.offset);
 }
 
 export function getTicket(db, user, ticketId) {

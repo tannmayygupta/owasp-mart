@@ -1,4 +1,4 @@
-# 0040. Edge, gate, ticket and strict hostname model
+# 0090. Edge, gate, ticket and strict hostname model
 
 - **Status:** Proposed (decided on the developer's delegation; to be confirmed). D-61, D-65, D-66 are planned only: their stories are not built.
 - **Date:** 2026-10-17
