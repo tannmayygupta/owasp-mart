@@ -9,6 +9,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Rename, removal, retyping, or making an optional field required: **breaking**. It needs approval from every consumer and an expand-then-contract path. Before v1.0.0 it bumps the minor number and is declared here with a bullet line that starts with `BREAKING:` and a reason (exact case; "no BREAKING changes" does not count); from v1.0.0 it is a major bump.
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
+- registry change: `.github/workflows/ci.yml` gets a step for the records check (`scripts/check-records.mjs`), a Valkey service for the api job and the release gate in the exploit-runner job (tracker audit 2026-10-21, story 12). No contract file, rule, pin or checker changes.
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
