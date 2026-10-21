@@ -31,7 +31,7 @@ test('C11 exploit PASSES on the vulnerable build (KYC fail-open auto-approves ->
   try {
     const r = await runExploit({ baseUrl, name: 'c11', test: exploit });
     assert.equal(r.passed, true, r.detail);
-    assert.ok(events.some((e) => e.type === 'store.approved' && e.data.approved_by === 'system:kyc-fallback'), 'expected the fallback approval event');
+    assert.ok(events.some((e) => e.type === 'store.approved' && e.data.approved_by === 'system_kyc_fallback'), 'expected the fallback approval event');
   } finally { server.close(); }
 });
 

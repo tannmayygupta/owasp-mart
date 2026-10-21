@@ -3,7 +3,7 @@ title: 'Snapshot seeding mechanism'
 type: 'feature'
 ticket: '1'
 created: '2026-10-09'
-status: built
+status: done
 baseline_revision: 'db62cfe'
 route: 'full'
 route_source: 'pinned'

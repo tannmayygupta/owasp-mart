@@ -1,20 +1,26 @@
 {% extends "layout.njk" %}
 {% block title %}{{ product.title }}{% endblock %}
 {% block body %}
-<div class="card">
-  <h1>{{ product.title }}</h1>
-  <p class="muted">{{ product.description }}</p>
-  <p class="price">{{ product.price_cents | cents }}</p>
-  {% if user %}
-  <form method="post" action="/cart/add">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input type="hidden" name="product_id" value="{{ product.id }}">
-    <input type="number" name="qty" value="1" min="1" style="width:4rem">
-    <button>Add to cart</button>
-  </form>
-  {% else %}<p><a href="/login">Log in</a> to buy.</p>{% endif %}
-  <h3>Reviews</h3>
-  {% for r in reviews %}<div class="card"><strong>{{ r.rating }}/5</strong><p>{{ r.body }}</p></div>
-  {% else %}<p class="muted">No reviews yet.</p>{% endfor %}
+<p class="crumbs"><a href="/shop">Shop</a> / {{ product.title }}</p>
+<div class="detail">
+  <div class="art a{{ product.id % 6 }}" aria-hidden="true">{{ product.title | first | upper }}</div>
+  <div>
+    <h1>{{ product.title }}</h1>
+    <p class="muted">{{ product.description }}</p>
+    <p class="price">{{ product.price_cents | cents }}</p>
+    {% if user %}
+    <form class="buy" method="post" action="/cart/add">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="product_id" value="{{ product.id }}">
+      <input type="number" name="qty" value="1" min="1" aria-label="Quantity">
+      <button>Add to cart</button>
+    </form>
+    {% else %}<p><a href="/login">Log in</a> to buy.</p>{% endif %}
+  </div>
 </div>
+<section class="reviews">
+  <h2>Reviews</h2>
+  {% for r in reviews %}<div class="card review"><span class="stars" aria-hidden="true">{% for i in range(r.rating) %}★{% endfor %}</span> <strong>{{ r.rating }}/5</strong><p>{{ r.body }}</p></div>
+  {% else %}<p class="muted">No reviews yet.</p>{% endfor %}
+</section>
 {% endblock %}

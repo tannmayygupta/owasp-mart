@@ -27,24 +27,27 @@ export function isLocked(db, userId) {
 }
 
 // Write the security event for an auth attempt to the shop's OWN security log
-// (the `security_events` table) and raise an alert on the threshold. This is
-// exactly the pipeline the vulnerable legacy route is missing, and the C09 proof
-// ("attack happened, nothing logged") reads this table. The matching IF-4 platform
-// event `shop.security_event_written` is NOT emitted yet: the posted event schema
-// does not list it, so emitting it would fail the IF-4 posted-schema validation
-// (same situation as the other per-challenge event names). Emitting it is deferred
-// to the IF-4 schema addition — see deferred-work.md. `emit` is kept in the
-// signature for when that lands.
-export function recordAuth(db, { userId, success, route, emit = () => {} }) {
-  void emit;
-  if (userId == null) return;
-  const kind = success ? 'login_success' : 'login_failed';
+// (the `security_events` table), raise an alert on the threshold, and post the
+// matching IF-4 platform event `shop.security_event_written` (account_id and
+// kind only). That event is what the platform's C09 M2 rule (a negative
+// observation) counts: the vulnerable legacy route never reaches this function, so
+// "attack happened, nothing logged" shows as zero of these events for the account,
+// while the fixed build (and the web login) post one per attempt.
+export function recordSecurityEvent(db, { userId = null, kind, route, emit = () => {} }) {
   const info = db.prepare('INSERT INTO security_events (account_id, kind, detail) VALUES (?, ?, ?)').run(userId, kind, `route:${route}`);
-  if (!success && recentFailures(db, userId) >= LOCK_THRESHOLD) {
-    db.prepare("INSERT INTO alerts (security_event_id, kind) VALUES (?, 'brute_force')").run(Number(info.lastInsertRowid));
-  }
+  // account_id is the account the attempt named, or `unknown` for an email that has no account (the platform event has no null)
+  emit('shop.security_event_written', { account_id: userId == null ? 'unknown' : String(userId), kind }, { user_id: userId == null ? null : String(userId) });
+  return Number(info.lastInsertRowid);
 }
 
+// One authentication attempt: `login_success` or `login_failed` (an attempt at an unknown email is a failure with no account). The threshold alert is raised on the failure
+// that reaches it.
+export function recordAuth(db, { userId, success, route, emit = () => {} }) {
+  const eventId = recordSecurityEvent(db, { userId, kind: success ? 'login_success' : 'login_failed', route, emit });
+  if (!success && userId != null && recentFailures(db, userId) >= LOCK_THRESHOLD) {
+    db.prepare("INSERT INTO alerts (security_event_id, kind) VALUES (?, 'brute_force')").run(eventId);
+  }
+}
 // The break-glass reference in the support case notes — the C09 flag (sentinel).
 export function caseNoteReference(db) {
   return db.prepare("SELECT value FROM sentinel WHERE key = 'c09'").get()?.value ?? 'C09-CASENOTE-FLAG-MARKER';
@@ -62,11 +65,12 @@ export function registerLegacyLoginRoute(app, db, express, { challenges = {}, em
     // FIXED only: the lockout applies to the legacy route too.
     if (!vuln && isLocked(db, found?.id)) {
       emit('auth.attempt', { route: 'legacy', account_id: found ? String(found.id) : 'unknown', result: 'locked' });
+      recordSecurityEvent(db, { userId: found?.id, kind: 'login_locked', route: 'legacy', emit });
       return res.status(429).json({ error: 'account temporarily locked' });
     }
     const user = authenticate(db, email, req.body?.password);
     const active = !!user && user.status === 'active';
-    emit('auth.attempt', { route: 'legacy', account_id: user ? String(user.id) : 'unknown', result: active ? 'success' : user ? 'rejected' : 'unknown' });
+    emit('auth.attempt', { route: 'legacy', account_id: found ? String(found.id) : 'unknown', result: active ? 'success' : 'failure' }); // the platform's rule for C09 reads `failure` and `success` on the legacy route
     // The ONE difference: the vulnerable build skips the security pipeline here.
     if (!vuln) recordAuth(db, { userId: found?.id, success: active, route: 'legacy', emit });
 

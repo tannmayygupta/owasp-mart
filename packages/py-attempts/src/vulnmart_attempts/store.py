@@ -66,6 +66,15 @@ class AttemptRecord:
         )
 
 
+# A learner's practice attempt in one of these states is finished: the learner may start a new run (a company attempt never restarts: one attempt per invite).
+FINISHED_LEARNER_STATES = frozenset({AttemptState.SUBMITTED, AttemptState.REPORTED, AttemptState.WITHDRAWN, AttemptState.CANCELLED, AttemptState.DELETED})
+
+
+def allows_new_run(existing: "AttemptRecord") -> bool:
+    """True when the stored attempt is a finished learner practice attempt, so a new one may take its place for the same (user, template)."""
+    return existing.org_id is None and existing.state in FINISHED_LEARNER_STATES
+
+
 DUE_STATES = (AttemptState.RUNNING, AttemptState.EXPIRED, AttemptState.SUBMITTED, AttemptState.REPORTED, AttemptState.CANCELLED)
 
 
@@ -85,11 +94,12 @@ class AttemptStore(Protocol):
     def get(self, attempt_id: str) -> AttemptRecord | None: ...
 
     def find(self, user_id: str, template_id: str) -> AttemptRecord | None:
-        """The one attempt of this user for this template, if any."""
+        """The current attempt of this user for this template, if any: the newest one (a learner may have finished earlier runs)."""
         ...
 
     def add(self, record: AttemptRecord) -> AttemptRecord:
-        """Insert a new record (version 0). Raises Conflict if the id or the (user, template) pair exists."""
+        """Insert a new record (version 0). Raises Conflict if the id exists, or if the (user, template) pair already has an attempt that is not a
+        finished learner run (`allows_new_run`)."""
         ...
 
     def ids(self) -> list[str]:
@@ -132,7 +142,8 @@ class InMemoryAttemptStore:
     def add(self, record: AttemptRecord) -> AttemptRecord:
         with self._lock:
             key = (record.user_id, record.template_id)
-            if record.id in self._by_id or key in self._by_key:
+            held = self._by_key.get(key)
+            if record.id in self._by_id or (held is not None and not allows_new_run(self._by_id[held])):
                 raise Conflict("attempt already exists")
             stored = replace(record, version=0)
             self._by_id[record.id] = stored

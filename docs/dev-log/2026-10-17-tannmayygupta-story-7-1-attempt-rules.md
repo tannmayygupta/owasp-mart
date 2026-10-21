@@ -9,7 +9,7 @@
 | Report tag | attempt rules, server clock, FR-SES-01, FR-SES-02, FR-SES-03, FR-SES-06, FR-SES-08, FR-TIM-05, D-80, D-81, D-82 |
 
 ## Requirements covered
-FR-SES-01, FR-SES-02, FR-SES-03, FR-SES-06, FR-SES-08, FR-TIM-05; open question OI-22 (clock start, proposed answer); decisions D-80, D-81, D-82 (new, decided on the developer's delegation, Proposed); ADR 0041 (Proposed); handoffs H-87 (answered as a proposal), H-327 (new). Task L-22 (first of three stories; stays unticked).
+FR-SES-01, FR-SES-02, FR-SES-03, FR-SES-06, FR-SES-08, FR-TIM-05; open question OI-22 (clock start, proposed answer); decisions D-80, D-81, D-82 (new, decided on the developer's delegation, Proposed); ADR 0091 (Proposed); handoffs H-87 (answered as a proposal), H-327 (new). Task L-22 (first of three stories; stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 Nothing decided when an assessment attempt starts, ends or which state may follow which. There is now a small Python package with no dependencies that holds the ten attempt states, the allowed moves, the time rules (limit, grace, warnings, freeze) and pure functions that answer "is this request still accepted", "which warnings are due", "has it expired", "may the instance be destroyed". The clock starts when the instance is ready, as the server sees it.
@@ -34,10 +34,10 @@ All times are absolute UTC instants from an injected clock. The deadline is `sta
 - `pyproject.toml` (root) - member `packages/py-attempts` added to the workspace
 - `uv.lock` - the new member only (16 lines; no existing package changed)
 - `docs/assets/story-7-1-attempt-rules/test-output.txt` - raw test output
-- Docs: this entry, ADR 0041, `initial.md` (D-80 to D-82), `docs/dev/HANDOFFS.md`, `CHANGELOG.md`, `docs/traceability.md`, `docs/dev/dev1-tanmay.md`
+- Docs: this entry, ADR 0091, `initial.md` (D-80 to D-82), `docs/dev/HANDOFFS.md`, `CHANGELOG.md`, `docs/traceability.md`, `docs/dev/dev1-tanmay.md`
 
 ## Decisions made
-D-80 (clock starts at instance ready, stamped by the server; the Start button only asks for the instance), D-81 (one dependency-free package, not code in `apps/api`), D-82 (absolute UTC instants, grace 60 s, warnings 15 and 5 minutes, numbers held in `Rules`). Recorded in `docs/adr/0041-attempt-clock-scoring-and-expiry.md` (Proposed, decided on the developer's delegation, to be confirmed). Alternative for D-80: start when the candidate presses Start (rejected in the plan because cold start would count against FR-TIM-05).
+D-80 (clock starts at instance ready, stamped by the server; the Start button only asks for the instance), D-81 (one dependency-free package, not code in `apps/api`), D-82 (absolute UTC instants, grace 60 s, warnings 15 and 5 minutes, numbers held in `Rules`). Recorded in `docs/adr/0091-attempt-clock-scoring-and-expiry.md` (Proposed, decided on the developer's delegation, to be confirmed). Alternative for D-80: start when the candidate presses Start (rejected in the plan because cold start would count against FR-TIM-05).
 
 ## Tests
 Real commands and results (raw output in `docs/assets/story-7-1-attempt-rules/test-output.txt`):

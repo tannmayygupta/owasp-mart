@@ -30,6 +30,7 @@ from vulnmart.ingest.stores import (
     IntegritySink,
     MilestoneStore,
 )
+from vulnmart.lab.sequence import ChallengeClockLedger, InMemoryChallengeClockLedger
 
 
 class HintLedger(Protocol):
@@ -79,6 +80,7 @@ class LabStores:
     held: HeldStore
     audit: AuditSink
     purge: Callable[[str], Any] | None = None  # deletes the data of an attempt once it is `deleted` (withdrawal, FR-SES-10)
+    challenge_clock: ChallengeClockLedger | None = None  # when a learner began each challenge (the per-challenge countdown); None means in memory
 
     @property
     def persistent(self) -> bool:
@@ -92,6 +94,7 @@ def memory_stores() -> LabStores:
         epochs=MemoryInstanceEpochs(), events=InMemoryEventLog(), event_store=MemoryEventStore(), security=MemorySecuritySink(),
         evidence=InMemoryEvidenceStore(), activity=InMemoryActivityStore(), bots=InMemoryBotVisitStore(),
         flag_log=InMemoryFlagSubmissionLog(), held=InMemoryHeldStore(), audit=InMemoryAudit(),
+        challenge_clock=InMemoryChallengeClockLedger(),
     )
 
 

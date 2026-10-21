@@ -198,6 +198,10 @@ Notes.
 - Amounts (`amount`, `paid`, `refunded_total`, `cumulative_after`) are whole numbers in the smallest currency unit.
 - `instance.flags_injected` and `infrastructure_fault` have no `shop` form; a shop that posts them is answered `422` at `/source`.
 
+### Milestone mapping (H-43, OI-17, settled 2026-10-21)
+
+The catalogue (IF-7) is the mapping. Each milestone entry of `challenges/catalog/cNN.yaml` names, in its `signal` text, the event type of this table and the field values that count; the platform's rules file (`apps/api/src/vulnmart/ingest/milestone_rules.json`) implements exactly that text, one rule per milestone, and a test per challenge proves that the vulnerable build earns the milestone and the fixed build does not. No rule ids (`rule:cNN.mN`) are used: the event name plus its field values is the identifier. Events with `session_kind` `bot` never count. The C09 M2 rule is the negative observation: attack events on `auth.attempt` (route `legacy`) with zero `shop.security_event_written` events for the same `account_id` in the grace window; the vulnerable build skips the security pipeline on the legacy route and so posts none, the fixed build posts one per attempt (`login_success`, `login_failed`, `login_locked`).
+
 ## 8. How this differs from the three earlier descriptions
 
 | Item | Challenge specs section 10 | Architecture 07 section 3.2 item 6 | This contract |

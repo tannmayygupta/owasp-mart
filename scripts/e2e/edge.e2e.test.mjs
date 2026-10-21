@@ -180,6 +180,7 @@ before(async () => {
   fs.chmodSync(path.join(certDir, 'privkey.pem'), 0o644);
   fs.writeFileSync(path.join(secDir, 'gate_key_current'), `${keys.current.toString('hex')}\n`, { mode: 0o644 });
   fs.writeFileSync(path.join(secDir, 'gate_key_previous'), '', { mode: 0o644 }); // empty: "no previous key"
+  fs.writeFileSync(path.join(secDir, 'ingest_ca.pem'), '', { mode: 0o644 }); // the compose file mounts the CA of an https ingest; this test uses http and the edge reads an empty file as none
   fs.writeFileSync(path.join(secDir, 'gate_admin_secret'), `${adminSecret}\n`, { mode: 0o644 });
 
   await docker(['network', 'create', ...LABEL, NET_PUB]);
@@ -217,7 +218,7 @@ before(async () => {
   const vars = { VULNMART_LABS_ZONE: ZONE, VULNMART_EDGE_INGEST_URL: 'http://ingest:8081' };
   const gateSvc = compose.services['edge-gate'];
   await docker(['create', '--name', GATE, '--network', NET_PUB, ...gateSvc.networks['edge-public'].aliases.flatMap((a) => ['--network-alias', a]), ...LABEL,
-    ...composeFlags(gateSvc, { vars, mounts: { '/run/secrets/gate_key_current': path.join(secDir, 'gate_key_current'), '/run/secrets/gate_key_previous': path.join(secDir, 'gate_key_previous'), '/run/secrets/gate_admin_secret': path.join(secDir, 'gate_admin_secret') } }), EDGE_IMAGE]);
+    ...composeFlags(gateSvc, { vars, mounts: { '/run/secrets/gate_key_current': path.join(secDir, 'gate_key_current'), '/run/secrets/gate_key_previous': path.join(secDir, 'gate_key_previous'), '/run/secrets/gate_admin_secret': path.join(secDir, 'gate_admin_secret'), '/run/secrets/ingest_ca': path.join(secDir, 'ingest_ca.pem') } }), EDGE_IMAGE]);
   await docker(['network', 'connect', ...gateSvc.networks['labs-core'].aliases.flatMap((a) => ['--alias', a]), NET_CORE, GATE]);
   await docker(['start', GATE]);
   for (let i = 0; i < 60; i++) { const l = await run(['logs', GATE]); if (/edge-gate: player/.test(l.stdout)) break; if (i === 59) assert.fail(`the gate did not start: ${l.stdout}${l.stderr}`); await sleep(500); }

@@ -1,4 +1,4 @@
-# 0041. Attempt clock, expiry sequence and scoring rules
+# 0091. Attempt clock, expiry sequence and scoring rules
 
 - **Status:** Proposed (decided on the developer's delegation; to be confirmed)
 - **Date:** 2026-10-17

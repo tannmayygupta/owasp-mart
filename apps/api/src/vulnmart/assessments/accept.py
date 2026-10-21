@@ -136,6 +136,6 @@ class InviteConsentTargets:
         elif view.state not in ("consented", "started"):
             raise InviteClosed(view.state)  # revoked or expired between the decision and now: nothing is created
         self._attempts.create_from_consent(user_id=view.user_id, org_id=org_id, template_id=attempt_template_key(view.template_id, view.generation),
-                                           invite_id=view.invite_id, consent_id=consent_id, attempt_id=attempt_id,
+                                           invite_id=view.invite_id, consent_id=consent_id, attempt_id=attempt_id, rules=view.rules,
                                            history={"invite_created": view.created_at, "invite_opened": view.opened_at, "consent_given": view.consented_at or datetime.now(UTC)})  # FR-TIM-04
         self._roles.grant_candidate_role(view.user_id)

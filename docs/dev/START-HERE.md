@@ -1,3 +1,5 @@
+> **2026-10-21 (D-102, ADR 0064):** the team is the leader and Claude only. This guide and the task files below are the backlog of that pair; see `CLAUDE.md` for the current rules. Names of other developers are history.
+
 # Start here: how we build VulnMart with BMAD and Claude Code
 
 Message to Tanmay, Akshay and Sahil. Requirements, architecture and decisions are done. From now on we only build, one task at a time, and every task leaves a written record for the college report.

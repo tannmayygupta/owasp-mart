@@ -91,3 +91,31 @@ fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0.75rem 0;
 legend { font-weight: 600; padding: 0 0.25rem; }
 pre.writeup { overflow-x: auto; font-family: ui-monospace, monospace; font-size: 0.85rem; }
 code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+
+/* Learner stage (work package E): the sequenced practice run. No inline style anywhere: the CSP forbids it, so the countdown is a <progress> element. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.rail { list-style: none; display: flex; gap: 0.4rem; padding: 0; margin: 0 0 1rem; flex-wrap: wrap; }
+.rail .dot { min-width: 2.2rem; min-height: 2.2rem; border-radius: 999px; background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 0; }
+.rail li.now .dot { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.rail li.done .dot { border-color: var(--ok); color: var(--ok); }
+.rail li.lost .dot { border-color: var(--bad); color: var(--bad); }
+.mission { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.25rem; }
+.m-title { font-size: 1.35rem; margin: 0.25rem 0 0.75rem; }
+.kicker { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.kicker .tag { display: inline-block; margin-left: 0.5rem; }
+.lede { font-size: 1.02rem; }
+.timer { margin: 0.5rem 0; }
+.timer .digits { font-family: ui-monospace, monospace; font-size: 1.6rem; font-weight: 700; }
+.timer.low .digits { color: var(--warn); }
+.timer.urgent .digits { color: var(--bad); }
+.timer progress { display: block; width: 100%; height: 0.5rem; margin-top: 0.25rem; accent-color: var(--accent); }
+.timer.low progress { accent-color: var(--warn); }
+.timer.urgent progress { accent-color: var(--bad); }
+.box { border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 0.7rem; background: var(--bg); }
+.hints .hint { margin-top: 0.4rem; }
+.ok { color: var(--ok); }
+.bad { color: var(--bad); }
+ul.plain { list-style: none; padding: 0; margin: 0.5rem 0; }
+.writeup { white-space: pre-wrap; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

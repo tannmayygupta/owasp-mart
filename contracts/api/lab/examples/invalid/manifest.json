@@ -149,6 +149,11 @@
     "path": "/attempt_id",
     "rule": "attempt id shape"
   },
+  "attempt-released-string.json": {
+    "schema": "Attempt",
+    "path": "/results_released",
+    "rule": "results_released is true or false"
+  },
   "attempt-hints-string.json": {
     "schema": "Attempt",
     "path": "/hints_enabled",
@@ -503,5 +508,20 @@
     "schema": "Problem",
     "path": "/type",
     "rule": "the old https type is gone; type is urn:vulnmart:error: plus the code"
+  },
+  "challenge-bad-state.json": {
+    "schema": "ChallengeProgress",
+    "path": "/state",
+    "rule": "state is ready, active, solved or expired"
+  },
+  "account-progress-too-many-points.json": {
+    "schema": "AccountProgress",
+    "path": "/total_points",
+    "rule": "the total is at most 1000"
+  },
+  "timeline-bad-minutes.json": {
+    "schema": "Timeline",
+    "path": "/items/0/minutes_left",
+    "rule": "minutes_left is a whole number of 1 to 1440"
   }
 }

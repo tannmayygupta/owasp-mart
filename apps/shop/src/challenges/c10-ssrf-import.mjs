@@ -17,6 +17,7 @@
 // final IP (and after redirects), deny internal ranges at the network layer,
 // token-based metadata, generic errors, do not return bodies.
 import { lookup } from 'node:dns/promises';
+import { randomBytes } from 'node:crypto';
 import { ValidationError } from '../domain/shop-service.mjs';
 import { isVulnerable } from './mode.mjs';
 
@@ -61,10 +62,15 @@ export function routeMetadata(raw, env = process.env) {
 
 // Import an image by URL. Returns { ok, preview | error }. Throws ValidationError
 // (-> 400) when the URL is refused.
+// What the event of IF-4 (data_importer_fetch_attempt) calls an address: external, loopback, private, link_local, internal_name or other.
+const eventUrlClass = (c) => (c === 'public' ? 'external' : ['loopback', 'private', 'link_local', 'internal_name'].includes(c) ? c : 'other');
+export const IMPORTER_USER_AGENT = 'VulnMart-Importer/1.0'; // the metadata mock reports a request with this agent as ua_class importer
+
 export async function importImageFromUrl(url, { challenges = {}, emit = () => {}, fetchImpl = fetch } = {}) {
   const raw = String(url ?? '');
+  const jobId = `fetch-${randomBytes(6).toString('hex')}`;
   if (!/^https?:\/\//i.test(raw)) {
-    emit('importer.fetch_attempt', { url_class: 'bad_scheme', blocked: true, status: 0 });
+    emit('importer.fetch_attempt', { job_id: jobId, url_class: 'other', blocked: true, status: 0 });
     throw new ValidationError('only http and https URLs can be imported');
   }
   const url_class = await classify(raw);
@@ -81,13 +87,13 @@ export async function importImageFromUrl(url, { challenges = {}, emit = () => {}
     blocked = Boolean(ip && privateClass(ip));
   }
 
-  emit('importer.fetch_attempt', { url_class, blocked, status: 0 });
+  emit('importer.fetch_attempt', { job_id: jobId, url_class: eventUrlClass(url_class), blocked, status: 0 });
   if (blocked) throw new ValidationError('that address is not allowed');
 
   // Fetch with a timeout; a 1 MB cap in a real deployment. If the response is not
   // an image, the first 200 characters are shown (this is what leaks the flag).
   let res;
-  try { res = await fetchImpl(routeMetadata(raw), { signal: AbortSignal.timeout(3000) }); }
+  try { res = await fetchImpl(routeMetadata(raw), { signal: AbortSignal.timeout(3000), headers: { 'user-agent': IMPORTER_USER_AGENT } }); }
   catch (e) { throw new ValidationError(`could not fetch the image (${e?.cause?.code || 'error'})`); }
   const ct = res.headers.get('content-type') || '';
   const body = (await res.text()).slice(0, 200);

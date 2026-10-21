@@ -9,7 +9,7 @@
 | Report tag | attempt engine, expiry, auto-submit, freeze, FR-SES-02, FR-SES-04 to FR-SES-08, D-83, D-84, D-88 |
 
 ## Requirements covered
-FR-SES-02, FR-SES-04, FR-SES-05, FR-SES-06, FR-SES-07, FR-SES-08, FR-TIM-05 (library part); decisions D-83, D-84, D-88 (new, Proposed); ADR 0041; handoff H-328 (new). Task L-22 (second of its stories; stays unticked).
+FR-SES-02, FR-SES-04, FR-SES-05, FR-SES-06, FR-SES-07, FR-SES-08, FR-TIM-05 (library part); decisions D-83, D-84, D-88 (new, Proposed); ADR 0091; handoff H-328 (new). Task L-22 (second of its stories; stays unticked).
 
 ## Summary (plain language, 3-5 lines)
 The engine runs an attempt: it starts the clock when the instance is ready, sends the time warnings, expires an overdue attempt and submits it at the deadline, freezes the instance for 15 minutes and then destroys it. It also does manual submit, cancel and "report". A repeated or concurrent tick does nothing twice. It only talks to small interfaces (a store and an instance control), so it is tested without Docker or a database.
@@ -30,10 +30,10 @@ FR-SES-02, 04, 05, 06, 07 need something that runs an attempt, and the platform 
 - `packages/py-attempts/src/vulnmart_attempts/{store,instances,engine}.py`, `__init__.py` (exports) - new / changed
 - `packages/py-attempts/tests/{conftest_engine,test_engine,test_engine_expiry,test_engine_concurrency}.py` - new
 - `docs/assets/story-7-2-attempt-engine/test-output.txt` - raw output
-- Docs: this entry, ADR 0041, `initial.md` (D-83, D-84, D-88), HANDOFFS, CHANGELOG, traceability, dev1 file
+- Docs: this entry, ADR 0091, `initial.md` (D-83, D-84, D-88), HANDOFFS, CHANGELOG, traceability, dev1 file
 
 ## Decisions made
-D-83 (expiry sequence and freeze), D-84 (engine is the only writer, idempotent, compare-and-set, tick every 15 s as a placeholder), D-88 (`reported` only through `mark_reported`). See `docs/adr/0041-attempt-clock-scoring-and-expiry.md`. Choices inside the plan to confirm: one attempt per `(user_id, template_id)` (the plan text said per invite and consent, the developer's instruction was per user and template); the destroy claim lease; freeze must succeed before destroy; no warnings after the deadline; a failing event sink never undoes a stored step.
+D-83 (expiry sequence and freeze), D-84 (engine is the only writer, idempotent, compare-and-set, tick every 15 s as a placeholder), D-88 (`reported` only through `mark_reported`). See `docs/adr/0091-attempt-clock-scoring-and-expiry.md`. Choices inside the plan to confirm: one attempt per `(user_id, template_id)` (the plan text said per invite and consent, the developer's instruction was per user and template); the destroy claim lease; freeze must succeed before destroy; no warnings after the deadline; a failing event sink never undoes a stored step.
 
 ## Tests
 - `uv run --locked --package vulnmart-attempts pytest -q packages/py-attempts/tests`: 254 passed in 0.61 s (221 before, 33 new). Raw output in the evidence file.

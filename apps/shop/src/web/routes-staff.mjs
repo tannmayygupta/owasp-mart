@@ -9,6 +9,7 @@ import { renderTicketMessageHtml } from '../challenges/c03b-ticket-xss.mjs';
 import { agentProfile, PROFILE_PATH } from '../challenges/c03b-bot.mjs';
 import { financeSettlementReference } from '../challenges/c07-password-reset.mjs';
 import { caseNoteReference } from '../challenges/c09-logging-failures.mjs';
+import { pageOf, slicePage } from './paging.mjs';
 
 function handleError(err, res) {
   if (err instanceof ForbiddenError) return res.status(403).render('message', { title: 'Forbidden', message: err.message });
@@ -23,11 +24,18 @@ const SUPPORT = requireRole('support_agent', 'admin');
 const FINANCE = requireRole('finance', 'admin');
 const ADMIN = requireRole('admin');
 const back = (res, title, message) => res.render('message', { title, message });
+// One page of a staff list: ask the service for a page and one more row, hand the view the rows and the pager.
+const paged = (req, path, list) => { const pg = pageOf(req.query); return slicePage(list({ limit: pg.limit, offset: pg.offset }), pg, path); };
 
 export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {}, flagOf = () => undefined } = {}) {
   void emit;
   // Support: tickets, disputes, review moderation, order read.
-  app.get('/staff/tickets', SUPPORT, h((req, res) => res.render('staff/tickets', { tickets: staff.listTickets(db, req.user) })));
+  app.get('/staff/tickets', SUPPORT, h((req, res) => {
+    const { rows, pager } = paged(req, '/staff/tickets', (o) => staff.listTickets(db, req.user, o));
+    // the agents a ticket can be assigned to (support agents and admins), for the Assign control
+    const agents = db.prepare(`SELECT id, email FROM users WHERE role IN ('support_agent', 'admin') AND status = 'active' ORDER BY id`).all();
+    res.render('staff/tickets', { tickets: rows, pager, agents });
+  }));
 
   // C03 part B: the support console ticket detail. Each message body is passed
   // through the challenge render helper (FIXED escapes it; VULNERABLE leaves raw
@@ -44,7 +52,10 @@ export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {},
   app.post('/staff/tickets/:id/assign', SUPPORT, h((req, res) => { staff.assignTicket(db, req.user, req.params.id, req.body.assignee_id); res.redirect('/staff/tickets'); }));
   app.post('/staff/tickets/:id/resolve', SUPPORT, h((req, res) => { staff.resolveTicket(db, req.user, req.params.id); res.redirect('/staff/tickets'); }));
 
-  app.get('/staff/disputes', SUPPORT, h((req, res) => res.render('staff/disputes', { disputes: staff.listDisputes(db, req.user) })));
+  app.get('/staff/disputes', SUPPORT, h((req, res) => {
+    const { rows, pager } = paged(req, '/staff/disputes', (o) => staff.listDisputes(db, req.user, o));
+    res.render('staff/disputes', { disputes: rows, pager });
+  }));
   app.post('/staff/disputes/:id/move', SUPPORT, h((req, res) => { staff.moveDispute(db, req.user, req.params.id, req.body.to); back(res, 'Dispute updated', `Dispute moved to ${req.body.to}.`); }));
 
   app.post('/staff/reviews/:id/moderate', SUPPORT, h((req, res) => { staff.moderateReview(db, req.user, req.params.id, req.body.action); back(res, 'Review moderated', `Review ${req.body.action}d.`); }));
@@ -53,7 +64,10 @@ export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {},
 
   // Support/admin: refund decisions (T-18). Approve (optionally a partial amount),
   // reject, or process an approved refund (which reverses commission in proportion).
-  app.get('/staff/refunds', SUPPORT, h((req, res) => res.render('staff/refunds', { refunds: money.listRefunds(db, req.user) })));
+  app.get('/staff/refunds', SUPPORT, h((req, res) => {
+    const { rows, pager } = paged(req, '/staff/refunds', (o) => money.listRefunds(db, req.user, o));
+    res.render('staff/refunds', { refunds: rows, pager });
+  }));
   app.post('/staff/refunds/:id/approve', SUPPORT, h((req, res) => { money.approveRefund(db, req.user, req.params.id, { amount: req.body.amount ? Number(req.body.amount) : undefined, idempotencyKey: req.body.idempotency_key || undefined }); res.redirect('/staff/refunds'); }));
   app.post('/staff/refunds/:id/reject', SUPPORT, h((req, res) => { money.rejectRefund(db, req.user, req.params.id); res.redirect('/staff/refunds'); }));
   app.post('/staff/refunds/:id/process', SUPPORT, h((req, res) => { money.processRefund(db, req.user, req.params.id); res.redirect('/staff/refunds'); }));
@@ -69,7 +83,10 @@ export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {},
   app.get('/support/cases/notes', SUPPORT, h((req, res) => res.render('staff/case-notes', { reference: caseNoteReference(db) })));
 
   // Finance: payouts + commissions, and payout accrual (T-18).
-  app.get('/staff/payouts', FINANCE, h((req, res) => res.render('staff/payouts', { payouts: staff.listPayouts(db, req.user), commissions: staff.listCommissions(db, req.user) })));
+  app.get('/staff/payouts', FINANCE, h((req, res) => {
+    const { rows, pager } = paged(req, '/staff/payouts', (o) => staff.listPayouts(db, req.user, o));
+    res.render('staff/payouts', { payouts: rows, pager, commissions: staff.listCommissions(db, req.user, { limit: 200 }), can_hold: req.user.role === 'admin' });
+  }));
   app.post('/staff/payouts/accrue', FINANCE, h((req, res) => { money.accruePayout(db, req.user, req.body.store_id, req.body.period); res.redirect('/staff/payouts'); }));
   app.post('/staff/payouts/:id/ready', FINANCE, h((req, res) => { money.markPayoutReady(db, req.user, req.params.id); res.redirect('/staff/payouts'); }));
   app.post('/staff/payouts/:id/approve', FINANCE, h((req, res) => { staff.approvePayout(db, req.user, req.params.id); res.redirect('/staff/payouts'); }));
@@ -78,7 +95,10 @@ export function registerStaffRoutes(app, db, { emit = () => {}, challenges = {},
   // Admin: seller/product approval, users, audit, alerts.
   app.post('/staff/stores/:id/decision', ADMIN, h((req, res) => { staff.approveStore(db, req.user, req.params.id, req.body.decision); back(res, 'Store updated', `Store ${req.body.decision}d.`); }));
   app.post('/staff/products/:id/decision', ADMIN, h((req, res) => { staff.approveProduct(db, req.user, req.params.id, req.body.decision); back(res, 'Product updated', `Product ${req.body.decision}d.`); }));
-  app.get('/staff/users', ADMIN, h((req, res) => res.render('staff/users', { users: staff.listUsers(db, req.user) })));
+  app.get('/staff/users', ADMIN, h((req, res) => {
+    const { rows, pager } = paged(req, '/staff/users', (o) => staff.listUsers(db, req.user, o));
+    res.render('staff/users', { users: rows, pager });
+  }));
   app.post('/staff/users/:id/status', ADMIN, h((req, res) => { staff.setUserStatus(db, req.user, req.params.id, req.body.status); res.redirect('/staff/users'); }));
   app.get('/staff/audit', ADMIN, h((req, res) => res.render('staff/audit', { rows: staff.viewAuditLog(db, req.user), alerts: staff.viewAlerts(db, req.user) })));
 }

@@ -78,3 +78,30 @@ def test_from_dict_is_strict_about_types_and_unknown_members():
                 {"warning_minutes": [15.5]}, {"activity_check_mode": 1}, {"nope": 1}):
         with pytest.raises(ValueError):
             Rules.from_dict(bad)
+
+# ---- WP-A: the template's settings are rules of the attempt (wiring audit F-07)
+
+def test_template_settings_default_to_hints_off_every_challenge_ten_flags_a_minute():
+    r = Rules()
+    assert (r.hints_mode, r.hint_cost_pct, r.challenge_keys, r.flag_submissions_per_minute, r.writeup_required) == ("off", 0, (), 10, False)
+
+
+def test_template_settings_round_trip_and_the_subset_is_sorted():
+    r = Rules(hints_mode="on", hint_cost_pct=10, challenge_keys=("C05", "C01"), flag_submissions_per_minute=3, writeup_required=True)
+    assert r.challenge_keys == ("C01", "C05")
+    assert Rules.from_dict(r.to_dict()) == r
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"hints_mode": "maybe"}, {"hint_cost_pct": -1}, {"hint_cost_pct": 101}, {"hint_cost_pct": True}, {"challenge_keys": ("C12",)},
+    {"challenge_keys": ("C01", "C01")}, {"flag_submissions_per_minute": 0}, {"flag_submissions_per_minute": 61}, {"writeup_required": "yes"},
+])
+def test_invalid_template_settings_are_refused(kwargs):
+    with pytest.raises(ValueError):
+        Rules(**kwargs)
+
+
+@pytest.mark.parametrize("data", [{"hints_mode": 1}, {"challenge_keys": "C01"}, {"challenge_keys": [1]}, {"writeup_required": 1}])
+def test_from_dict_is_strict_about_the_template_settings(data):
+    with pytest.raises(ValueError):
+        Rules.from_dict(data)

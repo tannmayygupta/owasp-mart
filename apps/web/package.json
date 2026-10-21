@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:e2e": "pnpm --dir ../../tests/web-e2e install --frozen-lockfile --ignore-workspace && pnpm --dir ../../tests/web-e2e test"
   },
   "dependencies": {
     "next": "16.4.0",

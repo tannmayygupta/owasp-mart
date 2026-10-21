@@ -9,6 +9,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Rename, removal, retyping, or making an optional field required: **breaking**. It needs approval from every consumer and an expand-then-contract path. Before v1.0.0 it bumps the minor number and is declared here with a bullet line that starts with `BREAKING:` and a reason (exact case; "no BREAKING changes" does not count); from v1.0.0 it is a major bump.
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
+- registry change: `.github/workflows/ci.yml` gets a new job `shop-instance` (builds the shop image and runs the instance harness; work package D, 2026-10-21). No contract file, rule, pin or checker changes.
+- registry change: `scripts/check-contract-rules.mjs` (rule `approvals`) and `contracts/COMPAT.md` on 2026-10-21 (D-105, ADR 0095): a line `**Sole maintainer:** @handle` in the base COMPAT.md makes a pull request authored by that handle pass the approvals rule, because nobody else can review it; the breaking-change diff, validators, changelog, mock and registry rules are unchanged. Without it the first contract change after the tag `contracts-v1.0.0` could not be merged.
+- registry change: `contracts/COMPAT.md` is edited on 2026-10-21 (decisions D-102 and D-104: the team is the leader and Claude, and Claude approves under the leader's standing authority). The three rows that were `pending` for former developers (IF-2 2.1.0 consumer, DB 2.2.0 owner, DB 2.2.0 consumer) now name `@tannmayygupta` and are `approved`. Evidence: `apps/api/tests/test_table_owners.py` and `test_lab_contract.py` 191 passed, `pnpm run api:check` clean, the typecheck of `apps/web` against the regenerated types clean, `pnpm run contracts:rules` 16 PASS 0 FAIL, and the sign-off method is the standard one for a single maintainer: breaking-change detection by oasdiff plus the consumers' own test suites. No contract file changes.
+- registry change: `.github/workflows/ci.yml` gets a step for the records check (`scripts/check-records.mjs`), a Valkey service for the api job and the release gate in the exploit-runner job (tracker audit 2026-10-21, story 12). No contract file, rule, pin or checker changes.
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
@@ -76,6 +80,10 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Error codes and error format (IF-8), `contracts/errors/`
 
+### 2.0.0 (2026-10-21, Tanmay with Claude, backlog story 12, ADR 0071)
+- Additive: one code, `INST-NO-CAPACITY` (503, retryable): no instance can be started right now (the platform is at its limit or the orchestrator has no capacity); the lab API answers it instead of a 429. Constants regenerated (61 codes).
+- BREAKING: none in substance. The rules engine cannot compare `error-codes.yaml` and treats any change as breaking, so the major number is raised (the same reading as IF-2 2.0.0). Checked by hand: 1 added, 0 removed, 0 changed.
+- registry change: `contracts/COMPAT.md` IF-8 row names 2.0.0 (the approval rows are the leader's to close). No mock change: no mock sends this code.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, label change plus one code (below); no mock change. Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -122,7 +130,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance contract (IF-6), `contracts/instance/`
 
-### 1.0.1 (2026-10-20, Tanmay, story L-30 support bot, ADR 0058)
+### 1.0.1 (2026-10-20, Tanmay, story L-30 support bot, ADR 0061)
 
 - The example templates give the two components of the live C03 part B loop the addresses they need, using names that were already allowed in section 2: `mock-services` gets `VM_INSTANCE_ID` (the collector checks its id against it) and `VM_SIDECAR_EVENTS_URL` (it reports `collector.hit`); `bot-controller` gets `VM_SIDECAR_EVENTS_URL` (it reports `bot.visit`) and `VM_MOCK_URL` (the collector is the one address besides the shop its browser may reach). No schema change, no new name, no change to the injection document or the sidecar start.
 - registry change: none to `contracts/registry.json`.
@@ -171,6 +179,28 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - No change to the other three schemas, to IF-4, IF-5, IF-1 or IF-2.
 
 ## Lab API (IF-2), `contracts/api/lab/`
+
+### 2.2.0 (2026-10-21, Tanmay with Claude, backlog story 12, ADR 0071: the attempt lifecycle, template settings, quotas and rate limits)
+- Additive: one operation, `cancelAttempt` (`POST /api/v1/attempts/{attempt_id}/cancel`), for the recruiter of the owning company (FR-SES-07): a `ready` or `running` company attempt becomes `cancelled`, the instance is destroyed, the candidate sees the state in `getAttempt`. Documented responses added: `429 REQ-RATE-LIMITED` (per-account hourly limit) on `requestInstance`, `startAttempt`, `openInstance`, `resetInstance`, `stopInstance`, `releaseResults`, `decideIntegrityFlag`; `503 INST-NO-CAPACITY` (component `Unavailable`, with `Retry-After`) on `requestInstance` and `startAttempt`.
+- Behaviour: a full orchestrator or platform answered 429 `REQ-RATE-LIMITED` before; it now answers 503 `INST-NO-CAPACITY` (new IF-8 code, registry 2.0.0). `startAttempt` checks the invite (a revoked, expired, declined or cancelled invite is 409 and cancels a ready attempt; a consented invite becomes `started`). The template's challenge subset, hints mode, hint cost and flags per minute now apply to `listChallenges`, hints, flags, score and report. No existing member, value or route changed.
+- BREAKING: none in substance (no value of a response enum or member was added, removed or changed). The one visible change is the status of a full platform on `requestInstance` (429 to 503); no consumer relies on it (apps/web and lab-console show the problem text), so there is no contract step to follow.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (`cancelAttempt`); example `examples/valid/attempt.cancelled.json`. Generated code and bundle regenerated.
+### 2.1.0 (2026-10-20, Tanmay, backlog story 10, handoff H-355: the recruiter releases a candidate's results)
+- Additive: one operation, `releaseResults` (`POST /api/v1/attempts/{attempt_id}/release`), for the recruiter of the owning company; the optional member `results_released` (boolean) of `Attempt`, present only on a company assessment whose invite says `after_release`. No existing value, member or route changed.
+- Behaviour: when the invite says `after_release` the candidate's own `getScore` answers 404 and `listChallenges` shows nothing earned until the recruiter releases the finished attempt (OI-15, the developer's answer of 2026-10-18). `after_submit` (the default) and a learner's practice are as before.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs`; examples `examples/valid/attempt.released.json` and `examples/invalid/attempt-released-string.json`. Generated code and bundle regenerated.
+
+### 2.0.0 (2026-10-20, Tanmay, backlog story 8, handoff H-359: time warnings in the timeline)
+- Additive: the timeline type `attempt.time_warning` and the optional member `minutes_left` (1 to 1440) of `TimelineEntry`, present only on that type. `getTimeline` now lists the warnings the engine wrote (`time_warning_sent`, 15 and 5 minutes before the end by default), so the recruiter's report shows when the candidate was told time was running out. Nothing a client sends changed; a client that does not know the type shows it as text.
+- BREAKING: the response enum `TimelineEntry.type` gains `attempt.time_warning` (the diff tool counts a new value of a response enum as breaking, because a client that switches exhaustively on the enum would not know it). Why it is safe here: the only consumer, the recruiter page of stream P (`apps/web`), printed the type as text and now maps it to words with a fallback for an unknown type; no value is removed or renamed, so there is no contract step to follow. The rule of this repository raises the major number for any new value of a response enum, which is why an additive change is labelled 2.0.0.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (a seeded warning, the test hook accepts the type); examples `examples/valid/timeline.json` and `examples/invalid/timeline-bad-minutes.json`. Generated code and bundle regenerated.
+
+### 1.3.0 (2026-10-20, Tanmay, backlog story 6: one challenge at a time with a countdown each)
+- Additive: two operations. `beginChallenge` (`POST /api/v1/attempts/{attempt_id}/challenges/{challenge_key}/begin`) starts the countdown of the current challenge of a learner's practice run (Easy 20, Medium 40, Hard 60 minutes) and answers the challenge entry. `getMyProgress` (`GET /api/v1/me/progress`) answers the points on the learner's account: the best result per challenge over every run, `total_points` out of 1000, `runs`.
+- Additive: `ChallengeProgress` gets optional members `state` (ready, active, solved, expired), `title`, `tier`, `time_limit_seconds`, `opened_at`, `expires_at`, `seconds_left`; `ChallengeProgressList` gets optional `total`, `current_key`, `server_time`. A sequenced run lists only the challenges the learner has reached; a company assessment and an attempt that is not sequenced answer exactly as before. New schemas `AccountProgress` and `AccountChallengePoints`.
+- Behaviour (no new error code): a challenge that is not reached answers 404 ATT-CHALLENGE-NOT-FOUND on begin, hints and flags; a challenge not begun, or already ended, answers 409 ATT-INVALID-STATE. Nothing a client sends changed.
+- Mock changed with it: `contracts/mocks/fake-lab/server.mjs` (a sequenced seed attempt `a-HHHHHHHHHHHHHHHH`, the two operations, the gates); examples `examples/valid/challenges.sequenced.json`, `challenge.begun.json`, `account-progress.json` and two invalid ones. Generated code and bundle regenerated.
+- registry change: none; `scripts/check_lab_contract.py` now lists the 22 operations and the schemas `ChallengeProgress` and `AccountProgress` among the ones that need an example.
 
 ### 1.2.0 (2026-10-20, Tanmay, story L-30 player experience)
 - Additive: `ChallengeProgress` gets three optional members: `brief` (what the challenge is about), `start` (how to begin: the documented demo account to sign in with and where to look) and `write_up` (the weakness and the fix; only for the owner of a practice attempt once the challenge is captured, never in an assessment, never a flag). The route `listChallenges` fills them from the catalogue. Nothing a client sends changed.
@@ -263,6 +293,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Instance events (IF-4), `contracts/events/`
 
+### 1.0.1 (2026-10-21, the leader and Claude, work package D, H-43)
+
+- Documentation only, no schema or example change (clarification, no version label change in COMPAT): section 7 of `app-events.md` now states the milestone mapping (H-43, OI-17): the catalogue `signal` text names the event type and field values, the platform rules file implements it, tests prove the vulnerable and the fixed build; the C09 M2 negative observation uses `shop.security_event_written`, which the shop now posts. no mock change: documentation only.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -301,8 +334,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ## Table owners (DB), `contracts/db/`
 
-### 2.2.0 (2026-10-21, Tanmay, work package B)
+### 2.3.0 (2026-10-21, Tanmay, work package B)
 - Additive: one row in `table-owners.yaml`, `email_changes` (owner accounts), created by migration `0018` (a pending change of an account's address: the new address and the hash of the single-use link mailed to it, one row per account; FR-ACC-09). The schema of every other table is unchanged. The application role may select, insert, update and delete the new table.
+
+### 2.2.0 (2026-10-20, Tanmay, backlog story 6)
+- Additive: one row in `table-owners.yaml`, `challenge_opens` (owner attempts), created by migration `0017`: when a learner began each challenge of a sequenced run, the start of its countdown. The same migration replaces the unique constraint `uq_attempts_user_id_template_id` of `attempts` by the partial unique index `uq_attempts_current`, so a learner can start a new run after a finished one (a company attempt stays one per invite). The schema is unchanged.
 - no mock change: nothing runs against the table-owners list (`noMock` in the registry).
 
 ### 2.1.0 (2026-10-19, Akshay, story P-25)
@@ -337,6 +373,9 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Additive: three optional fields on a challenge entry — `brief` (a short player-facing description, never a flag), `write_up` (`{ vulnerable, fix }`) and `decoys` (string array of foil locations). Existing entries stay valid; a stub omits them. No mock change (the catalogue is data read by validators, nothing runs against it). Not breaking (new optional properties; `exploit_test` and `fixed_build` patterns unchanged — they stay logical references, with `challenges/catalog/README.md` noting the real self-test folders are `challenges/tests/cNN-<name>` and the fixed build is the `VM_CHALLENGE_<KEY>` env flag). `validate-catalog.mjs` now also requires a `complete` entry to have non-null milestone signals, non-null hints and a brief.
 - All 11 `challenges/catalog/cNN.yaml` entries are now `status: complete` (T-30): milestone detection signals, the three hint texts, a flag-free brief, the vulnerable/fix write-up and decoy locations, filled from `docs/design/challenge-specs.md`.
 
+### 1.2.1 (2026-10-21, the leader and Claude, work package D, H-42, H-43, H-331)
+
+- Data and documentation only, no schema change (clarification; work package D, the leader and Claude, no schema change, no version bump): the milestone `signal` text of C01 M2, C03 M3, C05 M2, C07 M1, C08 M1 and M2, C09 M1 and C10 M1 is tightened to what the platform rules read; every entry now lists its decoy placements in `decoys` (H-42, H-331: kinds `shop-db` and `service-file`, described in `contracts/catalog/README.md`); the mapping of milestone to event name (H-43) is settled in IF-4 section 7. no mock change: the catalogue is data read by validators.
 ### 1.0.0 (2026-10-13, Tanmay, release commit, ADR 0029)
 
 - First stable release, no content change (no mock change: label only). Every contract is labelled 1.0.0 in one commit so the sign-offs and the tag `contracts-v1.0.0` mark the same version.
@@ -350,7 +389,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 ## Contract rules engine (L-07), `scripts/check-contract-rules.mjs`
 
 ### 2026-10-20 (Sahil, IF-6 1.0.1 consumer re-sign-off)
-- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0058) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
+- registry change: in `contracts/COMPAT.md` the stream-T IF-6 consumer row is updated from 1.0.0 to 1.0.1 (approved 2026-10-20). Sahil's review: IF-6 1.0.1 (L-30, ADR 0061) is example-templates only — it gives mock-services and bot-controller the env addresses for the C03 part B live loop (`VM_INSTANCE_ID`, `VM_SIDECAR_EVENTS_URL`, `VM_MOCK_URL`, names already allowed in section 2); no schema change, no change to the injection document or the sidecar start, and nothing that affects the shop's own IF-6 consumption (readiness marker, snapshot, runtime profile, events). No rule, checker, registry, diff script, oasdiff pin or contract file changed; only the approval status.
 
 
 ### 2026-10-20 (Sahil, IF-7 1.2.0 owner + DB 2.1.0 consumer sign-off)
@@ -385,3 +424,4 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 
 ### 2026-10-11 (Tanmay, story 1.15)
 - registry change: IF-7 (challenge catalogue, owner T) is registered and `contracts/catalog` is no longer reserved; the checker, its registry, the oasdiff pins and the workflow now run from the base commit (trusted checker, ADR 0026); deleting a whole contract is a breaking change; the marker is the exact line `BREAKING:`.
+- registry change: `.github/workflows/ci.yml` gets a step `node scripts/check-asvs.mjs` in the `scripts` job on 2026-10-21 (work package G, task P-32): the ASVS 5.0.0 checklist `docs/security/asvs-checklist.md` must hold one row per requirement with a status, an owner and evidence whose files exist. No contract file changes, no rule of the contract checker changes.

@@ -60,19 +60,19 @@ CLASSES: dict[str, tuple[str, str]] = {
         "openInvite", "signupRecruiter", "listCatalogue", "getCatalogueChallenge")},
     **{op: ("self", W + "test_self_routes_show_only_the_caller_s_data") for op in (
         "getSession", "deleteSession", "getMe", "updateMe", "changePassword", "startMfaEnrolment", "disableMfa", "confirmMfaEnrolment", "listMyConsents",
-        "listMyDeletionRequests", "listMyDataViews", "listMyInvites", "exportMyData", "listMyAttempts", "requestInstance")},
+        "listMyDeletionRequests", "listMyDataViews", "listMyInvites", "exportMyData", "listMyAttempts", "requestInstance", "getMyProgress")},
     "listMySessions": ("self", "test_my_sessions_api.py::test_the_list_shows_only_my_live_sessions_and_marks_the_current_one"),
     "logOutEverywhere": ("self", "test_my_sessions_api.py::test_log_out_everywhere_ends_every_session_clears_the_cookie_and_is_audited"),
     "revokeMySession": ("own_id", "test_my_sessions_api.py::test_another_users_ref_ends_nothing"),
     **{op: ("self", "test_live_authorisation.py::test_two_people_never_share_a_user_stream_and_two_companies_never_share_a_company_stream") for op in ("openLiveStream", "getLiveSnapshot", "createLiveTicket")},
     **{op: ("own_id", W + "test_another_learner_cannot_use_an_attempt_or_instance_of_mine") for op in (
         "getInstance", "openInstance", "resetInstance", "stopInstance", "getAttempt", "startAttempt", "submitAttempt", "submitFlag", "getScore", "listChallenges",
-        "listHints", "unlockHint", "listEvidence", "listIntegrityFlags", "getReport", "getTimeline")},
+        "listHints", "unlockHint", "listEvidence", "listIntegrityFlags", "getReport", "getTimeline", "beginChallenge")},
     **{op: ("own_id", W + "test_another_person_cannot_use_a_consent_deletion_invite_or_withdrawal_of_mine") for op in (
         "getConsentNotice", "recordConsent", "createDeletionRequest", "cancelDeletionRequest", "acceptInvite", "withdrawAttempt", "undoWithdrawal")},
     **{op: ("company", W + "test_another_company_sees_none_of_a_company_s_data") for op in (
         "getMyCompany", "reapplyCompany", "getCompanyTerms", "acceptCompanyTerms", "listTemplates", "createTemplate", "getTemplate", "updateTemplate", "deleteTemplate",
-        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag")},
+        "listCompanyInvites", "createInvites", "actOnInvite", "exportCompanyResults", "decideIntegrityFlag", "releaseResults", "cancelAttempt")},
     **{op: ("admin", W + "test_admin_routes_answer_everyone_else_like_unknown_routes") for op in (
         "listPendingCompanies", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
         "setQuota", "removeQuota", "getCapacity", "listJobs")},
@@ -195,7 +195,7 @@ def w(sessions, clock, companies, assessments, audit):
     world.ada_request = ada.post("/api/v1/me/deletion-requests", {"kind": "learner"}).json()["request_id"]
     # Rita's company invites Cam, who accepts, consents and starts
     owner = active_company(companies, sessions)
-    world.template = assessments.create_template(owner, basic(hints_mode="on", hint_cost_pct=10)).template_id
+    world.template = assessments.create_template(owner, basic(hints_mode="on", hint_cost_pct=10, time_limit_min=45, results_visibility="after_release")).template_id
     assessments.create_invite(owner, world.template, CAM_EMAIL)
     world.cam_token = token_in(mail_rows(sessions)[-1])
     world.learner(CAM, CAM_EMAIL)
@@ -207,8 +207,10 @@ def w(sessions, clock, companies, assessments, audit):
     granted = cam.post("/api/v1/consent", {"attempt_id": world.cam_attempt, "notice_version": notice["notice_version"],
                                            "notice_text_sha256": notice["notice_text_sha256"], "decision": "granted"})
     assert granted.status_code in (200, 201), granted.text
-    # the grant creates the attempt in the lab (state `ready`); the lab has no route to start it yet (startAttempt is pending OI-22, handoff H-356)
+    # the grant creates the attempt in the lab (state `ready`); the candidate starts it through startAttempt (H-356, D-80)
     assert world.lab.engine.get(world.cam_attempt).state.value == "ready"
+    rules = world.lab.engine.get(world.cam_attempt).rules  # the template's rules reach the attempt a consent creates (H-355; they were dropped before 2026-10-21)
+    assert (rules.time_limit_minutes, rules.results_visibility) == (45, "after_release")
     # Rob's company, approved, terms accepted, with a template of its own
     signup(companies, email=ROB, company="Globex", name="Rob Owner")
     verify(sessions, ROB)
@@ -244,7 +246,7 @@ def test_public_routes_carry_nobody_s_data(w):
 def test_self_routes_show_only_the_caller_s_data(w):
     eve = w.browser(EVE_EMAIL)
     for url in ("/api/v1/session", "/api/v1/me", "/api/v1/me/consents", "/api/v1/me/deletion-requests", "/api/v1/me/data-views", "/api/v1/me/invites",
-                "/api/v1/me/attempts"):
+                "/api/v1/me/attempts", "/api/v1/me/progress"):
         r = eve.get(url)
         assert r.status_code == 200, (url, r.text)
         assert not leaks(r.text, w), (url, leaks(r.text, w))
@@ -266,7 +268,8 @@ def test_another_learner_cannot_use_an_attempt_or_instance_of_mine(w):
              eve.post(f"/api/v1/attempts/{a}/submit", {"confirm": True}), eve.post(f"/api/v1/attempts/{a}/flags", {"challenge_key": "C02", "flag": "VM{x}"}),
              eve.get(f"/api/v1/attempts/{a}/score"), eve.get(f"/api/v1/attempts/{a}/challenges"), eve.get(f"/api/v1/attempts/{a}/challenges/C01/hints"),
              eve.post(f"/api/v1/attempts/{a}/challenges/C01/hints/1/unlock"), eve.get(f"/api/v1/attempts/{a}/evidence"),
-             eve.get(f"/api/v1/attempts/{a}/integrity-flags"), eve.get(f"/api/v1/attempts/{a}/report"), eve.get(f"/api/v1/attempts/{a}/timeline")]
+             eve.get(f"/api/v1/attempts/{a}/integrity-flags"), eve.get(f"/api/v1/attempts/{a}/report"), eve.get(f"/api/v1/attempts/{a}/timeline"),
+             eve.post(f"/api/v1/attempts/{a}/challenges/C01/begin")]
     for r in tries:
         assert r.status_code == 404, r.text
         assert not leaks(r.text, w, allowed=(a, i))
@@ -320,6 +323,7 @@ def test_another_company_sees_none_of_a_company_s_data(w):
                 f"/api/v1/attempts/{c}/timeline", f"/api/v1/attempts/{c}/challenges", f"/api/v1/attempts/{c}/score"):
         assert rob.get(url).status_code == 404, url
     assert rob.post(f"/api/v1/attempts/{c}/integrity-flags/f-AAAAAAAAAAAAAAAA/decision", {"decision": "accept", "note": "x"}).status_code == 404
+    assert rob.post(f"/api/v1/attempts/{c}/release").status_code == 404  # another company cannot release the results either (H-355)
     assert w.browser(RITA).get(f"/api/v1/attempts/{c}/report").status_code == 200
     # Rob's look left no trace in Cam's view history; Rita's did
     views = w.browser(CAM_EMAIL).get("/api/v1/me/data-views").json()["items"]

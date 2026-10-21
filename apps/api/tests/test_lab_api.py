@@ -499,7 +499,7 @@ def test_the_gate_key_file_must_be_hex_and_long_enough(tmp_path):
     assert 0 < TicketMinter(b"k" * 32, ZONE).mint("i-AAAAAAAAAAAAAAAA", "0" * 64, 0).expires_at.timestamp() - time.time() <= 46
 
 
-def test_a_host_with_no_capacity_answers_429_with_a_retry_and_a_later_start_works_a_broken_orchestrator_is_a_clean_500(world, ada):
+def test_a_host_with_no_capacity_answers_503_with_a_retry_and_a_later_start_works_a_broken_orchestrator_is_a_clean_500(world, ada):
     from vulnmart.ports.instance_host import Busy, OrchestratorUnavailable
 
     real_create = world.host.create
@@ -509,7 +509,7 @@ def test_a_host_with_no_capacity_answers_429_with_a_retry_and_a_later_start_work
 
     world.host.create = full
     r = ada.post("/api/v1/instances", {"kind": "learner"})
-    problem(r, 429, "REQ-RATE-LIMITED")
+    problem(r, 503, "INST-NO-CAPACITY")
     assert r.headers["retry-after"] == "15"
     assert [a.state.value for a in world.lab.engine.for_user("u-AAAAAAAAAAAAAAAA")] == ["ready"], "the attempt waits, nothing leaked"
 

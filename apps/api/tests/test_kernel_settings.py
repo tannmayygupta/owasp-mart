@@ -139,7 +139,7 @@ def test_every_table_of_the_metadata_is_in_the_table_owners_file():
 
     assert json.dumps(sorted(Base.metadata.tables)) == json.dumps(
         sorted(["domain_events", "email_changes", "email_outbox", "email_tokens", "job_runs", "org_members", "organizations", "quotas", "sessions", "settings", "user_roles", "users",
-                "activity_buckets", "attempt_events", "attempts", "bot_visits", "evidence", "events", "flag_submissions", "held_captures",
+                "activity_buckets", "challenge_opens", "attempt_events", "attempts", "bot_visits", "evidence", "events", "flag_submissions", "held_captures",
                 "hint_unlocks", "instance_epochs", "instances", "integrity_flags", "milestones", "review_audit", "security_events",
                 "audit_anchor", "audit_checkpoint", "audit_log", "consent_records", "mfa_credentials", "recovery_codes", "subject_map",
                 "dpa_acceptances", "join_requests", "assessment_templates", "invites", "template_challenges", "deletion_requests", "data_views",

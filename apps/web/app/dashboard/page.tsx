@@ -2,11 +2,10 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { api, say, when, type Attempt, type AttemptSummary, type CatalogueItem, type MyInvite } from '../../lib/api';
+import { api, say, when, type AccountProgress, type Attempt, type AttemptSummary, type CatalogueItem, type MyInvite } from '../../lib/api';
+import { pickAssessment, pickPracticeRun, splitByMode } from '../../lib/attempt-logic';
 import { useRequireUser } from '../../lib/session';
-import { AttemptBoard, Stars } from '../attempt-board';
-
-const ACTIVE = ['ready', 'running', 'submitted', 'reported'];
+import { AttemptBoard } from '../attempt-board';
 const learnerResults = (_: Attempt) => true; // a learner's practice results are always their own to see
 
 // The dashboard (FR-DSH-01, FR-DSH-04): a participant's practice lab and their invitations. Every list comes from the caller's own routes (`me`), so the page
@@ -16,19 +15,22 @@ export default function DashboardPage() {
   const [catalog, setCatalog] = useState<CatalogueItem[]>([]);
   const [attempts, setAttempts] = useState<AttemptSummary[] | null>(null);
   const [invites, setInvites] = useState<MyInvite[]>([]);
+  const [account, setAccount] = useState<AccountProgress | null>(null);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
       // the lab's routes (catalogue, attempts) and the platform's (invites) are loaded side by side: one being down must not hide the other
-      const [c, a, i] = await Promise.all([
+      const [c, a, i, acc] = await Promise.all([
         api<{ items: CatalogueItem[] }>('GET', '/api/v1/challenges').catch(() => ({ items: [] as CatalogueItem[] })),
         api<{ items: AttemptSummary[] }>('GET', '/api/v1/me/attempts').catch((e) => {
           setError(say(e));
           return { items: [] as AttemptSummary[] };
         }),
         api<{ items: MyInvite[] }>('GET', '/api/v1/me/invites'),
+        api<AccountProgress>('GET', '/api/v1/me/progress').catch(() => null), // a lab that is not sequenced has no account points
       ]);
+      setAccount(acc);
       setCatalog(c.items);
       setAttempts(a.items);
       setInvites(i.items);
@@ -59,8 +61,10 @@ export default function DashboardPage() {
     );
   }
 
-  const practice = (attempts ?? []).filter((a) => a.mode === 'learner');
-  const current = practice.find((a) => ACTIVE.includes(a.state)) ?? null;
+  // practice and assessments are kept apart by mode: a candidate assessment is never drawn as practice (it lives on /assessment/<id>)
+  const { practice } = splitByMode(attempts ?? []);
+  const current = pickPracticeRun(attempts ?? []); // a live run first, else the latest finished one (its board offers a new run)
+  const assessment = pickAssessment(attempts ?? []);
 
   return (
     <>
@@ -96,10 +100,12 @@ export default function DashboardPage() {
         {attempts === null ? (
           <p className="muted">Loading...</p>
         ) : current ? (
-          <AttemptBoard attemptId={current.attempt_id} catalog={catalog} resultsAllowed={learnerResults} onChanged={load} />
+          <AttemptBoard key={current.attempt_id} attemptId={current.attempt_id} catalog={catalog} expectedMode="learner" resultsAllowed={learnerResults} onChanged={load} />
         ) : (
           <>
-            <p>Start an instance to get your own copy of the shop. Hints are free in practice and never lower your progress.</p>
+            <p>Start your lab to get your own copy of the shop. The challenges open one at a time, each with a countdown that starts when you begin it. Hints are free in practice and never lower your progress.</p>
+            <p data-testid="catalogue">There {catalog.length === 1 ? 'is' : 'are'} {catalog.length || 'several'} challenge{catalog.length === 1 ? '' : 's'} in all.{account && <> Your account has <strong data-testid="account-points">{account.total_points} of 1000</strong> points so far.</>}</p>
+            {assessment && <p className="muted" data-testid="assessment-note">You also have a company assessment. It is not part of the practice lab: <Link href={`/assessment/${assessment.attempt_id}`}>open it on the assessment page</Link>.</p>}
             <p>
               <button type="button" onClick={async () => {
                 setError('');
@@ -109,23 +115,8 @@ export default function DashboardPage() {
                 } catch (e) {
                   setError(say(e));
                 }
-              }}>Start an instance</button>
-            </p>
-            <div className="table-wrap">
-              <table data-testid="catalogue">
-                <thead><tr><th>Challenge</th><th>OWASP</th><th>Difficulty</th></tr></thead>
-                <tbody>
-                  {catalog.map((c) => (
-                    <tr key={c.challenge_key}>
-                      <td><strong>{c.challenge_key}</strong> {c.title}</td>
-                      <td><span className="tag">2025 {c.owasp_2025}</span>{c.owasp_2021 && <span className="tag">2021 {c.owasp_2021}</span>}</td>
-                      <td><Stars difficulty={c.difficulty} /> <span className="tag">{c.tier}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+              }}>Start my lab</button>
+            </p>          </>
         )}
         {practice.length > 1 && <p className="muted">Earlier practice attempts: {practice.filter((a) => a !== current).length}.</p>}
       </section>

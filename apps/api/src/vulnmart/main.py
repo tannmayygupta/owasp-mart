@@ -127,6 +127,11 @@ def _mount_lab(app: FastAPI, lab: LabRuntime, tickets: TicketMinter | None) -> N
 
     app.state.lab = lab
     ports = getattr(app.state, "ports", None)
+    if ports is not None and getattr(ports, "quota", None) is not None and lab.quota is None:
+        lab.quota = ports.quota  # the admin's quotas are enforced by the lab (wiring audit F-08)
+    from vulnmart.lab.runtime import check_deployable
+
+    check_deployable(lab, app.state.settings.env)  # a deployed API refuses fakes and memory state unless the dev flag says otherwise
     if ports is not None and getattr(ports, "outbox", None) is not None:
         lab.live.attach(ports.outbox.publish)  # durable domain events for the live hub (H-142)
     app.state.lab_tickets = tickets or minter_from_environ(os.environ)

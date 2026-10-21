@@ -25,7 +25,9 @@ def base_template(template_id: str | None) -> str | None:
 
 class EngineCohortPort:
     def __init__(self, *, engine, facts: FactSource, milestones, active_seconds_of: Callable[[str], int | None],
-                 catalogue: Catalogue | None = None, rules: ScoringRules | None = None) -> None:
+                 catalogue: Catalogue | None = None, rules: ScoringRules | None = None,
+                 profile: Callable[[str], tuple[Catalogue, ScoringRules]] | None = None) -> None:
+        self._profile = profile  # the challenges and hint costs of each attempt (its template)
         self._engine, self._facts, self._milestones, self._active = engine, facts, milestones, active_seconds_of
         self._catalogue, self._rules = catalogue or Catalogue(), rules or ScoringRules()
 
@@ -37,7 +39,8 @@ class EngineCohortPort:
         for rec in self._engine.in_states(AttemptState.SUBMITTED, AttemptState.REPORTED):
             if rec.org_id != org_id or base_template(rec.template_id) != assessment_id or rec.purged_at is not None:
                 continue
-            score = compute_score(self._facts.facts(rec.id), self._catalogue, self._rules)
+            catalogue, rules = self._profile(rec.id) if self._profile is not None else (self._catalogue, self._rules)
+            score = compute_score(self._facts.facts(rec.id), catalogue, rules)
             captures = self._milestones.captures(rec.id)
             last = max(captures.values()) if captures else None
             yield CohortCandidate(RankRow(rec.id, score, last, self._active(rec.id)), rec.state, held_open=len(self._milestones.held_for(rec.id)))

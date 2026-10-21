@@ -102,6 +102,7 @@ export function createFakeLab(options = {}) {
     b.progress.get('C01').best = 2;
     b.progress.get('C11').held = true;
     addTimeline(b, { at: b.startedAt, type: 'attempt.started', challenge_key: null, milestone: null, result: null });
+    addTimeline(b, { at: stamp(Date.now() - 35 * 60 * 1000), type: 'attempt.time_warning', challenge_key: null, milestone: null, result: null, minutes_left: 15 }); // a seeded warning (the mock's clock is not the engine's)
     addTimeline(b, { at: stamp(Date.now() - 30 * 60 * 1000), type: 'milestone.reached', challenge_key: 'C01', milestone: 'M1', result: null });
     addTimeline(b, { at: stamp(Date.now() - 20 * 60 * 1000), type: 'milestone.reached', challenge_key: 'C01', milestone: 'M2', result: null });
     b.evidence.push({ evidence_id: 'e-AAAAAAAAAAAAAAAA', challenge_key: 'C01', captured_at: stamp(Date.now() - 20 * 60 * 1000), method: 'GET',
@@ -116,10 +117,17 @@ export function createFakeLab(options = {}) {
     d.deadlineAt = stamp(Date.now() - 1 * 3600 * 1000);
     d.submittedAt = stamp(Date.now() - 70 * 60 * 1000);
     d.frozenUntil = stamp(Date.now() - 55 * 60 * 1000);
+    d.afterRelease = true; d.released = false; // the invite of this candidate says after_release (IF-2 2.1.0, H-355)
     const e = makeAttempt('a-EEEEEEEEEEEEEEEE', 'cam', 'candidate', 'org-1', 'withdrawn', false);
     e.deleteAfter = stamp(Date.now() + 7 * 24 * 3600 * 1000);
     makeAttempt('a-FFFFFFFFFFFFFFFF', 'cam', 'candidate', 'org-1', 'cancelled', false);
     makeAttempt('a-GGGGGGGGGGGGGGGG', 'cam', 'candidate', 'org-1', 'deleted', false);
+    // a sequenced learner run (contract 1.3.0): one challenge at a time, each with its own countdown by tier; a-AAAA... above stays open on every challenge
+    const h = makeAttempt('a-HHHHHHHHHHHHHHHH', 'ada', 'learner', null, 'running', true);
+    h.sequenced = true;
+    h.opened = new Map();
+    h.startedAt = stamp(Date.now() - 5 * 60 * 1000);
+    h.deadlineAt = stamp(Date.now() + 445 * 60 * 1000);
   }
   seed();
 
@@ -146,7 +154,7 @@ export function createFakeLab(options = {}) {
     error_code: r.errorCode, requested_at: r.requestedAt, ready_at: r.readyAt, expires_at: r.expiresAt, updated_at: r.updatedAt });
   const attemptView = (a) => ({ attempt_id: a.id, mode: a.mode, state: a.state, hints_enabled: a.hintsEnabled, instance_id: a.instanceId,
     started_at: a.startedAt, deadline_at: a.deadlineAt, submitted_at: a.submittedAt, frozen_until: a.frozenUntil,
-    ...(a.state === 'withdrawn' ? { delete_after: a.deleteAfter ?? null } : {}), server_time: stamp() });
+    ...(a.state === 'withdrawn' ? { delete_after: a.deleteAfter ?? null } : {}), ...(a.afterRelease ? { results_released: a.released === true } : {}), server_time: stamp() });
   const costPct = (a, level) => (a.mode === 'candidate' ? level * 10 : 0);
   const hintText = (key, level) => `Fake hint level ${level} for ${key} (mock text, not a real hint).`;
   function points(a, key) {
@@ -159,7 +167,46 @@ export function createFakeLab(options = {}) {
   const total = (a) => Math.round((1000 * KEYS.reduce((n, k) => n + points(a, k), 0)) / (KEYS.length * WEIGHT));
   const scoreRows = (a) => KEYS.map((k) => { const p = a.progress.get(k);
     return { challenge_key: k, best_milestone: MILESTONES[p.best], held: p.held, hints_used: p.hints.size, points: points(a, k) }; });
-  const timelineView = (e) => ({ at: e.at, type: e.type, challenge_key: e.challenge_key, milestone: e.milestone, result: e.result });
+  // ---- one challenge at a time, each with a countdown (contract 1.3.0; the real rules are vulnmart.lab.sequence) ----
+  const TIER = { C01: 'Easy', C02: 'Medium', C03: 'Medium', C04: 'Medium', C05: 'Easy', C06: 'Hard', C07: 'Easy', C08: 'Medium', C09: 'Medium', C10: 'Hard', C11: 'Medium' };
+  const TITLE = { C01: 'Broken Access Control', C02: 'Cryptographic Failures', C03: 'Injection', C04: 'Insecure Design', C05: 'Security Misconfiguration', C06: 'Software Supply Chain Failures',
+    C07: 'Authentication Failures', C08: 'Software or Data Integrity Failures', C09: 'Security Logging and Alerting Failures', C10: 'Server-Side Request Forgery', C11: 'Mishandling of Exceptional Conditions' };
+  const MINUTES = { Easy: 20, Medium: 40, Hard: 60 };
+  function clocks(a) {
+    const now = Date.now();
+    let foundCurrent = false;
+    return KEYS.map((k) => {
+      const p = a.progress.get(k);
+      const limit = MINUTES[TIER[k]] * 60;
+      const opened = a.opened.get(k) ?? null;
+      const expires = opened === null ? null : opened + limit * 1000;
+      if (p.best === 3 || p.held) return { key: k, state: 'solved', limit, opened, expires };
+      if (expires !== null && now >= expires) return { key: k, state: 'expired', limit, opened, expires };
+      if (foundCurrent) return { key: k, state: 'future', limit, opened: null, expires: null };
+      foundCurrent = true;
+      return { key: k, state: opened === null ? 'ready' : 'active', limit, opened, expires };
+    });
+  }
+  const clockOf = (a, key) => clocks(a).find((c) => c.key === key);
+  function sequencedItem(a, user, c) {
+    const p = a.progress.get(c.key);
+    const item = { challenge_key: c.key, best_milestone: MILESTONES[p.best], solved: p.best === 3, held: p.held, hints_used: p.hints.size, hints_available: a.hintsEnabled && c.state === 'active',
+      state: c.state, title: TITLE[c.key], tier: TIER[c.key], time_limit_seconds: c.limit, opened_at: c.opened === null ? null : stamp(c.opened), expires_at: c.expires === null ? null : stamp(c.expires),
+      seconds_left: c.state === 'active' ? Math.max(0, Math.floor((c.expires - Date.now()) / 1000)) : null };
+    item.brief = `Mock brief of ${c.key}: what the weakness is, in plain words.`;
+    if (c.state !== 'ready') item.start = `Mock start of ${c.key}: sign in with the demo account of the mock lab.`;
+    if ((p.best === 3 || c.state === 'expired') && a.mode === 'learner' && a.ownerId === user.id) item.write_up = { vulnerable: `Mock write-up of ${c.key}: the idea that made it vulnerable.`, fix: `Mock write-up of ${c.key}: how to fix it.` };
+    return item;
+  }
+  // 404 for a challenge not reached, 409 for one not begun or ended; null when the call may go on
+  function sequenceGate(res, a, key, { allowSolved = false } = {}) {
+    if (!a.sequenced) return null;
+    const c = clockOf(a, key);
+    if (!c || c.state === 'future') return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge for this run yet') ?? true;
+    if (c.state === 'active' || (allowSolved && c.state === 'solved')) return null;
+    return problem(res, 409, 'ATT-INVALID-STATE', `the challenge is ${c.state}`) ?? true;
+  }
+  const timelineView = (e) => ({ at: e.at, type: e.type, challenge_key: e.challenge_key, milestone: e.milestone, result: e.result, ...(e.type === 'attempt.time_warning' ? { minutes_left: e.minutes_left } : {}) });
   const GONE_STATES = ['withdrawn', 'cancelled'];
   const flagView = (f) => ({ integrity_flag_id: f.id, type: f.type, challenge_key: f.challenge, explanation: f.explanation, status: f.status,
     held: f.held, created_at: f.createdAt, decided_at: f.decidedAt, decision_note: f.note });
@@ -363,6 +410,25 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     send(res, 200, attemptView(a));
   };
   const WITHDRAWABLE = ['ready', 'running', 'submitted'];
+  H.releaseResults = ({ res, user, params, take }) => {
+    const a = reviewable(res, user, params.attempt_id);
+    if (!a || take() === false) return;
+    if (user.role !== 'recruiter' || a.orgId === null) return attemptNotFound(res);
+    if (!['submitted', 'reported', 'expired'].includes(a.state)) return problem(res, 409, 'ATT-INVALID-STATE', `release is not allowed in state ${a.state}`);
+    if (a.afterRelease) a.released = true;
+    send(res, 200, attemptView(a));
+  };
+  H.cancelAttempt = ({ res, user, params, take }) => { // IF-2 2.2.0, FR-SES-07: the recruiter of the owning company cancels a ready or running candidate attempt
+    const a = findAttempt(res, params.attempt_id); // not the reviewable helper: a repeat on a cancelled attempt is 409, not the 410 of derived reads
+    if (a && !isReviewer(user, a)) return attemptNotFound(res);
+    if (!a || take() === false) return;
+    if (user.role !== 'recruiter' || a.orgId === null) return attemptNotFound(res);
+    if (!['ready', 'running'].includes(a.state)) return problem(res, 409, 'ATT-INVALID-STATE', `cancel is not allowed in state ${a.state}`);
+    a.state = 'cancelled';
+    const r = a.instanceId ? instances.get(a.instanceId) : null;
+    if (r && r.state !== 'destroyed') { r.state = 'destroyed'; r.access = 'closed'; r.updatedAt = stamp(); }
+    send(res, 200, attemptView(a));
+  };
   H.withdrawAttempt = ({ res, user, params, take }) => {
     const a = owned(res, user, params.attempt_id);
     if (!a) return;
@@ -394,6 +460,7 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     if (typeof body.challenge_key !== 'string' || !RE.challenge.test(body.challenge_key)) return invalid(res, '/challenge_key', 'bad challenge key');
     if (typeof body.flag !== 'string' || body.flag.length < 1 || body.flag.length > 200) return invalid(res, '/flag', 'flag is text of 1 to 200 characters');
     if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a flag cannot be submitted in state ${a.state}`);
+    if (sequenceGate(res, a, body.challenge_key, { allowSolved: true })) return;
     const key = body.challenge_key;
     const now = Date.now();
     // Only the result is kept, never the text. The submitter is told `correct` or `incorrect` (no oracle); the reason stays on the server.
@@ -436,13 +503,20 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     addTimeline(a, { at: stamp(), type: 'flag.submitted', challenge_key: key, milestone: null, result });
     send(res, 200, { challenge_key: key, result, credit });
   };
+  const hidden = (user, a) => a.afterRelease === true && a.released !== true && a.ownerId === user.id && !isReviewer(user, a); // H-355: the candidate sees no results yet
   H.getScore = ({ res, user, params, url }) => {
     const a = readable(res, user, params.attempt_id);
+    if (a && hidden(user, a)) return attemptNotFound(res);
     if (a && queryOf(res, url, [])) send(res, 200, { attempt_id: a.id, score: total(a), computed_at: stamp(), per_challenge: scoreRows(a) });
   };
   H.listChallenges = ({ res, user, params, url }) => {
     const a = readable(res, user, params.attempt_id);
     if (!a || !queryOf(res, url, [])) return;
+    if (a.sequenced) {
+      const all = clocks(a);
+      const cur = all.find((c) => c.state === 'ready' || c.state === 'active');
+      return send(res, 200, { items: all.filter((c) => c.state !== 'future').map((c) => sequencedItem(a, user, c)), has_more: false, total: KEYS.length, current_key: cur ? cur.key : null, server_time: stamp() });
+    }
     send(res, 200, { items: KEYS.map((k) => { const p = a.progress.get(k);
       const item = { challenge_key: k, best_milestone: MILESTONES[p.best], solved: p.best === 3, held: p.held, hints_used: p.hints.size, hints_available: a.hintsEnabled,
         brief: `Mock brief of ${k}: what the weakness is, in plain words.`, start: `Mock start of ${k}: sign in with the demo account of the mock lab.` };
@@ -464,11 +538,35 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     const a = hintContext(res, user, params);
     if (a && queryOf(res, url, [])) send(res, 200, { challenge_key: params.challenge_key, items: [1, 2, 3].map((l) => hintView(a, params.challenge_key, l)), has_more: false });
   };
+  H.beginChallenge = ({ res, user, params, take }) => {
+    const a = owned(res, user, params.attempt_id);
+    if (!a || take() === false) return;
+    if (!RE.challenge.test(params.challenge_key) || !a.sequenced) return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge, or the run is not sequenced');
+    if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a challenge cannot be begun in state ${a.state}`);
+    const c = clockOf(a, params.challenge_key);
+    if (!c || c.state === 'future') return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such challenge for this run yet');
+    if (c.state === 'solved' || c.state === 'expired') return problem(res, 409, 'ATT-INVALID-STATE', `the challenge is ${c.state}`);
+    if (c.state === 'ready') a.opened.set(c.key, Date.now());
+    send(res, 200, sequencedItem(a, user, clockOf(a, c.key)));
+  };
+  H.getMyProgress = ({ res, user, url }) => {
+    if (!queryOf(res, url, [])) return;
+    const best = Object.fromEntries(KEYS.map((k) => [k, 0]));
+    let runs = 0;
+    for (const a of attempts.values()) {
+      if (a.ownerId !== user.id || a.mode !== 'learner') continue;
+      runs += 1;
+      for (const k of KEYS) best[k] = Math.max(best[k], points(a, k));
+    }
+    const sum = KEYS.reduce((n, k) => n + best[k], 0);
+    send(res, 200, { total_points: Math.min(1000, Math.round((1000 * sum) / (KEYS.length * WEIGHT))), runs, per_challenge: KEYS.map((k) => ({ challenge_key: k, best_points: best[k] })) });
+  };
   H.unlockHint = ({ res, user, params, take }) => {
     const a = hintContext(res, user, params);
     if (!a || take() === false) return;
     if (!/^[1-3]$/.test(params.level)) return problem(res, 404, 'ATT-CHALLENGE-NOT-FOUND', 'no such hint level');
     if (a.state !== 'running') return problem(res, 409, 'ATT-INVALID-STATE', `a hint cannot be unlocked in state ${a.state}`);
+    if (sequenceGate(res, a, params.challenge_key)) return;
     const level = Number(params.level);
     const set = a.progress.get(params.challenge_key).hints;
     if (!set.has(level)) {
@@ -559,13 +657,14 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     if (!isObj(body)) return invalid(res, '', 'the body must be a JSON object');
     const a = typeof body.attempt_id === 'string' ? attempts.get(body.attempt_id) : undefined;
     if (!a) return attemptNotFound(res);
-    const types = ['attempt.started', 'milestone.reached', 'flag.submitted', 'hint.unlocked', 'instance.reset', 'attempt.submitted', 'attempt.expired'];
+    const types = ['attempt.started', 'milestone.reached', 'flag.submitted', 'hint.unlocked', 'instance.reset', 'attempt.submitted', 'attempt.expired', 'attempt.time_warning'];
     const type = body.type ?? 'flag.submitted';
     if (!Number.isSafeInteger(body.epoch) || body.epoch < 1) return invalid(res, '/epoch', 'epoch is a whole number of at least 1');
     if (!Number.isSafeInteger(body.seq) || body.seq < 1) return invalid(res, '/seq', 'seq is a whole number of at least 1');
     if (!types.includes(type)) return invalid(res, '/type', 'unknown timeline type');
     if (a.timeline.some((e) => e.epoch === body.epoch && e.seq === body.seq)) return problem(res, 409, 'ATT-INVALID-STATE', 'an event with this key exists');
-    addTimeline(a, { at: stamp(), type, challenge_key: body.challenge_key ?? null, milestone: body.milestone ?? null, result: body.result ?? null }, { epoch: body.epoch, seq: body.seq });
+    if (type === 'attempt.time_warning' && (!Number.isSafeInteger(body.minutes_left) || body.minutes_left < 1 || body.minutes_left > 1440)) return invalid(res, '/minutes_left', 'minutes_left is a whole number of 1 to 1440');
+    addTimeline(a, { at: stamp(), type, challenge_key: body.challenge_key ?? null, milestone: body.milestone ?? null, result: body.result ?? null, ...(type === 'attempt.time_warning' ? { minutes_left: body.minutes_left } : {}) }, { epoch: body.epoch, seq: body.seq });
     res.writeHead(204, { 'cache-control': 'private, no-store' });
     res.end();
   }
@@ -580,12 +679,16 @@ const queryPointer = (name) => (pointer(name) === '' ? '' : '/query' + pointer(n
     ['POST', new RegExp(`^/api/v1/instances/${ID}/stop$`), ['instance_id'], 'stopInstance', 'none'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}$`), ['attempt_id'], 'getAttempt'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/start$`), ['attempt_id'], 'startAttempt', 'none'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/release$`), ['attempt_id'], 'releaseResults', 'none'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/cancel$`), ['attempt_id'], 'cancelAttempt', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/submit$`), ['attempt_id'], 'submitAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw$`), ['attempt_id'], 'withdrawAttempt', 'json'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/withdraw/undo$`), ['attempt_id'], 'undoWithdrawal', 'none'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/flags$`), ['attempt_id'], 'submitFlag', 'json'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/score$`), ['attempt_id'], 'getScore'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges$`), ['attempt_id'], 'listChallenges'],
+    ['POST', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/begin$`), ['attempt_id', 'challenge_key'], 'beginChallenge', 'none'],
+    ['GET', /^\/api\/v1\/me\/progress$/, [], 'getMyProgress'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/hints$`), ['attempt_id', 'challenge_key'], 'listHints'],
     ['POST', new RegExp(`^/api/v1/attempts/${ID}/challenges/${ID}/hints/${ID}/unlock$`), ['attempt_id', 'challenge_key', 'level'], 'unlockHint', 'none'],
     ['GET', new RegExp(`^/api/v1/attempts/${ID}/evidence$`), ['attempt_id'], 'listEvidence'],

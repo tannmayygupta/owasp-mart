@@ -17,6 +17,7 @@ SETTINGS: dict[str, int | bool | str] = {
     "instance_max_minutes": 240,  # FR-INS (placeholder)
     "instance_company_cap": 5,  # FR-ADM-05, OI-21 (placeholder, story P-28): live instances one company may hold together
     "instance_total_cap": 20,  # FR-ADM-05, OI-21 (placeholder, story P-28): live instances on the whole platform (the global cap)
+    "instance_assessment_reserve": 2,  # F-08 (placeholder): places of the platform cap that only a company assessment may use, so learners cannot block a candidate's Start
     "hints_enabled_default": True,
     "evidence_max_bytes": 8192,  # FR-DET-03
     "learner_evidence_days": 30,  # FR-PRV-06
@@ -31,6 +32,10 @@ SETTINGS: dict[str, int | bool | str] = {
     "rate_invite_resend_per_user_per_hour": 30,  # story 1.9 (placeholder): invite resends one recruiter may send an hour (each is a mail outside the daily cap)
     "invite_cap_per_company_per_day": 50,  # FR-ORG-08 (placeholder, to be tuned against email limits NFR-CST-02): invites one company may send a day; an admin can set another number for one company
     "flag_submit_per_minute": 10,  # FR-FLG (placeholder)
+    "rate_instance_start_per_user_per_hour": 20,  # wiring audit (placeholder): instance requests and candidate starts from one account; stops a start/stop loop that churns instances
+    "rate_instance_open_per_user_per_hour": 120,  # wiring audit (placeholder): one-time gate tickets minted by one account
+    "rate_instance_stop_per_user_per_hour": 30,  # wiring audit (placeholder): stops and resets from one account
+    "rate_review_action_per_user_per_hour": 300,  # wiring audit (placeholder): result releases and integrity decisions from one recruiter
     "rate_login_per_ip_per_hour": 60,  # FR-ACC-10 (placeholder): every login attempt from one visitor address
     "login_failures_per_window": 10,  # FR-ACC-08, FR-ACC-10 (placeholder): wrong passwords for one address before it waits
     "login_failure_window_minutes": 15,  # how long that wait lasts: a back-off, never a permanent lockout (FR-ACC-08)

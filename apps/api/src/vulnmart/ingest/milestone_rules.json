@@ -3,7 +3,10 @@
   "challenges": {
     "C01": {
       "m1": {"kind": "event", "type": "shop.cross_store_order_read", "where": {}},
-      "m2": {"kind": "count_distinct", "type": "shop.cross_store_order_read", "where": {}, "field": "order_id", "at_least": 3},
+      "m2": {"kind": "any", "of": [
+        {"kind": "count_distinct", "type": "shop.cross_store_order_read", "where": {}, "field": "order_id", "at_least": 3},
+        {"kind": "event", "type": "shop.cross_store_order_read", "where": {"order_store_id": "2"}}
+      ]},
       "m3": {"kind": "flag"}
     },
     "C02": {
@@ -27,7 +30,7 @@
     },
     "C05": {
       "m1": {"kind": "event", "type": "shop.verbose_error", "where": {"handler": "c05_api"}},
-      "m2": {"kind": "event", "type": "ops.page_served", "where": {"client_class": {"ne": "internal"}}},
+      "m2": {"kind": "event", "type": "ops.page_served", "where": {"path": "/_ops/diagnostics", "client_class": {"ne": "internal"}}},
       "m3": {"kind": "flag"}
     },
     "C06": {
@@ -36,7 +39,7 @@
       "m3": {"kind": "flag"}
     },
     "C07": {
-      "m1": {"kind": "event", "type": "auth.reset_requested", "where": {"account_role": "finance"}},
+      "m1": {"kind": "event", "type": "auth.reset_requested", "where": {"account_role": "finance", "account_found": true}},
       "m2": {"kind": "any", "of": [
         {"kind": "event", "type": "auth.password_reset_completed", "where": {"account_role": "finance"}},
         {"kind": "count", "type": "auth.reset_confirm_batch", "where": {}, "sum_field": "fail_count", "at_least": 501,
@@ -45,8 +48,8 @@
       "m3": {"kind": "flag"}
     },
     "C08": {
-      "m1": {"kind": "event", "type": "webhook.received", "where": {"source": "non_gateway"}},
-      "m2": {"kind": "event", "type": "order.paid", "where": {"verified": false}},
+      "m1": {"kind": "event", "type": "webhook.received", "where": {"source": "non_gateway", "order_id": {"ne": "unknown"}}},
+      "m2": {"kind": "event", "type": "order.paid", "where": {"verified": false, "via": "webhook"}},
       "m3": {"kind": "flag"}
     },
     "C09": {
@@ -61,13 +64,13 @@
       "m3": {"kind": "flag"}
     },
     "C10": {
-      "m1": {"kind": "event", "type": "importer.fetch_attempt", "where": {"url_class": {"in": ["loopback", "private", "link_local", "internal_name"]}}},
+      "m1": {"kind": "event", "type": "importer.fetch_attempt", "where": {"url_class": {"in": ["loopback", "private", "link_local", "internal_name"]}, "blocked": false}},
       "m2": {"kind": "event", "type": "meta.request_served", "where": {"ua_class": "importer"}},
       "m3": {"kind": "flag"}
     },
     "C11": {
       "m1": {"kind": "event", "type": "kyc.result", "where": {"outcome": "invalid_verbose"}},
-      "m2": {"kind": "event", "type": "store.approved", "where": {"approved_by": "system:kyc-fallback"}},
+      "m2": {"kind": "event", "type": "store.approved", "where": {"approved_by": "system_kyc_fallback"}},
       "m3": {"kind": "flag"}
     }
   }

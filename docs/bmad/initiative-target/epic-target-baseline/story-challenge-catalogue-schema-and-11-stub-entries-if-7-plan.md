@@ -3,7 +3,7 @@ title: 'Challenge catalogue schema and 11 stub entries (IF-7)'
 type: 'feature'
 ticket: '2'
 created: '2026-10-09'
-status: built
+status: done
 baseline_revision: 'd139072'
 route: 'full'
 route_source: 'pinned'

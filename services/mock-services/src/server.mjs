@@ -99,21 +99,33 @@ export function createKyc() {
 // /rates is called legitimately by the shop; /latest/user-data imitates cloud
 // instance metadata and serves the per-instance C10 flag from the read-only
 // placement file (the SSRF that reaches this from the shop's importer is C10).
-export function createMetadata({ placementDir = PLACEMENT_DIR } = {}) {
+// Every request it serves is reported to the sidecar as `meta.request_served` (IF-4): the path and who asked (ua_class importer for the shop's importer, health for the
+// health check, rates for the shop's own rates call). It is the signal that the importer really reached an internal service (the second milestone of C10).
+const uaClassOf = (req, pathname) => (pathname === '/healthz' ? 'health' : /^VulnMart-Importer\//.test(String(req.headers['user-agent'] ?? '')) ? 'importer' : 'rates');
+
+export function createMetadata({ placementDir = PLACEMENT_DIR, eventsUrl = process.env.VM_SIDECAR_EVENTS_URL, post = postEvent } = {}) {
   // The injector writes exactly one "file in mock-services" placement file (C10);
   // its NAME comes from the challenge catalogue (IF-7), only the directory is
   // fixed by IF-6. So serve whichever single file is there, not a hardcoded name.
+  // A decoy file (C10.decoy<n>, H-42) may sit in the same volume: it is never served. The placement file is C10.placement, or else the one file that is not a decoy.
   const readPlacement = () => {
     try {
-      const file = fs.readdirSync(placementDir).find((f) => fs.statSync(path.join(placementDir, f)).isFile());
+      const files = fs.readdirSync(placementDir).filter((f) => !/\.decoy\d+$/.test(f) && fs.statSync(path.join(placementDir, f)).isFile());
+      const file = files.includes('C10.placement') ? 'C10.placement' : files[0];
       return file ? fs.readFileSync(path.join(placementDir, file), 'utf8').trim() : null;
     } catch { return null; }
+  };
+  const served = (req, pathname) => {
+    if (!eventsUrl) return;
+    post(eventsUrl, { schema_version: '0.1', type: 'meta.request_served', source: 'mock', session_kind: 'anon', user_id: null,
+      ts: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'), data: { path: pathname.slice(0, 200), ua_class: uaClassOf(req, pathname) } });
   };
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
     if (req.method === 'GET' && url.pathname === '/healthz') return sendJson(res, 200, { status: 'ok' });
-    if (req.method === 'GET' && url.pathname === '/rates') return sendJson(res, 200, { base: 'USD', rates: { EUR: 0.92, GBP: 0.79, INR: 83.2 } });
+    if (req.method === 'GET' && url.pathname === '/rates') { served(req, url.pathname); return sendJson(res, 200, { base: 'USD', rates: { EUR: 0.92, GBP: 0.79, INR: 83.2 } }); }
     if (req.method === 'GET' && url.pathname === '/latest/user-data') {
+      served(req, url.pathname);
       const flag = readPlacement();
       const userData = `#!/bin/sh\n# vm-meta startup\nexport VM_REGION=lab-1\n${flag ? `export VM_C10=${flag}\n` : ''}`;
       res.writeHead(200, { 'content-type': 'text/plain' });

@@ -45,10 +45,12 @@ export function getSellerOrderByNo(db, actor, orderNo, { challenges = {}, emit =
     // VULNERABLE: no store scoping. Serve the order to any seller.
     if (!callerOwns) {
       // The detection signal: the caller read an order of a store that is not theirs.
+      // the event of IF-4 (data_shop_cross_store_order_read, no other member): the order number the player asked for, who asked and for which store, and whose order it is
       emit('shop.cross_store_order_read', {
-        order_id: String(order.id),
-        order_store: stores.length ? String(stores[0]) : null,
-        caller_store: actor.store_id != null ? String(actor.store_id) : null,
+        order_id: String(order.order_no),
+        caller_user_id: String(actor.id ?? 'unknown'),
+        caller_store_id: actor.store_id != null ? String(actor.store_id) : 'none',
+        order_store_id: stores.length ? String(stores[0]) : 'none',
       });
     }
     return orderDetail(db, order);
