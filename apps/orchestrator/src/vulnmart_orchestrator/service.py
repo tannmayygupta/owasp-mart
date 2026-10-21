@@ -466,6 +466,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-fake-backend", action="store_true", help="test switch: required for --backend fake")
     p.add_argument("--report-url", help="platform base URL for state reports")
     p.add_argument("--report-timeout-ms", type=int, default=5000)
+    p.add_argument("--no-desired-state", action="store_true", help="test and development only: do not ask the platform which instances are wanted (the reconciler then never enters safe mode); the deployed compose never sets it")
     p.add_argument("--capacity-mb", type=int, default=DEFAULT_CAPACITY_MB)
     p.add_argument("--step-delay-ms", type=int, default=0, help="test aid: pause before each step of a create and of a destroy")
     p.add_argument("--state-dir", help="directory for the tombstone file of destroyed instance ids (kept in memory only when not given)")
@@ -604,7 +605,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.report_url:
             report_key = _key(args.report_key_file, "VM_ORCH_REPORT_KEY", "report-key (orchestrator signing key)")
             pusher = ReportPusher(args.report_url, report_key, timeout_s=args.report_timeout_ms / 1000)
-            desired = HttpDesiredState(args.report_url, report_key, timeout_s=args.report_timeout_ms / 1000)  # the platform says which instances it wants (H-123)
+            if not args.no_desired_state:
+                desired = HttpDesiredState(args.report_url, report_key, timeout_s=args.report_timeout_ms / 1000)  # the platform says which instances it wants (H-123)
         else:
             log_line(event="no-desired-state", detail="no report URL: every instance found on the host is wanted and none is destroyed for being unlisted")
         engine = build_engine(args, pusher.submit if pusher else None, desired)
