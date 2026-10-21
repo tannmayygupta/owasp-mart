@@ -58,7 +58,7 @@
 	}
 
 	# The dashboards. Keep this list in step with the page folders of apps/web/app (scripts/check-deployed-compose.mjs fails when a folder has no entry here) and with PAGES in scripts/verify-deployed.mjs.
-	@dashboards path /login /login/* /signup /signup/* /verify-email /verify-email/* /forgot-password /forgot-password/* /reset-password /reset-password/* /account /account/* /dashboard /dashboard/* /invite /invite/* /company /company/* /admin /admin/* /assessment /assessment/* /_next/*
+	@dashboards path /login /login/* /signup /signup/* /verify-email /verify-email/* /forgot-password /forgot-password/* /reset-password /reset-password/* /confirm-email-change /confirm-email-change/* /account /account/* /dashboard /dashboard/* /invite /invite/* /company /company/* /admin /admin/* /assessment /assessment/* /_next/*
 	handle @dashboards {
 		reverse_proxy web:3000 {
 			flush_interval -1
