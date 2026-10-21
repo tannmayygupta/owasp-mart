@@ -9,6 +9,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Rename, removal, retyping, or making an optional field required: **breaking**. It needs approval from every consumer and an expand-then-contract path. Before v1.0.0 it bumps the minor number and is declared here with a bullet line that starts with `BREAKING:` and a reason (exact case; "no BREAKING changes" does not count); from v1.0.0 it is a major bump.
 - Tags are `contracts-vX.Y.Z`.
 - CI enforces these rules with `node scripts/check-contract-rules.mjs` (story L-07, job `contract-rules`), reading `contracts/registry.json`: a change to a registered contract needs a new line in its own section below; a change to a schema or OpenAPI file also needs a change under its mock paths, or a line `no mock change: <reason>` in the new entry; a breaking change (deleting a whole contract included) needs a `BREAKING:` line and a raised version in the same section; a pull request that changes the registry, the checker, the diff scripts, the oasdiff pins or the workflows needs a new line `registry change: <reason>` (story 1.15, D-46); a new folder under `contracts/` needs a registry entry.
+- registry change: `.github/workflows/ci.yml` gets the deployed-compose lint, the route check, the pytest skip budget and the production dashboards image build (work package C, 2026-10-21). No contract file, rule, pin or checker changes.
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
@@ -213,6 +214,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting optional confirmation by Akshay (consumer; handoffs H-84 to H-89).
 
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
+
+### 1.2.0 (2026-10-21, the leader and Claude, work package C, handoff H-123)
+
+- Additive, not breaking: `GET /internal/v1/orch/desired` (`getDesiredInstances`, orchestrator to platform API, signed with the orchestrator key like the state report): the ids of the instances the platform wants, so that the reconciler can destroy what no one asked for and adopt the rest; the schema `DesiredInstances`; one valid and one invalid example; section 8a of `orchestrator-api.md`. Any answer but a good 200 keeps the orchestrator in safe mode. no mock change: the route is served by the platform API (the fake orchestrator is the other side and only sends reports), so the fake service has nothing to serve for it.
+- registry change: `.github/workflows/ci.yml` runs three more checks (`scripts/check-deployed-compose.mjs`, `scripts/check-pytest-skips.mjs` on the `api` and `scripts` jobs, `scripts/check_spec_routes.py`), and `scripts/check_orchestrator_contract.py` lists the new operation; no rule of `scripts/check-contract-rules.mjs` changes (the leader's instruction of 2026-10-21, D-102).
 
 ### 1.1.0 (2026-10-19, Tanmay, audit blocker B1)
 - Additive: `POST /v1/instances/{id}/activity` (`reportActivity`, body `{ "at": <RFC 3339> }`, signed like the other calls, 200 with the instance status, 409 ORCH-INVALID-STATE when the instance is not ready, active or idle). Without it the real service never learned that a player was active, so the idle limit ran from `ready` and cut off players mid-attempt. Examples: `activity.request.json` and three invalid ones.

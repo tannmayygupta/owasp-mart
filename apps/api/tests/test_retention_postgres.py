@@ -266,3 +266,20 @@ def test_the_whole_scheduler_runs_on_the_real_tables_with_the_application_role(s
     assert statuses["consent_purge"][1] == "1 consent records purged"
     assert port.verify().ok
     assert scalar(owner, "SELECT count(*) FROM job_runs WHERE status = 'succeeded'") == len(scheduler.jobs)
+
+def test_the_first_pass_of_a_fresh_deployment_deletes_nothing_it_must_keep(sessions, assessments, owner, app_engine):
+    """What turning the scheduler on in the deployed stack (VULNMART_SCHEDULER_ENABLED, production hardening ADR 0074) may do on its first pass over real tables with the
+    application role: a consent record that is not yet due (an erase date in the future, or none: the retention rule has not run for it) and every audit entry younger than twelve
+    months survive; the jobs write their runs; the hash chain verifies; and a second pass changes nothing."""
+    port = audit_chain(sessions, [300, 100, 10])
+    consent_row(owner, 1, NOW + timedelta(days=30))
+    consent_row(owner, 2, None)
+    scheduler = build_scheduler(sessions=sessions, assessments=assessments, settings=FakeSettingsPort(), audit=FakeAuditPort(), subjects=SubjectService(sessions),
+                                eraser=lambda a: None, anchors=None, streams=None, public_origin="https://vulnmart.example")
+    for _ in range(2):
+        scheduler.run_due()
+        assert scalar(owner, "SELECT count(*) FROM consent_records") == 2
+        assert scalar(owner, "SELECT count(*) FROM audit_log") == 3
+        assert port.verify().ok
+    assert all(s.last_status == "succeeded" for s in scheduler.status())
+    assert scalar(owner, "SELECT count(*) FROM job_runs WHERE status = 'succeeded'") == len(scheduler.jobs), "the second pass found nothing due: each job ran once"

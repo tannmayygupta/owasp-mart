@@ -22,6 +22,7 @@ What this contract does not cover: the browser API (IF-1, IF-2), the other inter
 | `GET /v1/instances` | platform to orchestrator | 200 | List by label (cursor-paged) for the reconciler and the Admin view |
 | `GET /v1/host` | platform to orchestrator | 200 | Capacity and health |
 | `POST /internal/v1/orch/state` | orchestrator to platform API | 204 new, 200 identical repeat | Signed state transition report with a `transition` number |
+| `GET /internal/v1/orch/desired` | orchestrator to platform API | 200 | Signed read of the ids of the instances the platform wants (section 8a) |
 
 Python side: the `InstanceHost` protocol in `apps/api/src/vulnmart/ports/instance_host.py` has one method per call. Three things implement it: `HttpInstanceHost` (the real client), `FakeInstanceHost` (in memory) and, as a service, the fake orchestrator in `contracts/mocks/fake-orchestrator/` that `HttpInstanceHost` can talk to. One shared test suite (`apps/api/tests/test_protocol.py`) runs against `FakeInstanceHost` and against `HttpInstanceHost` talking to the fake service.
 
@@ -182,6 +183,12 @@ What the platform does with a report:
 | malformed (missing or non-integer `transition`, `0`, a float token, a string, above 2^53 - 1) | 422 `ORCH-VALIDATION` | nothing stored |
 
 The platform treats a report as a claim and checks it against the state machine; what it does with an impossible transition (log, alert, ignore) is the platform's choice. If the platform is unreachable the orchestrator keeps the reports and retries in order (proposal; the fake orchestrator does not retry). Python side: `StateReport` and `ReportIngest` in `apps/api/src/vulnmart/ports/instance_host.py` implement the table; the shared tests run the same cases against the fake host and against the fake service.
+
+## 8a. The wanted instances (desired state, handoff H-123, since 1.2.0)
+
+`GET /internal/v1/orch/desired`, orchestrator to platform API, signed like a state report with the orchestrator key (empty body, so the body hash is the SHA-256 of nothing). Answer 200 `{ "instance_ids": [ "i-..." ] }` with `Cache-Control: private, no-store`: every instance the platform asked for and has not seen destroyed, an instance whose create is still being sent included; an empty list means nothing is wanted. A bad signature is 401 `ORCH-BAD-SIGNATURE`.
+
+The orchestrator reads it at start (before it serves) and with every reconciler pass. An instance it finds on its host that is not in the list is destroyed, but only when it was missing from two passes in a row (a create that is accepted a moment before the platform has noted its id is never destroyed by one pass); an instance that is in the list is adopted. Anything but a good 200 (a network error, a status other than 200, a body that is not this schema) means the platform cannot tell: the orchestrator destroys nothing for being unwanted and refuses new creates until a pass works (safe mode, as before). `null` is never an answer: it is the orchestrator's own word for "could not read".
 ## 9. Fake orchestrator and fake host
 
 - **Fake service** (`contracts/mocks/fake-orchestrator/server.mjs`, Node, no dependencies): all eight calls, the state machine, the signature, nonce and timestamp checks, a capacity limit, a step delay (`--step-delay-ms`, default 0), optional state reports (`--report-url`, `--report-key`). It stores no secret: the create body is checked and then reduced to a SHA-256 fingerprint. Extras that are **not part of the contract**: a second template name `shop-fail-v0` that ends in `failed` with `INST-HEALTH-TIMEOUT`, and a test-control path `POST /_fake/v1/instances/{id}/activity` (unsigned, localhost only) that moves an instance between `ready`, `active` and `idle`. Unknown routes answer 404 `ORCH-ROUTE-UNKNOWN` and a crash of the fake answers 500 `ORCH-INTERNAL`; both are fake-only codes, and both are RFC 9457 problems like every other answer.

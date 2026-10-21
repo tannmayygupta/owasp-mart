@@ -9,6 +9,8 @@
 //   EDGE_ADMIN_SECRET_FILE     file with the admin secret (read on every admin call, see admin.mjs) (required)
 //   EDGE_INGEST_URL            origin of the ingest, e.g. http://ingest:8081 (required); https needs EDGE_INGEST_CA_FILE
 //   EDGE_INGEST_CA_FILE        optional; the PEM of the CA of the ingest certificate (a missing file, a folder or an empty file means none)
+//   EDGE_STATE_FILE            optional; a file on a volume of the edge only where the access map and the used tickets are saved (persist.mjs); without it the state is memory only
+//   EDGE_STATE_MAX_AGE_S       how old a saved state may be and still be trusted at start (default 600; older: ignored, the gate starts closed)
 //   EDGE_PLAYER_BIND_HOST      address or Docker network alias to bind the player listener to (default 0.0.0.0)
 //   EDGE_ADMIN_BIND_HOST       address or network alias to bind the admin listener to (default 127.0.0.1); a name is resolved at start with retries
 //   EDGE_PLAYER_PORT / EDGE_ADMIN_PORT / EDGE_RELAY_PORT   defaults 8080 / 9090 / 8081
@@ -23,6 +25,7 @@ import http from 'node:http';
 import { createAdmin } from './admin.mjs';
 import { createGate } from './gate.mjs';
 import { createRelay } from './relay.mjs';
+import { createPersistence, createSaver, DEFAULT_MAX_AGE_S } from './persist.mjs';
 import { createStore } from './state.mjs';
 
 // A file that may be missing, empty or a folder (Docker makes one of a missing bind source): all of that means none.
@@ -127,10 +130,27 @@ export async function startServer({
   playerHost = '0.0.0.0', adminHost = '127.0.0.1', relayHost = '0.0.0.0',
   playerPort = 8080, adminPort = 9090, relayPort = 8081,
   relayRateMax, relayRateWindowMs, resolveUpstream, now, log = () => {},
+  stateFile, stateMaxAgeS = DEFAULT_MAX_AGE_S, saveDelayMs, heartbeatMs,
 }) {
-  const store = createStore({ zone });
-  const gate = createGate({ keys, zone, store, ...(now ? { now } : {}) });
-  const admin = createAdmin({ store, secretFile: adminSecretFile });
+  // Durable state (ADR 0075): the saver is wired to the store and the gate before anything is served, then the saved state (if fresh and genuine) is loaded.
+  const persistence = stateFile ? createPersistence({ file: stateFile, keys, zone, maxAgeS: stateMaxAgeS, log, ...(now ? { now } : {}) }) : null;
+  let saver = null;
+  const schedule = () => saver?.schedule();
+  const store = createStore({ zone, onChange: schedule });
+  const gate = createGate({ keys, zone, store, log, onUsedChange: schedule, ...(now ? { now } : {}) });
+  if (persistence) {
+    saver = createSaver({ persistence, snapshot: () => ({ instances: store.list(), used: gate.usedSnapshot() }), ...(saveDelayMs !== undefined ? { delayMs: saveDelayMs } : {}), ...(heartbeatMs !== undefined ? { heartbeatMs } : {}) });
+    const saved = persistence.load();
+    if (saved) {
+      store.restore(saved.instances);
+      gate.restoreUsed(saved.used);
+      log(`edge-gate: restored ${saved.instances.length} instance(s) and ${saved.used.length} used ticket(s) from the saved state`);
+    }
+    saver.flush(); // a state file of the new run exists at once (written_at fresh), also when nothing was restored
+    saver.start();
+  }
+  const status = () => ({ ...gate.status(), saved_state: persistence ? { enabled: true, ...persistence.lastLoad(), save_errors: persistence.saveErrors() } : { enabled: false } });
+  const admin = createAdmin({ store, secretFile: adminSecretFile, status });
   const relay = createRelay({ ingestUrl, ingestCa, rateMax: relayRateMax, rateWindowMs: relayRateWindowMs, log });
   const player = http.createServer(createPlayerHandler({ gate, resolveUpstream, log }));
   const adminServer = http.createServer(createAdminHandler({ admin }));
@@ -140,7 +160,7 @@ export async function startServer({
     admin: await listen(adminServer, adminPort, adminHost),
     relay: await listen(relay.server, relayPort, relayHost),
   };
-  return { ports, gate, stop: () => Promise.all([close(player), close(adminServer), close(relay.server)]).then(() => undefined) };
+  return { ports, gate, status, stop: () => Promise.all([close(player), close(adminServer), close(relay.server)]).then(() => { saver?.stop(); }) };
 }
 
 /** An address as it is, or a name resolved to its first IPv4 address (retried: Docker attaches the networks a moment after the start). */
@@ -172,6 +192,7 @@ export async function main(env = process.env) {
     relayHost: await resolveBindHost(env.EDGE_RELAY_BIND_HOST ?? '0.0.0.0'), // the instance-facing address in production (review finding C3)
     playerPort: int('EDGE_PLAYER_PORT', 8080), adminPort: int('EDGE_ADMIN_PORT', 9090), relayPort: int('EDGE_RELAY_PORT', 8081),
     relayRateMax: int('EDGE_RELAY_RATE_MAX', 120), relayRateWindowMs: int('EDGE_RELAY_RATE_WINDOW_MS', 10000),
+    ...(env.EDGE_STATE_FILE ? { stateFile: env.EDGE_STATE_FILE, stateMaxAgeS: int('EDGE_STATE_MAX_AGE_S', DEFAULT_MAX_AGE_S) } : {}),
     log: (m) => console.log(m),
   });
   console.log(`edge-gate: player ${s.ports.player}, admin ${s.ports.admin}, relay ${s.ports.relay}`);

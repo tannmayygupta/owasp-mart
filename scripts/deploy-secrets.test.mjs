@@ -42,6 +42,8 @@ test('the certificates chain to one CA, carry the addresses and the right usages
 for (const n of ['event_master', 'flag_key', 'owner_key']) assert.equal(Buffer.from(fs.readFileSync(path.join(keys, n), 'utf8'), 'base64url').length, 32, n);
 assert.match(fs.readFileSync(path.join(keys, 'kek'), 'utf8'), /^1:[A-Za-z0-9_-]{43}$/);
 assert.match(fs.readFileSync(path.join(keys, 'keystore_password'), 'utf8'), /^[0-9a-f]{48}$/);
+  assert.match(fs.readFileSync(path.join(keys, 'valkey_password'), 'utf8'), /^[0-9a-f]{48}$/);
+  assert.equal(fs.existsSync(path.join(keys, 'brevo_api_key')), false, 'the Brevo key is external: never made here');
     assert.equal(fs.readFileSync(path.join(keys, 'gate_key_previous'), 'utf8'), '');
     assert.ok(r.pki.includes('ca.key') && r.keys.includes('pg_app_password'));
     assert.throws(() => make({ out: path.join(dir, 'o'), vmiIp: '10.0.2.10', vmpIp: '10.0.1.10', days: 5, force: false }), /not empty/);

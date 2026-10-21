@@ -53,7 +53,7 @@ from .problems import (
     INTERNAL, MEDIA_TYPE, RETRY_AFTER_BUSY, ROUTE_UNKNOWN, ProblemError, new_request_id, pointer, problem_body,
 )
 from .ratelimit import BURST, RATE_PER_SECOND, RateLimiter
-from .reconcile import TombstoneStore
+from .reconcile import HttpDesiredState, TombstoneStore
 from .reports import ReportPusher, check_report_url
 from .states import Busy, CursorInvalid, EngineError, FieldForbidden, LabelUnknown, ValidationFailed
 from .templates import load_templates
@@ -528,13 +528,13 @@ def fail_variant(template: dict) -> dict:
     return t
 
 
-def build_engine(args: argparse.Namespace, on_transition: Callable | None) -> Orchestrator:
+def build_engine(args: argparse.Namespace, on_transition: Callable | None, desired=None) -> Orchestrator:
     templates = load_templates(args.templates_dir, args.template_schema)
     if not templates:
         raise ValueError(f"no template (*.json) found in {args.templates_dir}")
     common = dict(
         capacity_mb=args.capacity_mb, host_id=args.host_id, step_delay_s=args.step_delay_ms / 1000, on_transition=on_transition,
-        tombstones=TombstoneStore(args.state_dir), reconcile_gate=True, edge_container=args.edge_container,
+        tombstones=TombstoneStore(args.state_dir), reconcile_gate=True, edge_container=args.edge_container, desired=desired,
         gate=GatePort(args.gate_url, args.gate_admin_key_file) if args.gate_url else NullGate(),
     )
     if args.backend == "fake":
@@ -548,6 +548,7 @@ def build_engine(args: argparse.Namespace, on_transition: Callable | None) -> Or
         raise ValueError("--images-manifest is required with --backend docker")
     if not args.state_dir:
         log_line(event="no-state-dir", detail="destroyed instance ids are only kept in memory and are forgotten when the service restarts")
+    log_line(event="settings-defaults", detail="the idle, maximum and parallel-build settings are the built-in defaults: the admin's platform settings do not reach this orchestrator (ADR 0075, open)")
     from .backend import SdkBackend
 
     return Orchestrator(
@@ -599,10 +600,16 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--gate-url and --gate-admin-key-file must be given together")
         platform_key = _key(args.key_file, "VM_ORCH_PLATFORM_KEY", "key (platform signing key)")
         pusher = None
+        desired = None
         if args.report_url:
-            pusher = ReportPusher(args.report_url, _key(args.report_key_file, "VM_ORCH_REPORT_KEY", "report-key (orchestrator signing key)"),
-                                  timeout_s=args.report_timeout_ms / 1000)
-        engine = build_engine(args, pusher.submit if pusher else None)
+            report_key = _key(args.report_key_file, "VM_ORCH_REPORT_KEY", "report-key (orchestrator signing key)")
+            pusher = ReportPusher(args.report_url, report_key, timeout_s=args.report_timeout_ms / 1000)
+            desired = HttpDesiredState(args.report_url, report_key, timeout_s=args.report_timeout_ms / 1000)  # the platform says which instances it wants (H-123)
+        else:
+            log_line(event="no-desired-state", detail="no report URL: every instance found on the host is wanted and none is destroyed for being unlisted")
+        engine = build_engine(args, pusher.submit if pusher else None, desired)
+        if desired is not None:
+            engine.reconciler.unwanted_passes = 2  # unlisted in two passes in a row before it is destroyed (contract section 8a)
         ctx = tls_context(args.tls_cert, args.tls_key, args.tls_ca) if all(tls) else None
     except ssl.SSLError as e:
         print(f"vulnmart_orchestrator: the TLS files are not usable ({e.reason or 'SSLError'})", file=sys.stderr)

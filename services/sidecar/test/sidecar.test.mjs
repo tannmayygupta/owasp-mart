@@ -94,8 +94,8 @@ test('ingest down: the event is kept and retried until it is delivered', async (
   } finally { await b.sc.stop(); if (ing) await closeServer(ing.server); }
 });
 
-test('drop rules: 401, 409, 413 and 422 drop the event with an alarm that holds only seq and status', async () => {
-  for (const status of [401, 409, 413, 422]) {
+test('drop rules: 409, 413 and 422 can never succeed and drop the event at once with an alarm that holds only seq and status', async () => {
+  for (const status of [409, 413, 422]) {
     const rel = await scripted([status]);
     const b = await boot({ relayPort: rel.port });
     try {

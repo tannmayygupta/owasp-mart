@@ -85,20 +85,24 @@ services:
     profiles: ["platform"]
     image: valkey/valkey:9.0.6-alpine3.24@sha256:187679e3bd4036959631e3f03983ab2ba503ab21e6fd0454d508e909db2ee989
     container_name: vulnmart-valkey
-    user: "65532:65532"
+    # The image's own user owns /data, so the named volume is writable without a root step (the same as the deployed file, infra/deploy/platform.compose.yaml).
+    user: "999:1000"
     read_only: true
-    # No persistence in development: nothing is written to disk.
-    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    # The same settings as the deployed stack so development finds the same problems: a password, an append-only file on a named volume (the mail queue survives a restart), and the policy
+    # `volatile-lru` (only keys with a TTL, the rate-limit counters, may be evicted; a queue or a live stream is never silently dropped). The password is a development value, not a secret.
+    environment:
+      VALKEY_PASSWORD: ${VULNMART_DEV_VALKEY_PASSWORD:-vulnmart-valkey-dev-only-not-a-secret}
+    command: ["sh", "-c", "exec valkey-server --requirepass \"$$VALKEY_PASSWORD\" --appendonly yes --appendfsync everysec --save \"\" --maxmemory 64mb --maxmemory-policy volatile-lru"]
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
     mem_limit: 128m
     pids_limit: 64
-    tmpfs:
-      - /data:rw,noexec,nosuid,size=8m,uid=65532,gid=65532
+    volumes:
+      - valkey-data:/data
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$VALKEY_PASSWORD\" valkey-cli ping | grep -q PONG"]
       interval: 2s
       timeout: 3s
       retries: 15
@@ -177,7 +181,7 @@ services:
     read_only: true
     environment:
       VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}@postgres:5432/vulnmart
-      VULNMART_VALKEY_URL: valkey://valkey:6379/0
+      VULNMART_VALKEY_URL: valkey://:${VULNMART_DEV_VALKEY_PASSWORD:-vulnmart-valkey-dev-only-not-a-secret}@valkey:6379/0
       VULNMART_SERVICE: api
       # Story P-07: the API refuses /api/* without the origin secret the web proxy adds (a development value, the same
       # default as the web service below; production keeps it in the Vercel project and on VM-P, architecture 06 s3).
@@ -227,7 +231,7 @@ services:
     command: ["uvicorn", "vulnmart.kernel.entrypoints.worker:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]
     environment:
       VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_DEV_APP_DB_PASSWORD:-vulnmart-app-dev-only-not-a-secret}@postgres:5432/vulnmart
-      VULNMART_VALKEY_URL: valkey://valkey:6379/0
+      VULNMART_VALKEY_URL: valkey://:${VULNMART_DEV_VALKEY_PASSWORD:-vulnmart-valkey-dev-only-not-a-secret}@valkey:6379/0
       VULNMART_SERVICE: worker
       # Story P-20: the field secret of the API (a development value; production reads a secret file), so the worker opens the address of an invited candidate that the API sealed.
       VULNMART_FIELD_SECRET: ${VULNMART_DEV_FIELD_SECRET:-vulnmart-dev-field-secret-not-a-secret-0123456789}
@@ -364,6 +368,9 @@ services:
       EDGE_INGEST_URL: ${VULNMART_EDGE_INGEST_URL:-http://ingest.invalid:8081}
       # An https ingest URL (the one TLS listener of vm-p) needs the CA of its certificate; an empty file means none (the file must exist).
       EDGE_INGEST_CA_FILE: /run/secrets/ingest_ca
+      # The access map and the used tickets are saved here (ADR 0075), so a restart of the edge does not end every live lab; a state older than 10 minutes is ignored.
+      EDGE_STATE_FILE: /var/lib/vulnmart-edge/state.json
+      EDGE_STATE_MAX_AGE_S: "600"
       EDGE_PLAYER_BIND_HOST: edge-gate-player
       EDGE_ADMIN_BIND_HOST: edge-gate-admin
     volumes:
@@ -371,6 +378,7 @@ services:
       - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_key_previous:/run/secrets/gate_key_previous:ro
       - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/gate_admin_secret:/run/secrets/gate_admin_secret:ro
       - ${VULNMART_EDGE_SECRETS:-/opt/vulnmart/lab/secrets}/ingest_ca.pem:/run/secrets/ingest_ca:ro
+      - edge-state:/var/lib/vulnmart-edge
     cap_drop:
       - ALL
     security_opt:
@@ -538,6 +546,8 @@ secrets:
 
 volumes:
   orch-state:
+  edge-state:
   pg-data:
+  valkey-data:
   web-node-modules:
   web-next:

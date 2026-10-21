@@ -5,6 +5,7 @@
 // folder `scripts/deploy-secrets.mjs` made (outside the repository). Secrets travel as files over ssh, are never put on a command line and never printed.
 // Everything remote runs through `sudo` on the hosts as the user `ubuntu` with the key of this PC's ssh agent. Idempotent: run a command again to repair or to update.
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,6 +21,7 @@ export const OWNER = '65532:65532'; // the user of every container that reads a 
 // image name on this PC -> [dockerfile, extra build args]; context is always the repository root
 export const IMAGES = {
   'vulnmart-api:prod': ['apps/api/Dockerfile'],
+  'vulnmart-web:prod': ['apps/web/Dockerfile.prod', 'apps/web'], // the dashboards (Next.js standalone), served on vm-p beside the lab console (ADR 0074)
   'vulnmart-orchestrator:local': ['apps/orchestrator/Dockerfile'],
   'vulnmart-edge:local': ['apps/edge/Dockerfile'],
   'vulnmart-sidecar:local': ['services/sidecar/Dockerfile', 'services/sidecar'],
@@ -29,7 +31,7 @@ export const IMAGES = {
   'vulnmart-mock-services:local': ['services/mock-services/Dockerfile', 'services/mock-services'],
   'vulnmart-bot:local': ['services/bot/Dockerfile', 'services/bot'],
 };
-export const SHIP = { p: ['vulnmart-api:prod'], i: ['vulnmart-orchestrator:local', 'vulnmart-edge:local', 'vulnmart-sidecar:local', 'vulnmart-stub-instance:local', 'vulnmart-shop:local', 'vulnmart-import-service:local', 'vulnmart-mock-services:local', 'vulnmart-bot:local'] };
+export const SHIP = { p: ['vulnmart-api:prod', 'vulnmart-web:prod'], i: ['vulnmart-orchestrator:local', 'vulnmart-edge:local', 'vulnmart-sidecar:local', 'vulnmart-stub-instance:local', 'vulnmart-shop:local', 'vulnmart-import-service:local', 'vulnmart-mock-services:local', 'vulnmart-bot:local'] };
 // the instance roles of the lab: which image each role runs, and what the orchestrator may pass (a request can only name a template, never an image or a command)
 export const ROLE_IMAGE = {
   shop: 'vulnmart-shop:local', injector: 'vulnmart-shop:local', 'volume-keeper': 'vulnmart-stub-instance:local', sidecar: 'vulnmart-sidecar:local',
@@ -84,11 +86,12 @@ export function labEnv({ zone, H, runtime = DEFAULT_RUNTIME }) {
 
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
-  const o = { cmd, dryRun: false };
-  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--runtime runsc|runc] [--dry-run]' };
+  const o = { cmd, dryRun: false, allowMailCatcher: false };
+  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--runtime runsc|runc] [--allow-mail-catcher] [--dry-run]' };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--dry-run') o.dryRun = true;
+    else if (a === '--allow-mail-catcher') o.allowMailCatcher = true;
     else if (['--secrets', '--zone', '--platform-host', '--runtime'].includes(a)) {
       if (rest[i + 1] === undefined) return { error: `${a} needs a value` };
       o[{ '--secrets': 'secrets', '--zone': 'zone', '--platform-host': 'platformHost', '--runtime': 'runtime' }[a]] = rest[++i];
@@ -96,6 +99,23 @@ export function parseArgs(argv) {
     } else return { error: `unknown argument ${a}` };
   }
   return o;
+}
+
+/** The .env of the platform stack on vm-p (mode 600, never committed). Mail: Brevo when a key was staged; the catcher only when the operator allowed it knowingly (--allow-mail-catcher). */
+export function platformEnv({ pg, platformHost, zone, H, mail }) {
+  const lines = [`VULNMART_OWNER_DB_PASSWORD=${pg.owner}`, `VULNMART_APP_DB_PASSWORD=${pg.app}`, `VULNMART_KEYSTORE_PASSWORD=${pg.keystore}`, `VULNMART_VALKEY_PASSWORD=${pg.valkey}`,
+    `VULNMART_PLATFORM_HOST=${platformHost}`, `VULNMART_LABS_ZONE=${zone}`, `VULNMART_VMI_PRIVATE_IP=${H.i.priv}`, `VULNMART_VMP_PRIVATE_IP=${H.p.priv}`];
+  if (mail === 'brevo') lines.push('VULNMART_EMAIL_PROVIDER=brevo', 'VULNMART_ALLOW_MAIL_CATCHER=false');
+  else if (mail === 'catcher') lines.push('VULNMART_EMAIL_PROVIDER=smtp', 'VULNMART_SMTP_HOST=mailpit', 'VULNMART_ALLOW_MAIL_CATCHER=true', 'COMPOSE_PROFILES=mail-catcher');
+  else throw new Error('mail is brevo or catcher');
+  return `${lines.join('\n')}\n`;
+}
+
+/** Which mail mode a deploy runs in, from the secrets folder: a non-empty keys/brevo_api_key means Brevo; without one the deploy stops unless the catcher was asked for. */
+export function mailMode({ keyText, allowCatcher }) {
+  if ((keyText ?? '').trim()) return 'brevo';
+  if (allowCatcher) return 'catcher';
+  throw new Error('no Brevo key: put the key in <secrets folder>/keys/brevo_api_key (docs/runbooks/live-deploy.md, Real e-mail), or deploy with --allow-mail-catcher to run knowingly without real mail');
 }
 
 /** images.json of the orchestrator from the digests the local registry gave: {role: ref}. Every role of the lab must be there. */
@@ -269,9 +289,23 @@ rm -rf stage
   stage(host, [{ local: k('origin_secret'), name: 'origin_secret' }], '/opt/vulnmart/platform/secrets', '65532:0', '440', '755');
   stage(host, [{ local: p('ca.pem'), name: 'ca.pem' }, { local: p('client.pem'), name: 'client.pem' }, { local: p('client.key'), name: 'client.key' }], '/opt/vulnmart/platform/pki', OWNER, '400');
   stage(host, [{ local: p('ingest.pem'), name: 'ingest.pem' }, { local: p('ingest.key'), name: 'ingest.key' }], '/opt/vulnmart/platform/pki', 'root:root', '400', '755');
+  // Real e-mail (production hardening): the Brevo key is an external credential kept in the secrets folder as keys/brevo_api_key (never in the repository). The file is always staged
+  // (the compose file bind-mounts it; a missing file would become a directory); empty means no key, and then the deploy stops unless the catcher was asked for.
+  const brevoFile = path.join(k('brevo_api_key'));
+  const brevoText = fs.existsSync(brevoFile) ? fs.readFileSync(brevoFile, 'utf8') : '';
+  const mail = mailMode({ keyText: brevoText, allowCatcher: o.allowMailCatcher });
+  if (mail === 'catcher') log('WARNING: no Brevo key, running with the mail catcher on purpose (--allow-mail-catcher): no e-mail reaches anyone');
+  const emptyKey = path.join(os.tmpdir(), `brevo-empty-${Date.now()}`);
+  fs.writeFileSync(emptyKey, '');
+  stage(host, [{ local: mail === 'brevo' ? brevoFile : emptyKey, name: 'brevo_api_key' }], '/opt/vulnmart/platform/secrets', OWNER, '400');
+  fs.rmSync(emptyKey, { force: true });
+  // the audit anchor file (OI-28) is written by the API (uid 65532) into this folder; an operator ships it off the machine
+  sshScript(host, 'plat-anchors.sh', `set -eu\nsudo install -d -o ${OWNER.split(':')[0]} -g ${OWNER.split(':')[1]} -m 750 /opt/vulnmart/platform/anchors\n`);
   const envFile = path.join(os.tmpdir(), `platform-env-${Date.now()}`);
   const rd = (n) => fs.readFileSync(k(n), 'utf8').trim();
-  fs.writeFileSync(envFile, [`VULNMART_OWNER_DB_PASSWORD=${rd('pg_owner_password')}`, `VULNMART_APP_DB_PASSWORD=${rd('pg_app_password')}`, `VULNMART_KEYSTORE_PASSWORD=${rd('keystore_password')}`, `VULNMART_PLATFORM_HOST=${platformHost}`, `VULNMART_LABS_ZONE=${zone}`, `VULNMART_VMI_PRIVATE_IP=${H.i.priv}`, `VULNMART_VMP_PRIVATE_IP=${H.p.priv}`, ''].join('\n'));
+  // a secrets folder made before the Valkey password existed gets one now (the other secrets are never touched)
+  if (!fs.existsSync(k('valkey_password')) && !cfg.dryRun) fs.writeFileSync(k('valkey_password'), crypto.randomBytes(24).toString('hex'), { mode: 0o600 });
+  fs.writeFileSync(envFile, platformEnv({ pg: { owner: rd('pg_owner_password'), app: rd('pg_app_password'), keystore: rd('keystore_password'), valkey: rd('valkey_password') }, platformHost, zone, H, mail }));
   stage(host, [{ local: envFile, name: '.env' }], '/opt/vulnmart/platform', 'root:root', '600', '755');
   fs.rmSync(envFile, { force: true });
   log('swap, images and start');
