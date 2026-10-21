@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { api, say, timeWarning, when, type Attempt, type CompanyInvite, type Progress } from '../../../lib/api';
+import { api, inviteActions, say, timeWarning, when, type Attempt, type CompanyInvite, type InviteAction, type Progress } from '../../../lib/api';
 import { useLive } from '../../../lib/live';
 import { useRequireUser } from '../../../lib/session';
 
@@ -17,6 +17,58 @@ export default function CandidatesPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
+  const [notice, setNotice] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
+
+  // One invite action (resend, cancel, revoke, re-invite; IF-1 actOnInvite). The API decides what is allowed; a refusal is shown, never hidden.
+  async function doAction(invite: CompanyInvite, action: InviteAction): Promise<string | null> {
+    try {
+      await api('POST', `/api/v1/company/invites/${invite.invite_id}/actions`, { action });
+      return null;
+    } catch (e) {
+      return say(e);
+    }
+  }
+  async function act(invite: CompanyInvite, action: InviteAction) {
+    const sure = action === 'revoke' || action === 'reinvite' || action === 'cancel';
+    if (sure && !window.confirm(action === 'reinvite'
+      ? `Give ${invite.email} a new attempt? The old attempt is cancelled and stays in the record, and the invite counts against today's limit.`
+      : `${action === 'revoke' ? 'Revoke' : 'Cancel'} the invitation of ${invite.email}? The link stops working.`)) return;
+    const problem = await doAction(invite, action);
+    setNotice('');
+    setError(problem ?? '');
+    if (!problem) setNotice(`${invite.email}: ${action === 'resend' ? 'a new link was sent' : action === 'reinvite' ? 'a new attempt was invited' : action === 'revoke' ? 'revoked' : 'cancelled'}.`);
+    await load();
+  }
+  // Cancel an attempt that has not ended (FR-SES-07, IF-2 cancelAttempt): the instance is destroyed at once and nothing scores any more.
+  async function cancelAttempt(invite: CompanyInvite) {
+    if (!window.confirm(`Cancel the attempt of ${invite.email}? Their instance is destroyed now and nothing scores any more. This cannot be undone; to give them another go, use a re-invite.`)) return;
+    try {
+      await api('POST', `/api/v1/attempts/${invite.attempt_id}/cancel`);
+      setError('');
+      setNotice(`${invite.email}: the attempt was cancelled.`);
+    } catch (e) {
+      setNotice('');
+      setError(say(e));
+    }
+    await load();
+  }
+  // The bulk form of the same actions: the chosen invites one after the other, then one summary (no bulk route: each call is checked by the API on its own).
+  async function bulk(action: 'resend' | 'revoke') {
+    const chosen = rows.map((r) => r.invite).filter((i) => picked.includes(i.invite_id));
+    if (action === 'revoke' && !window.confirm(`Revoke ${chosen.length} invitation(s)? The links stop working.`)) return;
+    let done = 0;
+    const failed: string[] = [];
+    for (const invite of chosen) {
+      if (!inviteActions(invite).includes(action)) { failed.push(`${invite.email}: not possible in state ${invite.state}`); continue; }
+      const problem = await doAction(invite, action);
+      if (problem) failed.push(`${invite.email}: ${problem}`); else done += 1;
+    }
+    setPicked([]);
+    setError(failed.length ? failed.join(' | ') : '');
+    setNotice(`${action === 'resend' ? 'Resent' : 'Revoked'}: ${done} of ${chosen.length}.`);
+    await load();
+  }
 
   const load = useCallback(async () => {
     try {
@@ -57,16 +109,30 @@ export default function CandidatesPage() {
       <h1>Candidates</h1>
       <p className="muted">Updates live. <Link href="/company">Templates and invitations</Link></p>
       {error && <p className="banner bad" role="alert">{error}</p>}
-      <div className="card table-wrap">
+      {notice && <p className="banner ok" role="status">{notice}</p>}
+      {picked.length > 0 && (
+        <p className="row" data-testid="bulk-bar">
+          <span>{picked.length} chosen</span>
+          <button type="button" className="ghost" onClick={() => void bulk('resend')}>Resend the chosen</button>
+          <button type="button" className="danger" onClick={() => void bulk('revoke')}>Revoke the chosen</button>
+        </p>
+      )}
+      <div className="card table-wrap" tabIndex={0} role="region" aria-label="Invitations and candidates">
         {rows.length === 0 ? <p className="muted">No invitations yet.</p> : (
           <table data-testid="monitor">
-            <thead><tr><th>Candidate</th><th>Invite</th><th>Attempt</th><th>Time left</th><th>Progress</th><th /></tr></thead>
+            <thead><tr><th><span className="sr-only">Choose</span></th><th>Candidate</th><th>Invite</th><th>Attempt</th><th>Time left</th><th>Progress</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {rows.map(({ invite, attempt, progress }) => {
                 const left = attempt?.state === 'running' && attempt.deadline_at ? Math.max(0, Math.round((Date.parse(attempt.deadline_at) - now) / 1000)) : null;
                 const captured = progress.filter((p) => p.solved).length;
                 return (
                   <tr key={invite.invite_id} data-invite={invite.invite_id}>
+                    <td>
+                      {['resend', 'revoke'].some((a) => inviteActions(invite).includes(a as InviteAction)) && (
+                        <input type="checkbox" aria-label={`Choose ${invite.email}`} checked={picked.includes(invite.invite_id)}
+                          onChange={(ev) => setPicked(ev.target.checked ? [...picked, invite.invite_id] : picked.filter((p) => p !== invite.invite_id))} />
+                      )}
+                    </td>
                     <td>
                       {invite.email}<span className="tag">sent {when(invite.sent_at ?? invite.created_at)}</span>
                       {invite.generation > 1 && <span className="tag">re-invite, attempt {invite.generation}</span>}
@@ -86,7 +152,16 @@ export default function CandidatesPage() {
                         </>
                       ) : '-'}
                     </td>
-                    <td>{attempt && ['running', 'submitted', 'reported', 'expired'].includes(attempt.state) && <Link href={`/company/candidates/${invite.attempt_id}`}>Report</Link>}</td>
+                    <td className="row">
+                      {attempt && ['running', 'submitted', 'reported', 'expired'].includes(attempt.state) && <Link href={`/company/candidates/${invite.attempt_id}`} aria-label={`Report of ${invite.email}`}>Report</Link>}
+                      {attempt && ['ready', 'running'].includes(attempt.state) && (
+                        <button type="button" className="danger" aria-label={`Cancel the attempt of ${invite.email}`} onClick={() => void cancelAttempt(invite)}>Cancel attempt</button>
+                      )}
+                      {inviteActions(invite).map((a) => (
+                        <button key={a} type="button" className={a === 'revoke' || a === 'cancel' ? 'danger' : 'ghost'} aria-label={`${a === 'reinvite' ? 'Re-invite' : a[0].toUpperCase() + a.slice(1)} ${invite.email}`}
+                          onClick={() => void act(invite, a)}>{a === 'reinvite' ? 'Re-invite' : a[0].toUpperCase() + a.slice(1)}</button>
+                      ))}
+                    </td>
                   </tr>
                 );
               })}

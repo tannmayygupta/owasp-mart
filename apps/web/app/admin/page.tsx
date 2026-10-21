@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
-  ApiError, api, say, when, type AdminSetting, type AdminUser, type AuditEntry, type BreakGlassSession, type Capacity, type JobStatus, type PendingCompany, type Quota,
+  ApiError, api, say, when, type AdminCompany, type AdminSetting, type AdminUser, type AuditEntry, type BreakGlassSession, type Capacity, type JobStatus, type PendingCompany, type Quota,
 } from '../../lib/api';
 import { useRequireUser } from '../../lib/session';
 
@@ -14,6 +14,7 @@ import { useRequireUser } from '../../lib/session';
 export default function AdminPage() {
   const user = useRequireUser();
   const [queue, setQueue] = useState<PendingCompany[]>([]);
+  const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [capacity, setCapacity] = useState<Capacity | null>(null);
   const [jobs, setJobs] = useState<JobStatus[]>([]);
@@ -27,14 +28,16 @@ export default function AdminPage() {
 
   const load = useCallback(async () => {
     try {
-      const [q, c, j, s, qu, bg] = await Promise.all([
+      const [q, c, j, s, qu, bg, co] = await Promise.all([
         api<{ items: PendingCompany[] }>('GET', '/api/v1/admin/companies/pending'),
         api<Capacity>('GET', '/api/v1/admin/capacity'),
         api<{ items: JobStatus[] }>('GET', '/api/v1/admin/jobs'),
         api<{ items: AdminSetting[] }>('GET', '/api/v1/admin/settings'),
         api<{ items: Quota[] }>('GET', '/api/v1/admin/quotas'),
         api<{ items: BreakGlassSession[] }>('GET', '/api/v1/admin/break-glass'),
+        api<{ items: AdminCompany[] }>('GET', '/api/v1/admin/companies'),
       ]);
+      setCompanies(co.items);
       setGlass(bg.items);
       setQueue(q.items);
       setCapacity(c);
@@ -81,7 +84,7 @@ export default function AdminPage() {
       <section className="card" data-testid="queue">
         <h2>Companies waiting for approval</h2>
         {queue.length === 0 ? <p className="muted">None waiting.</p> : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Companies waiting for approval">
             <table>
               <thead><tr><th>Company</th><th>Owner</th><th>Applied</th><th /></tr></thead>
               <tbody>
@@ -105,6 +108,61 @@ export default function AdminPage() {
         )}
       </section>
 
+      <section className="card" data-testid="companies" aria-labelledby="companies-h">
+        <h2 id="companies-h">Companies</h2>
+        <p className="muted">Every company, with how many recruiters it has and its daily invite cap. Reading this list is recorded in the audit log. Suspending ends the recruiters&apos; sessions; deleting a company removes its data under the retention rules.</p>
+        {companies.length === 0 ? <p className="muted">No company yet.</p> : (
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Companies">
+            <table>
+              <thead><tr><th>Company</th><th>Owner</th><th>Status</th><th>Members</th><th>Daily invite cap</th><th><span className="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                {companies.map((c) => (
+                  <tr key={c.org_id} data-company={c.name}>
+                    <td>{c.name}</td>
+                    <td>{c.owner_name}<span className="tag">@{c.owner_email_domain}</span></td>
+                    <td><span className={`pill ${c.status === 'active' ? 'ok' : c.status === 'suspended' ? 'warn' : ''}`}>{c.status}</span></td>
+                    <td>{c.members}</td>
+                    <td>
+                      <form className="row" onSubmit={(ev: FormEvent<HTMLFormElement>) => {
+                        ev.preventDefault();
+                        const raw = String(new FormData(ev.currentTarget).get('cap') ?? '').trim();
+                        void act(() => api('PUT', `/api/v1/admin/companies/${c.org_id}/invite-cap`, { invite_cap: raw === '' ? null : Number(raw) }),
+                          raw === '' ? `${c.name}: the global cap applies again.` : `${c.name}: the daily cap is ${raw}.`);
+                      }}>
+                        <input name="cap" type="text" inputMode="numeric" defaultValue={c.invite_cap_override === null ? '' : String(c.invite_cap_override)} placeholder={`${c.invite_cap} (global)`}
+                          aria-label={`Daily invite cap of ${c.name}, empty for the global setting`} />
+                        <button type="submit" className="ghost" aria-label={`Save the invite cap of ${c.name}`}>Save</button>
+                      </form>
+                    </td>
+                    <td className="row">
+                      {c.status === 'active' && (
+                        <button type="button" className="ghost" aria-label={`Suspend ${c.name}`} onClick={() => {
+                          const reason = window.prompt(`Why is ${c.name} suspended? The owner sees this.`);
+                          if (reason) void act(() => api('POST', `/api/v1/admin/companies/${c.org_id}/decision`, { decision: 'suspend', reason }), `${c.name} suspended.`);
+                        }}>Suspend</button>
+                      )}
+                      {c.status === 'suspended' && (
+                        <button type="button" className="ghost" aria-label={`Reinstate ${c.name}`} onClick={() => {
+                          const reason = window.prompt(`Why is ${c.name} reinstated?`);
+                          if (reason) void act(() => api('POST', `/api/v1/admin/companies/${c.org_id}/decision`, { decision: 'reinstate', reason }), `${c.name} reinstated.`);
+                        }}>Reinstate</button>
+                      )}
+                      {c.status !== 'deleted' && c.status !== 'pending' && (
+                        <button type="button" className="danger" aria-label={`Delete ${c.name}`} onClick={() => {
+                          if (!window.confirm(`Delete ${c.name}? Its recruiters lose access and its data is removed under the retention rules.`)) return;
+                          const reason = window.prompt(`Why is ${c.name} deleted? (recorded)`);
+                          if (reason) void act(() => api('POST', `/api/v1/admin/companies/${c.org_id}/decision`, { decision: 'delete', reason }), `${c.name} deleted.`);
+                        }}>Delete</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <section className="card" data-testid="users">
         <h2>Users</h2>
         <form className="row" onSubmit={(ev: FormEvent<HTMLFormElement>) => {
@@ -116,7 +174,7 @@ export default function AdminPage() {
           <button type="submit">Search</button>
         </form>
         {users && (users.length === 0 ? <p className="muted">Nobody found.</p> : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Users found">
             <table>
               <thead><tr><th>Name</th><th>Email</th><th>Type</th><th>Status</th><th>Last sign-in</th><th /></tr></thead>
               <tbody>
@@ -167,7 +225,7 @@ export default function AdminPage() {
 
       <section className="card" data-testid="jobs">
         <h2>Retention and scheduled jobs</h2>
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Retention and scheduled jobs">
           <table>
             <thead><tr><th>Job</th><th>Last run</th><th>Result</th><th>Next</th></tr></thead>
             <tbody>
@@ -186,7 +244,7 @@ export default function AdminPage() {
 
       <section className="card" data-testid="settings">
         <h2>Settings</h2>
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Settings">
           <table>
             <thead><tr><th>Setting</th><th>Value</th><th>Default</th><th /></tr></thead>
             <tbody>
@@ -249,7 +307,7 @@ export default function AdminPage() {
           <button type="submit">Read</button>
         </form>
         {audit && (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Audit log entries">
             <table>
               <thead><tr><th>#</th><th>When</th><th>Who</th><th>Action</th><th>About</th><th>Details</th></tr></thead>
               <tbody>
@@ -284,7 +342,7 @@ export default function AdminPage() {
           <p><button type="submit" className="danger">Open break-glass</button></p>
         </form>
         {glass.length > 0 && (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Break-glass sessions">
             <table>
               <thead><tr><th>Admin</th><th>Attempt</th><th>Reason</th><th>Window</th><th>Reads</th><th>State</th><th /></tr></thead>
               <tbody>

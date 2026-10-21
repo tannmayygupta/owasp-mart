@@ -39,7 +39,9 @@ import vulnmart.privacy.models  # noqa: E402,F401
 from vulnmart.accounts import security  # noqa: E402
 from vulnmart.accounts.directory import UserDirectory  # noqa: E402
 from vulnmart.accounts.fieldkeys import FieldKeys  # noqa: E402
-from vulnmart.accounts.models import User, UserRole  # noqa: E402
+from vulnmart.accounts import totp  # noqa: E402
+from vulnmart.accounts.mfa import MfaService  # noqa: E402
+from vulnmart.accounts.models import MfaCredential, User, UserRole  # noqa: E402
 from vulnmart.accounts.passwords import CommonPasswordList, PasswordPolicy  # noqa: E402
 from vulnmart.accounts.roles import RoleService  # noqa: E402
 from vulnmart.accounts.self_service import SelfService  # noqa: E402
@@ -67,8 +69,12 @@ PASSWORD = "correct horse battery staple"  # local test accounts only
 FIELD_KEYS = FieldKeys.from_secret(b"an e2e field key secret of 32+ bytes!!")
 ZONE = "labs.example.test"
 RECRUITER_EMAIL = "recruiter-e2e@acme.example"
-CANDIDATES = {"release": "cand-release@e2e.example", "submit": "cand-submit@e2e.example", "closed": "cand-closed@e2e.example"}
+CANDIDATES = {"release": "cand-release@e2e.example", "submit": "cand-submit@e2e.example", "closed": "cand-closed@e2e.example", "board": "cand-board@e2e.example", "rev1": "cand-rev1@e2e.example", "rev2": "cand-rev2@e2e.example", "rev3": "cand-rev3@e2e.example",
+              "cancel": "cand-cancel@e2e.example", "del": "cand-del@e2e.example"}
 ADMIN_ID = "u-ADMINADMINADMIN2"[:18]
+# admins with a second factor (every admin session needs one, FR-ACC-07); one per journey because a code works once. The secrets stay in this process; the `/_e2e/totp` hook gives the current code.
+ADMINS = {"journey": ("u-ADMINJOURNEY22222", "admin-journey@e2e.example"), "a11y": ("u-ADMINAXESCAN22222", "admin-a11y@e2e.example")}
+PENDING_OWNER = "owner-pending@globex-e2e.example"  # the owner of a company waiting for the admin's approval
 
 
 def now() -> datetime:
@@ -82,6 +88,27 @@ def add_user(sessions, uid: str, email: str, *, account_type: str = "participant
         s.flush()
         if account_type == "participant":
             s.add(UserRole(user_id=uid, role="learner", account_type="participant"))
+
+
+class LabAttemptRecords:
+    """What the retention and deletion services read about attempts, from the lab runtime of this process (its attempts live in memory here, not in the SQL table the
+    production lab writes); the rest is the real SQL view."""
+
+    def __init__(self, sql, lab):
+        self._sql, self._lab = sql, lab
+
+    def get(self, attempt_id: str):
+        from vulnmart.privacy.retention.records import TERMINAL, AttemptInfo
+
+        try:
+            rec = self._lab.engine.get(attempt_id)
+        except KeyError:
+            return self._sql.get(attempt_id)
+        ended = (rec.submitted_at or now()) if rec.state.value in TERMINAL else None
+        return AttemptInfo(rec.id, rec.user_id, rec.org_id, rec.state.value, ended, None)
+
+    def __getattr__(self, name):
+        return getattr(self._sql, name)
 
 
 def build(web_origin: str):
@@ -117,14 +144,46 @@ def build(web_origin: str):
     consent = ConsentService(sessions, targets, audit, settings, FIELD_KEYS)
 
     app = create_app({}, settings=Settings(public_origin=web_origin), rate_limiter=InMemoryRateLimiter(now=lambda: time.time()), policy=policy, accounts=accounts,
-                     sessions=session_service, self_service=SelfService(sessions, session_service, policy), lab=lab, lab_tickets=TicketMinter(b"g" * 32, ZONE),
-                     consent=consent, consent_targets=targets)
+                     sessions=session_service, self_service=SelfService(sessions, session_service, policy, settings=settings, keys=FIELD_KEYS, public_origin=web_origin, audit=audit), lab=lab, lab_tickets=TicketMinter(b"g" * 32, ZONE),
+                     consent=consent, consent_targets=targets, mfa=MfaService(sessions, FIELD_KEYS, audit, session_service))
     app.state.ports.settings = settings
     app.state.assessments, app.state.invite_acceptance = assessments, acceptance
     session_service.set_org_resolver(companies.membership_of)  # a recruiter acts for their company in every request
+    # the services behind the recruiter, export, admin and break-glass routes (create_app builds them only on a real database port set)
+    from vulnmart.admin.breakglass import BreakGlassService
+    from vulnmart.admin.ops import AdminOps
+    from vulnmart.kernel.quota import DbQuotaPort
+    from vulnmart.privacy.exports import ExportService
+    from vulnmart.privacy.retention.records import SqlAttemptRecords
+    from vulnmart.privacy.views import ViewHistory
+
+    from vulnmart.privacy.deletion import DeletionService
+    from vulnmart.privacy.subjects import SubjectService
+
+    app.state.companies = companies
+    records = LabAttemptRecords(SqlAttemptRecords(sessions), lab)
+    app.state.deletion_service = DeletionService(sessions, assessments, records, settings, audit, SubjectService(sessions), lab.erase)
+    app.state.view_history = ViewHistory(sessions)
+    app.state.export_service = ExportService(sessions=sessions, audit=audit, consent=consent, views=app.state.view_history, deletion=app.state.deletion_service, assessments=assessments,
+                                             companies=companies, lab=lambda: lab)
+    app.state.admin_ops = AdminOps(
+        sessions=sessions, roles=roles, companies=companies, status=AccountStatusService(sessions, roles, audit), accounts=accounts, settings=settings,
+        quotas=DbQuotaPort(sessions, settings), audit=audit, records=SqlAttemptRecords(sessions), deletion=app.state.deletion_service, end_sessions=lambda *_a: None, stopper=lab.force_stop,
+        host_status=lambda: lab.host.host_status(), instance_states=lambda: lab.instance_states)
+    app.state.break_glass = BreakGlassService(sessions=sessions, roles=roles, audit=audit, companies=companies, lab=lambda: lab)
 
     # ---- the seed: an approved company with a recruiter, three templates and three invited candidates (local test data) ----
     add_user(sessions, ADMIN_ID, "admin-e2e@e2e.example", account_type="admin", name="E2E Admin")
+    secrets_by_admin: dict[str, str] = {}
+    for name, (uid, email) in ADMINS.items():
+        add_user(sessions, uid, email, account_type="admin", name=f"E2E Admin {name}")
+        secret = totp.new_secret()
+        secrets_by_admin[email] = secret
+        with sessions.begin() as s:
+            s.add(MfaCredential(user_id=uid, type="totp", secret_enc=FIELD_KEYS.seal(secret, account=uid), enabled_at=now()))
+    companies.signup_recruiter(email=PENDING_OWNER, password=PASSWORD, display_name="Olga Owner", company_name="Globex Pending")
+    with sessions.begin() as s:
+        s.scalar(select(User).where(User.email_ci == PENDING_OWNER)).email_verified_at = now()
     companies.signup_recruiter(email=RECRUITER_EMAIL, password=PASSWORD, display_name="Rita Recruiter", company_name="Acme Security")
     with sessions.begin() as s:
         recruiter = s.scalar(select(User).where(User.email_ci == RECRUITER_EMAIL))
@@ -156,6 +215,8 @@ def build(web_origin: str):
     seed = {
         "password": PASSWORD,
         "recruiter_email": RECRUITER_EMAIL,
+        "admins": {name: email for name, (_uid, email) in ADMINS.items()},
+        "pending_company": {"name": "Globex Pending", "owner_email": PENDING_OWNER},
         "candidates": CANDIDATES,
         "tokens": {
             # results held until the recruiter releases them, hints on at 10 percent
@@ -164,6 +225,16 @@ def build(web_origin: str):
             # results shown at submit, hints off
             "submit": invite("submit", {"title": "Submit assessment", "challenge_keys": ["C01"], "time_limit_min": 30, "hints_mode": "off",
                               "results_visibility": "after_submit"}, CANDIDATES["submit"]),
+            # the cohort board is on and results are held until the recruiter releases them
+            "board": invite("board", {"title": "Board assessment", "challenge_keys": ["C01", "C02"], "time_limit_min": 30, "hints_mode": "off", "results_visibility": "after_release",
+                            "cohort_board": True}, CANDIDATES["board"]),
+            # invites that the recruiter revokes in the browser tests (single and bulk); they are opened by the test visiting the link
+            "rev1": invite("rev1", {"title": "Revoke one", "challenge_keys": ["C01"]}, "cand-rev1@e2e.example"),
+            "rev2": invite("rev2", {"title": "Revoke two", "challenge_keys": ["C01"]}, "cand-rev2@e2e.example"),
+            "rev3": invite("rev3", {"title": "Revoke three", "challenge_keys": ["C01"]}, "cand-rev3@e2e.example"),
+            # a candidate whose attempt the recruiter cancels, and one who asks the company to delete the record
+            "cancel": invite("cancel", {"title": "Cancel assessment", "challenge_keys": ["C01"]}, CANDIDATES["cancel"]),
+            "del": invite("del", {"title": "Deletion assessment", "challenge_keys": ["C01"]}, CANDIDATES["del"]),
             "closed": invite("closed", {"title": "Closed assessment", "challenge_keys": ["C01"], "time_limit_min": 30}, CANDIDATES["closed"]),
         },
     }
@@ -185,6 +256,18 @@ def build(web_origin: str):
             raise HTTPException(404, "no mail")
         m = re.search(r"token=([A-Za-z0-9_-]{20,})", found[-1].params["link"])
         return {"token": m.group(1)}
+
+    last_step: dict[str, int] = {}
+
+    @hooks.get("/totp")
+    def current_code(email: str):
+        """The current authenticator code of a seeded admin (a code works once, so a repeat asks for the next step, which the verifier accepts one step ahead)."""
+        secret = secrets_by_admin.get(email.lower())
+        if secret is None:
+            raise HTTPException(404, "no such admin")
+        step = max(totp.time_step(now()), last_step.get(email.lower(), 0) + 1)
+        last_step[email.lower()] = step
+        return {"code": totp.code_for(secret, step)}
 
     @hooks.post("/play")
     def play(instance_id: str, requests: int = 8):

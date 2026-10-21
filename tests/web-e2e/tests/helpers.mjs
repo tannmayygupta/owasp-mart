@@ -1,4 +1,5 @@
 // Shared pieces of the browser tests: a page that fails on Content-Security-Policy violations and uncaught page errors, the hooks of the test API, sign-up and sign-in.
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test as base } from '@playwright/test';
 
 const WEB = `http://127.0.0.1:${process.env.E2E_WEB_PORT ?? 3100}`;
@@ -10,7 +11,7 @@ export const test = base.extend({
     const problems = [];
     page.on('console', (m) => { if (/Content Security Policy|Refused to (apply|execute|load)/i.test(m.text())) problems.push(`console: ${m.text()}`); });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-    page.on('dialog', (d) => void d.accept()); // every confirm of the dashboards is answered yes
+    page.on('dialog', (d) => void d.accept(d.type() === 'prompt' ? 'Reason typed in the browser test' : undefined)); // every confirm is answered yes, every prompt with a reason
     await use(page);
     expect(problems, 'no CSP violation and no uncaught error on any page').toEqual([]);
   },
@@ -83,4 +84,53 @@ export async function release(browser, attemptId, recruiterEmail) {
   }, attemptId);
   expect(status, 'the recruiter releases the results').toBe(200);
   await ctx.close();
+}
+
+/** A candidate follows the invite link, signs in and accepts: returns the attempt id. */
+export async function acceptInvite(page, token, email) {
+  await page.goto(`/invite?token=${token}`);
+  await expect(page.getByTestId('invite-summary')).toBeVisible();
+  await page.getByRole('main').getByRole('link', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/invite/);
+  await page.getByRole('button', { name: 'Accept the invitation' }).click();
+  await expect(page).toHaveURL(/\/assessment\/a-/);
+  return page.url().split('/assessment/')[1];
+}
+
+/** Consent (never pre-ticked): the attempt is then ready, no instance yet. */
+export async function consent(page) {
+  const start = page.getByRole('button', { name: 'Start', exact: true });
+  await expect(page.getByTestId('consent')).toBeVisible();
+  await expect(start).toBeDisabled();
+  await page.getByTestId('consent-agree').check();
+  await start.click();
+  await expect(page.getByTestId('attempt-state')).toHaveText('ready');
+}
+
+/** Consent, Start, and wait for the running attempt. */
+export async function consentAndStart(page) {
+  await consent(page);
+  await page.getByTestId('start-assessment').click();
+  await expect(page.getByTestId('attempt-state')).toHaveText('running', { timeout: 45_000 });
+}
+
+/** Sign in as a seeded admin: the password step, then the current code of the test API's authenticator (a seeded secret that exists in the runner only). */
+export async function adminLogIn(page, email) {
+  await logIn(page, { email });
+  await expect(page.getByLabel('Code')).toBeVisible();
+  const { code } = await hook(`totp?email=${encodeURIComponent(email)}`);
+  await page.getByLabel('Code').fill(code);
+  await page.getByRole('button', { name: /sign in|verify|continue/i }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+}
+
+/** The accessibility check (OI-30): axe-core with the WCAG 2.0, 2.1 and 2.2 A and AA rules on the page as drawn now. Any violation fails the test and names the rule and the nodes. */
+export async function checkAccessible(page, name) {
+  const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+  const lines = result.violations.map((v) => `${v.id} (${v.impact}): ${v.help} -> ${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}`);
+  expect(lines, `accessibility violations on ${name}`).toEqual([]);
 }

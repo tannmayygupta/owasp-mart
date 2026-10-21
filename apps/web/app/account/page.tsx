@@ -74,6 +74,27 @@ export default function AccountPage() {
         </form>
       </section>
 
+      {user.account_type !== 'admin' && (
+        <section className="card" data-testid="change-email">
+          <h2>Email address</h2>
+          <p className="muted">We send a link to the new address. Nothing changes until you use it, and then you sign in again with the new address.</p>
+          <form
+            onSubmit={async (ev: FormEvent<HTMLFormElement>) => {
+              ev.preventDefault();
+              const form = ev.currentTarget;
+              const f = new FormData(form);
+              if (await act(() => api('POST', '/api/v1/me/email', { new_email: String(f.get('new_email') ?? '').trim(), current_password: f.get('email_password') }),
+                'If that address can be used, a link is on its way to it.')) form.reset();
+            }}
+          >
+            <label htmlFor="new_email">New email address</label>
+            <input id="new_email" name="new_email" type="email" autoComplete="email" required />
+            <label htmlFor="email_password">Your current password</label>
+            <input id="email_password" name="email_password" type="password" autoComplete="current-password" required />
+            <p><button type="submit">Send the link</button></p>
+          </form>
+        </section>
+      )}
       <section className="card">
         <h2>Password</h2>
         <form

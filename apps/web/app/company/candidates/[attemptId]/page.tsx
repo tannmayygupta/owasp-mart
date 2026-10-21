@@ -61,6 +61,18 @@ export default function CandidateReportPage() {
     }
   }
 
+  // The company deletes a candidate's record now (FR-PRV-08, IF-1 deleteCandidateRecord): the attempt, its evidence and its logs are erased and cannot come back.
+  async function deleteRecord() {
+    if (!window.confirm(`Delete the record of ${invite?.email ?? 'this candidate'} now? The report, the evidence and the timeline are erased and cannot be recovered.`)) return;
+    setBanner(null);
+    try {
+      await api('DELETE', `/api/v1/company/attempts/${attemptId}`);
+      window.location.assign('/company/candidates');
+    } catch (e) {
+      setBanner({ text: say(e), kind: 'bad' });
+    }
+  }
+
   async function release() {
     setBanner(null);
     try {
@@ -99,7 +111,7 @@ export default function CandidateReportPage() {
           <dt>Hints</dt><dd>{hintsOn ? `${report.hints_used_total} used (the template set the hint cost at ${invite?.hint_cost_pct}%; the points above are after the cost)` : 'off for this assessment'}</dd>
           <dt>Open integrity flags</dt><dd>{report.integrity_open}</dd>
         </dl>
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Results per challenge">
           <table>
             <thead><tr><th>Challenge</th><th>Milestone</th><th>Points</th><th>Time to capture</th><th>Technique</th>{hintsOn && <th>Hints used</th>}</tr></thead>
             <tbody>
@@ -146,6 +158,12 @@ export default function CandidateReportPage() {
             )}
           </div>
         ))}
+      </section>
+
+      <section className="card" data-testid="delete-record">
+        <h2>Delete this record</h2>
+        <p className="muted">You can delete this candidate&apos;s record now, for example when they asked. It cannot be undone.</p>
+        <button type="button" className="danger" onClick={() => void deleteRecord()}>Delete this candidate&apos;s record now</button>
       </section>
 
       <section className="card">

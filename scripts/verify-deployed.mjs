@@ -12,7 +12,7 @@ import path from 'node:path';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Operations the contract declares but marks PENDING and the API does not serve on purpose (createLiveTicket waits for the spike S-14).
 export const PENDING = new Set(['createLiveTicket']);
-export const PAGES = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/account', '/dashboard', '/invite', '/company',
+export const PAGES = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/confirm-email-change', '/account', '/dashboard', '/invite', '/company',
   '/company/candidates', '/admin'];
 
 export function parseArgs(argv) {
