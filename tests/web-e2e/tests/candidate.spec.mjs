@@ -1,31 +1,6 @@
 // A candidate on a company assessment: invite, account, consent, start, countdown and warnings, hints only when allowed, flag, submit, results hidden until the recruiter
 // releases them, withdraw and undo, a closed invite, and the practice lab never showing the assessment.
-import { captureFlag, expect, hook, logIn, myAttempts, release, seed, shot, test } from './helpers.mjs';
-
-async function acceptInvite(page, token, email) {
-  await page.goto(`/invite?token=${token}`);
-  await expect(page.getByTestId('invite-summary')).toBeVisible();
-  await page.getByRole('main').getByRole('link', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/login/);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill('correct horse battery staple');
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/invite/);
-  await page.getByRole('button', { name: 'Accept the invitation' }).click();
-  await expect(page).toHaveURL(/\/assessment\/a-/);
-  return page.url().split('/assessment/')[1];
-}
-
-async function consentAndStart(page) {
-  const start = page.getByRole('button', { name: 'Start', exact: true });
-  await expect(page.getByTestId('consent')).toBeVisible();
-  await shot(page, 'candidate-1-consent');
-  await expect(start).toBeDisabled(); // never pre-ticked
-  await page.getByTestId('consent-agree').check();
-  await start.click();
-  await page.getByTestId('start-assessment').click();
-  await expect(page.getByTestId('attempt-state')).toHaveText('running', { timeout: 45_000 });
-}
+import { acceptInvite, captureFlag, consentAndStart, expect, hook, logIn, myAttempts, release, seed, shot, test } from './helpers.mjs';
 
 test('a closed invite says so', async ({ page }) => {
   const s = await seed();
@@ -58,11 +33,11 @@ test('candidate with results released by the recruiter: invite, consent, start, 
   await expect(page.getByTestId('time-warning')).toContainText('15 minutes left');
   await shot(page, 'candidate-2-running-warning');
 
-  // the page follows the ATTEMPT: its `hints_enabled` is false for every company attempt today (the API's placeholder, apps/api/src/vulnmart/lab/api.py hints_enabled), so
-  // no hint control is drawn even though the template says hints on; when the API starts reading the template this assertion must change to the unlock flow
+  // the attempt now follows the template (attempt lifecycle, WP-A): this template says hints on, so the hint control is drawn and opens the three levels
   const row = page.locator('tr[data-challenge="C01"]');
-  await expect(row.getByTestId('no-hints')).toHaveText('off');
-  await expect(row.getByRole('button', { name: 'Hints' })).toHaveCount(0);
+  await expect(row.getByTestId('no-hints')).toHaveCount(0);
+  await row.getByRole('button', { name: 'Hints' }).click();
+  await expect(row.getByText(/of 3 used/)).toBeVisible();
   // flag, then submit
   const flag = await captureFlag(page, attemptId, 'C01');
   await row.getByLabel('Flag for C01').fill(flag);
