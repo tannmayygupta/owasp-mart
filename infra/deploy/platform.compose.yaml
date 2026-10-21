@@ -2,8 +2,10 @@
 # Everything here is file-based: this file, `.env` (the two database passwords, mode 600, never committed), `secrets/` (one file per secret, owner 65532, mode 400),
 # `pki/` (the private CA and the server certificate of the one TLS listener), `catalog/` (the IF-7 files), `console/` (the demo page), `postgres/initdb/`.
 # See docs/runbooks/live-deploy.md. Images: `vulnmart-api:prod` is built on a PC and loaded (`scripts/live-deploy.mjs`); the rest are pulled by digest.
-# Nothing is published except 443 (the site, with the TLS certificate that lego writes) and the TLS listener 9444 on the PRIVATE address of vm-p (the security group
-# allows vm-i to reach it, nobody else). The database, Valkey, the API and the mail catcher answer inside the compose network only (Mailpit's page on 127.0.0.1:8025).
+# Nothing is published except 443 (the site, with the TLS certificate that lego writes), 80 (only a redirect to https) and the TLS listener 9444 on the PRIVATE address of
+# vm-p (the security group allows vm-i to reach it, nobody else). The database, Valkey, the API and the dashboards (`web`) answer inside the compose network only.
+# Mail: the API sends through Brevo (key file secrets/brevo_api_key). The Mailpit catcher is a PROFILE (`mail-catcher`), off unless `scripts/live-deploy.mjs platform --allow-mail-catcher`
+# turned it on knowingly; production refuses to start with the catcher otherwise (settings.py, check_mail_for_environment).
 name: vulnmart-platform
 x-hardening: &hardening
   read_only: true
@@ -13,14 +15,16 @@ x-hardening: &hardening
 x-api-env: &api-env
   VULNMART_ENV: production
   VULNMART_POSTGRES_DSN: postgresql://vulnmart_app:${VULNMART_APP_DB_PASSWORD}@postgres:5432/vulnmart
-  VULNMART_VALKEY_URL: valkey://valkey:6379/0
+  VULNMART_VALKEY_URL: valkey://:${VULNMART_VALKEY_PASSWORD:?the Valkey password is missing from .env}@valkey:6379/0
   VULNMART_PUBLIC_ORIGIN: https://${VULNMART_PLATFORM_HOST}
   VULNMART_ORIGIN_SECRET_FILE: /run/secrets/origin_secret
   VULNMART_CSRF_SECRET_FILE: /run/secrets/csrf_secret
   VULNMART_FIELD_SECRET_FILE: /run/secrets/field_secret  # seals second-factor secrets (story P-15); production does not start without it
   VULNMART_TRUSTED_PROXY_HOPS: "1"
-  VULNMART_EMAIL_PROVIDER: smtp
-  VULNMART_SMTP_HOST: mailpit
+  VULNMART_EMAIL_PROVIDER: ${VULNMART_EMAIL_PROVIDER:-brevo}  # `smtp` only together with the mail-catcher profile (live-deploy --allow-mail-catcher)
+  VULNMART_ALLOW_MAIL_CATCHER: ${VULNMART_ALLOW_MAIL_CATCHER:-false}
+  VULNMART_BREVO_API_KEY_FILE: /run/secrets/brevo_api_key
+  VULNMART_SMTP_HOST: ${VULNMART_SMTP_HOST:-mailpit}  # read only when the provider is smtp
   VULNMART_SMTP_PORT: "1025"
   VULNMART_EMAIL_SENDER_ADDRESS: no-reply@${VULNMART_PLATFORM_HOST}
 services:
@@ -49,26 +53,32 @@ services:
       retries: 30
       start_period: 5s
 
+  # Valkey holds the rate-limit counters (every key has a TTL), the mail queue and the live streams (no TTL, trimmed by length). Policy `volatile-lru`: when the 64 MB are full only keys
+  # with a TTL (rate-limit counters) are evicted, so a queued mail or a live stream is never silently dropped; if the data without a TTL alone filled it, a write fails loudly instead.
+  # Append-only file on the named volume `valkey-data` (everysec): the queue survives a restart. Password from .env (the compose file never holds it). The image's own user (999:1000)
+  # owns /data, so the named volume is writable without a root step.
   valkey:
     <<: *hardening
     image: valkey/valkey:9.0.6-alpine3.24@sha256:187679e3bd4036959631e3f03983ab2ba503ab21e6fd0454d508e909db2ee989
     container_name: vulnmart-valkey
-    user: "65532:65532"
-    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    user: "999:1000"
+    environment:
+      VALKEY_PASSWORD: ${VULNMART_VALKEY_PASSWORD:?the Valkey password is missing from .env}
+    command: ["sh", "-c", "exec valkey-server --requirepass \"$$VALKEY_PASSWORD\" --appendonly yes --appendfsync everysec --save \"\" --maxmemory 64mb --maxmemory-policy volatile-lru"]
     mem_limit: 128m
     pids_limit: 64
-    tmpfs:
-      - /data:rw,noexec,nosuid,size=8m,uid=65532,gid=65532
+    volumes:
+      - valkey-data:/data
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$VALKEY_PASSWORD\" valkey-cli ping | grep -q PONG"]
       interval: 3s
       timeout: 3s
       retries: 15
-
   mailpit:
     <<: *hardening
     image: axllent/mailpit:v1.31.5@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea
     container_name: vulnmart-mailpit
+    profiles: ["mail-catcher"]
     user: "65532:65532"
     mem_limit: 128m
     pids_limit: 64
@@ -130,7 +140,14 @@ services:
       VULNMART_ORCH_CERT_KEY_FILE: /run/pki/client.key
       VULNMART_ORCH_REPORT_KEY_FILE: /run/secrets/report_key
       VULNMART_LAB_READY_TIMEOUT_S: "180"
+      # The retention scheduler (story P-24, ADR 0054, production hardening ADR 0074): invite expiry, candidate and learner retention, deletion requests after the undo window,
+      # the audit anchor, log and token purges. Every job acts only on rows past their retention or undo window and runs under a lease (job_runs), see docs/runbooks/live-deploy.md.
+      # To turn it off: set this to "false" and `docker compose up -d api`; nothing is deleted while it is off.
+      VULNMART_SCHEDULER_ENABLED: "true"
+      VULNMART_SCHEDULER_INTERVAL_SECONDS: "60"
+      VULNMART_AUDIT_ANCHOR_FILE: /anchors/audit-anchor.log  # the daily anchor line outside the database (OI-28); an operator ships this file off the machine
     volumes:
+      - ./anchors:/anchors
       - ./secrets/origin_secret:/run/secrets/origin_secret:ro
       - ./secrets/csrf_secret:/run/secrets/csrf_secret:ro
       - ./secrets/field_secret:/run/secrets/field_secret:ro
@@ -141,6 +158,7 @@ services:
       - ./secrets/gate_key_current:/run/secrets/gate_key_current:ro
       - ./secrets/platform_key:/run/secrets/platform_key:ro
       - ./secrets/report_key:/run/secrets/report_key:ro
+      - ./secrets/brevo_api_key:/run/secrets/brevo_api_key:ro
       - ./pki/ca.pem:/run/pki/ca.pem:ro
       - ./pki/client.pem:/run/pki/client.pem:ro
       - ./pki/client.key:/run/pki/client.key:ro
@@ -167,6 +185,7 @@ services:
       - ./secrets/origin_secret:/run/secrets/origin_secret:ro
       - ./secrets/csrf_secret:/run/secrets/csrf_secret:ro
       - ./secrets/field_secret:/run/secrets/field_secret:ro
+      - ./secrets/brevo_api_key:/run/secrets/brevo_api_key:ro
     mem_limit: 256m
     pids_limit: 128
     tmpfs:
@@ -174,8 +193,21 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      mailpit:
-        condition: service_healthy
+
+  # The dashboards (apps/web, Next.js standalone, image vulnmart-web:prod from apps/web/Dockerfile.prod): recruiter, candidate, admin, invite, consent, account pages on the same origin as the
+  # lab console (Caddy routes their paths here). Measured locally: about 57 MiB idle and 70 MiB after 300 page requests, so 192 MB is a ceiling with room, not an expectation.
+  # vm-p has 1.9 GB of RAM: the sum of the limits of this file is kept under it (the catcher is a profile and is not counted).
+  web:
+    <<: *hardening
+    image: vulnmart-web:prod
+    container_name: vulnmart-web
+    environment:
+      NODE_OPTIONS: --max-old-space-size=128
+      DASHBOARD_ORIGIN: https://${VULNMART_PLATFORM_HOST}
+    mem_limit: 192m
+    pids_limit: 64
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,uid=65532,gid=65532
 
   # TLS for the site and for the private listener. Stock Caddy, certificates from files (lego writes the site certificate; the private CA made the other).
   caddy:
@@ -183,6 +215,7 @@ services:
     image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     container_name: vulnmart-caddy
     ports:
+      - "80:80"
       - "443:443"
       - "${VULNMART_VMP_PRIVATE_IP}:9444:9444"
     environment:
@@ -204,6 +237,9 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      web:
+        condition: service_healthy
 
 volumes:
   pg-data:
+  valkey-data:

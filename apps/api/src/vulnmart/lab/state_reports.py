@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from vulnmart_models.error_codes import ErrorCode
 
 from vulnmart.problem import ProblemError
@@ -40,6 +40,7 @@ if TYPE_CHECKING:
 log = logging.getLogger("vulnmart.lab.state_reports")
 
 ROUTE = "/internal/v1/orch/state"
+DESIRED_ROUTE = "/internal/v1/orch/desired"
 MAX_BODY_BYTES = 64 * 1024
 KEY_FILE_VAR = "VULNMART_ORCH_REPORT_KEY_FILE"
 
@@ -176,6 +177,43 @@ def install_state_report_route(app: FastAPI, store: StateReportStore, key: bytes
         return Response(status_code=204 if result.new else 200, headers={"Cache-Control": "private, no-store"})
 
 
+def wanted_instance_ids(runtime: "LabRuntime") -> list[str]:
+    """The instances the platform wants on its hosts (handoff H-123, contract section 8a): the instance of every attempt that is ready or running, and every
+    instance whose start is under way (`_starting`, set before the create is sent), sorted. Instances of submitted, expired, cancelled or deleted attempts are
+    not wanted: the orchestrator removes them if they are still there. Raises when the attempt store cannot be read (the route then answers 503: safe mode)."""
+    from vulnmart.ports.attempts import AttemptState
+
+    ids: set[str] = set(runtime._starting.values())  # noqa: SLF001 - the runtime and this receiver are one package
+    for rec in runtime.engine.in_states(AttemptState.READY, AttemptState.RUNNING):
+        if rec.instance_id:
+            ids.add(rec.instance_id)
+    return sorted(ids)
+
+
+def install_desired_route(app: FastAPI, runtime: "LabRuntime", key: bytes, *, nonces: NonceCache | None = None) -> None:
+    """`GET /internal/v1/orch/desired`, signed with the orchestrator key like a state report (empty body)."""
+    cache = nonces or NonceCache()
+
+    @app.get(DESIRED_ROUTE, include_in_schema=False)
+    async def get_desired(request: Request) -> Response:
+        raw_path = request.scope.get("raw_path") or request.scope["path"].encode()
+        target = raw_path.decode("latin-1")
+        query = request.scope.get("query_string", b"")
+        if query:
+            target += "?" + query.decode("latin-1")
+        try:
+            verify_request(key, request.method, target, request.headers, b"", nonces=cache)
+        except BadSignature:
+            log.warning("desired-state request refused: bad signature")
+            raise ProblemError(ErrorCode.ORCH_BAD_SIGNATURE) from None
+        try:
+            ids = wanted_instance_ids(runtime)
+        except Exception:
+            log.exception("the wanted instances cannot be listed")
+            return Response(status_code=503, headers={"Cache-Control": "private, no-store"})  # the orchestrator stays in safe mode
+        return JSONResponse({"instance_ids": ids}, headers={"Cache-Control": "private, no-store"})
+
+
 def install_state_reports(app: FastAPI, runtime: "LabRuntime", environ: Mapping[str, str] | None = None) -> bool:
     """Mount the route when `VULNMART_ORCH_REPORT_KEY_FILE` is set. Returns False and mounts nothing when it is not; a key file that
     cannot be used raises (the service must not start with a receiver that cannot verify)."""
@@ -183,5 +221,8 @@ def install_state_reports(app: FastAPI, runtime: "LabRuntime", environ: Mapping[
     path = env.get(KEY_FILE_VAR, "")
     if not path:
         return False
-    install_state_report_route(app, runtime.state_reports, read_report_key(path), on_moved=runtime.announce_instance)
+    key = read_report_key(path)
+    nonces = NonceCache()  # one memory for both routes: a nonce is never accepted twice on either
+    install_state_report_route(app, runtime.state_reports, key, nonces=nonces, on_moved=runtime.announce_instance)
+    install_desired_route(app, runtime, key, nonces=nonces)
     return True

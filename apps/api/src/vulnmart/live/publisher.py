@@ -47,13 +47,15 @@ class DbEventPublisher:
 
 
 class LiveOutbox:
-    """`publish` is durable (the database), `enqueue_email` is the stand-in's."""
+    """`publish` is durable (the database), `enqueue_email` is the stand-in's; with no stand-in (production) it fails closed instead of losing the mail in memory."""
 
-    def __init__(self, events: DbEventPublisher, emails: OutboxPort):
+    def __init__(self, events: DbEventPublisher, emails: OutboxPort | None):
         self._events, self._emails = events, emails
 
     def publish(self, event: Mapping[str, Any]) -> OutboxEntry:
         return self._events.publish(event)
 
     def enqueue_email(self, *, template: str, to_user_id: str, params: Mapping[str, Any] | None = None) -> EmailJob:
+        if self._emails is None:
+            raise RuntimeError("this outbox carries domain events only: emails are written with DbOutboxPort in the caller's own transaction")
         return self._emails.enqueue_email(template=template, to_user_id=to_user_id, params=params)

@@ -9,7 +9,8 @@
 //   keys/origin_secret csrf_secret field_secret                        64 hex characters each (the field secret seals second-factor secrets)
 //   keys/event_master flag_key owner_key                               base64 (URL-safe) of 32 random bytes each: the three masters of the key service (story P-17)
 //   keys/kek                                                           one line `1:<base64 of 32 random bytes>`: the key-encryption key of the key service
-//   keys/pg_owner_password pg_app_password keystore_password           48 hex characters each
+//   keys/pg_owner_password pg_app_password keystore_password valkey_password   48 hex characters each
+//   keys/brevo_api_key                                                 NOT made here: the Brevo API key is an external credential you put in this folder yourself (live-deploy.mjs platform reads it)
 // The extensions are the ones Python 3.14 requires (a CA needs keyUsage keyCertSign). Run again with --force to replace everything (a new CA means new certificates everywhere).
 // --force alone refuses when the folder holds a key-encryption key (`keys/kek`): replacing it makes every wrapped attempt key, every sealed evidence row and every
 // second-factor secret unreadable, and changes every flag. Add --destroy-keys only when that is the intention (a fresh deployment with no data worth keeping).
@@ -78,7 +79,7 @@ export function make(o) {
   for (const n of ['platform_key', 'report_key', 'gate_key_current', 'gate_admin_secret', 'origin_secret', 'csrf_secret', 'field_secret']) fs.writeFileSync(path.join(keys, n), hex(32));
   for (const n of ['event_master', 'flag_key', 'owner_key']) fs.writeFileSync(path.join(keys, n), crypto.randomBytes(32).toString('base64url'));
   fs.writeFileSync(path.join(keys, 'kek'), `1:${crypto.randomBytes(32).toString('base64url')}`);
-  for (const n of ['pg_owner_password', 'pg_app_password', 'keystore_password']) fs.writeFileSync(path.join(keys, n), hex(24));
+  for (const n of ['pg_owner_password', 'pg_app_password', 'keystore_password', 'valkey_password']) fs.writeFileSync(path.join(keys, n), hex(24));
   fs.writeFileSync(path.join(keys, 'gate_key_previous'), '');
   return { out, pki: fs.readdirSync(pki).sort(), keys: fs.readdirSync(keys).sort() };
 }

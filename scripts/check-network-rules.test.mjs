@@ -104,7 +104,12 @@ test('the host firewall script opens exactly the ports of the rule file', () => 
 
 test('cloud-init runs one baseline script that stops at the first failure and writes a marker', () => {
   const c = read('infra', 'hosts', 'cloud-init.yaml.tftpl');
-  assert.match(c, /runcmd:\n\s+- \[\/usr\/local\/sbin\/vulnmart-baseline\.sh, "\$\{private_cidr\}", "\$\{keepalive_enabled\}"\]/);
+  // H-111, resumable first boot: the one baseline script runs as a oneshot unit that installs the packages itself (ExecStartPre), is retried every 30 s on failure and at every boot, and stops once baseline-ok exists
+  assert.match(c, /ExecStart=\/usr\/local\/sbin\/vulnmart-baseline\.sh "\$\{private_cidr\}" "\$\{keepalive_enabled\}"/);
+  assert.match(c, /ExecStartPre=\/usr\/bin\/apt-get install -y [^\n]*iptables-persistent[^\n]*netfilter-persistent/);
+  assert.match(c, /Restart=on-failure\n\s+RestartSec=30/);
+  assert.match(c, /ConditionPathExists=!\/var\/lib\/vulnmart\/baseline-ok/);
+  assert.match(c, /runcmd:\n\s+- \[systemctl, enable, --now, --no-block, vulnmart-baseline\.service\]/);
   for (const needle of ['00-vulnmart.conf', 'vulnmart-firewall.sh', 'vulnmart-install-docker.sh', 'vulnmart-keepalive.service', '/etc/docker/daemon.json', 'unattended-upgrades', 'timesyncd', 'ssh_authorized_keys']) assert.ok(c.includes(needle), needle);
   const b = read('infra', 'hosts', 'vulnmart-baseline.sh');
   assert.match(b, /^set -eu$/m);

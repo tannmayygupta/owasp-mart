@@ -13,6 +13,7 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - registry change: `scripts/check-contract-rules.mjs` (rule `approvals`) and `contracts/COMPAT.md` on 2026-10-21 (D-105, ADR 0095): a line `**Sole maintainer:** @handle` in the base COMPAT.md makes a pull request authored by that handle pass the approvals rule, because nobody else can review it; the breaking-change diff, validators, changelog, mock and registry rules are unchanged. Without it the first contract change after the tag `contracts-v1.0.0` could not be merged.
 - registry change: `contracts/COMPAT.md` is edited on 2026-10-21 (decisions D-102 and D-104: the team is the leader and Claude, and Claude approves under the leader's standing authority). The three rows that were `pending` for former developers (IF-2 2.1.0 consumer, DB 2.2.0 owner, DB 2.2.0 consumer) now name `@tannmayygupta` and are `approved`. Evidence: `apps/api/tests/test_table_owners.py` and `test_lab_contract.py` 191 passed, `pnpm run api:check` clean, the typecheck of `apps/web` against the regenerated types clean, `pnpm run contracts:rules` 16 PASS 0 FAIL, and the sign-off method is the standard one for a single maintainer: breaking-change detection by oasdiff plus the consumers' own test suites. No contract file changes.
 - registry change: `.github/workflows/ci.yml` gets a step for the records check (`scripts/check-records.mjs`), a Valkey service for the api job and the release gate in the exploit-runner job (tracker audit 2026-10-21, story 12). No contract file, rule, pin or checker changes.
+- registry change: `.github/workflows/ci.yml` gets the deployed-compose lint, the route check, the pytest skip budget and the production dashboards image build (work package C, 2026-10-21). No contract file, rule, pin or checker changes.
 
 ## Platform API (IF-1), `contracts/api/platform/`
 
@@ -248,6 +249,11 @@ Every change to a contract under `contracts/` adds an entry here (architecture 0
 - Status: awaiting optional confirmation by Akshay (consumer; handoffs H-84 to H-89).
 
 ## Orchestrator API (IF-5), `contracts/orchestrator/`
+
+### 1.2.0 (2026-10-21, the leader and Claude, work package C, handoff H-123)
+
+- Additive, not breaking: `GET /internal/v1/orch/desired` (`getDesiredInstances`, orchestrator to platform API, signed with the orchestrator key like the state report): the ids of the instances the platform wants, so that the reconciler can destroy what no one asked for and adopt the rest; the schema `DesiredInstances`; one valid and one invalid example; section 8a of `orchestrator-api.md`. Any answer but a good 200 keeps the orchestrator in safe mode. no mock change: the route is served by the platform API (the fake orchestrator is the other side and only sends reports), so the fake service has nothing to serve for it.
+- registry change: `.github/workflows/ci.yml` runs three more checks (`scripts/check-deployed-compose.mjs`, `scripts/check-pytest-skips.mjs` on the `api` and `scripts` jobs, `scripts/check_spec_routes.py`), and `scripts/check_orchestrator_contract.py` lists the new operation; no rule of `scripts/check-contract-rules.mjs` changes (the leader's instruction of 2026-10-21, D-102).
 
 ### 1.1.0 (2026-10-19, Tanmay, audit blocker B1)
 - Additive: `POST /v1/instances/{id}/activity` (`reportActivity`, body `{ "at": <RFC 3339> }`, signed like the other calls, 200 with the instance status, 409 ORCH-INVALID-STATE when the instance is not ready, active or idle). Without it the real service never learned that a player was active, so the idle limit ran from `ready` and cut off players mid-attempt. Examples: `activity.request.json` and three invalid ones.

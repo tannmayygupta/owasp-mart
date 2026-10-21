@@ -63,5 +63,13 @@ def check_deployed_env(env: Mapping[str, str], *, key_present: bool) -> list[str
     or a variable). Empty when the block is fine or is not production."""
     if str(env.get("VULNMART_ENV", "")).lower() != "production":
         return []
-    return problems(str(env.get("VULNMART_EMAIL_PROVIDER", "smtp")).lower(), brevo_key="present" if key_present else None,
-                    sender=re.sub(r"\$\{[^}]*\}", "deploy.vulnmart.app", str(env.get("VULNMART_EMAIL_SENDER_ADDRESS", ""))), smtp_host=env.get("VULNMART_SMTP_HOST"))
+    def value(name: str, default: str = "") -> str:
+        # a compose value may be `${NAME:-default}`: what the deployment uses when nothing overrides it is the default
+        raw = str(env.get(name, default))
+        return re.sub(r"\$\{[^}:]*:-([^}]*)\}", r"\1", raw)
+
+    provider = value("VULNMART_EMAIL_PROVIDER", "smtp").lower()
+    smtp_host = value("VULNMART_SMTP_HOST") or None
+    return problems(provider, brevo_key="present" if key_present else None,
+                    sender=re.sub(r"\$\{[^}]*\}", "deploy.vulnmart.app", value("VULNMART_EMAIL_SENDER_ADDRESS")),
+                    smtp_host=smtp_host if provider == "smtp" else None)  # a catcher host only matters when SMTP is the provider

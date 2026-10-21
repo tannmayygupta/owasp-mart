@@ -52,15 +52,24 @@ function conflict(cur, next) {
   return null;
 }
 
-export function createStore({ zone }) {
+/** `onChange` is called after every change that is accepted (put, remove, sync): the edge saves its state there (persist.mjs). It must not throw into a push. */
+export function createStore({ zone, onChange = () => {} }) {
   checkZone(zone);
   const map = new Map(); // label -> record
 
   const labelOf = (record) => record.instance_id.toLowerCase();
+  const changed = () => { try { onChange(); } catch { /* a failing save must never fail the push; the saver counts it */ } };
   return {
     /** The record of an instance label, or undefined (unknown behaves as closed). */
     get: (label) => map.get(label),
     get size() { return map.size; },
+    /** Every record (a copy), for the saved state. */
+    list: () => [...map.values()].map((r) => ({ ...r })),
+    /** Loads records that were validated by persist.mjs into an EMPTY store at start; the epoch rules still apply to every later push. */
+    restore(records) {
+      if (map.size !== 0) throw new Error('restore is for an empty store');
+      for (const r of records) map.set(labelOf(r), { ...r });
+    },
     /** PUT one instance. Returns { status: 204 } or { status, error }. */
     put(idFromPath, body) {
       const v = validateRecord(body, zone);
@@ -71,10 +80,12 @@ export function createStore({ zone }) {
       if (why) return { status: 409, error: why };
       if (!map.has(label) && map.size >= MAX_INSTANCES) return { status: 422, error: 'too many instances' };
       map.set(label, v.record);
+      changed();
       return { status: 204 };
     },
     remove(idFromPath) {
       map.delete(idFromPath.toLowerCase());
+      changed();
       return { status: 204 };
     },
     /** The full list of the orchestrator: all or nothing; instances not in the list are removed. */
@@ -95,6 +106,7 @@ export function createStore({ zone }) {
       }
       map.clear();
       for (const [label, rec] of next) map.set(label, rec);
+      changed();
       return { status: 204 };
     },
   };

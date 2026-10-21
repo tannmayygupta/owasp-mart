@@ -18,5 +18,6 @@
   "error.unsupported-media-type.json": "Problem",
   "error.busy.json": "Problem",
   "error.validation-errors.json": "Problem",
-  "activity.request.json": "ActivityRequest"
+  "activity.request.json": "ActivityRequest",
+  "desired.response.json": "DesiredInstances"
 }

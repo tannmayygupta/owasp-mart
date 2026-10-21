@@ -91,8 +91,6 @@ def test_the_rule_accepts_a_deployed_block_that_is_right_and_names_what_is_wrong
     assert check_deployed_env({"VULNMART_ENV": "staging", "VULNMART_EMAIL_PROVIDER": "smtp", "VULNMART_SMTP_HOST": "mailpit"}, key_present=False) == []
 
 
-@pytest.mark.xfail(reason="WP-C sets Brevo, the key file and the sender in infra/deploy/platform.compose.yaml; the compose still points at Mailpit (audit F-03). Remove this marker with that change.",
-                   strict=False)
 def test_the_deployed_compose_does_not_point_at_mailpit_and_names_brevo():
     blocks = deployed_blocks()
     assert blocks, "no production service block found in the deployed compose"
