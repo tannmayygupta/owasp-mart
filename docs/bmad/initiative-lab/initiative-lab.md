@@ -56,3 +56,5 @@ Follows the stream boundary of ADR 0013: everything driven by instance events an
 - Unknown: many spikes sit in this stream: S-1 to S-4, S-6 to S-8, S-11, S-13 to S-17, S-22.
 - Assumption: epic order below is a proposal for the user to approve.
 - Draft written 2026-10-08 by Claude Code for the user to approve; not yet confirmed.
+
+- 2026-10-21 live deploy of packages A to G2 done (70 PASS, 0 FAIL); live learner and exploit suites need a mail path in production, see docs/dev-log/2026-10-21-tannmayygupta-live-deploy-audit-packages.md
