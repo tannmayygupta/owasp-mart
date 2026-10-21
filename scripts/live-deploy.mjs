@@ -87,7 +87,7 @@ export function labEnv({ zone, H, runtime = DEFAULT_RUNTIME }) {
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
   const o = { cmd, dryRun: false, allowMailCatcher: false };
-  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--runtime runsc|runc] [--allow-mail-catcher] [--dry-run]' };
+  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks', 'backup-now', 'data-counts'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks | backup-now | data-counts [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--runtime runsc|runc] [--allow-mail-catcher] [--dry-run]' };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--dry-run') o.dryRun = true;
@@ -353,6 +353,23 @@ function status(H) {
   }
 }
 
+/** The SQL of `data-counts`: the migration head and the exact row count of every table of the platform database (counts only, never a value). */
+export const COUNTS_SQL = "select 'alembic_version', version_num from alembic_version union all select table_name, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' and table_name <> 'alembic_version' order by 1";
+
+/** `data-counts`: prints `<table> <rows>` lines of the live platform database (the owner role over the local socket inside the container, as the restore runbook does). */
+function dataCounts(H) {
+  const r = ssh(H.p.pub, `sudo docker exec vulnmart-postgres psql -U vulnmart -d vulnmart -At -F ' ' -c "${COUNTS_SQL}"`);
+  must(r, 'read the row counts');
+  log(String(r.stdout).trimEnd());
+}
+
+/** `backup-now`: runs the nightly backup unit once, before a change, and says whether it succeeded (the unit fails on an empty or unreadable dump). */
+function backupNow(H) {
+  must(ssh(H.p.pub, 'sudo systemctl start vulnmart-backup.service'), 'run the backup');
+  const r = ssh(H.p.pub, 'systemctl show vulnmart-backup.service -p Result -p ExecMainStatus; sudo ls -1t /var/backups/vulnmart | head -4; echo "alert files: $(ls /var/lib/vulnmart | grep -c ALERT || true)"');
+  log(String(r.stdout).trimEnd());
+}
+
 export function main(argv = process.argv.slice(2)) {
   const o = parseArgs(argv);
   if (o.error) { console.error(o.error); return 2; }
@@ -366,6 +383,8 @@ export function main(argv = process.argv.slice(2)) {
     else if (o.cmd === 'platform') platform(o, H);
     else if (o.cmd === 'status') status(H);
     else if (o.cmd === 'hooks') hooks(H);
+    else if (o.cmd === 'data-counts') dataCounts(H);
+    else if (o.cmd === 'backup-now') backupNow(H);
     else if (o.cmd === 'down-lab') must(ssh(H.i.pub, 'cd /opt/vulnmart/lab/repo && sudo docker compose -f infra/compose/compose.yaml -f infra/compose/lab.reports.yaml --profile lab down'), 'down lab');
     else if (o.cmd === 'down-platform') must(ssh(H.p.pub, 'cd /opt/vulnmart/platform && sudo docker compose -f compose.yaml --env-file .env down'), 'down platform');
     return 0;
