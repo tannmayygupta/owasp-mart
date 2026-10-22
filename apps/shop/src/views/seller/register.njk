@@ -1,10 +1,11 @@
 {% extends "layout.njk" %}{% block title %}Register a store{% endblock %}{% block body %}
 <h1>Register a store</h1>
 <p class="muted">Your store starts pending. An admin reviews it before you can publish products.</p>
-<form method="post" action="/seller/register">
+<form method="post" action="/sell/register">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <label>Store name <input name="name" maxlength="120" required></label>
-  <label>KYC details <textarea name="kyc_text" maxlength="2000"></textarea></label>
+  <label>Tax id <input name="tax_id" maxlength="40" autocomplete="off" placeholder="e.g. 29ABCDE1234F1Z5" required></label>
+  <p class="muted">We check your tax id with our verification service before the store goes live.</p>
   <button>Register</button>
 </form>
 {% endblock %}

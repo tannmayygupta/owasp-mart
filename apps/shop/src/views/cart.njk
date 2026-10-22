@@ -21,6 +21,7 @@
     </div>
     <div class="total"><span>Total</span><span>{{ cart.total_cents | cents }}</span></div>
     <button style="width:100%;padding:.75rem">Pay {{ cart.total_cents | cents }}</button>
+    <button type="submit" formaction="/pay/start" class="ghost" style="width:100%;margin-top:.5rem">Pay with PayGate instead (bank or UPI)</button>
   </form>
   {% endif %}
 </div>

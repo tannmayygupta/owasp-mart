@@ -1,0 +1,9 @@
+{% extends "layout.njk" %}{% block title %}Mobile app{% endblock %}{% block body %}
+<h1>The {{ brand.name }} mobile app</h1>
+<p class="muted">Shop, track orders and talk to support from your phone.</p>
+<section class="card">
+  <h2>Support agent app</h2>
+  <p>Our support team uses a mobile app that talks to the shop's mobile API under <code>/m/api/v1/</code>. The version 1 app signs in at <code>POST /m/api/v1/login</code> with a JSON body of <code>email</code> and <code>password</code> and answers <code>{"ok": true}</code> with a session cookie, or an error.</p>
+  <p class="muted">Version 1 is kept for the agents' older phones until they move to version 2.</p>
+</section>
+{% endblock %}

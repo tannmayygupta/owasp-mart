@@ -16,6 +16,7 @@ import { loadUser, checkCsrf } from './web/middleware.mjs';
 import { registerRoutes } from './web/routes.mjs';
 import { registerStaffRoutes } from './web/routes-staff.mjs';
 import { registerSellerRoutes } from './web/routes-seller.mjs';
+import { registerPageRoutes } from './web/routes-pages.mjs';
 import { buildCatalogStore } from './challenges/c03a-catalog-search.mjs';
 import { registerOpsRoutes } from './challenges/c05-ops-console.mjs';
 import { registerAuthResetRoutes } from './challenges/c07-password-reset.mjs';
@@ -103,6 +104,8 @@ export function createApp({ db, isReady = ALWAYS_READY, emit = () => {}, challen
     registerRoutes(app, db, emit, { challenges, bot: botQueue, mockUrl, instanceId: process.env.VM_INSTANCE_ID, loginThrottle, getCatalogDb: () => buildCatalogStore(db, { flag: flagOf('C03') }) });
     registerStaffRoutes(app, db, { emit, challenges, flagOf });
     registerSellerRoutes(app, db, { emit, challenges });
+    // The pages a learner reaches the weaknesses from (wallet, seller orders, pay step, sign-up, forgotten password, contact, app note).
+    registerPageRoutes(app, db);
   }
 
   // Terminal handler: unknown routes return a JSON body, never a stack trace

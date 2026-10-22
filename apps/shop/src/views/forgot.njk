@@ -1,0 +1,18 @@
+{% extends "layout.njk" %}{% block title %}Forgot your password{% endblock %}{% block body %}
+<div class="auth" data-widget="reset">
+  <h1>Forgot your password?</h1>
+  <p class="muted" style="text-align:center">Enter your account email. We send a code to it.</p>
+  <p id="reset-msg" class="note" hidden role="status"></p>
+  <form id="reset-request" class="card">
+    <input name="email" type="email" placeholder="Email" aria-label="Email" autocomplete="username" required>
+    <button>Send me a code</button>
+  </form>
+  <form id="reset-confirm" class="card" hidden>
+    <input id="confirm-email" name="email" type="hidden">
+    <input name="code" placeholder="Code from the email" aria-label="Code from the email" autocomplete="one-time-code" inputmode="numeric" required>
+    <input name="password" type="password" placeholder="New password (8 or more characters)" aria-label="New password" autocomplete="new-password" minlength="8" required>
+    <button>Change password</button>
+  </form>
+  <p class="muted" style="text-align:center"><a href="/login">Back to log in</a></p>
+</div>
+{% endblock %}

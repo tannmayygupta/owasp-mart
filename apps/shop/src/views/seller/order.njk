@@ -1,0 +1,13 @@
+{% extends "layout.njk" %}{% block title %}Order {{ orderNo }}{% endblock %}{% block body %}
+<p class="crumbs"><a href="/seller/orders">All orders</a> / {{ orderNo }}</p>
+<h1>Order {{ orderNo }}</h1>
+<div data-widget="seller-order" data-order-no="{{ orderNo }}">
+  <p id="order-msg" class="note" hidden role="alert"></p>
+  <div id="order-body" hidden>
+    <p class="kv">Status: <strong id="order-status"></strong></p>
+    <table><tr><th>Item</th><th class="num">Qty</th><th class="num">Unit</th><th>Status</th></tr><tbody id="order-items"></tbody></table>
+    <h2>Note from the buyer</h2>
+    <p id="order-note" class="card"></p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "layout.njk" %}{% block title %}Pay for order {{ order.order_no }}{% endblock %}{% block body %}
+<h1>Pay for order {{ order.order_no }}</h1>
+<section class="card">
+  <p class="kv">Amount: <span class="price">{{ order.total_cents | cents }}</span> · Status: <span class="badge b-{{ order.status }}">{{ order.status }}</span></p>
+  {% if order.status == 'paid' %}
+    <p>Your payment was confirmed. <a href="/orders/{{ order.id }}">See your order</a>.</p>
+  {% else %}
+    <h2>Waiting for the payment provider</h2>
+    <p>Complete the payment in your bank app or with the PayGate link we sent. PayGate then tells the shop that the payment went through, and this page changes to <strong>paid</strong>. Nothing you do in this browser marks an order as paid.</p>
+    <p class="muted">For developers: PayGate delivers payment events to <code>POST /webhooks/payments</code> with a JSON body of <code>order_no</code> and <code>amount_cents</code> and an HMAC signature in the <code>X-Gateway-Signature</code> header.</p>
+    <p><a href="/pay/{{ order.id }}">Refresh this page</a></p>
+  {% endif %}
+</section>
+{% endblock %}

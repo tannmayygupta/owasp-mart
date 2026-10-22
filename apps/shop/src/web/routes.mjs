@@ -53,7 +53,7 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
   app.get('/api/products/search', hj((req, res) => {
     const store = catalog();
     const results = store ? searchCatalog(store, req.query.q ?? '', { challenges, emit }) : [];
-    res.json({ results });
+    res.json(results.error ? { results: [], error: results.error } : { results });
   }));
 
   // C02 (Cryptographic Failures): gift-card wallet. Buy a card (simulated
@@ -87,8 +87,15 @@ export function registerRoutes(app, db, emit = () => {}, { challenges = {}, getC
   // Catalogue
   app.get('/shop', h((req, res) => {
     const q = String(req.query.q ?? '').slice(0, 100);
+    // C03 part A: a search goes through the catalogue search (the same one /api/products/search answers), so what the search box does is what the weakness is about.
+    if (q) {
+      const store = catalog();
+      const found = store ? searchCatalog(store, q, { challenges, emit }) : [];
+      const products = found.map((r) => ({ id: r.id, title: r.name, description: r.store, price_cents: r.price }));
+      return res.render('index', { products, q, pager: null, searchError: found.error ?? null });
+    }
     const pg = pageOf(req.query);
-    const { rows, pager } = slicePage(shop.listProducts(db, { q, limit: pg.limit, offset: pg.offset }), pg, '/shop', q ? `&q=${encodeURIComponent(q)}` : '');
+    const { rows, pager } = slicePage(shop.listProducts(db, { q, limit: pg.limit, offset: pg.offset }), pg, '/shop', '');
     res.render('index', { products: rows, q, pager });
   }));
   app.get('/product/:id', h((req, res) => {

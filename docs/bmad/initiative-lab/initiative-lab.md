@@ -64,3 +64,5 @@ Follows the stream boundary of ADR 0013: everything driven by instance events an
 - 2026-10-22 live backup, restore comparison, UI deploy and live data accuracy test done (dev-log 2026-10-22-tannmayygupta-live-data-verification)
 
 - 2026-10-22 landing page at / and UX polish of the console and dashboards (dev-log 2026-10-22-tannmayygupta-landing-page-and-ux-polish)
+
+- 2026-10-22 shop pages for every challenge, audit and browser walkthrough (dev-log 2026-10-22-tannmayygupta-shop-pages-for-every-challenge)

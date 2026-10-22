@@ -1,0 +1,14 @@
+{% extends "layout.njk" %}{% block title %}Create an account{% endblock %}{% block body %}
+<div class="auth">
+  <h1>Create an account</h1>
+  <p class="muted" style="text-align:center">Shop, track orders and ask for help with one customer account.</p>
+  {% if error %}<div class="flash error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/register" class="card">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="email" type="email" placeholder="Email" aria-label="Email" autocomplete="username" value="{{ email }}" required>
+    <input name="password" type="password" placeholder="Password (8 or more characters)" aria-label="Password" autocomplete="new-password" minlength="8" required>
+    <button>Create account</button>
+  </form>
+  <p class="muted" style="text-align:center">Already have one? <a href="/login">Log in</a></p>
+</div>
+{% endblock %}

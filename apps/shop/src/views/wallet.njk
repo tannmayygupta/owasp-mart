@@ -1,0 +1,35 @@
+{% extends "layout.njk" %}{% block title %}Gift cards{% endblock %}{% block body %}
+<h1>Gift cards</h1>
+<div data-widget="wallet">
+  <p class="kv">Promo credit from redeemed cards: <strong id="credit" class="price" data-cents="{{ credit }}">{{ credit | cents }}</strong></p>
+  <p id="wallet-msg" class="note" hidden role="status"></p>
+  <div class="cols">
+    <section class="card">
+      <h2>Buy a gift card</h2>
+      <p class="muted">Pay with the simulated card, no real money. You get the card's serial number and its redemption code on the receipt.</p>
+      <form id="buy-form" class="fields">
+        <label>Amount <select name="amount_cents" aria-label="Amount"><option value="1000">$10.00</option><option value="2000" selected>$20.00</option><option value="5000">$50.00</option></select></label>
+        <button>Buy gift card</button>
+      </form>
+      <h3>Receipts</h3>
+      <p id="no-receipts" class="muted">No cards bought in this session yet.</p>
+      <ul id="receipts" class="plain"></ul>
+    </section>
+    <section class="card">
+      <h2>Redeem a code</h2>
+      <p class="muted">Enter the code from a gift card to add its value as promo credit. A card can be redeemed once.</p>
+      <form id="redeem-form" class="fields">
+        <input name="code" placeholder="Gift card code" aria-label="Gift card code" autocomplete="off" required>
+        <button>Redeem</button>
+      </form>
+    </section>
+  </div>
+  <section class="card">
+    <h2>Cards you bought</h2>
+    <table><tr><th>Serial</th><th class="num">Amount</th><th>Status</th></tr>
+    {% for c in cards %}<tr><td>{{ c.serial }}</td><td class="num">{{ c.amount_cents | cents }}</td><td><span class="badge b-{{ c.status }}">{{ c.status }}</span></td></tr>
+    {% else %}<tr><td colspan="3" class="muted">None yet.</td></tr>{% endfor %}
+    </table>
+  </section>
+</div>
+{% endblock %}

@@ -174,6 +174,21 @@ export function listStoreOrderItems(db, actor, opts = {}) {
     .all(store.id, page.limit, page.offset);
 }
 
+// The orders that contain an item of the caller's store, newest first, with their order number (the number a seller quotes to a buyer and opens the order by).
+export function listStoreOrders(db, actor, { limit = 50 } = {}) {
+  const store = ownStore(db, actor);
+  return db
+    .prepare(
+      `SELECT o.order_no, o.status, o.total_cents, COUNT(oi.id) AS items
+         FROM orders o
+         JOIN order_items oi ON oi.order_id = o.id
+        WHERE oi.store_id = ? AND o.order_no IS NOT NULL
+        GROUP BY o.id
+        ORDER BY o.id DESC LIMIT ?`,
+    )
+    .all(store.id, limit);
+}
+
 // Move one of the store's order items forward (paid→processing→shipped→delivered)
 // or cancel it (from paid/processing). `completed` is the customer's confirmation,
 // not a seller action, so it is refused here.
