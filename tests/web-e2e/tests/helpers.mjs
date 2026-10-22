@@ -40,7 +40,7 @@ export async function signUpAndVerify(page, { name, email, password = PASSWORD }
   await page.getByLabel('Name shown on your dashboard').fill(name);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByLabel('I am 18 or over.').check();
+  await page.getByLabel(/I am 18 or over/).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByTestId('signup-sent')).toBeVisible();
   const { token } = await hook(`mail?to=${encodeURIComponent(email)}`);

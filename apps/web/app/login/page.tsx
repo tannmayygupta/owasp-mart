@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, say, type MfaRequired, type Session } from '../../lib/api';
-import { safeNext, useSession } from '../../lib/session';
+import { afterSignIn } from '../../lib/paths';
+import { useSession } from '../../lib/session';
 import { AuthShell } from '../auth-shell';
 
 // Sign-in (FR-ACC-03), then the second factor when the account has one (FR-ACC-07, H-135): the answer is `mfa_required` with a ticket, and the code
@@ -15,12 +16,12 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) window.location.replace(safeNext(new URLSearchParams(window.location.search).get('next')));
+    if (!loading && user) window.location.replace(afterSignIn(new URLSearchParams(window.location.search).get('next'), user.account_type));
   }, [loading, user]);
 
   function done(session: Session) {
     adopt(session);
-    window.location.assign(safeNext(new URLSearchParams(window.location.search).get('next')));
+    window.location.assign(afterSignIn(new URLSearchParams(window.location.search).get('next'), session.user.account_type));
   }
 
   async function onPassword(ev: FormEvent<HTMLFormElement>) {

@@ -18,6 +18,7 @@ export function Nav() {
         {!loading && user && (
           <>
             <Link href="/dashboard">Dashboard</Link>
+            {user.account_type === 'participant' && <a href="/">Practice lab</a>}
             {user.account_type === 'recruiter' && <Link href="/company/candidates">Candidates</Link>}
             {user.account_type === 'recruiter' && <Link href="/company">Company</Link>}
             {user.account_type === 'admin' && <Link href="/admin">Admin</Link>}

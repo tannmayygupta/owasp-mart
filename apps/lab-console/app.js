@@ -34,7 +34,13 @@ const MESSAGES = {
   'ATT-GONE': 'That run is closed.', 'AUTH-CSRF-FAILED': 'Your session changed. Reload the page.',
 };
 const say = (code) => MESSAGES[code] || `Something went wrong (${code}).`;
-function banner(text, kind) { const b = $('banner'); b.textContent = text || ''; b.className = kind || ''; b.hidden = !text; }
+// A message that was good news or a hint fades by itself (a "Building your shop" line must not outlive the building); an error stays until something else is said.
+let bannerTimer = null;
+function banner(text, kind) {
+  const b = $('banner'); b.textContent = text || ''; b.className = kind || ''; b.hidden = !text;
+  clearTimeout(bannerTimer);
+  if (text && kind !== 'bad') { bannerTimer = setTimeout(() => { b.hidden = true; b.textContent = ''; }, 7000); bannerTimer.unref?.(); }
+}
 
 // ---------- small helpers ----------
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
@@ -51,17 +57,11 @@ function svgRing() {
 }
 
 // ---------- views ----------
-function show(view) { for (const v of ['auth', 'verify', 'lab']) $(v).hidden = v !== view; $('who').hidden = view !== 'lab'; }
-function tab(which) {
-  $('login-form').hidden = which !== 'login'; $('signup-form').hidden = which !== 'signup';
-  $('tab-login').className = which === 'login' ? 'on' : ''; $('tab-signup').className = which === 'signup' ? 'on' : '';
-}
+// Signed out, this page is the landing page: what the platform offers and two buttons (Sign in and Create account are pages of their own, /login and /signup).
+// Signed in as a learner it is the lab. A recruiter or an administrator has no lab here: their screens are the dashboards.
+function show(view) { for (const v of ['landing', 'lab']) $(v).hidden = v !== view; $('who').hidden = view !== 'lab'; $('guest').hidden = view !== 'landing'; }
 
 async function boot() {
-  $('tab-login').addEventListener('click', () => tab('login'));
-  $('tab-signup').addEventListener('click', () => tab('signup'));
-  $('login-form').addEventListener('submit', onLogin);
-  $('signup-form').addEventListener('submit', onSignup);
   $('logout').addEventListener('click', onLogout);
   $('open').addEventListener('click', onOpen);
   $('copy').addEventListener('click', onCopy);
@@ -69,39 +69,15 @@ async function boot() {
   $('stop').addEventListener('click', onStop);
   $('submit').addEventListener('click', onFinishRun);
   $('report').addEventListener('click', onReport);
-  if (location.pathname === '/verify-email') return verifyEmail();
   try {
     const s = await api('GET', '/api/v1/session');
-    if (s.status === 'authenticated') return enter(s);
+    if (s.status === 'authenticated') {
+      const kind = s.user?.account_type;
+      if (kind && kind !== 'participant') { location.replace('/dashboard'); return; } // recruiters and administrators work in the dashboards
+      return enter(s);
+    }
   } catch { /* not signed in */ }
-  show('auth'); tab('login');
-}
-
-async function verifyEmail() {
-  show('verify');
-  const token = new URLSearchParams(location.search).get('token') || '';
-  try { await api('POST', '/api/v1/accounts/verify-email', { token }); $('verify-text').textContent = 'Your email is confirmed. You can sign in now.'; }
-  catch { $('verify-text').textContent = 'This link was already used or has expired. Sign in, or ask for a new link.'; }
-  history.replaceState(null, '', '/verify-email');
-}
-
-async function onSignup(ev) {
-  ev.preventDefault();
-  const f = new FormData(ev.target);
-  try {
-    await api('POST', '/api/v1/accounts', { email: f.get('email'), password: f.get('password'), display_name: f.get('display_name'), age_declaration: f.get('age') === 'on' });
-    banner('Check your email for the confirmation link, then sign in.', 'ok'); tab('login');
-  } catch (e) { banner(say(e.code), 'bad'); }
-}
-
-async function onLogin(ev) {
-  ev.preventDefault();
-  const f = new FormData(ev.target);
-  try {
-    const s = await api('POST', '/api/v1/session', { email: f.get('email'), password: f.get('password') });
-    if (s.status === 'mfa_required') return banner('This account needs a second factor, which this console does not handle.', 'bad');
-    ev.target.reset(); banner(''); enter(s);
-  } catch (e) { banner(say(e.code), 'bad'); }
+  show('landing');
 }
 
 async function onLogout() {
@@ -109,7 +85,7 @@ async function onLogout() {
   clearInterval(state.poll); clearInterval(state.tick);
   Object.assign(state, { csrf: null, user: null, attempt: null, assessment: null, instance: null, items: [], meta: {}, score: null, account: null, points: {}, hints: {}, hintErr: {}, flagMsg: null, draft: {}, picked: null });
   $('link-box').hidden = true; $('report-box').hidden = true;
-  show('auth'); tab('login'); banner('Signed out.', 'ok');
+  show('landing'); banner('You are signed out.', 'ok');
 }
 
 async function enter(session) {
@@ -144,7 +120,7 @@ async function refresh() {
       // one refused call is not a sign-out: ask the session itself before sending the learner back to the sign-in page
       const s = await api('GET', '/api/v1/session').catch(() => null);
       if (s && s.status === 'authenticated') { state.csrf = s.csrf_token || state.csrf; state.retry = (state.retry || 0) + 1; }
-      else { banner(say('AUTH-SESSION-REQUIRED'), 'bad'); show('auth'); }
+      else { banner(say('AUTH-SESSION-REQUIRED'), 'bad'); show('landing'); }
     } else banner(say(e.code), 'bad');
   } finally { state.busy = false; }
   if (state.retry && state.retry < 3) { const n = state.retry; await refresh(); if (state.retry === n) state.retry = 0; return; } // the session is fine: read the lab again
@@ -210,8 +186,14 @@ function render() {
   $('i-state').textContent = i ? (ready ? 'running' : i.state) : (a && live ? 'starting' : 'not started');
   $('i-state').className = `pill ${ready ? 'ok' : ''}`.trim();
   $('instance-actions').hidden = !live || !i;
-  $('open').disabled = !ready; $('copy').disabled = !ready; $('reset').disabled = !ready; $('stop').disabled = !i || ['stopping', 'destroyed'].includes(i?.state);
-  $('submit').disabled = a?.state !== 'running';
+  // a button that cannot be pressed says why (the pointer shows it too: see style.css)
+  const gate = (id, on, why) => { const b = $(id); b.disabled = !on; b.title = on ? (b.dataset.title || '') : why; };
+  for (const id of ['open', 'copy', 'reset', 'stop', 'submit']) { const b = $(id); if (b.dataset.title === undefined) b.dataset.title = b.title || ''; }
+  const noShop = 'Available when your shop is running.';
+  gate('open', ready, noShop); gate('copy', ready, noShop); gate('reset', ready, noShop);
+  gate('stop', Boolean(i) && !['stopping', 'destroyed'].includes(i.state), 'There is no running shop to stop.');
+  gate('submit', a?.state === 'running', 'There is no run in progress.');
+  if (ready && $('banner').textContent.startsWith('Building your shop')) banner(''); // it is built: the message is done
   $('report').hidden = !a || !['submitted', 'reported', 'running', 'expired'].includes(a.state);
   const solved = state.items.filter((x) => x.solved).length;
   const total = state.meta.total || state.items.length || state.catalog.length || 0;
@@ -235,8 +217,16 @@ function renderRail() {
     const cls = item && shown && shown.challenge_key === key ? 'now' : st === 'solved' ? 'done' : st === 'expired' ? 'lost' : '';
     const li = el('li', cls);
     const dot = el('button', 'dot', st === 'solved' ? '✓' : String(n + 1)); dot.type = 'button';
-    dot.setAttribute('aria-label', `Challenge ${n + 1}${item ? ': ' + titleOf(item) : ''}, ${st === 'future' ? 'not open yet' : st}`);
-    if (item) dot.addEventListener('click', () => { state.picked = key; render(); }); else dot.disabled = true;
+    dot.setAttribute('aria-label', `Challenge ${n + 1}${item ? ': ' + titleOf(item) : ''}, ${st === 'future' ? 'locked' : st}`);
+    if (item) {
+      dot.title = `Challenge ${n + 1}: ${titleOf(item)}`;
+      dot.addEventListener('click', () => { state.picked = key; banner(''); render(); });
+    } else {
+      // a challenge opens when the one before it is captured or its time is over: say so instead of doing nothing (the button stays focusable, so a keyboard user hears it too)
+      const why = n === 0 ? 'This challenge is not open yet.' : `Challenge ${n + 1} is locked. Capture challenge ${n}, or let its time run out, to open it.`;
+      dot.title = why; dot.className = 'dot locked'; dot.setAttribute('aria-disabled', 'true');
+      dot.addEventListener('click', () => banner(why, 'info'));
+    }
     li.appendChild(dot); rail.appendChild(li);
   });
 }
@@ -247,7 +237,7 @@ function renderMission() {
   if (!a) return m.appendChild(startPanel('Your lab is ready when you are', 'A private copy of the shop is built for you in a few seconds. Nothing you do there touches anything else.', 'Start my lab'));
   if (FINISHED.includes(a.state)) return m.appendChild(finishedPanel());
   if (a.state === 'ready') return m.appendChild(preparingPanel());
-  if (!state.instance || ['destroyed', 'failed'].includes(state.instance.state)) return m.appendChild(startPanel('Your shop is not running', 'Your run is still open. Build a new shop to carry on with the current challenge.', 'Build a new shop'));
+  if (!state.instance || ['destroyed', 'failed'].includes(state.instance.state)) return m.appendChild(startPanel('Your shop is not running', 'Your run is still open. Build a new shop to carry on with the current challenge.', 'Build a new shop', currentItem()));
   if (!INSTANCE_READY.includes(state.instance.state)) return m.appendChild(preparingPanel());
   const item = currentItem();
   if (!item) return m.appendChild(preparingPanel());
@@ -272,10 +262,17 @@ function renderMission() {
   if (ph === 'active' && !state.hints[item.challenge_key] && item.hints_available) void loadHints(item.challenge_key);
 }
 
-function startPanel(title, text, label) {
+function startPanel(title, text, label, item) {
   const body = el('div', 'm-body');
   if (state.assessment && !state.attempt) body.append(assessmentNote(state.assessment));
   body.append(el('div', 'empty-art', '>_'), el('h1', 'm-title', title), el('p', 'lede', text));
+  if (item) {
+    // the challenge the learner picked on the rail is shown even while the shop is down, so the rail always answers a click
+    const keys = state.catalog.map((c) => c.challenge_key);
+    const box = el('div', 'box');
+    box.append(el('b', '', `Challenge ${keys.indexOf(item.challenge_key) + 1 || '?'}: ${titleOf(item)}${tierOf(item) ? ` (${tierOf(item)})` : ''}`), el('span', '', item.brief || 'Build your shop to see this challenge.'));
+    body.append(box);
+  }
   const cta = el('div', 'cta'); cta.append(button(label, 'primary big', onStart)); body.append(cta);
   body.append(el('p', 'note', 'Challenges open one at a time. Each has a countdown that starts when you press Begin: Easy 20, Medium 40, Hard 60 minutes.'));
   return body;
@@ -347,7 +344,7 @@ function activeBody(item) {
       if (h?.unlocked && h.text) row.appendChild(el('span', 'txt', h.text));
       else {
         const next = level === item.hints_used + 1;
-        const b = button(next ? 'Reveal' : 'Locked', 'quiet sm', () => onHint(key, level)); b.disabled = !next;
+        const b = button(next ? 'Reveal' : 'Locked', 'quiet sm', () => onHint(key, level)); b.disabled = !next; if (!next) b.title = 'Reveal the hint before this one first.';
         row.appendChild(b);
         if (state.hintErr[key]?.level === level) row.appendChild(el('span', 'txt bad', state.hintErr[key].text));
       }

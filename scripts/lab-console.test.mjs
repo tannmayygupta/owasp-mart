@@ -264,3 +264,76 @@ test('an attempt whose own answer says candidate is dropped even if the list sai
   assert.match(app.mission().textContent, /Start my lab/);
   assert.equal(app.mission().withClass('flag-input').length, 0);
 });
+// ---- the landing page and the way the console feels (the pointer, the reasons, the rail) ----
+
+test('signed out, the page is the landing page: what the platform offers and two buttons, and no form of its own', async () => {
+  const app = boot(ROUTES({ 'GET /api/v1/session': { status: 'anonymous' } }));
+  await app.load(); await settle();
+  assert.equal(app.byId.get('landing').hidden, false);
+  assert.equal(app.byId.get('lab').hidden, true);
+  assert.equal(app.byId.get('guest').hidden, false, 'Sign in and Create account sit in the top bar');
+  assert.equal(app.byId.get('who').hidden, true);
+  assert.doesNotMatch(HTML, /id="login-form"|id="signup-form"|id="auth"/, 'sign in and sign up are the pages /login and /signup, not a second form here');
+  assert.match(HTML, /href="\/signup"/); assert.match(HTML, /href="\/login"/);
+  assert.match(HTML, /mailto:/, 'the footer carries a contact');
+  assert.ok(!app.calls.some((c) => c.startsWith('GET /api/v1/challenges')), 'nothing of the lab is asked for while signed out');
+});
+
+test('a recruiter or an administrator who opens / is sent to the dashboards, a learner gets the lab', async () => {
+  for (const kind of ['recruiter', 'admin']) {
+    const app = boot(ROUTES({ 'GET /api/v1/session': { status: 'authenticated', user: { display_name: 'R', account_type: kind }, csrf_token: 'C' } }));
+    let went = null; globalThis.location.replace = (to) => { went = to; };
+    await app.load(); await settle();
+    assert.equal(went, '/dashboard', kind);
+    assert.ok(!app.calls.some((c) => c.startsWith('GET /api/v1/challenges')), 'no lab is loaded for them');
+  }
+  const learner = boot(ROUTES({ 'GET /api/v1/session': { status: 'authenticated', user: { display_name: 'L', account_type: 'participant' }, csrf_token: 'C' } }));
+  await learner.load(); await settle();
+  assert.equal(learner.byId.get('lab').hidden, false);
+});
+
+test('a locked challenge on the rail answers a click and says why; an open one says its name and opens', async () => {
+  const app = boot(ROUTES());
+  await app.load(); await settle();
+  const dots = app.byId.get('rail').buttons();
+  assert.equal(dots.length, 2);
+  assert.match(dots[0].title, /Challenge 1: Broken Access Control/);
+  assert.equal(dots[0].attrs['aria-disabled'], undefined, 'an open challenge is a normal button');
+  assert.match(dots[1].className, /locked/);
+  assert.equal(dots[1].attrs['aria-disabled'], 'true');
+  assert.equal(dots[1].disabled, false, 'it stays focusable, so a keyboard user hears the reason too');
+  await dots[1].fire('click');
+  assert.match(app.byId.get('banner').textContent, /Challenge 2 is locked\. Capture challenge 1/);
+  assert.equal(app.byId.get('banner').className, 'info');
+});
+
+test('with the shop down, picking a challenge on the rail shows that challenge and its brief, not an unchanged page', async () => {
+  const app = boot(ROUTES({ 'GET /api/v1/instances/i-BBBBBBBBBBBBBBBB': { instance_id: 'i-BBBBBBBBBBBBBBBB', state: 'destroyed', access: 'closed', epoch: 1 } }));
+  await app.load(); await settle();
+  assert.match(app.mission().textContent, /Your shop is not running/);
+  assert.match(app.mission().textContent, /Challenge 1: Broken Access Control \(Easy\)/);
+  assert.match(app.mission().textContent, /Read a competitor order\./);
+  assert.ok(app.mission().button('Build a new shop'));
+});
+
+test('a button that cannot be pressed says why, and the "Building your shop" message goes away once the shop is up', async () => {
+  const down = boot(ROUTES({ 'GET /api/v1/instances/i-BBBBBBBBBBBBBBBB': { instance_id: 'i-BBBBBBBBBBBBBBBB', state: 'destroyed', access: 'closed', epoch: 1 } }));
+  await down.load(); await settle();
+  assert.equal(down.byId.get('open').disabled, true);
+  assert.match(down.byId.get('open').title, /when your shop is running/);
+  assert.match(down.byId.get('stop').title, /no running shop/);
+  const up = boot(ROUTES());
+  await up.load(); await settle();
+  up.byId.get('banner').textContent = 'Building your shop. This takes a few seconds.'; up.byId.get('banner').hidden = false;
+  await up.byId.get('open').fire('click'); await settle();
+  assert.equal(up.byId.get('open').disabled, false);
+  assert.equal(up.byId.get('open').title, '', 'an enabled button keeps its own title');
+});
+
+test('the styles make clickable things look clickable and the locked ones look locked', () => {
+  const css = fs.readFileSync(path.join(DIR, 'style.css'), 'utf8');
+  assert.match(css, /button, summary[^{]*\{\s*cursor:pointer/);
+  assert.match(css, /button:disabled[^{]*\{\s*cursor:not-allowed/);
+  assert.match(css, /\.dot\.locked/);
+  assert.match(css, /#banner\.info/);
+});
