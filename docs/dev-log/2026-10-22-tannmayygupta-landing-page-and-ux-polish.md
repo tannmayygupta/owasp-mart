@@ -62,3 +62,10 @@ None. The contact address in the footer is the leader's own, stated by the leade
 ## Limitations and follow-ups
 - Real phone width is checked only at 500 px in headless Chrome.
 - The contact line is one place per app (`apps/lab-console/index.html`, `apps/web/app/site-footer.tsx`).
+
+## Live deployment (2026-10-22)
+- From main at the merge of PR 91: backup first (`backup-now`: Result=success), baseline counts read, `ship-p`, `platform` (api, web, worker and caddy recreated; Postgres untouched).
+- `verify-deployed`: 70 PASS, 0 FAIL. `verify-live-data`: 14 PASS, 0 FAIL. After the deploy 0 tables were below the pre-deploy counts; migration head still 0018.
+- The live `/` serves the landing page (checked in the markup and in a screenshot, `docs/assets/ux-landing-and-polish/live-landing.png`), the old inline sign-in form is gone, the footer contact and `/favicon.svg` are served, `/signup?as=recruiter` answers 200.
+- A first screenshot taken at the load event showed an empty page: the page decides between landing and lab after the session answer, which the screenshot did not wait for. With a 6 second virtual-time budget the page is complete. A visitor sees the bar and the footer for the length of one request; showing the landing page first and replacing it for a signed-in learner would flash the wrong page the other way, so it was left.
+- Not checked live: the learner sign-in redirect into the lab and the locked rail dots in a signed-in browser (they need a confirmed account; covered locally by the console tests and the browser suite).
