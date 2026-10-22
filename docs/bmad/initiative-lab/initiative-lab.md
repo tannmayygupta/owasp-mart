@@ -69,3 +69,5 @@ Follows the stream boundary of ADR 0013: everything driven by instance events an
 - 2026-10-22 landing page and UX polish deployed live and verified (dev-log 2026-10-22-tannmayygupta-landing-page-and-ux-polish)
 
 - 2026-10-22 project guide written; live exploit suite 58 of 58 on the deployed lab (dev-log 2026-10-22-tannmayygupta-project-guide-and-live-exploit-proof)
+
+- 2026-10-22 README rewritten for a first-time reader (dev-log 2026-10-22-tannmayygupta-readme-rewrite)

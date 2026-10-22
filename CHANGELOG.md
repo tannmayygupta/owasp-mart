@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- README rewritten for a first-time reader: what VulnMart is and the problem it solves in plain language, roles, the 11 challenges, how it works, repository map, setup and run steps, tests, deployment overview, secrets rules, documentation map, how we work, safety and contacts.
 - Project guide in plain language (docs/PROJECT-GUIDE.md); the live exploit suite begins each challenge and passes 58 of 58 on the deployed lab (all 11 challenges solved live, flag credited by the sidecar, score 1000); live-deploy mail-status.
 - The shop's pages lead to every challenge (audit of all 11): customer sign-up, Gift cards, a seller's Orders and order page, Quick refund and statement, the cart preview, Pay with PayGate, Forgot password, Contact, Mobile app, image import form, the store form with a tax id, and menu entries for case notes and settlement; the search box goes through the catalogue search. Shop tests 213 passed, challenge tests 40, browser walkthrough 12 of 12.
 - Live deploy of the landing page and UX polish (backup first, 70 deployed checks and 14 data checks passed, no table below its pre-deploy count).
