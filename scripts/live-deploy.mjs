@@ -87,7 +87,7 @@ export function labEnv({ zone, H, runtime = DEFAULT_RUNTIME }) {
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
   const o = { cmd, dryRun: false, allowMailCatcher: false };
-  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks', 'backup-now', 'data-counts'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks | backup-now | data-counts [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--runtime runsc|runc] [--allow-mail-catcher] [--dry-run]' };
+  if (!['build', 'ship-i', 'ship-p', 'lab', 'platform', 'status', 'down-lab', 'down-platform', 'hooks', 'backup-now', 'data-counts', 'mail-status'].includes(cmd)) return { error: 'usage: node scripts/live-deploy.mjs build | ship-i | ship-p | lab | platform | status | down-lab | down-platform | hooks | backup-now | data-counts | mail-status [--secrets <folder>] [--zone <zone>] [--platform-host <name>] [--runtime runsc|runc] [--allow-mail-catcher] [--dry-run]' };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--dry-run') o.dryRun = true;
@@ -370,6 +370,13 @@ function backupNow(H) {
   log(String(r.stdout).trimEnd());
 }
 
+/** `mail-status`: the state of the mail queue, no address and no content: counts by state and error, and the newest eight rows (template, state, tries, error, time). */
+const MAIL_SQL = "select 'queue', state || ' ' || coalesce(last_error_code, '-') || ' ' || count(*) from email_outbox group by state, last_error_code union all select 'newest', template || ' ' || state || ' tries=' || attempts || ' ' || coalesce(last_error_code, '-') || ' ' || to_char(created_at, 'HH24:MI:SS') from (select * from email_outbox order by id desc limit 8) t union all select 'user', display_name || ' verified=' || (email_verified_at is not null) || ' status=' || status from users where display_name like 'Exploit audit%'";
+function mailStatus(H) {
+  const r = ssh(H.p.pub, `sudo docker exec vulnmart-postgres psql -U vulnmart -d vulnmart -At -F ' ' -c "${MAIL_SQL}"`);
+  must(r, 'read the mail queue');
+  log(String(r.stdout).trimEnd());
+}
 export function main(argv = process.argv.slice(2)) {
   const o = parseArgs(argv);
   if (o.error) { console.error(o.error); return 2; }
@@ -385,6 +392,7 @@ export function main(argv = process.argv.slice(2)) {
     else if (o.cmd === 'hooks') hooks(H);
     else if (o.cmd === 'data-counts') dataCounts(H);
     else if (o.cmd === 'backup-now') backupNow(H);
+    else if (o.cmd === 'mail-status') mailStatus(H);
     else if (o.cmd === 'down-lab') must(ssh(H.i.pub, 'cd /opt/vulnmart/lab/repo && sudo docker compose -f infra/compose/compose.yaml -f infra/compose/lab.reports.yaml --profile lab down'), 'down lab');
     else if (o.cmd === 'down-platform') must(ssh(H.p.pub, 'cd /opt/vulnmart/platform && sudo docker compose -f compose.yaml --env-file .env down'), 'down platform');
     return 0;
