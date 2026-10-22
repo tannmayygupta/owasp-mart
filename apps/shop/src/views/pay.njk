@@ -7,7 +7,7 @@
   {% else %}
     <h2>Waiting for the payment provider</h2>
     <p>Complete the payment in your bank app or with the PayGate link we sent. PayGate then tells the shop that the payment went through, and this page changes to <strong>paid</strong>. Nothing you do in this browser marks an order as paid.</p>
-    <p class="muted">For developers: PayGate delivers payment events to <code>POST /webhooks/payments</code> with a JSON body of <code>order_no</code> and <code>amount_cents</code> and an HMAC signature in the <code>X-Gateway-Signature</code> header.</p>
+    <p class="muted">For developers: PayGate delivers payment events to <code>POST /webhooks/payments</code> with a JSON body of <code>order_no</code> and <code>amount_cents</code> and an HMAC signature in the <code>X-Gateway-Signature</code> header. For this order the body is <code>{"order_no": "{{ order.order_no }}", "amount_cents": {{ order.total_cents }}}</code>. For integration tests PayGate has a sandbox mode, switched on by the request header <code>X-Gateway-Mode: sandbox</code>.</p>
     <p><a href="/pay/{{ order.id }}">Refresh this page</a></p>
   {% endif %}
 </section>

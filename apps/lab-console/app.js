@@ -99,7 +99,9 @@ async function enter(session) {
 
 // ---------- the data ----------
 async function refresh() {
-  if (state.busy) return;
+  // Asked while a read is already in flight (a poll, or the click that just changed something): that read may have started before the change, so read once more when it ends.
+  // Dropping the request left the page on the old run with no later poll (a finished run is not polled): "Start a new run" then showed a destroyed shop until a reload.
+  if (state.busy) { state.again = true; return; }
   state.busy = true;
   try {
     const all = (await api('GET', '/api/v1/me/attempts')).items;
@@ -110,8 +112,19 @@ async function refresh() {
     state.attempt = current ? await api('GET', `/api/v1/attempts/${current.attempt_id}`) : null;
     if (state.attempt && state.attempt.mode !== 'learner') state.attempt = null; // the attempt answer must agree with the list
     state.instance = state.attempt?.instance_id ? await api('GET', `/api/v1/instances/${state.attempt.instance_id}`).catch(() => null) : null;
+    const watched = state.attempt && state.items.length ? currentItem() : null; // the challenge on screen before this read
+    const watchedRun = state.attempt?.attempt_id;
     if (state.attempt && state.attempt.state !== 'ready') await loadProgress();
     else { state.items = []; state.meta = {}; state.score = null; }
+    // The lab counts a flag the moment it shows up in the shop (the sidecar sees it), so the challenge can end while the learner is still reading it or about to paste.
+    // Without this the page jumped to the next challenge and the flag just found was then refused there ("not the flag for this challenge"): stay on the captured one and say so.
+    if (watched && !watched.solved && state.attempt?.attempt_id === watchedRun) {
+      const now = state.items.find((i) => i.challenge_key === watched.challenge_key);
+      if (now && now.solved && !state.picked) {
+        state.picked = watched.challenge_key;
+        banner(`${watched.challenge_key} captured: the lab saw the flag in your shop and counted it. You do not need to paste it.`, 'ok');
+      }
+    }
     state.account = await api('GET', '/api/v1/me/progress').catch(() => null); // a lab that is not sequenced has no account points
     if (state.attempt) await loadTimeline();
     render();
@@ -123,6 +136,7 @@ async function refresh() {
       else { banner(say('AUTH-SESSION-REQUIRED'), 'bad'); show('landing'); }
     } else banner(say(e.code), 'bad');
   } finally { state.busy = false; }
+  if (state.again) { state.again = false; return refresh(); }
   if (state.retry && state.retry < 3) { const n = state.retry; await refresh(); if (state.retry === n) state.retry = 0; return; } // the session is fine: read the lab again
   state.retry = 0;
   schedule();
@@ -160,6 +174,7 @@ function schedule() {
   const waiting = state.attempt && state.attempt.state === 'ready';
   if (starting || waiting) state.poll = setInterval(refresh, 2000);
   else if (state.attempt && state.attempt.state === 'running') state.poll = setInterval(() => { if (!typing()) void refresh(); }, 15000);
+  else state.poll = setInterval(() => { void refresh(); }, 20000); // no live run: a slow look, so a run started or ended in another tab shows up
   state.tick = setInterval(tickClock, 1000);
 }
 const typing = () => { const a = typeof document.activeElement === 'object' ? document.activeElement : null; return Boolean(a && a.tagName === 'INPUT' && a.className.includes('flag-input')); };
@@ -371,6 +386,7 @@ function endedBody(item, ph) {
   out.push(head);
   const pts = state.points[key] ?? 0;
   out.push(el('p', pts ? 'points' : 'points none', `${pts} pts`));
+  if (ph === 'solved') out.push(el('p', 'note', 'The lab counts a flag the moment it shows up in your shop, so you do not have to paste it. Pasting it also works.'));
   if (item.write_up) {
     const w = el('div', 'box win'); w.append(el('b', '', 'What was wrong'), el('span', '', item.write_up.vulnerable));
     const f = el('div', 'box win'); f.append(el('b', '', 'How to fix it'), el('span', '', item.write_up.fix));
@@ -439,7 +455,7 @@ async function onFlag(key, input) {
   const flag = input.value.trim(); if (!flag) return;
   try {
     const r = await api('POST', `/api/v1/attempts/${state.attempt.attempt_id}/flags`, { challenge_key: key, flag });
-    state.flagMsg = { key, kind: r.result === 'correct' ? 'ok' : 'bad', text: r.result === 'correct' ? (r.credit === 'held' ? 'Correct. A human reviews this capture before it counts.' : 'Correct. Flag captured.') : 'That is not the flag for this challenge.' };
+    state.flagMsg = { key, kind: r.result === 'correct' ? 'ok' : 'bad', text: r.result === 'correct' ? (r.credit === 'held' ? 'Correct. A human reviews this capture before it counts.' : 'Correct. Flag captured.') : `That is not the flag for ${key}. Each challenge has its own flag, and Reset shop changes all of them.` };
     $('flag-answer').textContent = state.flagMsg.text;
     if (r.result === 'correct') delete state.draft[key];
     state.picked = r.result === 'correct' ? key : null; // stay on the captured challenge: the result and the way on come before the next one
