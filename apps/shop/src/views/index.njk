@@ -7,6 +7,7 @@
   <form class="search" method="get" action="/shop" role="search"><input name="q" value="{{ q }}" placeholder="Search products" aria-label="Search products"><button>Search</button></form>
 </section>
 {% if q %}<p class="muted">Results for <strong>{{ q }}</strong></p>{% endif %}
+{% if searchError %}<div class="flash error" role="alert">Search failed: {{ searchError }}</div>{% endif %}
 <div class="grid">
   {% for p in products %}
   <article class="card product">

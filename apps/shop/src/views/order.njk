@@ -13,4 +13,12 @@
   <form class="inline" method="post" action="/reviews"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="product_id" value="{{ it.product_id }}"><input name="rating" type="number" min="1" max="5" value="5" style="width:3.8rem" aria-label="Rating"><button>Review</button></form>
 </td></tr>
 {% endfor %}</table>
+<section class="card" data-widget="refund" data-order-id="{{ order.id }}">
+  <h2>Quick refund</h2>
+  <p class="muted">Refunds of small amounts on a delivered order are paid out at once. Enter an amount in cents. The statement shows what has been refunded so far.</p>
+  <form id="quick-refund" class="fields two"><input name="amount" type="number" min="1" inputmode="numeric" placeholder="Amount in cents" aria-label="Refund amount in cents" required><button>Refund now</button></form>
+  <p id="refund-msg" class="note" hidden role="status"></p>
+  <h3>Refund statement</h3>
+  <div id="statement" class="muted"></div>
+</section>
 {% endblock %}

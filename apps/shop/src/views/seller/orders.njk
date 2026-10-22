@@ -1,0 +1,8 @@
+{% extends "layout.njk" %}{% block title %}Orders{% endblock %}{% block body %}
+<h1>Orders</h1>
+<p class="muted">Every order that contains an item from your store. Open an order by its number.</p>
+<table><tr><th>Order</th><th>Status</th><th class="num">Items</th><th class="num">Total</th><th></th></tr>
+{% for o in orders %}<tr><td><a href="/seller/orders/{{ o.order_no }}">{{ o.order_no }}</a></td><td><span class="badge b-{{ o.status }}">{{ o.status }}</span></td><td class="num">{{ o.items }}</td><td class="num">{{ o.total_cents | cents }}</td><td><a href="/seller/orders/{{ o.order_no }}">View</a></td></tr>
+{% else %}<tr><td colspan="5" class="muted">No orders yet.</td></tr>{% endfor %}
+</table>
+{% endblock %}

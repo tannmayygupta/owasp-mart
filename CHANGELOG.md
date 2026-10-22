@@ -4,6 +4,7 @@ All notable changes to VulnMart. Format follows [Keep a Changelog](https://keepa
 Categories: Added, Changed, Deprecated, Removed, Fixed.
 
 ## [Unreleased]
+- The shop's pages lead to every challenge (audit of all 11): customer sign-up, Gift cards, a seller's Orders and order page, Quick refund and statement, the cart preview, Pay with PayGate, Forgot password, Contact, Mobile app, image import form, the store form with a tax id, and menu entries for case notes and settlement; the search box goes through the catalogue search. Shop tests 213 passed, challenge tests 40, browser walkthrough 12 of 12.
 - Live deploy of the landing page and UX polish (backup first, 70 deployed checks and 14 data checks passed, no table below its pre-deploy count).
 - Landing page at `/` (what the platform offers, Sign in and Create account buttons, footer with a contact) in place of a second sign-in form; `/login` and `/signup` are the only forms; a learner signs in to the lab, a recruiter or administrator to the dashboards; the console's pointer, locked challenges, disabled-button reasons, fading messages and the picked challenge while the shop is down; success colour darkened for contrast; browser suite 20 of 20.
 - Live data safety: `live-deploy.mjs backup-now` and `data-counts`, and `scripts/verify-live-data.mjs` (real HTTPS sign-ups checked against the live row counts); the live database was backed up, the dump restored and compared (43 of 43 tables equal), the new sign-in pages deployed, 70 deployed checks and 14 data checks passed.

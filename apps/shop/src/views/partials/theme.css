@@ -151,3 +151,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .thread .card{margin:.6rem 0}
 .crumbs{font-size:.88rem;color:var(--muted);margin-bottom:.4rem}
 .kv{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin:.3rem 0 1rem}
+.note{padding:.6rem .8rem;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);margin:.6rem 0}
+.note.ok{background:var(--ok-bg);border-color:var(--ok)}
+.note.bad{background:var(--bad-bg);border-color:var(--bad)}
+ul.plain{list-style:none;padding:0;margin:.5rem 0}ul.plain li{padding:.35rem 0;border-bottom:1px solid var(--line)}
+.kv-list{display:grid;grid-template-columns:max-content 1fr;gap:.2rem 1rem;margin:0;text-transform:none}.kv-list dt{color:var(--muted);text-transform:capitalize}.kv-list dd{margin:0}

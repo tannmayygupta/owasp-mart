@@ -43,9 +43,12 @@ export function searchCatalog(catalogDb, q, { challenges = {}, emit = () => {} }
     } catch (err) {
       // A malformed term produces a SQL error — the part-A M1 detection signal.
       emit('shop.catalog_query_error', { route: 'web', error_class: err?.code || 'sql_error' });
-      return [];
+      // The page shows the database's own message (a search box that prints SQL errors is the first sign of the weakness).
+      return Object.assign([], { error: String(err?.message ?? 'sql error') });
     }
   }
   // FIXED: the term is a bound parameter — data, not SQL.
-  return catalogDb.prepare("SELECT id,name,price,store FROM catalog_products WHERE status='published' AND name LIKE ?").all(`%${term}%`);
+  // wildcards in the text are literal (a search for "50%" is not a match-all), as the shop's own listing does
+  const literal = term.replace(/[\\%_]/g, '\\$&');
+  return catalogDb.prepare("SELECT id,name,price,store FROM catalog_products WHERE status='published' AND name LIKE ? ESCAPE '\\'").all(`%${literal}%`);
 }

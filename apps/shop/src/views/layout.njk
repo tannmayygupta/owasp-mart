@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ csrf }}">
   <title>{% block title %}{{ brand.name }}{% endblock %} · {{ brand.name }}</title>
   <style>{% include "partials/theme.css" %}</style>
 </head>
@@ -20,10 +21,13 @@
           {% if user.role == "customer" %}
             <a href="/orders"{% if path == '/orders' %} class="on"{% endif %}>Orders</a>
             <a href="/cart"{% if path == '/cart' %} class="on"{% endif %}>Cart</a>
+            <a href="/seller/register">Sell with us</a>
+            <a href="/wallet"{% if path == '/wallet' %} class="on"{% endif %}>Gift cards</a>
             <a href="/tickets"{% if path == '/tickets' %} class="on"{% endif %}>Support</a>
           {% endif %}
           {% if user.role == "seller_owner" or user.role == "seller_staff" %}
             <a href="/seller"{% if path == '/seller' %} class="on"{% endif %}>Seller</a>
+            <a href="/seller/orders"{% if path == '/seller/orders' %} class="on"{% endif %}>Orders</a>
           {% endif %}
           {% if user.role == "seller_owner" %}
             <a href="/seller/payouts"{% if path == '/seller/payouts' %} class="on"{% endif %}>Payouts</a>
@@ -32,9 +36,11 @@
             <a href="/staff/tickets"{% if path == '/staff/tickets' %} class="on"{% endif %}>Tickets</a>
             <a href="/staff/disputes"{% if path == '/staff/disputes' %} class="on"{% endif %}>Disputes</a>
             <a href="/staff/refunds"{% if path == '/staff/refunds' %} class="on"{% endif %}>Refunds</a>
+            <a href="/support/cases/notes"{% if path == '/support/cases/notes' %} class="on"{% endif %}>Case notes</a>
           {% endif %}
           {% if user.role == "finance" or user.role == "admin" %}
             <a href="/staff/payouts"{% if path == '/staff/payouts' %} class="on"{% endif %}>Payouts</a>
+            <a href="/finance/settings/settlement"{% if path == '/finance/settings/settlement' %} class="on"{% endif %}>Settlement</a>
           {% endif %}
           {% if user.role == "admin" %}
             <a href="/staff/users"{% if path == '/staff/users' %} class="on"{% endif %}>Users</a>
@@ -49,13 +55,14 @@
         {% if user.role != "customer" %}<span class="role">{{ user.role | replace("_", " ") }}</span>{% endif %}
         <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Log out ({{ user.email }})</button></form>
       </div>
-      {% else %}<a class="signin" href="/login">Log in</a>{% endif %}
+      {% else %}<a class="signin" href="/login">Log in</a> <a class="signin" href="/register">Sign up</a>{% endif %}
     </div>
   </header>
   <main>
     {% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}
     {% block body %}{% endblock %}
   </main>
-  <footer class="footer">© {{ brand.name }} · {{ brand.tagline }}</footer>
+  <footer class="footer">© {{ brand.name }} · {{ brand.tagline }} · <a href="/contact">Contact us</a> · <a href="/app">Mobile app</a></footer>
+  <script src="/assets/shop.js" defer></script>
 </body>
 </html>

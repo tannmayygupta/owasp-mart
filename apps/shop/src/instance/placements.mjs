@@ -74,6 +74,12 @@ export function plantDatabase(db, flags) {
     // a Northwind (store 2) order, numbered VM-100777, whose buyer note is the flag: the competitor order C01 reads across stores
     const o = db.prepare("INSERT INTO orders (customer_id, status, total_cents, order_no, buyer_note, ship_line1, ship_city, ship_country) VALUES (11,'paid',1499,'VM-100777',?, '9 Rival Rd','Teastown','Landia')").run(flags.C01);
     db.prepare("INSERT INTO order_items (order_id, product_id, store_id, unit_price_cents, qty, status, commission_cents) VALUES (?,3,2,1499,1,'paid',180)").run(Number(o.lastInsertRowid));
+    // the orders around it, so the numbers run in sequence as the hints say: four of the player's own store (Harbor, store 1) just before it, two more of the competitor after it (decoys with ordinary notes, never a secret)
+    const around = [['VM-100773', 1, 1, 'Please gift wrap.'], ['VM-100774', 1, 1, 'Leave with the neighbour.'], ['VM-100775', 1, 1, 'Is this dishwasher safe?'], ['VM-100776', 1, 1, null], ['VM-100778', 3, 2, 'Ring the bell twice.'], ['VM-100779', 3, 2, 'Loose leaf, not bags, please.']];
+    for (const [no, product, store, note] of around) {
+      const x = db.prepare("INSERT INTO orders (customer_id, status, total_cents, order_no, buyer_note, ship_line1, ship_city, ship_country) VALUES (11,'paid',1200,?,?,'4 Quay St','Portville','Landia')").run(no, note);
+      db.prepare("INSERT INTO order_items (order_id, product_id, store_id, unit_price_cents, qty, status, commission_cents) VALUES (?,?,?,1200,1,'paid',150)").run(Number(x.lastInsertRowid), product, store);
+    }
     done.push('C01');
   }
   if (flags.C02) {

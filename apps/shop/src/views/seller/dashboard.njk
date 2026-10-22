@@ -10,7 +10,7 @@
     <label>KYC details <textarea name="kyc_text" maxlength="2000">{{ store.kyc_text }}</textarea></label>
     <button>Save profile</button>
   </form>
-  <p><a href="/seller/staff">Manage staff</a> &middot; <a href="/seller/import">Bulk import preview</a></p>
+  <p><a href="/seller/staff">Manage staff</a> &middot; <a href="/seller/import">Bulk import preview</a> &middot; <a href="/seller/orders">Orders</a></p>
 </section>
 
 <section>
@@ -33,6 +33,13 @@
     <label>Stock <input name="stock" type="number" min="0" value="0" required></label>
     <button>Create draft</button>
   </form>
+
+  <h3>Import a product image from a URL</h3>
+  <div data-widget="import-image">
+    <form id="import-form" class="fields two"><input name="url" type="url" placeholder="https://supplier.example/photo.jpg" aria-label="Image URL" required><button>Import image</button></form>
+    <p id="import-msg" class="note" hidden role="status"></p>
+    <pre id="import-result" hidden></pre>
+  </div>
 </section>
 
 <section>
