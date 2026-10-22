@@ -48,7 +48,7 @@ function boot(routes) {
     calls.push(key);
     const hit = Object.entries(routes).find(([k]) => k === key || (k.endsWith('*') && key.startsWith(k.slice(0, -1))));
     if (!hit) return { ok: false, status: 404, json: async () => ({ code: 'ATT-NOT-FOUND' }) };
-    const body = typeof hit[1] === 'function' ? hit[1](opts) : hit[1];
+    const body = typeof hit[1] === 'function' ? await hit[1](opts) : hit[1]; // a route may answer late (a promise)
     if (body?.__error) return { ok: false, status: body.__error, json: async () => ({ code: body.code }) };
     return { ok: true, status: 200, json: async () => body };
   };
@@ -147,7 +147,7 @@ test('a correct flag shows the result, the points and the write-up, and offers t
   await app.load(); await settle();
   let input = app.mission().withClass('flag-input')[0];
   input.value = 'VM{wrong}'; await app.mission().button('Check flag').fire('click'); await settle();
-  assert.match(app.mission().textContent, /That is not the flag for this challenge\./);
+  assert.match(app.mission().textContent, /That is not the flag for C01\./);
   assert.equal(app.mission().withClass('flag-input').length, 1, 'a wrong flag keeps the learner on the challenge');
   input = app.mission().withClass('flag-input')[0];
   input.value = 'VM{right}'; await app.mission().button('Check flag').fire('click'); await settle();
@@ -336,4 +336,51 @@ test('the styles make clickable things look clickable and the locked ones look l
   assert.match(css, /button:disabled[^{]*\{\s*cursor:not-allowed/);
   assert.match(css, /\.dot\.locked/);
   assert.match(css, /#banner\.info/);
+});
+
+test('Start pressed while a read of the old run is still in flight still shows the new run (the request is not dropped)', async () => {
+  let started = false;
+  const FINISHED_ATTEMPT = { attempt_id: A, mode: 'learner', state: 'submitted' };
+  const NEW = 'a-NNNNNNNNNNNNNNNN';
+  const app = boot(ROUTES({
+    // the list of attempts answers late and, if asked before the start, with the old finished run only
+    'GET /api/v1/me/attempts': async () => { const before = !started; await new Promise((r) => setTimeout(r, 120)); return { items: before ? [FINISHED_ATTEMPT] : [{ attempt_id: NEW, mode: 'learner', state: 'running' }, FINISHED_ATTEMPT] }; },
+    [`GET /api/v1/attempts/${A}`]: { attempt_id: A, mode: 'learner', state: 'submitted', instance_id: null, deadline_at: null },
+    [`GET /api/v1/attempts/${A}/challenges`]: LIST([ITEM({ state: 'solved', solved: true })]),
+    [`GET /api/v1/attempts/${NEW}`]: { attempt_id: NEW, mode: 'learner', state: 'running', instance_id: 'i-BBBBBBBBBBBBBBBB', deadline_at: far(3600) },
+    [`GET /api/v1/attempts/${NEW}/challenges`]: LIST([ITEM()]),
+    [`GET /api/v1/attempts/${NEW}/score`]: { score: 0, per_challenge: [{ challenge_key: 'C01', points: 0 }] },
+    [`GET /api/v1/attempts/${NEW}/timeline?limit=50`]: { items: [] },
+    'POST /api/v1/instances': () => { started = true; return { attempt_id: NEW, instance_id: 'i-BBBBBBBBBBBBBBBB' }; },
+  }));
+  await app.load();
+  await new Promise((r) => setTimeout(r, 40)); // the first read is still in flight (it takes 120 ms)
+  // the page already offers a Start button (the first answer is still on its way); press it
+  await app.mission().button('Start my lab').fire('click');
+  await new Promise((r) => setTimeout(r, 600));
+  assert.match(app.mission().textContent, /Challenge 1 of 2|Begin challenge/, 'the new run is shown, not the finished one');
+  assert.doesNotMatch(app.mission().textContent, /This run is finished/);
+});
+
+test('a challenge that the lab credits by itself while it is on screen stays on screen as captured, so the flag just found is not pasted into the next challenge', async () => {
+  let captured = false;
+  const items = () => (captured
+    ? [ITEM({ state: 'solved', solved: true, best_milestone: 'M3', write_up: { vulnerable: 'No store check.', fix: 'Scope the lookup.' } }), ITEM({ challenge_key: 'C02', title: 'Cryptographic Failures', tier: 'Medium', state: 'ready', brief: 'Forge a code.' })]
+    : [ITEM({ state: 'active', expires_at: far(1100), seconds_left: 1100 })]);
+  const app = boot(ROUTES({
+    [`GET /api/v1/attempts/${A}/challenges`]: () => LIST(items(), captured ? 'C02' : 'C01'),
+    [`GET /api/v1/attempts/${A}/challenges/C01/hints`]: { items: [] },
+    [`POST /api/v1/attempts/${A}/flags`]: () => ({ result: 'incorrect' }),
+  }));
+  await app.load(); await settle();
+  assert.match(app.mission().textContent, /Broken Access Control/);
+  assert.equal(app.mission().withClass('flag-input').length, 1, 'C01 is active with its flag box');
+  captured = true; // the sidecar saw the flag in a response and the platform credited it; the page's next read (here caused by a paste) says so
+  app.mission().withClass('flag-input')[0].value = 'VM{NOT-THE-FLAG}';
+  await app.mission().button('Check flag').fire('click'); await settle();
+  assert.match(app.mission().textContent, /Flag captured/, 'the captured challenge stays on screen');
+  assert.match(app.mission().textContent, /do not have to paste it/);
+  assert.ok(app.mission().button('Next challenge'), 'and the way on is one button');
+  assert.match(app.byId.get('banner').textContent, /C01 captured: the lab saw the flag/);
+  assert.doesNotMatch(app.mission().textContent, /Cryptographic Failures/, 'the next challenge is not shown until the learner moves on');
 });
