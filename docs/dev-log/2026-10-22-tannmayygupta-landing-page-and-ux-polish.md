@@ -43,13 +43,11 @@ No ADR. Alternatives: moving the console to `/lab` and keeping a static landing 
 
 ## Tests
 Real results (2026-10-22, on the leader's PC):
-- 
-ode --test scripts/lab-console.test.mjs: 19 of 19 (13 before; 6 new: landing when signed out, role redirect, locked dot says why, picked challenge with the shop down, disabled-button reasons and the vanishing build message, pointer and locked styles).
-- pnpm test in pps/web: 36 of 36 (one new: where each kind of account lands after sign-in). pnpm run typecheck: exit 0.
-- Browser suite 	ests/web-e2e (Playwright with the installed Chrome, production build of the dashboards, real API app): first run 16 of 20; the 4 failures were axe colour-contrast on the success green (4.4 to 1 on its soft background, under 4.5 to 1 required), fixed by darkening --ok in both apps; second run of the whole suite 20 of 20. (Running the accessibility file alone fails two tests that need data from the earlier specs; that is how the suite is built, not a defect.)
+- `node --test scripts/lab-console.test.mjs`: 19 of 19 (13 before; 6 new: landing when signed out, role redirect, locked dot says why, picked challenge with the shop down, disabled-button reasons and the vanishing build message, pointer and locked styles).
+- `pnpm test` in `apps/web`: 36 of 36 (one new: where each kind of account lands after sign-in). `pnpm run typecheck`: exit 0.
+- Browser suite `tests/web-e2e` (Playwright with the installed Chrome, production build of the dashboards, real API app): first run 16 of 20; the 4 failures were axe colour-contrast on the success green (4.4 to 1 on its soft background, under 4.5 to 1 required), fixed by darkening `--ok` in both apps; second run of the whole suite 20 of 20. (Running the accessibility file alone fails two tests that need data from the earlier specs; that is how the suite is built, not a defect.)
 - Before my fix to the helper, the learner sign-up specs failed on the changed checkbox wording (see Problems).
-- 
-ode scripts/check-text-files.mjs: PASS.
+- `node scripts/check-text-files.mjs`: PASS.
 
 ## Evidence
 `landing-dark.png`, `landing-light.png`, `landing-narrow-dark.png` in `docs/assets/ux-landing-and-polish/` (the console served as static files; headless Chrome).
