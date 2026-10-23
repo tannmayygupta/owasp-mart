@@ -1,0 +1,6 @@
+{
+  "schema": "EscalatedDeletionDecisionRequest",
+  "body": {
+    "approve": true
+  }
+}
