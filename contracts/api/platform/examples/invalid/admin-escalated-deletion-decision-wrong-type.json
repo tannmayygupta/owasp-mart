@@ -1,7 +1,7 @@
 {
   "schema": "EscalatedDeletionDecisionRequest",
   "body": {
-    "approve": "yes"
+    "approve": []
   },
   "path": "/approve",
   "rule": "boolean only"
