@@ -10,7 +10,7 @@ Every version listed here must be an entry of the contract's own section in `con
 
 | Contract | Version | Owner | Folder |
 |---|---|---|---|
-| IF-1 | 1.9.0 | P | `contracts/api/platform/` |
+| IF-1 | 1.10.0 | P | `contracts/api/platform/` |
 | IF-3 | 1.0.0 | P | `contracts/domain-events/` |
 | IF-8 | 2.0.0 | P | `contracts/errors/` |
 | IF-2 | 2.3.0 | L | `contracts/api/lab/` |
@@ -33,7 +33,7 @@ After the tag, a pull request that changes the files of a contract needs: one ap
 
 Contract | Stream | Handle | Role | Version | Date | Status
 ---|---|---|---|---|---|---
-IF-1 | P | @akshaay29 | owner | 1.9.0 | 2026-10-21 | pending
+IF-1 | P | @tannmayygupta | owner | 1.10.0 | 2026-10-23 | approved
 IF-3 | P | @akshaay29 | owner | 1.0.0 | 2026-10-20 | approved
 IF-8 | P | @tannmayygupta | owner | 2.0.0 | 2026-10-21 | approved
 IF-2 | L | @tannmayygupta | owner | 2.3.0 | 2026-10-21 | approved

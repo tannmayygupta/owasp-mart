@@ -924,6 +924,51 @@ class DeletionDecisionRequest(BaseModel):
     decision: Decision3
 
 
+class EscalatedDeletion(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(pattern='^d-[A-Z2-7]{16}$')]
+    org_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        ),
+    ]
+    attempt_id: AttemptId
+    requested_at: Timestamp
+    decide_by: Timestamp | None
+    escalated_at: Timestamp | None
+
+
+class EscalatedDeletionList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: Annotated[list[EscalatedDeletion], Field(max_length=100)]
+
+
+class EscalatedDeletionDecisionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    approve: bool
+
+
+class Status3(Enum):
+    approved = 'approved'
+    declined = 'declined'
+
+
+class EscalatedDeletionDecisionResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: Annotated[str, Field(pattern='^d-[A-Z2-7]{16}$')]
+    status: Status3
+    execute_after: Timestamp | None
+
+
 class DeletedRecord(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -1008,7 +1053,7 @@ class Cohort(BaseModel):
     items: Annotated[list[CohortRow], Field(max_length=5000)]
 
 
-class Status3(Enum):
+class Status4(Enum):
     pending = 'pending'
     active = 'active'
     rejected = 'rejected'
@@ -1038,7 +1083,7 @@ class AdminCompany(BaseModel):
         ),
     ]
     name: Annotated[str, Field(max_length=120)]
-    status: Status3
+    status: Status4
     owner_name: Annotated[str, Field(max_length=60)]
     owner_email_domain: Annotated[str, Field(max_length=253)]
     created_at: Timestamp
@@ -1128,7 +1173,7 @@ class InviteCapRequest(BaseModel):
     invite_cap: InviteCap | None
 
 
-class Status4(Enum):
+class Status5(Enum):
     active = 'active'
     disabled = 'disabled'
 
@@ -1146,7 +1191,7 @@ class AdminUser(BaseModel):
     display_name: Annotated[str, Field(max_length=60)]
     email: Annotated[str, Field(max_length=254)]
     account_type: AccountType
-    status: Status4
+    status: Status5
     roles: list[Role2]
     email_verified: bool
     created_at: Timestamp
@@ -2052,7 +2097,7 @@ class Type(Enum):
     similarity = 'similarity'
 
 
-class Status5(Enum):
+class Status6(Enum):
     open = 'open'
     accepted = 'accepted'
     rejected = 'rejected'
@@ -2070,7 +2115,7 @@ class IntegrityFlag(BaseModel):
     type: Type
     challenge_key: ChallengeKey | None
     explanation: Annotated[str, Field(max_length=500, min_length=1)]
-    status: Status5
+    status: Status6
     held: Annotated[
         bool,
         Field(

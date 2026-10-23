@@ -4684,6 +4684,152 @@
         "x-fragment": "platform"
       }
     },
+    "/api/v1/admin/deletion-requests/escalated": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "listEscalatedDeletions",
+        "summary": "Candidate deletion requests the company never decided",
+        "description": "The candidate deletion requests still `pending` whose company missed `deletion_decide_days` and never decided (A-19, FR-PRV-09), oldest escalation first: which company\nand attempt, not the person's account or the attempt's content. The read is audited.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The escalated requests.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalatedDeletionList"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "request_id": "d-AAAAAAAAAAAAAAAA",
+                          "org_id": "6f1c8f0e-0a5e-4a1c-9d5a-3f2d6a8b9c01",
+                          "attempt_id": "a-AAAAAAAAAAAAAAAA",
+                          "requested_at": "2026-10-01T09:00:00Z",
+                          "decide_by": "2026-10-15T09:00:00Z",
+                          "escalated_at": "2026-10-15T09:00:01Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
+    "/api/v1/admin/deletion-requests/{request_id}/decision": {
+      "parameters": [
+        {
+          "name": "request_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^d-[A-Z2-7]{16}$"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "decideEscalatedDeletion",
+        "summary": "Decide an escalated deletion request on the silent company's behalf",
+        "description": "An admin approves or declines a candidate's deletion request the company missed its deadline on (A-19, FR-PRV-09): `approve` starts the same 7-day undo hold the\ncompany's own approval would have started, `decline` ends it now. Audited as `deletion.admin_decided`, distinct from the company's own decision. A request that was\nnever escalated is 404 REQ-ROUTE-UNKNOWN (the same answer as an unknown request); one already decided, cancelled or carried out is 409 ATT-INVALID-STATE.\nOnly an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.\n",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalatedDeletionDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request after the decision.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalatedDeletionDecisionResult"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "request_id": "d-AAAAAAAAAAAAAAAA",
+                      "status": "approved",
+                      "execute_after": "2026-10-30T09:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/CsrfFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/AdminNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/AdminConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMedia"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "x-fragment": "platform"
+      }
+    },
     "/api/v1/admin/settings": {
       "get": {
         "tags": [
@@ -8792,6 +8938,113 @@
             "enum": [
               "approve",
               "decline"
+            ]
+          }
+        }
+      },
+      "EscalatedDeletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request_id",
+          "org_id",
+          "attempt_id",
+          "requested_at",
+          "decide_by",
+          "escalated_at"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "pattern": "^d-[A-Z2-7]{16}$"
+          },
+          "org_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "attempt_id": {
+            "$ref": "#/components/schemas/AttemptId"
+          },
+          "requested_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "decide_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "escalated_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "EscalatedDeletionList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/EscalatedDeletion"
+            }
+          }
+        }
+      },
+      "EscalatedDeletionDecisionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "approve"
+        ],
+        "properties": {
+          "approve": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EscalatedDeletionDecisionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request_id",
+          "status",
+          "execute_after"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "pattern": "^d-[A-Z2-7]{16}$"
+          },
+          "status": {
+            "enum": [
+              "approved",
+              "declined"
+            ]
+          },
+          "execute_after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         }
