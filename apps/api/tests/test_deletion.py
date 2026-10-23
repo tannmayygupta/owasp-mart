@@ -11,7 +11,7 @@ import vulnmart.accounts.models  # noqa: F401
 import vulnmart.assessments.models  # noqa: F401
 import vulnmart.lab.models  # noqa: F401
 from test_assessments import ANA, active_company, assessments, basic  # noqa: F401
-from test_companies import T0, audit, clock, companies, ended, entries, sessions  # noqa: F401
+from test_companies import ADMIN_SCOPE, T0, audit, clock, companies, ended, entries, org_row, sessions, signup, user_id, verify  # noqa: F401
 from test_retention_candidates import Eraser, SCOPE
 from vulnmart.accounts.models import User, UserRole
 from vulnmart.assessments.models import Invite
@@ -98,6 +98,19 @@ class Rig:
 @pytest.fixture
 def rig(sessions, companies, assessments, audit, clock):
     return Rig(sessions, companies, assessments, audit, clock)
+
+
+def second_company(companies, sessions, *, email="other-owner@beta.example", company="Beta"):
+    """A second approved company, for a test that needs two: `active_company`'s own fixed admin account already exists by the time this runs, so this skips
+    `add_admin` instead of inserting it again."""
+    signup(companies, email=email, company=company, name="Beta Owner")
+    verify(sessions, email)
+    uid = user_id(sessions, email)
+    org_id = str(org_row(sessions, email).id)
+    companies.approve(ADMIN_SCOPE, org_id)
+    t = companies.terms_for(uid)
+    companies.accept_terms(uid, t.version, t.sha256)
+    return Scope(user_id=uid, org_id=org_id, roles=frozenset({Role.RECRUITER, Role.ORG_OWNER}))
 
 
 # ---- a learner ---------------------------------------------------------------------------------------------------------------------------------
@@ -286,6 +299,82 @@ def test_a_company_that_does_not_decide_in_fourteen_days_is_reported_to_the_admi
     [(action, actor, subject, details)] = entries(audit, "deletion.escalated")
     assert details == {"org": rig.org, "request": request.request_id} and subject is None
     assert rig.row(request.request_id).status == "pending"  # escalation is a report, not a decision
+
+
+def test_an_admin_sees_an_escalated_request_and_decides_it_on_the_silent_companys_behalf(rig):
+    attempt, invite = rig.candidate_attempt()
+    request = rig.service.request_candidate(CAND, attempt)
+    assert rig.service.escalated() == []  # not escalated yet, not an admin's to decide
+    rig.run(14)
+    [row] = rig.service.escalated()
+    assert (row.request_id, row.org_id, row.attempt_id) == (request.request_id, rig.org, attempt)
+    decided = rig.service.decide_escalated(request.request_id, approve=True, actor_id="u-ADMINACCOUNT2222")
+    assert decided.status == "approved" and decided.execute_after == T0 + 7 * DAY  # the usual 7-day hold starts from the decision, not from the escalation
+    assert rig.service.escalated() == []  # decided, so no longer waiting on an admin
+    assert rig.run(20).startswith("0 learner requests done (0 kept the account for assessment data), 1 candidate requests done")
+    assert rig.eraser.calls == [attempt] and invite not in rig.invites()
+
+
+def test_a_request_that_was_never_escalated_is_not_the_admins_to_decide(rig):
+    attempt, _ = rig.candidate_attempt()
+    request = rig.service.request_candidate(CAND, attempt)
+    with pytest.raises(DeletionNotFound):
+        rig.service.decide_escalated(request.request_id, approve=True, actor_id="u-ADMINACCOUNT2222")
+    with pytest.raises(DeletionNotFound):
+        rig.service.decide_escalated("d-NOSUCHREQUEST2222", approve=True, actor_id="u-ADMINACCOUNT2222")
+    assert rig.row(request.request_id).status == "pending"
+
+
+def test_an_escalated_request_the_company_already_decided_is_not_decided_twice(rig):
+    attempt, _ = rig.candidate_attempt()
+    request = rig.service.request_candidate(CAND, attempt)
+    rig.run(14)
+    rig.service.decide(rig.org, request.request_id, approve=False, actor_id=rig.owner.user_id)  # the company still can, even after the admins were told
+    with pytest.raises(DeletionState):
+        rig.service.decide_escalated(request.request_id, approve=True, actor_id="u-ADMINACCOUNT2222")
+    assert rig.service.escalated() == []  # declined, not open any more: nothing left for an admin here
+
+
+def test_an_admin_can_decline_an_escalated_request_too_and_it_deletes_nothing(rig):
+    attempt, invite = rig.candidate_attempt()
+    request = rig.service.request_candidate(CAND, attempt)
+    rig.run(14)
+    declined = rig.service.decide_escalated(request.request_id, approve=False, actor_id="u-ADMINACCOUNT2222")
+    assert declined.status == "declined" and declined.execute_after is None
+    rig.run(60)
+    assert rig.eraser.calls == [] and invite in rig.invites()
+
+
+def test_escalated_requests_are_listed_oldest_first_across_every_company(rig, companies, sessions):
+    owner2 = second_company(companies, sessions)
+    rig2_attempt_template = rig.assessments.create_template(owner2, basic(title="T2"))
+    invite2 = rig.assessments.create_invite(owner2, rig2_attempt_template.template_id, "c-other@example.org")
+    rig.assessments.advance(owner2.org_id, invite2.invite_id, "opened")
+    other_attempt = rig.assessments.bind_candidate(owner2.org_id, invite2.invite_id, OTHER).attempt_id
+    rig.assessments.advance(owner2.org_id, invite2.invite_id, "consented")
+    rig.assessments.advance(owner2.org_id, invite2.invite_id, "started")
+    with rig.sessions.begin() as s:
+        s.add(Attempt(id=other_attempt, user_id=OTHER, template_id=invite2.template_id, org_id=owner2.org_id, state="submitted", version=0,
+                      record={"submitted_at": rig.clock.now.isoformat()}))
+    first_attempt, _ = rig.candidate_attempt()
+    first = rig.service.request_candidate(CAND, first_attempt)
+    rig.clock.advance(days=2)
+    second = rig.service.request_candidate(OTHER, other_attempt)
+    # two separate job passes, so the two requests get different escalated_at instants and the order is not left to an arbitrary id tiebreak
+    rig.service.run(T0 + timedelta(days=15))  # past the first's 14-day deadline only
+    rig.service.run(T0 + timedelta(days=17))  # now past the second's too (decide_by = T0 + 2 + 14 days)
+    assert [r.request_id for r in rig.service.escalated()] == [first.request_id, second.request_id]
+
+
+def test_the_admins_decision_is_audited_as_the_admins_not_the_company(rig, audit):
+    attempt, _ = rig.candidate_attempt()
+    request = rig.service.request_candidate(CAND, attempt)
+    rig.run(14)
+    rig.service.decide_escalated(request.request_id, approve=True, actor_id="u-ADMINACCOUNT2222")
+    [(action, actor, subject, details)] = entries(audit, "deletion.admin_decided")
+    assert (action, actor, subject) == ("deletion.admin_decided", "u-ADMINACCOUNT2222", None)
+    assert details == {"org": rig.org, "request": request.request_id, "approved": True}
+    assert entries(audit, "deletion.approved") == []  # this was the admin's decision, not the company's
 
 
 def test_the_company_can_delete_a_candidate_at_any_time_and_that_settles_an_open_request(rig):

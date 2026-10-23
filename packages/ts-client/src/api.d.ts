@@ -1301,6 +1301,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/deletion-requests/escalated": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Candidate deletion requests the company never decided
+         * @description The candidate deletion requests still `pending` whose company missed `deletion_decide_days` and never decided (A-19, FR-PRV-09), oldest escalation first: which company
+         *     and attempt, not the person's account or the attempt's content. The read is audited.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        get: operations["listEscalatedDeletions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/deletion-requests/{request_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide an escalated deletion request on the silent company's behalf
+         * @description An admin approves or declines a candidate's deletion request the company missed its deadline on (A-19, FR-PRV-09): `approve` starts the same 7-day undo hold the
+         *     company's own approval would have started, `decline` ends it now. Audited as `deletion.admin_decided`, distinct from the company's own decision. A request that was
+         *     never escalated is 404 REQ-ROUTE-UNKNOWN (the same answer as an unknown request); one already decided, cancelled or carried out is 409 ATT-INVALID-STATE.
+         *     Only an admin whose session has proved a second factor reaches this route; anyone else gets 404 REQ-ROUTE-UNKNOWN, the answer of a route that does not exist.
+         */
+        post: operations["decideEscalatedDeletion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/settings": {
         parameters: {
             query?: never;
@@ -2617,6 +2664,26 @@ export interface components {
         DeletionDecisionRequest: {
             /** @enum {unknown} */
             decision: "approve" | "decline";
+        };
+        EscalatedDeletion: {
+            request_id: string;
+            org_id: string;
+            attempt_id: components["schemas"]["AttemptId"];
+            requested_at: components["schemas"]["Timestamp"];
+            decide_by: components["schemas"]["Timestamp"] | null;
+            escalated_at: components["schemas"]["Timestamp"] | null;
+        };
+        EscalatedDeletionList: {
+            items: components["schemas"]["EscalatedDeletion"][];
+        };
+        EscalatedDeletionDecisionRequest: {
+            approve: boolean;
+        };
+        EscalatedDeletionDecisionResult: {
+            request_id: string;
+            /** @enum {unknown} */
+            status: "approved" | "declined";
+            execute_after: components["schemas"]["Timestamp"] | null;
         };
         DeletedRecord: {
             attempt_id: components["schemas"]["AttemptId"];
@@ -5478,6 +5545,68 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["CsrfFailed"];
             404: components["responses"]["AdminNotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listEscalatedDeletions: {
+        parameters: {
+            query?: {
+                /** @description Most entries in the answer. Default 50, maximum 100; a larger value is 422 REQ-VALIDATION with field /limit. When more exist, has_more is true. */
+                limit?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The escalated requests. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalatedDeletionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["AdminNotFound"];
+            422: components["responses"]["Invalid"];
+        };
+    };
+    decideEscalatedDeletion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalatedDeletionDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description The request after the decision. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalatedDeletionDecisionResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["CsrfFailed"];
+            404: components["responses"]["AdminNotFound"];
+            409: components["responses"]["AdminConflict"];
+            413: components["responses"]["TooLarge"];
+            415: components["responses"]["UnsupportedMedia"];
+            422: components["responses"]["Invalid"];
             429: components["responses"]["RateLimited"];
         };
     };

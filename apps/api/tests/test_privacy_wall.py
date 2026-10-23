@@ -76,6 +76,9 @@ CLASSES: dict[str, tuple[str, str]] = {
     **{op: ("admin", W + "test_admin_routes_answer_everyone_else_like_unknown_routes") for op in (
         "listPendingCompanies", "listOpenAttempts", "decideCompany", "listUsers", "actOnUser", "forceStopInstance", "listSettings", "updateSetting", "resetSetting", "listQuotas",
         "setQuota", "removeQuota", "getCapacity", "listJobs")},
+    # A-19: an admin decides a candidate deletion request the company never answered
+    **{op: ("admin", "test_admin_api.py::test_a_learner_and_an_admin_without_a_second_factor_get_the_answer_of_a_route_that_is_not_there") for op in (
+        "listEscalatedDeletions", "decideEscalatedDeletion")},
     # work package B: the company side of deletion requests, colleagues, the cohort view, the admin company routes and the change of address
     **{op: ("company", "test_wp_b_routes.py::test_another_company_cannot_use_my_deletion_requests_members_or_cohort") for op in (
         "listCompanyDeletionRequests", "decideDeletionRequest", "deleteCandidateRecord", "getCohort", "listCompanyMembers", "removeCompanyMember")},

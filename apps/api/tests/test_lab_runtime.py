@@ -14,6 +14,7 @@ from vulnmart.ingest.verify import sign_body
 from vulnmart.lab.runtime import LabRuntime, RuntimeFacts, build_lab_runtime, new_instance_id
 from vulnmart.ports.errors import AttemptGone, AttemptStateInvalid
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
+from vulnmart.ports.fakes import FakeSettingsPort
 from vulnmart.ports.instance_host import Access, InstanceState
 
 T0 = datetime(2026, 10, 17, 10, 0, 0, tzinfo=UTC)
@@ -462,6 +463,46 @@ def test_the_instance_limits_are_an_hour_idle_and_four_hours_for_a_learner_and_c
     lim = rt._limits_for(rec)
     assert lim.idle_minutes == 120 and lim.max_minutes == max(240, rec.rules.time_limit_minutes + 30)
     assert rt._limits_for(rt.engine.get(learner.attempt_id)) == rt._limits
+
+
+def test_the_admins_instance_idle_and_max_minutes_settings_are_read_for_every_new_instance_not_fixed_at_60_and_240():
+    """Wiring audit A-10 (2026-10-21): `instance_idle_minutes` and `instance_max_minutes` were stored, shown and changeable in the admin area but read by no code;
+    every instance got the hard-coded 60/240 regardless. With a settings store given, a learner's limits come from the CURRENT setting, read fresh each time (so a
+    change the admin makes takes effect for the next lab without a restart), and a candidate's limits still widen on top of it exactly as before."""
+    settings = FakeSettingsPort()
+    rt, _, _ = make_runtime()
+    rt._settings = settings
+    learner = rt.start_attempt("u-1")
+    lim = rt._limits_for(rt.engine.get(learner.attempt_id))
+    assert (lim.idle_minutes, lim.max_minutes) == (30, 240), "the settings table's own defaults (not the runtime's fixed 60/240)"
+
+    settings.set("instance_idle_minutes", 10)
+    settings.set("instance_max_minutes", 90)
+    lim2 = rt._limits_for(rt.engine.get(learner.attempt_id))
+    assert (lim2.idle_minutes, lim2.max_minutes) == (10, 90), "an admin change applies to the next instance with no restart"
+
+    candidate = rt.start_attempt("u-2", org_id="o-1")
+    rec = rt.engine.get(candidate.attempt_id)
+    lim3 = rt._limits_for(rec)
+    assert lim3.idle_minutes == max(10, 120)  # the candidate floor (120) still wins over a lower admin idle setting
+    assert lim3.max_minutes == max(90, rec.rules.time_limit_minutes + 30)  # and the template's own time limit still wins over a lower admin max setting
+
+
+def test_the_admins_flag_submit_per_minute_setting_is_what_a_learners_run_gets_not_the_fixed_default_of_ten():
+    """Wiring audit A-10: `flag_submit_per_minute` was stored, shown and changeable in the admin area but read by no code; every learner's `Rules` used the
+    dataclass's own hard-coded default of 10 regardless. A candidate's limit is unaffected (it is the recruiter's own template setting, a different, company-level
+    choice `_flags_per_minute` reads from `rec.rules` directly)."""
+    clock, host = FakeClock(T0), FakeInstanceHost()
+    settings = FakeSettingsPort()
+    rt = build_lab_runtime({}, host=host, clock=clock)
+    rt._settings = settings
+    learner = rt.start_attempt("u-1")
+    assert rt.engine.get(learner.attempt_id).rules.flag_submissions_per_minute == 10  # the setting's own default, read, not assumed
+
+    settings.set("flag_submit_per_minute", 3)
+    other = rt.start_attempt("u-2")
+    assert rt.engine.get(other.attempt_id).rules.flag_submissions_per_minute == 3
+    assert rt.engine.get(learner.attempt_id).rules.flag_submissions_per_minute == 10, "already-started attempts keep the limit they started with"
 
 
 def test_erase_is_safe_to_repeat_as_the_deletion_workflow_and_the_retention_job_both_call_it():

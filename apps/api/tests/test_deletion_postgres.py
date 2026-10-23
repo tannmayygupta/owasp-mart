@@ -155,6 +155,32 @@ def test_a_candidates_request_is_carried_out_through_row_level_security(owner, a
     assert scalar(owner, "SELECT status FROM deletion_requests") == "done"
 
 
+def test_an_admin_escalates_and_decides_a_silent_companys_request_as_the_application_role(owner, app_engine, sessions, companies, assessments):
+    """A-19, FR-PRV-09: the admin's `escalated`/`decide_escalated` read and update `deletion_requests` across every company (no `org_id` of their own to scope by), through the
+    same application-role column grants as the company's own `decide` (migration 0015 has no per-row security on this table, only the column grants checked above)."""
+    ana = company(companies, owner)
+    template = assessments.create_template(ana, BASIC)
+    invite = assessments.create_invite(ana, template.template_id, "taker2@example.org")
+    assessments.advance(ana.org_id, invite.invite_id, "opened")
+    attempt = assessments.bind_candidate(ana.org_id, invite.invite_id, CAND).attempt_id
+    assessments.advance(ana.org_id, invite.invite_id, "consented")
+    assessments.advance(ana.org_id, invite.invite_id, "started")
+    with owner.begin() as c:
+        c.execute(text("INSERT INTO attempts (id, user_id, template_id, org_id, state, version, record) VALUES (:a, :u, :t, :o, 'submitted', 0, "
+                       "jsonb_build_object('submitted_at', now()::text))"), {"a": attempt, "u": CAND, "t": template.template_id, "o": ana.org_id})
+    clock = Clock(NOW)
+    service = DeletionService(sessions, assessments, SqlAttemptRecords(sessions), FakeSettingsPort(), FakeAuditPort(), SubjectService(sessions), [].append, now=clock)
+    request = service.request_candidate(CAND, attempt)
+    clock.now = NOW + timedelta(days=14)
+    service.run(clock.now)
+    [row] = service.escalated()
+    assert (row.request_id, row.org_id, row.attempt_id) == (request.request_id, ana.org_id, attempt)
+    decided = service.decide_escalated(request.request_id, approve=True, actor_id="u-ADMINACCOUNT2222")
+    assert decided.status == "approved" and decided.execute_after == clock.now + timedelta(days=7)
+    assert scalar(owner, "SELECT status FROM deletion_requests WHERE id = :i", i=request.request_id) == "approved"
+    assert service.escalated() == []
+
+
 def test_a_learners_request_deletes_the_account_with_its_sessions_and_roles_and_the_pseudonym(owner, app_engine, sessions):
     with owner.begin() as c:
         c.execute(text("INSERT INTO users (id, account_type, email, email_ci, password_hash, display_name, status, email_verified_at, last_login_at) VALUES "

@@ -77,10 +77,11 @@ def web(sessions, clock):
     roles = RoleService(sessions, audit)
     stopped = []
     app.state.companies_stub = Companies()
+    app.state.deletion_stub = DeletionService(sessions, None, SqlAttemptRecords(sessions), settings, audit, SubjectService(sessions), lambda a: None, now=clock)
     app.state.admin_ops = AdminOps(
         sessions=sessions, roles=roles, companies=app.state.companies_stub, status=AccountStatusService(sessions, roles, audit),
         accounts=AccountService(sessions, settings, public_origin=ORIGIN, now=clock), settings=settings, quotas=DbQuotaPort(sessions, settings), audit=audit,
-        records=SqlAttemptRecords(sessions), deletion=DeletionService(sessions, None, SqlAttemptRecords(sessions), settings, audit, SubjectService(sessions), lambda a: None, now=clock),
+        records=SqlAttemptRecords(sessions), deletion=app.state.deletion_stub,
         end_sessions=lambda uid: None, stopper=lambda attempt_id: stopped.append(attempt_id) or "inst-1",
         host_status=lambda: SimpleNamespace(capacity_memory_mb=4096, used_memory_mb=1024, instances=2, health=SimpleNamespace(value="ok")),
         instance_states=lambda: {"i1": "ready"},
@@ -114,6 +115,8 @@ CALLS = [
     ("DELETE", "/api/v1/admin/quotas?scope=global", None),
     ("GET", "/api/v1/admin/capacity", None),
     ("GET", "/api/v1/admin/jobs", None),
+    ("GET", "/api/v1/admin/deletion-requests/escalated", None),
+    ("POST", "/api/v1/admin/deletion-requests/d-AAAAAAAAAAAAAAAA/decision", {"approve": True}),
 ]
 
 
@@ -167,6 +170,34 @@ def test_a_decision_body_that_does_not_fit_is_422(web, sessions, body):
     r = web.post(f"/api/v1/admin/companies/{ORG}/decision", json=body, headers=csrf)
     assert r.status_code == 422 and r.json()["code"] == "REQ-VALIDATION"
     assert web.app.state.companies_stub.decided == []
+
+
+def test_escalated_deletions_are_listed_and_decided_over_http(web, sessions):
+    csrf = sign_in_admin(web, sessions)
+    attempt_id = "a-ESCALATEDHTTP222"
+    with sessions.begin() as s:
+        s.add(Attempt(id=attempt_id, user_id=OTHER_ID, template_id="t-x", org_id=ORG, state="submitted", version=0, record={"submitted_at": T0.isoformat()}))
+    view = web.app.state.deletion_stub.request_candidate(OTHER_ID, attempt_id)
+    web.app.state.deletion_stub.run(T0 + timedelta(days=14))
+    listed = web.get("/api/v1/admin/deletion-requests/escalated")
+    assert listed.status_code == 200 and listed.headers["cache-control"] == "private, no-store"
+    assert listed.json() == {"items": [{"request_id": view.request_id, "org_id": ORG, "attempt_id": attempt_id, "requested_at": timestamp(T0),
+                                        "decide_by": timestamp(T0 + timedelta(days=14)), "escalated_at": timestamp(T0 + timedelta(days=14))}]}
+    decided = web.post(f"/api/v1/admin/deletion-requests/{view.request_id}/decision", json={"approve": True}, headers=csrf)
+    assert decided.status_code == 200
+    assert decided.json() == {"request_id": view.request_id, "status": "approved", "execute_after": timestamp(T0 + timedelta(days=7))}
+    assert web.get("/api/v1/admin/deletion-requests/escalated").json() == {"items": []}
+    again = web.post(f"/api/v1/admin/deletion-requests/{view.request_id}/decision", json={"approve": True}, headers=csrf)
+    assert (again.status_code, again.json()["code"]) == (409, "ATT-INVALID-STATE")
+    unknown = web.post("/api/v1/admin/deletion-requests/d-AAAAAAAAAAAAAAAA/decision", json={"approve": True}, headers=csrf)
+    assert (unknown.status_code, unknown.json()["code"]) == (404, "REQ-ROUTE-UNKNOWN")
+
+
+@pytest.mark.parametrize("body", [{}, {"approve": "yes"}, {"approve": True, "extra": 1}])
+def test_an_escalated_decision_body_that_does_not_fit_is_422(web, sessions, body):
+    csrf = sign_in_admin(web, sessions)
+    r = web.post("/api/v1/admin/deletion-requests/d-AAAAAAAAAAAAAAAA/decision", json=body, headers=csrf)
+    assert r.status_code == 422 and r.json()["code"] == "REQ-VALIDATION"
 
 
 def test_users_are_listed_and_searched_without_a_password_hash(web, sessions):

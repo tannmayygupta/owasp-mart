@@ -19,6 +19,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.orm import sessionmaker
 from vulnmart_attempts import AttemptRecord, AttemptState, Conflict, FakeClock, Rules
 from vulnmart_attempts.review import ReviewFinal
 
@@ -28,7 +29,7 @@ from vulnmart.ingest.bots import BotVisit
 from vulnmart.ingest.store import PutResult
 from vulnmart.ingest.stores import InstanceInfo
 from vulnmart.ingest.verify import sign_body
-from vulnmart.kernel.settings import sqlalchemy_url
+from vulnmart.kernel.settings import DbSettingsPort, sqlalchemy_url
 from vulnmart.lab import pg
 from vulnmart.lab.runtime import LabRuntime
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
@@ -173,6 +174,24 @@ def test_hints_integrity_and_flag_log_are_once_per_key_and_hold_no_flag(engine):
     assert set(cols) == {"id", "attempt_id", "challenge_key", "result", "at"}, "no column could hold a pasted value"
 
 
+def test_incorrect_total_counts_every_incorrect_paste_ever_for_that_pair_ignoring_the_window_and_other_keys(engine):
+    """FR-ACH-01 AC2's hard cap (30 per challenge per assessment, never reset) reads this: unlike incorrect_since, it takes no
+    time bound, so a submission from long ago still counts, and a different challenge or attempt never does."""
+    log = pg.PgFlagSubmissionLog(engine)
+    rec = pg.PgAttemptStore(engine).add(new_record(user="u-cap"))
+    other = pg.PgAttemptStore(engine).add(new_record(user="u-cap-2"))
+    assert log.incorrect_total(rec.id, "C02") == 0
+    log.record(rec.id, "C02", "incorrect", T0)
+    log.record(rec.id, "C02", "incorrect", T0 - timedelta(days=10))  # long before any 10-minute window: still counted
+    log.record(rec.id, "C02", "correct", T0)  # a right paste is not an incorrect one
+    log.record(rec.id, "C02", "rate_limited", T0)  # a refusal is not a paste either
+    log.record(rec.id, "C03", "incorrect", T0)  # a different challenge of the same attempt
+    log.record(other.id, "C02", "incorrect", T0)  # the same challenge of a different attempt
+    assert log.incorrect_total(rec.id, "C02") == 2
+    assert log.incorrect_total(rec.id, "C03") == 1
+    assert log.incorrect_total(other.id, "C02") == 1
+
+
 def test_events_are_stored_once_a_replay_with_another_body_is_a_mismatch_and_the_engine_sees_each_once(engine):
     store, log = pg.PgEventStore(engine), pg.PgEventLog(engine)
     iid = f"i-{uuid.uuid4().hex[:12]}"
@@ -257,6 +276,22 @@ class DenyC03:
 
 def make_runtime(engine, clock, host, keys) -> LabRuntime:
     return LabRuntime(host=host, clock=clock, keys=keys, gate=DenyC03(), stores=pg.build_pg_stores(engine))
+
+
+def test_the_admin_settings_table_of_the_same_database_sets_the_live_instance_limits(engine, keystore_engine):
+    """The exact wiring `build_lab_runtime` does for the deployed mode (a sessionmaker over the lab's own Postgres engine, wrapped as DbSettingsPort), proven
+    against a real database: the `settings` table starts at its coded defaults, and an admin's override is read for the next instance with no restart."""
+    clock, host = FakeClock(T0), FakeInstanceHost()
+    settings = DbSettingsPort(sessionmaker(bind=engine))
+    rt = LabRuntime(host=host, clock=clock, keys=make_keys(keystore_engine), stores=pg.build_pg_stores(engine), settings=settings)
+    learner = rt.start_attempt("u-settings-1")
+    before = rt._limits_for(rt.engine.get(learner.attempt_id))
+    assert (before.idle_minutes, before.max_minutes) == (30, 240)  # the settings table's own defaults, not the runtime's fixed 60/240
+
+    settings.set("instance_idle_minutes", 12, updated_by="u-admin")
+    other = rt.start_attempt("u-settings-2")
+    after = rt._limits_for(rt.engine.get(other.attempt_id))
+    assert after.idle_minutes == 12 and after.max_minutes == 240
 
 
 def signed(rt, ev, key=None):

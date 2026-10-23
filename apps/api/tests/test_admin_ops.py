@@ -251,6 +251,63 @@ def test_a_recruiter_account_is_marked_deleted_and_its_sessions_end(rig):
     assert rig.ops.users(ADMIN_SCOPE, query="acme.example") == []
 
 
+# ---- escalated deletion requests (A-19, FR-PRV-09) ------------------------------------------------------------------------------------------
+
+ESC_ORG = "00000000-0000-0000-0000-00000000005c"
+ESC_ATTEMPT = "a-ESCALATEDONE2222"
+
+
+def escalated_request(rig, *, uid=CAND, org=ESC_ORG, attempt_id=ESC_ATTEMPT):
+    """A candidate's over attempt with an open, already-escalated deletion request: past `deletion_decide_days` (14) with no company decision, exactly what A-19 is for."""
+    with rig.sessions.begin() as s:
+        s.add(Attempt(id=attempt_id, user_id=uid, template_id="t-" + attempt_id, org_id=org, state="submitted", version=0, record={"submitted_at": T0.isoformat()}))
+    view = rig.deletion.request_candidate(uid, attempt_id)
+    rig.deletion.run(T0 + timedelta(days=14))
+    return view.request_id
+
+
+def test_an_admin_lists_and_decides_an_escalated_request_the_company_never_answered(rig):
+    rig.user(CAND, roles=("learner", "candidate"))
+    request_id = escalated_request(rig)
+    [row] = rig.ops.escalated_deletions(ADMIN_SCOPE)
+    assert (row.request_id, row.org_id, row.attempt_id) == (request_id, ESC_ORG, ESC_ATTEMPT)
+    [(action, actor, subject, details)] = rig.actions("admin.escalated_deletions_read")
+    assert (action, subject, details) == ("admin.escalated_deletions_read", None, {"count": 1})
+    decided = rig.ops.decide_escalated_deletion(ADMIN_SCOPE, request_id, approve=True)
+    assert decided.status == "approved" and decided.execute_after is not None
+    assert rig.ops.escalated_deletions(ADMIN_SCOPE) == []
+    [(_, admin_actor, _, decided_details)] = rig.actions("deletion.admin_decided")
+    assert admin_actor == ADMIN and decided_details == {"org": ESC_ORG, "request": request_id, "approved": True}
+
+
+def test_a_request_not_yet_escalated_is_not_the_admins_to_decide(rig):
+    rig.user(CAND, roles=("learner", "candidate"))
+    with rig.sessions.begin() as s:
+        s.add(Attempt(id=ESC_ATTEMPT, user_id=CAND, template_id="t-x", org_id=ESC_ORG, state="submitted", version=0, record={"submitted_at": T0.isoformat()}))
+    view = rig.deletion.request_candidate(CAND, ESC_ATTEMPT)
+    assert rig.ops.escalated_deletions(ADMIN_SCOPE) == []
+    with pytest.raises(NotFound):
+        rig.ops.decide_escalated_deletion(ADMIN_SCOPE, view.request_id, approve=True)
+
+
+def test_an_already_decided_escalated_request_is_not_decided_twice_by_an_admin(rig):
+    rig.user(CAND, roles=("learner", "candidate"))
+    request_id = escalated_request(rig)
+    rig.ops.decide_escalated_deletion(ADMIN_SCOPE, request_id, approve=False)
+    with pytest.raises(NotAllowed):
+        rig.ops.decide_escalated_deletion(ADMIN_SCOPE, request_id, approve=True)
+
+
+@pytest.mark.parametrize("scope", [RECRUITER_SCOPE, LEARNER_SCOPE, Scope(user_id="u-NOSUCHADMIN22222", roles=frozenset({Role.ADMIN}))])
+def test_escalated_deletions_are_only_an_admins_to_see_or_decide(rig, scope):
+    rig.user(CAND, roles=("learner", "candidate"))
+    request_id = escalated_request(rig)
+    with pytest.raises(NotAnAdmin):
+        rig.ops.escalated_deletions(scope)
+    with pytest.raises(NotAnAdmin):
+        rig.ops.decide_escalated_deletion(scope, request_id, approve=True)
+
+
 # ---- force-stop -------------------------------------------------------------------------------------------------------------------------------
 
 def test_force_stop_destroys_the_instance_audits_it_and_mails_the_owner(rig, sessions):
