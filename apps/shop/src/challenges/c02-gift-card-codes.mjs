@@ -22,6 +22,14 @@ import { isVulnerable } from './mode.mjs';
 
 const PREFIX = 'VM-';
 const WELLFORMED = /^VM-[0-9a-f]{12}$/;
+// A code is 12 hex characters after "VM-"; the case of neither carries any meaning (it is a fingerprint, not a password), but a
+// bug report showed a correctly forged code being refused with "no such gift card" because an MD5 tool had printed it in upper
+// case. Accept any case the player typed or pasted, and settle on the one canonical (lower-case) form before anything else runs.
+function normalize(raw) {
+  const s = String(raw ?? '').trim();
+  const m = /^vm-([0-9a-f]{12,})$/i.exec(s);
+  return m ? PREFIX + m[1].toLowerCase() : s;
+}
 // A keyed hash secret for stored codes (fixed build). Per-instance in real runs;
 // a fixed dev default keeps tests deterministic. Never the challenge flag.
 const CODE_HMAC_KEY = process.env.VM_GIFTCARD_HMAC_KEY || 'dev-giftcard-key';
@@ -66,7 +74,7 @@ export function buyCard(db, user, { amount_cents = 2000 } = {}, { challenges = {
 
 // Redeem a code. The branch that matters is how a card is found from the code.
 export function redeem(db, user, rawCode, { challenges = {}, emit = () => {} } = {}) {
-  const code = String(rawCode ?? '').trim();
+  const code = normalize(rawCode);
   const wellformed = WELLFORMED.test(code);
   // The event of IF-4 (data_shop_giftcard_attempt, no other member): result is malformed, unknown_wellformed or redeemed; card_class says whose card was redeemed.
   const attempt = (result, cardClass = 'none') => emit('shop.giftcard_attempt', { user_id: String(user?.id ?? 'unknown'), result, card_class: cardClass });

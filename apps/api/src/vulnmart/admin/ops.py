@@ -7,6 +7,8 @@ never a reason's text, never an address, never anything a candidate wrote. An ad
 reads an attempt's answers, write-ups or evidence (FR-ADM-08; the break-glass step is story P-31).
 
 - **Queue:** `queue` lists the companies waiting; `decide_company` approves, rejects (with a reason), suspends or reinstates through `CompanyService`, which audits and mails the outcome.
+- **Escalated deletions (A-19, FR-PRV-09):** `escalated_deletions` lists the candidate deletion requests whose company missed `deletion_decide_days` and never decided;
+  `decide_escalated_deletion` lets the admin approve or decline one on the silent company's behalf, the same outcome the company's own decision would have had.
 - **Users:** `users` searches accounts; `act_on_user` locks (the account is disabled and its sessions end), unlocks, sends a password-reset link to the account's own address (the admin
   never sees or sets a password) or deletes. A participant's account is deleted through the deletion service (practice attempts erased, account and pseudonym gone; one that holds assessment
   data is locked instead, as in ADR 0054); a recruiter's account is marked deleted and its sessions end; an admin account is never changed through here.
@@ -42,7 +44,7 @@ from vulnmart.orgs.service import CompanyRow, CompanyService, PendingCompany
 from vulnmart.ports.audit import AuditPort
 from vulnmart.ports.scope import Scope
 from vulnmart.ports.settings import SETTINGS, SettingsPort
-from vulnmart.privacy.deletion import DeletionService
+from vulnmart.privacy.deletion import CompanyRequest, DeletionNotFound, DeletionService, DeletionState, EscalatedDeletion
 from vulnmart.privacy.retention.records import SqlAttemptRecords
 
 logger = logging.getLogger("vulnmart.admin")
@@ -75,6 +77,7 @@ RANGES: dict[str, tuple[int, int]] = {
     "instance_assessment_reserve": (0, MAX_QUOTA),
     "invite_cap_per_company_per_day": (0, 100_000),
     "evidence_max_bytes": (256, 1_048_576),
+    "flag_submit_per_minute": (1, 60),  # the same range Rules.flag_submissions_per_minute enforces (packages/py-attempts/rules.py); a wider value here would crash the next learner's attempt start instead of being refused here
 }
 GENERIC_RANGE = (0, 1_000_000)
 
@@ -224,6 +227,31 @@ class AdminOps:
         if not rows:
             raise NotFound
         return rows[0]
+
+    # ---- escalated deletion requests (A-19, FR-PRV-09) ----
+
+    def escalated_deletions(self, actor: Scope, limit: int = 100) -> list[EscalatedDeletion]:
+        """The candidate deletion requests whose company missed `deletion_decide_days` and never decided (FR-PRV-09). Ids, the company and the attempt only, not the
+        attempt's content; the read is audited (FR-DSH-05)."""
+        admin_id = self._admin(actor)
+        if self._deletion is None:
+            raise NoStopper("this process cannot read deletion requests")
+        rows = self._deletion.escalated(limit)
+        self._audit.append(actor=admin_id, action="admin.escalated_deletions_read", subject=None, details={"count": len(rows)})
+        return rows
+
+    def decide_escalated_deletion(self, actor: Scope, request_id: str, *, approve: bool) -> CompanyRequest:
+        """Decide an escalated request on the silent company's behalf (approve starts the candidate's 7-day undo hold same as the company deciding would; decline ends it
+        now). Raises NotFound (no such request, or it was never escalated), NotAllowed (already decided, cancelled or done)."""
+        admin_id = self._admin(actor)
+        if self._deletion is None:
+            raise NoStopper("this process cannot decide deletion requests")
+        try:
+            return self._deletion.decide_escalated(request_id, approve=approve, actor_id=admin_id)
+        except DeletionNotFound:
+            raise NotFound from None
+        except DeletionState:
+            raise NotAllowed from None
 
     # ---- users (FR-ADM-02) ----
 

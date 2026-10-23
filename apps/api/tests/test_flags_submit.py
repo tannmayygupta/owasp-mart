@@ -7,7 +7,7 @@ from datetime import timedelta
 import pytest
 from ingest_support import A, B, KEYS, T0, World, digest
 
-from vulnmart.flags.submit import FlagSubmissionResult, FlagSubmitService
+from vulnmart.flags.submit import CAP_RETRY_AFTER_S, MAX_INCORRECT_PER_ASSESSMENT, FlagSubmissionResult, FlagSubmitService
 from vulnmart.ports.attempts import AttemptState
 from vulnmart.ports.errors import AttemptNotFound, AttemptStateInvalid, ChallengeNotFound, FlagRateLimited, InstanceMissing
 from vulnmart.ports.lab_fakes import FakeAttemptPort
@@ -116,6 +116,30 @@ def test_five_wrong_then_a_correct_one_inside_the_limit_is_still_possible_before
     for i in range(4):
         e.paste("C08", f"nope-{i}")
     assert e.paste("C08", KEYS.flag(A, "C08", 1)).result == "correct"
+
+
+def test_thirty_wrong_pastes_over_the_whole_assessment_hard_cap_even_well_outside_any_ten_minute_window():
+    """FR-ACH-01 AC2: unlike the 5-per-10-minutes lock (which the window spacing below deliberately never triggers), this
+    cap never resets within the assessment: the 31st wrong paste for this challenge is refused however long ago the first
+    29 were, and so is a later CORRECT one; a different challenge of the same attempt is unaffected."""
+    e = Env()
+    assert MAX_INCORRECT_PER_ASSESSMENT == 30
+    t = 0
+    for batch in range(6):  # 6 x 5 = 30, each batch more than the 600 s window after the one before, so the window never locks it
+        for i in range(5):
+            e.now = T0 + timedelta(seconds=t)
+            assert e.paste("C02", f"nope-{batch}-{i}").result == "incorrect"
+            t += 1
+        t += 700
+    e.now = T0 + timedelta(seconds=t + 100000)  # long past every window; the cap does not care
+    with pytest.raises(FlagRateLimited) as ei:
+        e.paste("C02", KEYS.flag(A, "C02", 1))  # even the right value is refused once the cap is hit
+    assert ei.value.retry_after == CAP_RETRY_AFTER_S
+    assert e.w.best("C02") == "none"
+    assert e.w.submissions.rows[-1] == ("a-1", "C02", "rate_limited")
+    # a different challenge of the same attempt, and the same challenge of a different attempt, are not capped
+    assert e.paste("C03", KEYS.flag(A, "C03", 1)).result == "correct"
+    assert e.paste("C02", KEYS.flag(B, "C02", 1), attempt="a-2").result == "correct"
 
 
 def test_the_attempt_must_be_running():

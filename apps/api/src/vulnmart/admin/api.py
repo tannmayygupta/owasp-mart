@@ -37,6 +37,7 @@ ORG_ID = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA
 USER_ID = r"^u-[A-Z2-7]{16}$"
 ATTEMPT_ID = r"^a-[A-Z2-7]{16}$"
 SETTING_NAME = r"^[a-z][a-z0-9_]{0,63}$"
+DELETION_REQUEST_ID = r"^d-[A-Z2-7]{16}$"
 
 
 class CompanyDecisionBody(Strict):
@@ -46,6 +47,10 @@ class CompanyDecisionBody(Strict):
 
 class InviteCapBody(Strict):
     invite_cap: int | None = Field(ge=0, le=100_000)  # null: back to the global setting
+
+
+class EscalatedDecisionBody(Strict):
+    approve: bool
 
 
 class UserActionBody(Strict):
@@ -134,6 +139,24 @@ async def set_company_invite_cap(request: Request, org_id: Annotated[str, Path(p
     body = await read_json(request, InviteCapBody)
     row = await run(ops_of(request).set_company_invite_cap, auth.session.scope, org_id.lower(), body.invite_cap)
     return JSONResponse(company_body(row), headers=NO_STORE)
+
+
+# ---- escalated deletion requests (A-19, FR-PRV-09) ----
+
+@router.get("/api/v1/admin/deletion-requests/escalated", operation_id="listEscalatedDeletions")
+async def list_escalated_deletions(request: Request, auth: Authenticated = Depends(admin_read), limit: Annotated[int, Query(ge=1, le=100)] = 50) -> JSONResponse:
+    rows = await run(ops_of(request).escalated_deletions, auth.session.scope, limit)
+    return JSONResponse({"items": [{"request_id": r.request_id, "org_id": r.org_id, "attempt_id": r.attempt_id, "requested_at": timestamp(r.requested_at),
+                                    "decide_by": None if r.decide_by is None else timestamp(r.decide_by),
+                                    "escalated_at": None if r.escalated_at is None else timestamp(r.escalated_at)} for r in rows]}, headers=NO_STORE)
+
+
+@router.post("/api/v1/admin/deletion-requests/{request_id}/decision", operation_id="decideEscalatedDeletion")
+async def decide_escalated_deletion(request: Request, request_id: Annotated[str, Path(pattern=DELETION_REQUEST_ID)], auth: Authenticated = Depends(admin_write)) -> JSONResponse:
+    body = await read_json(request, EscalatedDecisionBody)
+    row = await run(ops_of(request).decide_escalated_deletion, auth.session.scope, request_id, approve=body.approve)
+    return JSONResponse({"request_id": row.request_id, "status": row.status,
+                         "execute_after": None if row.execute_after is None else timestamp(row.execute_after)}, headers=NO_STORE)
 
 
 # ---- users ----

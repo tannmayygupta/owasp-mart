@@ -50,6 +50,7 @@ from vulnmart.ports.engine_cohort import EngineCohortPort
 from vulnmart.ports.engine_reports import EngineReportPort
 from vulnmart.ports.errors import AttemptStateInvalid, ChallengeNotFound, InstanceNoCapacity, InstanceNotReady, InstanceQuotaReached
 from vulnmart.ports.quota import QuotaPort
+from vulnmart.ports.settings import SettingsPort
 from vulnmart.ports.fake_instance_host import FakeInstanceHost
 from vulnmart.ports.fakes import FakeKeyPort
 from vulnmart.ports.http_instance_host import HttpInstanceHost
@@ -122,9 +123,12 @@ class LabRuntime:
                  hostname_suffix: str = "instances.example.invalid", ready_timeout_s: float = READY_TIMEOUT_S,
                  ready_poll_s: float = READY_POLL_S, sleep: Callable[[float], None] = time.sleep, gate: ActivityGate | None = None,
                  limits: Limits = DEFAULT_TEMPLATE_LIMITS, stores: LabStores | None = None, catalog: Catalog | None = None,
-                 sequenced: bool = False, quota: QuotaPort | None = None) -> None:
+                 sequenced: bool = False, quota: QuotaPort | None = None, settings: SettingsPort | None = None) -> None:
         # quota: the admin's per-user, per-company and platform limits (wiring audit F-08); None (unit tests, the laptop demo) means no limit but the orchestrator's own.
         self.quota = quota
+        # settings: the admin's instance_idle_minutes and instance_max_minutes (story P-28; found read nowhere by the 2026-10-21 scenario-matrix audit, A-10). None
+        # (unit tests, the laptop demo) keeps `limits` exactly as given, so nothing here changes when no settings store exists.
+        self._settings = settings
         # sequenced: a learner's run goes one challenge at a time with a countdown each (the deployed mode, `VULNMART_LAB_SEQUENCE=1`);
         # off for the plain runtime of the older tests and demos, where every challenge is open at once.
         self.sequenced = sequenced
@@ -578,13 +582,18 @@ class LabRuntime:
             return rec, instance_id, 1, template
 
     def _rules_for(self, org_id: str | None) -> Rules | None:
-        """A sequenced learner run lasts as long as all its challenge times plus a margin (Easy 20, Medium 40, Hard 60 minutes each); everything else uses the defaults."""
+        """A sequenced learner run lasts as long as all its challenge times plus a margin (Easy 20, Medium 40, Hard 60 minutes each); everything else uses the defaults.
+        `flag_submissions_per_minute` is the admin's `flag_submit_per_minute` setting when one is given (wiring audit A-10: the `Rules` dataclass default of 10 was used
+        for every learner regardless of what the admin set); a candidate keeps the recruiter's own per-template choice (`_flags_per_minute` reads `rec.rules` there), which is
+        a company setting, not this platform-wide one."""
         if org_id is not None:
             return None
+        per_minute = int(self._settings.get("flag_submit_per_minute")) if self._settings is not None else None
+        extra = {} if per_minute is None else {"flag_submissions_per_minute": per_minute}
         # practice has no reviewer, so a capture the activity does not explain is only flagged, never held: nobody could release it (wiring audit section 4)
         if self.sequenced:
-            return Rules(time_limit_minutes=self.sequence.run_limit_minutes(), activity_check_mode="flag")
-        return Rules(activity_check_mode="flag")
+            return Rules(time_limit_minutes=self.sequence.run_limit_minutes(), activity_check_mode="flag", **extra)
+        return Rules(activity_check_mode="flag", **extra)
 
     def _retire(self, finished: Any) -> None:
         """Destroy what a finished learner run still holds (an instance frozen for its 15 minutes). Best effort: the reconciler of the orchestrator cleans up."""
@@ -596,15 +605,24 @@ class LabRuntime:
         except Exception:
             log.exception("retiring the instance of the finished run %s failed; the orchestrator's timers remain", finished.id)
 
+    def _base_limits(self) -> Limits:
+        """`self._limits` with the admin's current `instance_idle_minutes` and `instance_max_minutes` substituted in, when a settings store was given; otherwise
+        `self._limits` unchanged (unit tests and the laptop demo keep their own fixed numbers)."""
+        if self._settings is None:
+            return self._limits
+        return replace(self._limits, idle_minutes=int(self._settings.get("instance_idle_minutes")), max_minutes=int(self._settings.get("instance_max_minutes")))
+
     def _limits_for(self, rec: Any) -> Limits:
         """The limits of the instance of this attempt: the learner default (longer when the run is sequenced: it must outlive its challenge times), or for a candidate
-        attempt a longer idle limit and a total limit that covers the template's time limit."""
+        attempt a longer idle limit and a total limit that covers the template's time limit. The learner/candidate base is the admin's current setting (`_base_limits`),
+        read fresh for each instance so a change in the admin area takes effect for the next lab without a restart."""
+        base = self._base_limits()
         if not getattr(rec, "org_id", None):
             if self.sequenced:
-                return replace(self._limits, max_minutes=max(self._limits.max_minutes, min(1440, int(rec.rules.time_limit_minutes) + CANDIDATE_MARGIN_MINUTES)))
-            return self._limits
-        total = max(self._limits.max_minutes, int(rec.rules.time_limit_minutes) + CANDIDATE_MARGIN_MINUTES)
-        return replace(self._limits, idle_minutes=max(self._limits.idle_minutes, CANDIDATE_IDLE_MINUTES), max_minutes=min(total, 1440))
+                return replace(base, max_minutes=max(base.max_minutes, min(1440, int(rec.rules.time_limit_minutes) + CANDIDATE_MARGIN_MINUTES)))
+            return base
+        total = max(base.max_minutes, int(rec.rules.time_limit_minutes) + CANDIDATE_MARGIN_MINUTES)
+        return replace(base, idle_minutes=max(base.idle_minutes, CANDIDATE_IDLE_MINUTES), max_minutes=min(total, 1440))
 
     def _finish(self, rec: Any, instance_id: str, epoch: int, template: str) -> StartedAttempt:
         """The slow half, outside the lock (it waits for the orchestrator): ready, access open, directory, epoch, clock."""
@@ -959,18 +977,24 @@ def build_lab_runtime(environ: Mapping[str, str] | None = None, *, host: Instanc
     platform's key service (`DbKeyPort` over `vm_keystore`, story P-17: the KEK, the three masters and `VULNMART_KEYSTORE_DSN` come from the same
     settings as the rest of the API, read from the process environment); without it the state is in memory (tests and the laptop demo)."""
     env = os.environ if environ is None else environ
-    stores, keys = None, None
+    stores, keys, settings_port = None, None, None
     if env.get("VULNMART_LAB_STORE") == "postgres":
+        from sqlalchemy.orm import sessionmaker
+
         from vulnmart.kernel.db import make_engine
         from vulnmart.kernel.services import key_port_from
-        from vulnmart.kernel.settings import Settings
+        from vulnmart.kernel.settings import DbSettingsPort, Settings
         from vulnmart.lab.pg import build_pg_stores
 
         dsn = env.get("VULNMART_POSTGRES_DSN")
         if not dsn or not env.get("VULNMART_KEYSTORE_DSN"):
             raise ValueError("VULNMART_LAB_STORE=postgres needs VULNMART_POSTGRES_DSN and VULNMART_KEYSTORE_DSN (the key service of story P-17)")
-        stores = build_pg_stores(make_engine(dsn, pool_size=10, max_overflow=10))
+        engine = make_engine(dsn, pool_size=10, max_overflow=10)
+        stores = build_pg_stores(engine)
         keys = key_port_from(Settings())
+        # The `settings` table (instance_idle_minutes, instance_max_minutes) lives in the same database as the lab's own tables (wiring audit A-10:
+        # these were stored and shown in the admin area but read by no code; the orchestrator used a fixed 60/240 regardless of them).
+        settings_port = DbSettingsPort(sessionmaker(bind=engine))
     extra: dict[str, Any] = {}
     if env.get("VULNMART_LABS_ZONE"):
         extra["hostname_suffix"] = env["VULNMART_LABS_ZONE"]
@@ -980,5 +1004,5 @@ def build_lab_runtime(environ: Mapping[str, str] | None = None, *, host: Instanc
         extra["ready_timeout_s"] = float(env["VULNMART_LAB_READY_TIMEOUT_S"])
     extra["sequenced"] = env.get("VULNMART_LAB_SEQUENCE") == "1"  # one challenge at a time with a countdown each (the deployed learner mode)
     return LabRuntime(host=host or _host_from_environ(env), clock=clock, gate=gate, stores=stores, keys=keys,
-                      catalog=load_catalog(default_catalog_dir(env)), **extra)
+                      catalog=load_catalog(default_catalog_dir(env)), settings=settings_port, **extra)
 

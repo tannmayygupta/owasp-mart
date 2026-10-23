@@ -368,6 +368,13 @@ class PgFlagSubmissionLog(_Base):
                 m.FlagSubmission.attempt_id == attempt_id, m.FlagSubmission.challenge_key == challenge_key,
                 m.FlagSubmission.result == "incorrect", m.FlagSubmission.at > since).order_by(m.FlagSubmission.at)).scalars())
 
+    def incorrect_total(self, attempt_id: str, challenge_key: str) -> int:
+        """Every incorrect paste ever recorded for this challenge in this attempt (FR-ACH-01 AC2's hard cap: it never resets)."""
+        with self._engine.connect() as c:
+            return c.execute(select(func.count()).select_from(m.FlagSubmission).where(
+                m.FlagSubmission.attempt_id == attempt_id, m.FlagSubmission.challenge_key == challenge_key,
+                m.FlagSubmission.result == "incorrect")).scalar_one()
+
     def record(self, attempt_id: str, challenge_key: str, result: str, at: datetime) -> None:
         with self._engine.begin() as c:
             c.execute(m.FlagSubmission.__table__.insert().values(attempt_id=attempt_id, challenge_key=challenge_key, result=result, at=at))

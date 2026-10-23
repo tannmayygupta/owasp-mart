@@ -164,7 +164,7 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 | A-16 | Break-glass: reason 20-500 chars, 15 min, other admins and company owner mailed, another admin reviews | IMPL+WIRED (matrix: VERIFIED) | breakglass.py:1-10, 35 |
 | A-17 | Admin tries to read candidate answers without break-glass or a learner's practice | IMPL+WIRED (404) (matrix: VERIFIED) | api.py:200-205 |
 | A-18 | Incident notification to affected users | PARTIAL: operator CLI only (D-95) (matrix: PARTIAL) | admin/incident.py |
-| A-19 | Escalated candidate deletion request (company silent 14 days) | PARTIAL: only an audit entry, no admin action (matrix: PARTIAL) | deletion.py:243-251 |
+| A-19 | Escalated candidate deletion request (company silent 14 days) | DONE 2026-10-23: `DeletionService.escalated`/`decide_escalated`, `AdminOps.escalated_deletions`/`decide_escalated_deletion`, routes `GET/POST /api/v1/admin/deletion-requests/...` (matrix: DONE) | deletion.py (escalated, decide_escalated), admin/ops.py, admin/api.py |
 | A-20 | Failed mail retry visible | PARTIAL: counts only (matrix: PARTIAL) | ops.py:367 |
 | A-21 | Backup, restore, key shredding | PARTIAL: runbook and manual scripts, no schedule or off-host copy (audit 2026-10-18) (matrix: EXTERNAL) | docs/runbooks/backup-restore.md |
 | A-22 | Revoke candidate role or lock cheating learner | PARTIAL: lock only (matrix: PARTIAL) | roles.py:81 |
@@ -209,7 +209,7 @@ Read-only audit of `origin/main` plus PR #75. Method: read CLAUDE.md, initial.md
 5. **C-16** Hints for candidates can never be enabled.
 6. **A-09 / A-10 / X-11 / L-22** Quotas and instance settings unenforced; no capacity reservation for assessments; platform cap unenforced.
 7. **R-24** Recruiter cannot cancel an attempt (FR-SES-07).
-8. **R-28 / C-25 / A-19** Company side of deletion requests has no route; GDPR-style erasure by request stalls on the company, escalation only audits.
+8. **R-28 / C-25** Company side of deletion requests has no route; GDPR-style erasure by request stalls on the company. (A-19, the admin's side of a silent company, is fixed 2026-10-23: see that row.)
 9. **R-05 / R-06** Colleagues can sign up but never be approved; recruiters limited to the owner alone.
 10. **L-08** Next.js learner dashboard cannot run the sequenced deployed lab.
 11. **L-15** Retrying a failed challenge needs a full walk from C01.

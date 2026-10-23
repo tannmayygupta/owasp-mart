@@ -5,6 +5,11 @@
 `incorrect`; each counts toward 5 incorrect pastes per challenge in 10 minutes, and the next call raises `FlagRateLimited`
 (the API answers 429 with Retry-After), even for the right value. The pasted text is checked by recomputing and is never
 stored, logged, echoed or put into an error; only `(attempt, challenge, result)` goes to the log.
+
+FR-ACH-01's second AC, the hard cap: 30 wrong pastes for one challenge over the whole assessment, not just the 10-minute
+window (the window resets after its lock; the cap never does). It raises the same `FlagRateLimited` (same IF-8 code, so no
+contract change), with a long `retry_after` standing for "not in this assessment", because the shared error shape has no
+separate "permanent" field; a distinct code is a reasonable follow-up if the wording needs to differ for the learner.
 """
 from __future__ import annotations
 
@@ -27,6 +32,8 @@ from vulnmart.ports.reports import CHALLENGE_KEYS, Milestone
 MAX_INCORRECT = 5
 WINDOW_S = 600
 MAX_TEXT = 512
+MAX_INCORRECT_PER_ASSESSMENT = 30  # FR-ACH-01 AC2: a hard cap, never reset within the assessment
+CAP_RETRY_AFTER_S = 24 * 3600  # "not again in this assessment"; the attempt itself ends well before this elapses
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +56,7 @@ class FlagSubmitService:
         self.max_incorrect, self.window_s = max_incorrect, window_s
         self._lock = threading.Lock()
         self._misses: dict[tuple[str, str], deque[datetime]] = defaultdict(deque)  # in memory; the real store is Akshay's
+        self._lifetime_misses: dict[tuple[str, str], int] = defaultdict(int)  # fallback only, when the log has no incorrect_total
 
     def _retry_after(self, key: tuple[str, str], now: datetime) -> int | None:
         """Seconds to wait when the limit is reached, else None. The misses come from the stored submission log when it can say
@@ -65,6 +73,13 @@ class FlagSubmitService:
         if len(times) < self.max_incorrect:
             return None
         return math.ceil((times[0] + timedelta(seconds=self.window_s) - now).total_seconds())
+
+    def _cap_reached(self, key: tuple[str, str]) -> bool:
+        """FR-ACH-01 AC2: 30 wrong pastes for this challenge over the whole assessment. Read from the durable log when it can
+        count the whole history (so a restart does not reset it); otherwise an in-memory count that only grows."""
+        counted = getattr(self.log, "incorrect_total", None)
+        total = counted(key[0], key[1]) if counted is not None else self._lifetime_misses[key]
+        return total >= MAX_INCORRECT_PER_ASSESSMENT
 
     def submit_flag(self, attempt_id: str, challenge_key: str, text: str) -> FlagSubmissionResult:
         """Raises AttemptNotFound, AttemptGone, AttemptStateInvalid (not running), ChallengeNotFound, InstanceMissing,
@@ -83,6 +98,9 @@ class FlagSubmitService:
         if repeat is not None:
             return FlagSubmissionResult("correct", repeat)  # IF-2: before the rate limit, records nothing new
         with self._lock:
+            if self._cap_reached(key):
+                self.log.record(attempt_id, challenge_key, "rate_limited", now)
+                raise FlagRateLimited("too many incorrect submissions for this challenge in this assessment", retry_after=CAP_RETRY_AFTER_S)
             wait = self._pasted_too_fast(attempt_id, now)
             if wait is None:
                 wait = self._retry_after(key, now)
@@ -92,6 +110,8 @@ class FlagSubmitService:
             correct, credit = self._check(info, challenge_key, text, now)
             if not correct:
                 self._misses[key].append(now)
+                if getattr(self.log, "incorrect_total", None) is None:
+                    self._lifetime_misses[key] += 1
             self.log.record(attempt_id, challenge_key, "correct" if correct else "incorrect", now)
         return FlagSubmissionResult("correct" if correct else "incorrect", credit)
 

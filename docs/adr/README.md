@@ -80,4 +80,6 @@
 | 0095 | [A sole maintainer passes the contract approvals rule](0095-sole-maintainer-passes-the-contract-approvals-rule.md) | Accepted (the leader instructed it on 2026-10-21; Claude approved under D-104) |
 | 0096 | [Extra time for a running candidate attempt, and an open-attempts list for the admin](0096-extra-time-for-a-running-candidate-attempt.md) | Accepted (the leader instructed the refresh on 2026-10-21) |
 
+| 0097 | [Reading dead admin settings, the FR-ACH-01 hard cap, and an admin route for a silently escalated deletion request](0097-settings-wiring-hard-cap-and-admin-escalated-deletion.md) | Accepted (Claude, under D-104, 2026-10-23) |
+
 New record: copy `0000-template.md` to `NNNN-<title>.md` and add a row here.

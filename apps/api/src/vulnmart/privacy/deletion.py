@@ -8,6 +8,9 @@
   company is asked to decide within `deletion_decide_days` (14) and the admins are told when it does not (`deletion.escalated`; the numbers are placeholders from the requirements).
   An approved request waits the same 7 days (undo by the candidate), then the job deletes the record the way the retention job does: the lab erases the attempt, the consent
   records are scheduled to go 12 months later (OI-37), the invite and the person's view history for that company go.
+- **An admin** sees the requests that got that far and the company still never decided (`escalated`), and decides on the silent company's behalf (`decide_escalated`, A-19): the
+  same two outcomes as the company's own `decide`, audited as the admin's action (`deletion.admin_decided`), matched by the request id alone so it works whichever company it
+  is. A request that was never escalated, or was already decided, cancelled or carried out, is refused the same way `decide` refuses one the company already settled.
 - **The company** can delete a candidate's record at any time (`company_delete`): no request, no wait.
 
 Authorisation is the caller's (the routes know the session; the company side has no routes yet, story 5.3): every method that takes a person's id acts only on that person's
@@ -88,6 +91,19 @@ class CompanyRequest:
     decide_by: datetime | None
     execute_after: datetime | None
     escalated: bool = False  # the company did not decide in time and the admins were told (FR-PRV-09)
+
+
+@dataclass(frozen=True, slots=True)
+class EscalatedDeletion:
+    """What an admin sees of a candidate's request the company stayed silent on past `deletion_decide_days` (A-19, FR-PRV-09): which company and attempt, not the person's
+    account or the attempt's content."""
+
+    request_id: str
+    org_id: str
+    attempt_id: str
+    requested_at: datetime
+    decide_by: datetime | None
+    escalated_at: datetime | None
 
 
 def new_request_id() -> str:
@@ -211,6 +227,39 @@ class DeletionService:
                 raise DeletionState
             out = CompanyRequest(row.id, row.attempt_id or "", row.status, _aware(row.requested_at), _aware(row.decide_by), _aware(row.execute_after), row.escalated_at is not None)
         self._audit.append(actor=actor_id, action="deletion.approved" if approve else "deletion.declined", subject=None, details={"org": org_id, "request": request_id})
+        if self._mail is not None and out.attempt_id:
+            self._mail.deletion_decided(out.attempt_id, approve=approve, deletion_on=out.execute_after.date().isoformat() if out.execute_after else None)
+        return out
+
+    # ---- the admin's side (A-19: the company stayed silent past the deadline) ----
+
+    def escalated(self, limit: int = 100) -> list[EscalatedDeletion]:
+        """The candidate requests still `pending` whose company missed `deletion_decide_days` (FR-PRV-09): across every company, since nobody else will ever decide them
+        otherwise. Oldest escalation first, so the longest-waiting candidate is seen first."""
+        with self._sessions() as session:
+            rows = session.scalars(select(DeletionRequest).where(DeletionRequest.kind == "candidate", DeletionRequest.status == "pending",
+                                                                  DeletionRequest.escalated_at.is_not(None)).order_by(DeletionRequest.escalated_at, DeletionRequest.id).limit(limit)).all()
+            return [EscalatedDeletion(r.id, r.org_id or "", r.attempt_id or "", _aware(r.requested_at), _aware(r.decide_by), _aware(r.escalated_at)) for r in rows]
+
+    def decide_escalated(self, request_id: str, *, approve: bool, actor_id: str) -> CompanyRequest:
+        """An admin decides an escalated request on the silent company's behalf (A-19, FR-PRV-09): same outcome as the company's own `decide` (approved starts the same
+        7-day hold, declined ends it), but matched by request id alone, not by org, and only once the request is actually escalated. Raises DeletionNotFound (no such
+        request, or it was never escalated), DeletionState (already decided, cancelled or done)."""
+        now = self._now()
+        hold = timedelta(days=int(self._settings.get("consent_withdraw_undo_days")))
+        values = {"status": "approved", "decided_at": now, "execute_after": now + hold} if approve else {"status": "declined", "decided_at": now, "finished_at": now}
+        with self._sessions.begin() as session:
+            moved = session.execute(update(DeletionRequest).where(DeletionRequest.id == request_id, DeletionRequest.kind == "candidate",
+                                                                  DeletionRequest.escalated_at.is_not(None), DeletionRequest.status == "pending").values(**values)).rowcount
+            row = session.get(DeletionRequest, request_id)
+            if row is None or row.kind != "candidate" or row.escalated_at is None:
+                raise DeletionNotFound
+            if not moved:
+                raise DeletionState
+            org_id = row.org_id
+            out = CompanyRequest(row.id, row.attempt_id or "", row.status, _aware(row.requested_at), _aware(row.decide_by), _aware(row.execute_after), True)
+        self._audit.append(actor=actor_id, action="deletion.admin_decided", subject=None,
+                           details={"org": org_id, "request": request_id, "approved": approve})
         if self._mail is not None and out.attempt_id:
             self._mail.deletion_decided(out.attempt_id, approve=approve, deletion_on=out.execute_after.date().isoformat() if out.execute_after else None)
         return out
